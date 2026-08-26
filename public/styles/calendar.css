@@ -1849,3 +1849,20 @@
     justify-content: center;
   }
 }
+
+
+.cal-toolbar__schedule-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-warning);
+  font-size: var(--text-sm);
+}
+
+
+.allday-holiday .schedule-entry__start {
+  flex: 0 0 auto;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  opacity: .82;
+}

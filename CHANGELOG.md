@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Schedule adds opt-in rotating shift patterns and read-only calendar overlays** (#786). Households can define reusable shift types, assign them to cycle days, and replace individual dates with a different shift or an explicit free day. Schedules are computed when read rather than copied into calendar events, so changing a pattern does not leave stale appointments behind. Every household member can read the overlay; members can change only their own schedule and administrators can help any member.
+
 ## [2.46.0] - 2026-08-26
 
 ### Added

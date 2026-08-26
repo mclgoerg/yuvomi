@@ -70,6 +70,7 @@ const APP_SHELL = [
   '/styles/shopping.css',
   '/styles/meals.css',
   '/styles/calendar.css',
+  '/styles/schedule.css',
   '/styles/markdown-toolbar.css',
   '/styles/notes.css',
   '/styles/contacts.css',

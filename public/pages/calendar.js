@@ -282,6 +282,8 @@ const LEGACY_CALENDAR_VIEW_STORAGE_KEY = 'yuvomi-calendar-view';
 const LAYER_HOLIDAYS_KEY = 'yuvomi:calendar:layer:holidays';
 const LAYER_SCHOOL_KEY    = 'yuvomi:calendar:layer:school';
 const LAYER_BIRTHDAYS_KEY = 'yuvomi:calendar:layer:birthdays';
+const LAYER_SCHEDULE_KEY = 'yuvomi:calendar:layer:schedule';
+const SCHEDULE_DISPLAY_KEY = 'yuvomi:calendar:schedule-display';
 const ASSIGNED_TO_ME_KEY  = 'yuvomi:calendar:assignedToMe';
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -507,6 +509,8 @@ let state = {
   cursor:        null,     // aktuell angezeigte Referenz-Datum (YYYY-MM-DD)
   events:        [],
   tasks:         [],       // Aufgaben mit due_date für Kalender-Anzeige
+  scheduleEntries: [],
+  scheduleWarnings: [],
   users:         [],
   rangeFrom:     '',
   rangeTo:       '',
@@ -517,6 +521,8 @@ let state = {
   layerHolidays: true,     // toggle for public holiday layer
   layerSchool:   true,     // toggle for school holiday layer
   layerBirthdays: true,    // toggle for the birthday layer (#778)
+  layerSchedule: true,     // computed schedule overlay
+  scheduleDisplay: 'compact',
   offlineSince:  null,     // Date des letzten Cache-Stands, wenn offline bedient
   defaultDuration: 60,     // Standard-Termindauer (Minuten) aus den Präferenzen
   currentUserId: null,     // eigene User-ID für „Mir zugewiesen"-Filter
@@ -1059,20 +1065,18 @@ async function loadRange(from, to) {
   const win     = fetchWindow(from, to);
   const calPath = `/calendar?from=${win.from}&to=${win.to}`;
   try {
-    const [evRes, taskRes, holRes] = await Promise.all([
+    const [evRes, taskRes, holRes, scheduleRes] = await Promise.all([
       api.get(calPath),
-      api.get('/tasks?include_future=1').catch((err) => {
-        console.warn('[Calendar] Tasks-Fetch fehlgeschlagen:', err);
-        return { data: [] };
-      }),
+      api.get("/tasks?include_future=1").catch((err) => { console.warn("[Calendar] Tasks fetch failed:", err); return { data: [] }; }),
       api.get(`/calendar/holidays?from=${from}&to=${to}`).catch(() => ({ data: [] })),
+      api.get(`/schedule/entries?from=${from}&to=${to}`).catch(() => ({ data: { entries: [] } })),
     ]);
     state.loadError = null;
-    state.events   = (evRes.data ?? []).map(localizeBirthdayEvent);
-    state.tasks    = filterTasksForCalendar(taskRes.data ?? []);
+    state.events = (evRes.data ?? []).map(localizeBirthdayEvent);
+    state.tasks = filterTasksForCalendar(taskRes.data ?? []);
     state.holidays = holRes.data ?? [];
-    // Offline-Stand: wenn der Browser offline ist, kamen die Daten aus dem
-    // Service-Worker-Cache. Den Cache-Zeitstempel (x-cached-at) als „Stand" lesen.
+    state.scheduleEntries = scheduleRes.data?.entries ?? [];
+    state.scheduleWarnings = scheduleRes.data?.warnings ?? [];
     state.offlineSince = navigator.onLine ? null : await getCachedAt(calPath);
   } catch (err) {
     console.error('[Calendar] loadRange Fehler:', err);
@@ -1085,6 +1089,7 @@ async function loadRange(from, to) {
     state.events   = [];
     state.tasks    = [];
     state.holidays = [];
+    state.scheduleEntries = [];
     state.offlineSince = null;
   }
   state.rangeFrom = from;
@@ -1207,6 +1212,8 @@ export async function render(container, { user }) {
   state.layerHolidays = localStorage.getItem(LAYER_HOLIDAYS_KEY) !== 'false';
   state.layerSchool   = localStorage.getItem(LAYER_SCHOOL_KEY)   !== 'false';
   state.layerBirthdays = localStorage.getItem(LAYER_BIRTHDAYS_KEY) !== 'false';
+  state.layerSchedule = localStorage.getItem(LAYER_SCHEDULE_KEY) !== 'false';
+  state.scheduleDisplay = localStorage.getItem(SCHEDULE_DISPLAY_KEY) === 'blocks' ? 'blocks' : 'compact';
   state.currentUserId = user?.id ?? null;
   state.assignedToMe  = localStorage.getItem(ASSIGNED_TO_ME_KEY) === '1';
 
@@ -1252,8 +1259,9 @@ function renderToolbar() {
   // Weg zurueck: ohne sichtbare Geburtstage verschwaende der Knopf, der sie
   // wieder einschaltet.
   const showBirthdayToggle = hasBirthdayEvents() || !state.layerBirthdays;
+  const showScheduleToggle = state.scheduleEntries.length > 0 || !state.layerSchedule;
 
-  const holidayToggleHtml = (showHolidayToggle || showSchoolToggle || showBirthdayToggle) ? `
+  const holidayToggleHtml = (showHolidayToggle || showSchoolToggle || showBirthdayToggle || showScheduleToggle) ? `
     <div class="cal-toolbar__layers">
       ${showHolidayToggle ? `
         <button class="cal-toolbar__layer-btn ${state.layerHolidays ? 'cal-toolbar__layer-btn--active' : ''}"
@@ -1272,6 +1280,9 @@ function renderToolbar() {
           <span class="cal-toolbar__layer-dot"></span>
           <span>${t('calendar.toggleSchool')}</span>
         </button>
+      ` : ''}
+      ${showScheduleToggle ? `
+        <button class="cal-toolbar__layer-btn ${state.layerSchedule ? 'cal-toolbar__layer-btn--active' : ''}" data-layer="schedule" title="${t('schedule.overlay')}" style="--layer-color:#6C3AED"><span class="cal-toolbar__layer-dot"></span><span>${t('schedule.overlay')}</span></button><button class="cal-toolbar__layer-btn" data-schedule-display title="${t(state.scheduleDisplay === 'compact' ? 'schedule.fullBlocks' : 'schedule.compactDisplay')}"><span>${t(state.scheduleDisplay === 'compact' ? 'schedule.fullBlocks' : 'schedule.compactDisplay')}</span></button>${state.scheduleWarnings.length ? '<span class="cal-toolbar__schedule-warning" role="status" title="' + esc(t('schedule.overlapWarning', { date: state.scheduleWarnings[0].date_key, user: scheduleOwnerName(state.scheduleWarnings[0]) })) + '"><i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i><span>' + t('schedule.overlapWarningShort') + '</span></span>' : ''}
       ` : ''}
       ${showBirthdayToggle ? `
         <button class="cal-toolbar__layer-btn ${state.layerBirthdays ? 'cal-toolbar__layer-btn--active' : ''}"
@@ -1352,6 +1363,13 @@ function renderToolbar() {
     renderView();
   });
 
+  bar.querySelector('[data-schedule-display]')?.addEventListener('click', () => {
+    state.scheduleDisplay = state.scheduleDisplay === 'compact' ? 'blocks' : 'compact';
+    localStorage.setItem(SCHEDULE_DISPLAY_KEY, state.scheduleDisplay);
+    renderToolbar();
+    renderView();
+  });
+
   bar.querySelectorAll('[data-layer]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const layer = btn.dataset.layer;
@@ -1363,6 +1381,10 @@ function renderToolbar() {
         state.layerSchool = !state.layerSchool;
         localStorage.setItem(LAYER_SCHOOL_KEY, state.layerSchool);
         btn.classList.toggle('cal-toolbar__layer-btn--active', state.layerSchool);
+      } else if (layer === 'schedule') {
+        state.layerSchedule = !state.layerSchedule;
+        localStorage.setItem(LAYER_SCHEDULE_KEY, state.layerSchedule);
+        btn.classList.toggle('cal-toolbar__layer-btn--active', state.layerSchedule);
       } else if (layer === 'birthdays') {
         state.layerBirthdays = !state.layerBirthdays;
         localStorage.setItem(LAYER_BIRTHDAYS_KEY, state.layerBirthdays);
@@ -1725,6 +1747,7 @@ function renderMonthDay(date, inMonth) {
   const evs      = eventsOnDay(date);
   const dayTasks = tasksOnDay(date);
   const dayHols  = holidaysOnDay(date);
+  const daySchedule = state.layerSchedule ? state.scheduleEntries.filter((entry) => entry.date_key === date && entry.shift_type) : [];
   const isToday  = date === state.today;
   const classes  = monthDayClasses(date, inMonth);
 
@@ -1735,7 +1758,7 @@ function renderMonthDay(date, inMonth) {
   // Chip mittig ab, ohne "+N" (Audit A1-04 / P2). data-total trägt die Gesamtzahl,
   // damit "+N" auch die nicht gerenderten Überzähligen mitzählt. Reihenfolge
   // Feiertag -> Termin -> Aufgabe.
-  const total     = dayHols.length + evs.length + dayTasks.length;
+  const total     = dayHols.length + daySchedule.length + evs.length + dayTasks.length;
   const holShown  = dayHols.slice(0, MONTH_DAY_MAX_CHIPS);
   const evShown   = evs.slice(0, Math.max(0, MONTH_DAY_MAX_CHIPS - holShown.length));
   const taskShown = dayTasks.slice(0, Math.max(0, MONTH_DAY_MAX_CHIPS - holShown.length - evShown.length));
@@ -1745,6 +1768,8 @@ function renderMonthDay(date, inMonth) {
       <span>${esc(h.name)}</span>
     </div>
   `).join('');
+
+  const scheduleHtml = daySchedule.map((entry) => `<div class="month-day__holiday schedule-entry" style="--holi-color:${esc(entry.shift_type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(scheduleEntryLabel(entry))}</span></div>`).join("");
 
   // Monatsgrid-Kanon (Apple Kalender / Fantastical): flache getönte Bar mit nur
   // dem Titel. Icon und Avatar-Stack leben in der Tages-/Detailansicht; die
@@ -1765,6 +1790,7 @@ function renderMonthDay(date, inMonth) {
          aria-label="${esc(monthDayAriaLabel(date, total))}"${isToday ? ' aria-current="date"' : ''}>
       <div class="month-day__number">${new Date(date + 'T00:00:00').getDate()}</div>
       ${holHtml}
+      ${scheduleHtml}
       ${evHtml}
       ${taskHtml}
       <div class="month-day__more" hidden></div>
@@ -1775,6 +1801,58 @@ function renderMonthDay(date, inMonth) {
 // aria-label der Tageszelle: lokalisiertes Datum + (falls vorhanden) Zahl der
 // Einträge, damit Tastatur/Screenreader den Tag vor dem Drill-in einordnen
 // können. Leere Tage tragen nur das Datum (die role sagt "Schaltfläche"). P1.
+function scheduleEntriesOnDay(date) {
+  return state.layerSchedule
+    ? state.scheduleEntries.filter((entry) => entry.date_key === date && entry.shift_type)
+    : [];
+}
+
+function scheduleHasTimes(entry) { return Boolean(entry.shift_type?.start_time && entry.shift_type?.end_time); }
+
+function scheduleOwnerName(entry) {
+  const owner = state.users.find((user) => Number(user.id) === Number(entry.user_id));
+  return owner?.display_name || owner?.username || "";
+}
+
+function scheduleEntryLabel(entry) {
+  const shift = entry.shift_type.short_code || entry.shift_type.name;
+  const owner = scheduleOwnerName(entry);
+  return owner ? shift + " · " + owner : shift;
+}
+
+function scheduleEntryTitle(entry) {
+  const owner = scheduleOwnerName(entry);
+  const time = scheduleTimeLabel(entry.shift_type);
+  return entry.shift_type.name + (owner ? " · " + owner : "") + (time ? " · " + time : "");
+}
+
+function scheduleIsFullDayShift(entry) {
+  const type = entry.shift_type;
+  return Boolean(type?.start_time && type?.end_time && type.start_time === type.end_time);
+}
+
+function scheduleTimeLabel(type) {
+  if (!type.start_time || !type.end_time) return "";
+  const crossesDay = type.end_time <= type.start_time;
+  const fullDay = type.end_time === type.start_time;
+  return type.start_time + "–" + type.end_time + (crossesDay ? " +1" : "") + (fullDay ? " · 24 h" : "");
+}
+
+function renderScheduleChip(entry, className = 'allday-holiday') {
+  const type = entry.shift_type;
+  const label = scheduleEntryLabel(entry);
+  const start = type.start_time ? '<small class="schedule-entry__start">' + esc(type.start_time) + '</small>' : '';
+  return `<div class="${className} schedule-entry" style="--holi-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(label)}</span>${start}</div>`;
+}
+function renderScheduleTimeBlock(entry, className) {
+  const type = entry.shift_type;
+  const start = timeToMinutes(type.start_time);
+  const end = timeToMinutes(type.end_time);
+  const duration = Math.max((end > start ? end : 24 * 60) - start, 30);
+  const bounds = className === 'week-event' ? 'left:2px;width:calc(100% - 4px);' : 'left:calc(4px);width:calc(100% - 14px);';
+  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);${bounds}--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(scheduleEntryLabel(entry))}</span><small>${esc(scheduleTimeLabel(type))}</small></div>`;
+}
+
 function monthDayAriaLabel(date, total) {
   const d = formatPreferredDate(date);
   return total > 0 ? `${d}, ${t('calendar.monthDayEntries', { count: total })}` : d;
@@ -1802,6 +1880,9 @@ function renderWeekView(container) {
     eventsOnDay(d).filter((e) => !isAllDayLike(e))
   );
   const layouts = timedEvs.map((events) => layoutOverlaps(events));
+  const schedule = days.map((d) => scheduleEntriesOnDay(d));
+  const scheduleChips = schedule.map((items) => state.scheduleDisplay === 'compact' ? items : items.filter((entry) => !scheduleHasTimes(entry) || scheduleIsFullDayShift(entry)));
+  const scheduleBlocks = schedule.map((items) => state.scheduleDisplay === 'blocks' ? items.filter((entry) => scheduleHasTimes(entry) && !scheduleIsFullDayShift(entry)) : []);
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -1827,6 +1908,7 @@ function renderWeekView(container) {
                 <span>${esc(h.name)}</span>
               </div>
             `).join('')}
+            ${scheduleChips[i].map((entry) => renderScheduleChip(entry)).join('')}
             ${alldayEvs[i].map((ev) => `
               <div class="allday-event" data-id="${ev.id}"
                    style="${eventSurfaceStyle(ev)}"
@@ -1853,6 +1935,7 @@ function renderWeekView(container) {
                   <div class="week-view__hour-line" style="top:${hourOffset(h * 60)};"></div>
                 `).join('')}
                 ${timedEvs[i].map((ev) => renderWeekEvent(ev, layouts[i].get(ev.id))).join('')}
+                ${scheduleBlocks[i].map((entry) => renderScheduleTimeBlock(entry, 'week-event')).join('')}
                 ${d === state.today ? `<div class="week-view__now-line" id="now-line" style="top:${hourOffset(nowMinutes())};"></div>` : ''}
               </div>
             `).join('')}
@@ -1869,6 +1952,7 @@ function renderWeekView(container) {
   });
 
   container.querySelector('#week-cols').addEventListener('click', (e) => {
+    if (e.target.closest('.schedule-time-block')) return;
     const evEl = e.target.closest('.week-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
@@ -2042,13 +2126,16 @@ function renderDayView(container) {
   const allday  = dayEvs.filter(isAllDayLike);
   const timed   = dayEvs.filter((e) => !isAllDayLike(e));
   const layout = layoutOverlaps(timed);
+  const schedule = scheduleEntriesOnDay(state.cursor);
+  const scheduleChips = state.scheduleDisplay === 'compact' ? schedule : schedule.filter((entry) => !scheduleHasTimes(entry) || scheduleIsFullDayShift(entry));
+  const scheduleBlocks = state.scheduleDisplay === 'blocks' ? schedule.filter((entry) => scheduleHasTimes(entry) && !scheduleIsFullDayShift(entry)) : [];
 
   container.replaceChildren();
   // Kein eigener Datums-Header mehr: die Toolbar zeigt exakt dasselbe Datum
   // bereits als Ansichts-Label (Audit A1-18).
   container.insertAdjacentHTML('beforeend', `
     <div class="day-view">
-      ${(allday.length || tasksOnDay(state.cursor).length || holidaysOnDay(state.cursor).length) ? `
+      ${(allday.length || scheduleChips.length || tasksOnDay(state.cursor).length || holidaysOnDay(state.cursor).length) ? `
       <div class="allday-row" style="display:grid;grid-template-columns:var(--cal-gutter-width) 1fr;">
         <div class="calendar-all-day-label">${t('calendar.allDayShort')}</div>
         <div class="allday-cell">
@@ -2057,6 +2144,7 @@ function renderDayView(container) {
               <span>${esc(h.name)}</span>
             </div>
           `).join('')}
+          ${scheduleChips.map((entry) => renderScheduleChip(entry)).join('')}
           ${allday.map((ev) => `
             <div class="allday-event" data-id="${ev.id}"
                  style="${eventSurfaceStyle(ev)}"
@@ -2078,7 +2166,8 @@ function renderDayView(container) {
               <div class="week-view__hour-line" style="top:${hourOffset(h * 60)};"></div>
             `).join('')}
             ${timed.map((ev) => renderDayEvent(ev, layout.get(ev.id))).join('')}
-            ${dayEvs.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${t('calendar.dayEmptyHint')}</div>` : ''}
+            ${scheduleBlocks.map((entry) => renderScheduleTimeBlock(entry, 'day-event')).join('')}
+            ${dayEvs.length === 0 && schedule.length === 0 ? `<div class="day-view__empty-hint" style="top:calc(${hourOffset(state.cursor === state.today ? nowMinutes() : 9 * 60)} + 16px)">${t('calendar.dayEmptyHint')}</div>` : ''}
           </div>
           ${state.cursor === state.today ? `
             <div class="day-view__now-line" aria-hidden="true" style="top:${hourOffset(nowMinutes())};"></div>
@@ -2103,6 +2192,7 @@ function renderDayView(container) {
   });
 
   container.querySelector('#day-col').addEventListener('click', (e) => {
+    if (e.target.closest('.schedule-time-block')) return;
     const evEl = e.target.closest('.day-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
@@ -2168,8 +2258,8 @@ function renderAgendaView(container) {
   const days = Array.from({ length: 31 }, (_, i) => addDays(from, i));
 
   const groups = days
-    .map((d) => ({ date: d, events: eventsOnDay(d), tasks: tasksOnDay(d), holidays: holidaysOnDay(d) }))
-    .filter((g) => g.events.length > 0 || g.tasks.length > 0 || g.holidays.length > 0);
+    .map((d) => ({ date: d, events: eventsOnDay(d), tasks: tasksOnDay(d), holidays: holidaysOnDay(d), schedule: scheduleEntriesOnDay(d) }))
+    .filter((g) => g.events.length > 0 || g.tasks.length > 0 || g.holidays.length > 0 || g.schedule.length > 0);
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -2180,7 +2270,7 @@ function renderAgendaView(container) {
           title: t('calendar.agendaEmpty'),
           action: { label: t('calendar.newEvent'), attrs: { id: 'agenda-empty-cta' } },
         })
-        : groups.map(({ date, events, tasks, holidays }) => `
+        : groups.map(({ date, events, tasks, holidays, schedule }) => `
           <div class="agenda-day">
             <!-- Tageskopf als echte Ueberschrift (Critique 2026-08-10):
                  /calendar hatte genau EIN h-Element im ganzen Dokument. -->
@@ -2193,6 +2283,7 @@ function renderAgendaView(container) {
                 <span class="agenda-holiday__dot"></span>
                 <span>${esc(h.name)}</span>
               </div>`).join('')}</div>` : ''}
+            ${schedule.length ? `<div class="agenda-holidays">${schedule.map((entry) => renderScheduleChip(entry, 'agenda-holiday')).join('')}</div>` : ''}
             ${events.length ? `<div class="list-rows">${events.map((ev) => renderAgendaEvent(ev, date)).join('')}</div>` : ''}
             ${tasks.length ? `<div class="agenda-tasks">${tasks.map(renderTaskChip).join('')}</div>` : ''}
           </div>

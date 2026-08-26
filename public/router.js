@@ -83,6 +83,7 @@ const ROUTES = [
   { path: '/recipes',  page: '/pages/recipes.js',   requiresAuth: true, module: 'recipes',   titleKey: 'nav.recipes' },
   { path: '/pantry',   page: '/pages/pantry.js',    requiresAuth: true, module: 'pantry',    titleKey: 'nav.pantry' },
   { path: '/inventory', page: '/pages/inventory.js', requiresAuth: true, module: 'inventory', titleKey: 'nav.inventory' },
+  { path: '/schedule', page: '/pages/schedule.js', requiresAuth: true, module: 'schedule', titleKey: 'nav.schedule' },
   { path: '/contacts', page: '/pages/contacts.js',  requiresAuth: true, module: 'contacts',  titleKey: 'nav.contacts' },
   { path: '/budget',   page: '/pages/budget.js',    requiresAuth: true, module: 'budget',    titleKey: 'nav.budget' },
   { path: '/documents', page: '/pages/documents.js', requiresAuth: true, module: 'documents', titleKey: 'nav.documents' },
@@ -426,7 +427,7 @@ let _setupRequired = false;
 // Router
 // --------------------------------------------------------
 
-const ROUTE_ORDER = ['/', '/calendar', '/tasks', '/meals', '/recipes', '/shopping', '/pantry',
+const ROUTE_ORDER = ['/', '/calendar', '/schedule', '/tasks', '/meals', '/recipes', '/shopping', '/pantry',
                      '/birthdays', '/notes', '/contacts', '/budget', '/inventory', '/documents', '/housekeeping', '/health', '/settings'];
 
 const MOBILE_FAVORITE_COUNT = 3;
@@ -3202,6 +3203,7 @@ function navItems({ catalog = false } = {}) {
     { path: '/',          label: t('nav.dashboard'), module: 'dashboard', section: NAV_SECTION.overview },
     // Plan
     { path: '/calendar',  label: t('nav.calendar'),  module: 'calendar',  section: NAV_SECTION.plan },
+    { path: '/schedule',  label: t('nav.schedule'),  module: 'schedule',  section: NAV_SECTION.plan },
     { path: '/tasks',     label: t('nav.tasks'),     module: 'tasks',     section: NAV_SECTION.plan },
     { path: '/notes',     label: t('nav.notes'),     module: 'notes',     section: NAV_SECTION.plan },
     // Haushalt — Kitchen-Gruppe zuerst, dann die übrigen Haushalts-Module
@@ -3212,7 +3214,6 @@ function navItems({ catalog = false } = {}) {
     { path: '/housekeeping', label: t('nav.housekeeping'), module: 'housekeeping', section: NAV_SECTION.household },
     { path: '/documents', label: t('nav.documents'), module: 'documents',   section: NAV_SECTION.household },
     { path: '/inventory', label: t('nav.inventory'), module: 'inventory',   section: NAV_SECTION.household },
-    { path: '/rewards',   label: t('nav.rewards'),   module: 'rewards',     section: NAV_SECTION.household },
     // Menschen
     { path: '/contacts',  label: t('nav.contacts'),  module: 'contacts',    section: NAV_SECTION.people },
     { path: '/birthdays', label: t('nav.birthdays'), module: 'birthdays',   section: NAV_SECTION.people },
