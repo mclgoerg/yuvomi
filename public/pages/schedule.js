@@ -1,7 +1,7 @@
 import { api } from '/api.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { todayKey, addLocalDays, parseLocalDateKey } from '/utils/date.js';
+import { todayKey, addLocalDays, startOfLocalWeekKey, weekStartIndex } from '/utils/date.js';
 import { openModal, closeModal, confirmModal } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
@@ -69,13 +69,14 @@ const clockLabel = (shiftType) => {
 
 async function load() {
   const day = todayKey();
-  const [users, types, patternResult, overrides, entries, preferences] = await Promise.all([
+  const [users, types, patternResult, overrides, entries, preferences, householdPreferences] = await Promise.all([
     api.get('/auth/users'),
     api.get('/schedule/shift-types'),
     api.get('/schedule/patterns'),
     api.get('/schedule/overrides'),
     api.get(`/schedule/entries?from=${day}&to=${day}`),
     api.get('/schedule/preferences'),
+    api.get('/preferences').catch(() => ({ data: {} })),
   ]);
   const patterns = patternResult.data ?? [];
   const days = await Promise.all(patterns.map((pattern) => api.get(`/schedule/patterns/${pattern.id}/days`)));
@@ -88,6 +89,7 @@ async function load() {
     warnings: entries.data?.warnings ?? [],
     reminderOffsetMinutes: preferences.data?.reminderOffsetMinutes ?? null,
     weeklyHours: preferences.data?.weeklyHours ?? null,
+    weekStart: weekStartIndex(householdPreferences.data?.week_start),
   };
 }
 
@@ -134,21 +136,36 @@ function formatHours(minutes) {
 
 // Personenbezogen und konfigurierbar (users.schedule_weekly_hours), NICHT ein
 // Haushaltsfeld - ein Teilzeit- und ein Vollzeit-Mitglied im selben Haushalt
-// haben unterschiedliche Sollstunden. Die Schwelle skaliert auf die Tage der
-// gewaehlten Spanne (statt eine feste Zahl je Bereichsart zu pflegen -
-// "aktueller Monat", "gewaehlte Monate" und "eigener Zeitraum" haben alle eine
-// unterschiedliche Laenge, aber dieselbe Frage: wie viele Wochen stecken darin).
-// 40 ist der Rueckfall, solange niemand einen eigenen Wert gesetzt hat; die
-// Markierung bleibt ein Hinweis, kein Urteil - es gibt keine Ablehnung, nur
-// eine Zahl neben einer anderen.
+// haben unterschiedliche Sollstunden. 40 ist der Rueckfall, solange niemand
+// einen eigenen Wert gesetzt hat; die Markierung bleibt ein Hinweis, kein
+// Urteil - es gibt keine Ablehnung, nur eine Zahl neben einer anderen.
 const DEFAULT_WEEKLY_HOURS = 40;
 
-function overtimeInfo(bounds, totalMinutes, weeklyHours = DEFAULT_WEEKLY_HOURS) {
-  if (!bounds) return null;
-  const days = Math.round((parseLocalDateKey(bounds.to) - parseLocalDateKey(bounds.from)) / 86400000) + 1;
-  if (days < 1) return null;
-  const expectedMinutes = Math.round((weeklyHours * 60 * days) / 7);
-  return { expectedMinutes, over: totalMinutes > expectedMinutes };
+// Bewusst PRO KALENDERWOCHE geprueft, nicht als Durchschnitt ueber die ganze
+// gewaehlte Spanne: eine fruehere Fassung verteilte das Wochenziel gleichmaessig
+// auf alle Tage der Spanne (Tage/7 * Sollstunden) und verglich das gegen die
+// Gesamtsumme - fuer einen vollen Monat kam dabei praktisch derselbe Wert
+// heraus, den ein normaler Mo-Fr-Job ohnehin erreicht, UND eine einzelne
+// echte Ueberstunden-Woche verschwand im Schnitt, sobald eine ruhigere Woche
+// im selben Monat sie ausglich (kaum jemand arbeitet an allen 7 Tagen, aber
+// genau das nahm die Verteilung an). Jetzt zaehlt jede Kalenderwoche fuer sich:
+// ueberschreitet ihre Summe das Wochenziel, zaehlt der Ueberschuss, unabhaengig
+// davon, wie die uebrigen Wochen der Spanne liefen.
+function overtimeInfo(entries, weeklyHours = DEFAULT_WEEKLY_HOURS, weekStart = 1) {
+  const perWeek = new Map();
+  for (const entry of entries) {
+    const minutes = entry.shift_type ? shiftMinutes(entry.shift_type) : null;
+    if (minutes == null) continue;
+    const weekKey = startOfLocalWeekKey(entry.date_key, weekStart);
+    perWeek.set(weekKey, (perWeek.get(weekKey) ?? 0) + minutes);
+  }
+  const expectedPerWeek = weeklyHours * 60;
+  let excessMinutes = 0;
+  let overWeeks = 0;
+  for (const minutes of perWeek.values()) {
+    if (minutes > expectedPerWeek) { excessMinutes += minutes - expectedPerWeek; overWeeks += 1; }
+  }
+  return { over: overWeeks > 0, excessMinutes, overWeeks };
 }
 
 // Feste Presets statt eines freien Zahlenfelds: der Server deckelt ohnehin auf
@@ -445,7 +462,7 @@ function renderStatistics() {
   const bounds = statistics.bounds || statisticBounds();
   const summary = statisticsSummary();
   const weeklyHours = state.weeklyHours ?? DEFAULT_WEEKLY_HOURS;
-  const overtime = overtimeInfo(bounds, summary.totalMinutes, weeklyHours);
+  const overtime = overtimeInfo(statistics.entries, weeklyHours, state.weekStart);
   const selectedUser = statistics.userId || currentUserId;
   const range = statistics.range;
   const countItems = [...summary.values];
@@ -471,7 +488,7 @@ function renderStatistics() {
       + '<div class="metric-grid schedule-stat-metrics' + (overtime?.over ? ' schedule-stat-metrics--with-overtime' : '') + '">'
       + '<article class="metric-card"><div class="metric-card__label">' + esc(t('schedule.shiftCounts')) + '</div><div class="metric-card__value">' + esc(String(summary.totalCount)) + '</div><div class="metric-card__note">' + esc(t('schedule.shifts')) + '</div></article>'
       + '<article class="metric-card"><div class="metric-card__label">' + esc(t('schedule.workedHours')) + '</div><div class="metric-card__value">' + esc(formatHours(summary.totalMinutes)) + '</div><div class="metric-card__note">' + esc(t('schedule.total')) + '</div></article>'
-      + (overtime?.over ? '<article class="metric-card metric-card--warning"><div class="metric-card__label">' + esc(t('schedule.overtime')) + '</div><div class="metric-card__value">+' + esc(formatHours(summary.totalMinutes - overtime.expectedMinutes)) + '</div><div class="metric-card__note">' + esc(t('schedule.overtimeNote', { hours: weeklyHours })) + '</div></article>' : '')
+      + (overtime?.over ? '<article class="metric-card metric-card--warning"><div class="metric-card__label">' + esc(t('schedule.overtime')) + '</div><div class="metric-card__value">+' + esc(formatHours(overtime.excessMinutes)) + '</div><div class="metric-card__note">' + esc(t('schedule.overtimeNote', { hours: weeklyHours })) + '</div></article>' : '')
       + '</div>'
       + '<div class="schedule-stat-sections">'
       + '<section class="card card--padded schedule-stat-card"><div><h2 class="u-section-title">' + esc(t('schedule.shiftCounts')) + '</h2><p class="u-meta">' + esc(t('schedule.shiftCountsDescription')) + '</p></div>' + statisticsRows(countItems, (item) => String(item.count), (item) => item.count, t('schedule.noStatistics')) + '<div class="schedule-stat-total"><span>' + esc(t('schedule.total')) + '</span><strong>' + esc(String(summary.totalCount)) + '</strong></div></section>'
@@ -956,4 +973,4 @@ export async function render(container, { user } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { overrideGroups, rangeDifference, setShiftIconButtonIcon };
+export const __test = { overrideGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo };

@@ -509,21 +509,39 @@ test('renderPage() preserves the #main-content scroll position across its own DO
   assert.ok(saveIndex < rebuildIndex && rebuildIndex < restoreIndex, 'save must happen before the rebuild and restore must happen after it, not interleaved');
 });
 
-// A fixed weekly figure would be wrong for every range except a single week -
-// "current month" and "custom range" both need the same threshold SCALED to
-// however many days they actually span, not a flat 40h regardless of length.
-// The threshold itself is also per-user configurable (schedule_weekly_hours,
-// server/routes/schedule-preferences.js), not a hardcoded constant - a
-// part-time and a full-time member of the same household work to different
-// targets.
-test('overtime scales its threshold to the selected range and to the user\'s own configured weekly hours', () => {
-  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  assert.match(schedulePage, /const DEFAULT_WEEKLY_HOURS = 40;/);
-  const fnBody = schedulePage.slice(schedulePage.indexOf('function overtimeInfo'), schedulePage.indexOf('function statisticsSummary'));
-  assert.match(fnBody, /days/, 'must derive a day count from the range, not assume a fixed period');
-  assert.match(fnBody, /weeklyHours \* 60 \* days\) \/ 7/, 'expected minutes must scale by days/7 against the configurable target, not a constant');
-  assert.match(schedulePage, /state\.weeklyHours \?\? DEFAULT_WEEKLY_HOURS/, 'falls back to the default only when the user has not set their own target');
-  assert.match(schedulePage, /overtime\?\.over/, 'the card only renders once the range is actually over its scaled threshold');
+// Overtime must be caught per calendar week, not averaged across the whole
+// selected range: a single genuinely-over week (5x10h = 50h against a 40h
+// target) sitting inside an otherwise-quiet 30-day month must still flag,
+// even though the month's TOTAL (3000 min) is nowhere near a whole-month
+// average threshold (~10286 min for 30 days at 40h/week) - that average was
+// the earlier, wrong design (most people don't work all 7 days of a week,
+// so spreading the weekly target evenly across every calendar day set a
+// target a real week's hours could never realistically cross).
+test('overtimeInfo() flags a single real overtime week even when the rest of a 30-day range is quiet, and sums only the excess of weeks that actually crossed the target', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const longShift = { start_time: '08:00', end_time: '18:00' }; // 10h
+  const entries = [
+    { date_key: '2026-09-07', shift_type: longShift },
+    { date_key: '2026-09-08', shift_type: longShift },
+    { date_key: '2026-09-09', shift_type: longShift },
+    { date_key: '2026-09-10', shift_type: longShift },
+    { date_key: '2026-09-11', shift_type: longShift }, // Mon-Fri week of Sep 7, 50h total
+    { date_key: '2026-09-20', shift_type: null }, // a free day elsewhere in the range
+  ];
+  const result = __test.overtimeInfo(entries, 40, 1);
+  assert.equal(result.over, true, 'one week at 50h against a 40h target must flag, regardless of how quiet the rest of the range was');
+  assert.equal(result.overWeeks, 1);
+  assert.equal(result.excessMinutes, 600, 'only the 10h (600 min) that crossed the 40h/week target counts, not the week\'s full total');
+});
+
+test('overtimeInfo() never flags when every calendar week stayed at or under the target', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const normalShift = { start_time: '09:00', end_time: '17:00' }; // 8h
+  const entries = ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11']
+    .map((date_key) => ({ date_key, shift_type: normalShift })); // Mon-Fri, 40h exactly
+  const result = __test.overtimeInfo(entries, 40, 1);
+  assert.equal(result.over, false);
+  assert.equal(result.excessMinutes, 0);
 });
 
 test('the weekly-hours target is a per-user preference, fetched and saved through /schedule/preferences', () => {
