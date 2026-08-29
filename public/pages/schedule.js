@@ -269,6 +269,12 @@ function shiftPresetOptions() {
     + SHIFT_PRESETS.map((preset) => option(preset.key, shiftPresetLabel(preset.key))).join('');
 }
 
+function setShiftIconButtonIcon(button, iconName) {
+  button.querySelectorAll('i[data-lucide], svg.lucide').forEach((el) => el.remove());
+  button.insertAdjacentHTML('afterbegin', '<i data-lucide="' + esc(iconName || 'image-off') + '" aria-hidden="true"></i>');
+  window.lucide?.createIcons({ el: button });
+}
+
 function applyShiftPreset(form) {
   const selected = SHIFT_PRESETS.find((preset) => preset.key === form.elements.shift_preset?.value);
   if (!selected) return;
@@ -279,11 +285,7 @@ function applyShiftPreset(form) {
   form.elements.color.value = selected.color;
   form.elements.icon.value = selected.icon ?? '';
   const iconButton = form.querySelector('[data-action="pick-shift-icon"]');
-  if (iconButton) {
-    iconButton.querySelector('i')?.remove();
-    iconButton.insertAdjacentHTML('afterbegin', '<i data-lucide="' + esc(selected.icon || 'image-off') + '" aria-hidden="true"></i>');
-    window.lucide?.createIcons({ el: iconButton });
-  }
+  if (iconButton) setShiftIconButtonIcon(iconButton, selected.icon);
 }
 function userOptions(selected) {
   return state.users.filter((user) => canManageOthers || Number(user.id) === Number(currentUserId)).map((user) => option(user.id, user.display_name || user.username, Number(selected) === Number(user.id))).join('');
@@ -323,9 +325,7 @@ async function pickShiftIcon(button) {
   const chosen = await openIconPicker(hidden.value || null);
   if (chosen === undefined) return;
   hidden.value = chosen ?? '';
-  button.querySelector('i')?.remove();
-  button.insertAdjacentHTML('afterbegin', '<i data-lucide="' + esc(chosen || 'image-off') + '" aria-hidden="true"></i>');
-  window.lucide?.createIcons({ el: button });
+  setShiftIconButtonIcon(button, chosen);
 }
 
 function patternFields(pattern = {}) {
@@ -945,4 +945,4 @@ export async function render(container, { user } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { overrideGroups, rangeDifference };
+export const __test = { overrideGroups, rangeDifference, setShiftIconButtonIcon };

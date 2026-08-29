@@ -440,6 +440,56 @@ test('the shift-type icon picker is wired for both the create modal and inline e
   assert.match(schedulePage, /import\('\/components\/icon-picker\.js'\)/, 'reuses the shared icon picker rather than a new dialog');
 });
 
+// Lucide's createIcons() replaces an <i data-lucide> element with an <svg
+// class="lucide ..."> IN PLACE, it does not just decorate the existing <i>.
+// A cleanup that only ever looks for an <i> therefore finds nothing to
+// remove after the first pick, and every subsequent pick just stacks
+// another icon into the button instead of replacing the old one.
+function makeFakeIconButton() {
+  const button = {
+    children: [],
+    querySelectorAll(selector) {
+      const wantsI = selector.includes('i[data-lucide]');
+      const wantsSvg = selector.includes('svg.lucide');
+      return button.children.filter((node) => (wantsI && node.tag === 'i' && 'data-lucide' in node.attrs)
+        || (wantsSvg && node.tag === 'svg' && (node.attrs.class || '').split(' ').includes('lucide')))
+        .map((node) => ({ remove: () => { button.children = button.children.filter((other) => other !== node); } }));
+    },
+    insertAdjacentHTML(position, html) {
+      const match = html.match(/data-lucide="([^"]+)"/);
+      const node = { tag: 'i', attrs: { 'data-lucide': match ? match[1] : '' } };
+      if (position === 'afterbegin') button.children.unshift(node);
+      else button.children.push(node);
+    },
+  };
+  return button;
+}
+
+test('setShiftIconButtonIcon replaces the previous icon even after lucide has converted it to an <svg>, so repeated picks never stack icons', async () => {
+  const originalWindow = globalThis.window;
+  globalThis.window = {
+    lucide: {
+      createIcons({ el }) {
+        el.children = el.children.map((node) => ((node.tag === 'i' && 'data-lucide' in node.attrs)
+          ? { tag: 'svg', attrs: { class: `lucide lucide-${node.attrs['data-lucide']}` } }
+          : node));
+      },
+    },
+  };
+  try {
+    const { __test } = await import('../public/pages/schedule.js');
+    const button = makeFakeIconButton();
+    __test.setShiftIconButtonIcon(button, 'shield');
+    __test.setShiftIconButtonIcon(button, 'key');
+    __test.setShiftIconButtonIcon(button, 'mail');
+    __test.setShiftIconButtonIcon(button, 'clock');
+    assert.equal(button.children.length, 1, 'only the most recently picked icon should remain, not one per pick');
+    assert.equal(button.children[0].attrs.class, 'lucide lucide-clock');
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});
+
 // A fixed weekly figure would be wrong for every range except a single week -
 // "current month" and "custom range" both need the same threshold SCALED to
 // however many days they actually span, not a flat 40h regardless of length.
