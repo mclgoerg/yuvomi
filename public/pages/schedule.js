@@ -579,6 +579,16 @@ function renderShell() {
 }
 
 function renderPage() {
+  // Rebuilding .schedule-body below can destroy whatever currently holds
+  // focus (e.g. the weekly-hours input right after the user typed into it) -
+  // losing focus resets it to <body>, and the browser scrolls the page's
+  // real scrollport (#main-content, see router.js) back to the top to show
+  // it. Statistics is the one tab with persistent on-page form controls that
+  // trigger a render while focused, so it's the one tab where this was
+  // visible; restoring the scroll position afterward papers over it for
+  // every tab uniformly rather than special-casing statistics.
+  const scrollPort = document.getElementById('main-content');
+  const scrollTop = scrollPort?.scrollTop ?? 0;
   root.querySelectorAll('[data-tab]').forEach((button) => {
     const isActive = button.dataset.tab === activeView;
     button.classList.toggle('sub-tab--active', isActive);
@@ -605,6 +615,7 @@ function renderPage() {
     + `<div class="schedule-content">${panel}</div>`);
   updateScheduleFab();
   window.lucide?.createIcons({ el: body });
+  if (scrollPort) scrollPort.scrollTop = scrollTop;
 }
 function updateScheduleFab() {
   if (!scheduleFab) return;

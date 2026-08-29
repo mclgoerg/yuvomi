@@ -490,6 +490,25 @@ test('setShiftIconButtonIcon replaces the previous icon even after lucide has co
   }
 });
 
+// Rebuilding .schedule-body on every renderPage() call can destroy whatever
+// currently holds focus (e.g. the Statistics tab's own persistent form
+// controls, which trigger a render on every change) - losing focus resets it
+// to <body>, and the browser scrolls #main-content (the app's real
+// scrollport, see router.js) back to the top. renderPage() must snapshot and
+// restore that scrollTop around its own DOM mutation, or every click/change
+// on the Statistics tab visibly jumps the page to the top.
+test('renderPage() preserves the #main-content scroll position across its own DOM rebuild', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const body = schedulePage.slice(schedulePage.indexOf('function renderPage()'), schedulePage.indexOf('function updateScheduleFab()'));
+  assert.match(body, /const scrollPort = document\.getElementById\('main-content'\);/);
+  assert.match(body, /const scrollTop = scrollPort\?\.scrollTop \?\? 0;/, 'must capture the scroll position before body.replaceChildren() runs');
+  assert.match(body, /if \(scrollPort\) scrollPort\.scrollTop = scrollTop;/, 'must restore the scroll position after the DOM rebuild completes');
+  const saveIndex = body.indexOf('const scrollTop = scrollPort');
+  const rebuildIndex = body.indexOf('body.replaceChildren()');
+  const restoreIndex = body.indexOf('scrollPort.scrollTop = scrollTop;');
+  assert.ok(saveIndex < rebuildIndex && rebuildIndex < restoreIndex, 'save must happen before the rebuild and restore must happen after it, not interleaved');
+});
+
 // A fixed weekly figure would be wrong for every range except a single week -
 // "current month" and "custom range" both need the same threshold SCALED to
 // however many days they actually span, not a flat 40h regardless of length.
