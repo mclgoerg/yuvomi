@@ -509,15 +509,29 @@ test('renderPage() preserves the #main-content scroll position across its own DO
   assert.ok(saveIndex < rebuildIndex && rebuildIndex < restoreIndex, 'save must happen before the rebuild and restore must happen after it, not interleaved');
 });
 
-// Overtime must be caught per calendar week, not averaged across the whole
-// selected range: a single genuinely-over week (5x10h = 50h against a 40h
-// target) sitting inside an otherwise-quiet 30-day month must still flag,
-// even though the month's TOTAL (3000 min) is nowhere near a whole-month
-// average threshold (~10286 min for 30 days at 40h/week) - that average was
-// the earlier, wrong design (most people don't work all 7 days of a week,
-// so spreading the weekly target evenly across every calendar day set a
-// target a real week's hours could never realistically cross).
-test('overtimeInfo() flags a single real overtime week even when the rest of a 30-day range is quiet, and sums only the excess of weeks that actually crossed the target', async () => {
+// Overtime must be caught over ANY rolling 7-day stretch, not fixed calendar
+// weeks (Mon-Sun) and not averaged across the whole selected range. Fixed
+// weeks would cut a contiguous work stretch that straddles a week boundary
+// into two halves, neither of which alone crosses the threshold - a single
+// genuinely-over 30-day range's total (3000 min) is also nowhere near a
+// whole-range average threshold (~10286 min at 40h/week over 30 days), which
+// was the original, wrong design (most people don't work all 7 days of a
+// week, so spreading the weekly target evenly across every calendar day set
+// a target a real week's hours could rarely cross).
+test('overtimeInfo() catches a work stretch that straddles a calendar-week boundary, which fixed Mon-Sun weeks would have missed', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const longShift = { start_time: '08:00', end_time: '18:00' }; // 10h
+  // Thu Sep 10 through Mon Sep 14 2026: five consecutive 10h days that split
+  // 4/1 across the Sun 13 / Mon 14 calendar-week boundary - fixed weeks would
+  // see 40h in one half and 10h in the other, neither over a 40h target.
+  const entries = ['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-14']
+    .map((date_key) => ({ date_key, shift_type: longShift }));
+  const result = __test.overtimeInfo(entries, 40);
+  assert.equal(result.over, true, 'five consecutive 10h days is 50h in any 7-day window that contains them all, regardless of which calendar week they land in');
+  assert.equal(result.excessMinutes, 600, 'only the 10h (600 min) over the 40h/week target counts, not the stretch\'s full 50h');
+});
+
+test('overtimeInfo() flags a single real overtime week even when the rest of a 30-day range is quiet, and reports only the worst window\'s excess', async () => {
   const { __test } = await import('../public/pages/schedule.js');
   const longShift = { start_time: '08:00', end_time: '18:00' }; // 10h
   const entries = [
@@ -525,21 +539,20 @@ test('overtimeInfo() flags a single real overtime week even when the rest of a 3
     { date_key: '2026-09-08', shift_type: longShift },
     { date_key: '2026-09-09', shift_type: longShift },
     { date_key: '2026-09-10', shift_type: longShift },
-    { date_key: '2026-09-11', shift_type: longShift }, // Mon-Fri week of Sep 7, 50h total
+    { date_key: '2026-09-11', shift_type: longShift }, // Mon-Fri, 50h total
     { date_key: '2026-09-20', shift_type: null }, // a free day elsewhere in the range
   ];
-  const result = __test.overtimeInfo(entries, 40, 1);
-  assert.equal(result.over, true, 'one week at 50h against a 40h target must flag, regardless of how quiet the rest of the range was');
-  assert.equal(result.overWeeks, 1);
+  const result = __test.overtimeInfo(entries, 40);
+  assert.equal(result.over, true, 'one 50h week must flag, regardless of how quiet the rest of the range was');
   assert.equal(result.excessMinutes, 600, 'only the 10h (600 min) that crossed the 40h/week target counts, not the week\'s full total');
 });
 
-test('overtimeInfo() never flags when every calendar week stayed at or under the target', async () => {
+test('overtimeInfo() never flags when no 7-day window crossed the target', async () => {
   const { __test } = await import('../public/pages/schedule.js');
   const normalShift = { start_time: '09:00', end_time: '17:00' }; // 8h
   const entries = ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11']
     .map((date_key) => ({ date_key, shift_type: normalShift })); // Mon-Fri, 40h exactly
-  const result = __test.overtimeInfo(entries, 40, 1);
+  const result = __test.overtimeInfo(entries, 40);
   assert.equal(result.over, false);
   assert.equal(result.excessMinutes, 0);
 });

@@ -1,7 +1,7 @@
 import { api } from '/api.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { todayKey, addLocalDays, startOfLocalWeekKey, weekStartIndex } from '/utils/date.js';
+import { todayKey, addLocalDays, parseLocalDateKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
@@ -69,14 +69,13 @@ const clockLabel = (shiftType) => {
 
 async function load() {
   const day = todayKey();
-  const [users, types, patternResult, overrides, entries, preferences, householdPreferences] = await Promise.all([
+  const [users, types, patternResult, overrides, entries, preferences] = await Promise.all([
     api.get('/auth/users'),
     api.get('/schedule/shift-types'),
     api.get('/schedule/patterns'),
     api.get('/schedule/overrides'),
     api.get(`/schedule/entries?from=${day}&to=${day}`),
     api.get('/schedule/preferences'),
-    api.get('/preferences').catch(() => ({ data: {} })),
   ]);
   const patterns = patternResult.data ?? [];
   const days = await Promise.all(patterns.map((pattern) => api.get(`/schedule/patterns/${pattern.id}/days`)));
@@ -89,7 +88,6 @@ async function load() {
     warnings: entries.data?.warnings ?? [],
     reminderOffsetMinutes: preferences.data?.reminderOffsetMinutes ?? null,
     weeklyHours: preferences.data?.weeklyHours ?? null,
-    weekStart: weekStartIndex(householdPreferences.data?.week_start),
   };
 }
 
@@ -141,31 +139,34 @@ function formatHours(minutes) {
 // Urteil - es gibt keine Ablehnung, nur eine Zahl neben einer anderen.
 const DEFAULT_WEEKLY_HOURS = 40;
 
-// Bewusst PRO KALENDERWOCHE geprueft, nicht als Durchschnitt ueber die ganze
-// gewaehlte Spanne: eine fruehere Fassung verteilte das Wochenziel gleichmaessig
-// auf alle Tage der Spanne (Tage/7 * Sollstunden) und verglich das gegen die
-// Gesamtsumme - fuer einen vollen Monat kam dabei praktisch derselbe Wert
-// heraus, den ein normaler Mo-Fr-Job ohnehin erreicht, UND eine einzelne
-// echte Ueberstunden-Woche verschwand im Schnitt, sobald eine ruhigere Woche
-// im selben Monat sie ausglich (kaum jemand arbeitet an allen 7 Tagen, aber
-// genau das nahm die Verteilung an). Jetzt zaehlt jede Kalenderwoche fuer sich:
-// ueberschreitet ihre Summe das Wochenziel, zaehlt der Ueberschuss, unabhaengig
-// davon, wie die uebrigen Wochen der Spanne liefen.
-function overtimeInfo(entries, weeklyHours = DEFAULT_WEEKLY_HOURS, weekStart = 1) {
-  const perWeek = new Map();
-  for (const entry of entries) {
-    const minutes = entry.shift_type ? shiftMinutes(entry.shift_type) : null;
-    if (minutes == null) continue;
-    const weekKey = startOfLocalWeekKey(entry.date_key, weekStart);
-    perWeek.set(weekKey, (perWeek.get(weekKey) ?? 0) + minutes);
+// Ein ROLLIERENDES 7-Tage-Fenster statt fester Kalenderwochen (Mo-So o.ae.):
+// ein Schichtblock kann eine Wochengrenze ueberspannen (z.B. Do-Mo als
+// zusammenhaengende fuenf Tage) - feste Wochen zerschneiden ihn dann in zwei
+// Haelften, von denen keine allein die Schwelle reisst, obwohl die
+// zusammenhaengenden sieben Tage es sehr wohl tun. Der Wochenstart des
+// Haushalts ist hier deshalb irrelevant: jedes Fenster von genau sieben
+// aufeinanderfolgenden Kalendertagen zaehlt, nicht nur die, die an einem
+// bestimmten Wochentag beginnen. Gemeldet wird nur das SCHLIMMSTE Fenster
+// (nicht die Summe ueber alle ueberlappenden Fenster - die teilen sich
+// dieselben Tage mehrfach, das wuerde denselben Ueberschuss vielfach zaehlen).
+function overtimeInfo(entries, weeklyHours = DEFAULT_WEEKLY_HOURS) {
+  const days = entries
+    .map((entry) => ({ day: parseLocalDateKey(entry.date_key).getTime(), minutes: entry.shift_type ? (shiftMinutes(entry.shift_type) ?? 0) : 0 }))
+    .sort((a, b) => a.day - b.day);
+  const sixDaysMs = 6 * 86400000;
+  let windowStart = 0;
+  let windowSum = 0;
+  let worstWindowMinutes = 0;
+  for (let end = 0; end < days.length; end += 1) {
+    windowSum += days[end].minutes;
+    while (days[windowStart].day < days[end].day - sixDaysMs) {
+      windowSum -= days[windowStart].minutes;
+      windowStart += 1;
+    }
+    worstWindowMinutes = Math.max(worstWindowMinutes, windowSum);
   }
-  const expectedPerWeek = weeklyHours * 60;
-  let excessMinutes = 0;
-  let overWeeks = 0;
-  for (const minutes of perWeek.values()) {
-    if (minutes > expectedPerWeek) { excessMinutes += minutes - expectedPerWeek; overWeeks += 1; }
-  }
-  return { over: overWeeks > 0, excessMinutes, overWeeks };
+  const excessMinutes = Math.max(0, worstWindowMinutes - weeklyHours * 60);
+  return { over: excessMinutes > 0, excessMinutes };
 }
 
 // Feste Presets statt eines freien Zahlenfelds: der Server deckelt ohnehin auf
@@ -462,7 +463,7 @@ function renderStatistics() {
   const bounds = statistics.bounds || statisticBounds();
   const summary = statisticsSummary();
   const weeklyHours = state.weeklyHours ?? DEFAULT_WEEKLY_HOURS;
-  const overtime = overtimeInfo(statistics.entries, weeklyHours, state.weekStart);
+  const overtime = overtimeInfo(statistics.entries, weeklyHours);
   const selectedUser = statistics.userId || currentUserId;
   const range = statistics.range;
   const countItems = [...summary.values];
