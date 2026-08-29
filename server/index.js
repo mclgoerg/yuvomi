@@ -76,7 +76,7 @@ import changelogRouter from './routes/changelog.js';
 import mcpRouter from './mcp/server.js';
 import scheduleRouter from './routes/schedule.js';
 import scheduleFeedRouter from './routes/schedule-feed.js';
-import scheduleRemindersRouter from './routes/schedule-reminders.js';
+import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import { moduleForPath, requiredAccess, tokenAllows } from './scopes.js';
 import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './permissions.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
@@ -519,7 +519,7 @@ app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/rewards', rewardsRouter);
 app.use('/api/v1/schedule', scheduleRouter);
 app.use('/api/v1/schedule/feed', scheduleFeedRouter);
-app.use('/api/v1/schedule/reminders', scheduleRemindersRouter);
+app.use('/api/v1/schedule/preferences', schedulePreferencesRouter);
 app.use('/api/v1/permissions', permissionsRouter);
 
 // --------------------------------------------------------

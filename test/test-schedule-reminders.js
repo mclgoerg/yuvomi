@@ -3,7 +3,7 @@
  * Zweck: (1) syncScheduleRemindersForUser() - Anker+Erinnerung anlegen,
  *        abraeumen, unangetastet lassen, retimen. (2) syncAllScheduleReminders()
  *        ueber mehrere Nutzer isoliert. (3) Der Verwaltungs-Router
- *        (/schedule/reminders) end-to-end. (4) Integration mit dem generischen
+ *        (/schedule/preferences) end-to-end. (4) Integration mit dem generischen
  *        Erinnerungs-Router: schedule_entry ist eine abgeleitete Herkunft.
  * Ausführen: node --experimental-sqlite --test test/test-schedule-reminders.js
  */
@@ -17,7 +17,7 @@ import express from 'express';
 
 const dbmod = await import('../server/db.js');
 const scheduleReminders = await import('../server/services/schedule-reminders.js');
-const { default: scheduleRemindersRouter } = await import('../server/routes/schedule-reminders.js');
+const { default: schedulePreferencesRouter } = await import('../server/routes/schedule-preferences.js');
 const { default: remindersRouter } = await import('../server/routes/reminders.js');
 const db = dbmod.get();
 
@@ -230,7 +230,7 @@ let actorId = alice;
 const app = express();
 app.use(express.json());
 app.use((req, _res, next) => { req.authUserId = actorId; req.sessionModuleAccess = {}; req.authScopes = null; next(); });
-app.use('/schedule/reminders', scheduleRemindersRouter);
+app.use('/schedule/preferences', schedulePreferencesRouter);
 app.use('/reminders', remindersRouter);
 const server = app.listen(0);
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
@@ -248,55 +248,88 @@ async function call(method, path, { as = alice, body } = {}) {
   return { status: res.status, body: json };
 }
 
-test('GET /schedule/reminders liefert null ohne aktivierten Vorlauf', async () => {
+test('GET /schedule/preferences liefert beide Felder als null ohne eigene Einstellung', async () => {
   clearAll();
-  const r = await call('GET', '/schedule/reminders');
+  const r = await call('GET', '/schedule/preferences');
   assert.equal(r.status, 200);
-  assert.equal(r.body.data.offsetMinutes, null);
+  assert.equal(r.body.data.reminderOffsetMinutes, null);
+  assert.equal(r.body.data.weeklyHours, null);
 });
 
-test('PUT /schedule/reminders setzt den Vorlauf und synchronisiert sofort', async () => {
+test('PUT /schedule/preferences setzt den Vorlauf und synchronisiert sofort', async () => {
   clearAll();
   const early = insertType();
   insertOverride(alice, REAL_TOMORROW, early);
 
-  const r = await call('PUT', '/schedule/reminders', { body: { offsetMinutes: 30 } });
+  const r = await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
   assert.equal(r.status, 200);
-  assert.equal(r.body.data.offsetMinutes, 30);
+  assert.equal(r.body.data.reminderOffsetMinutes, 30);
 
   // Sofort wirksam, ohne auf den periodischen Lauf zu warten.
   const anchor = anchorFor(alice, REAL_TOMORROW);
   assert.ok(anchor, 'PUT muss sofort synchronisieren');
 });
 
-test('PUT /schedule/reminders lehnt ungültige Werte ab', async () => {
+test('PUT /schedule/preferences lehnt ungültige Vorlauf-Werte ab', async () => {
   clearAll();
-  const bad1 = await call('PUT', '/schedule/reminders', { body: { offsetMinutes: -5 } });
+  const bad1 = await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: -5 } });
   assert.equal(bad1.status, 400);
-  const bad2 = await call('PUT', '/schedule/reminders', { body: { offsetMinutes: 99999 } });
+  const bad2 = await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 99999 } });
   assert.equal(bad2.status, 400);
-  const bad3 = await call('PUT', '/schedule/reminders', { body: { offsetMinutes: 'soon' } });
+  const bad3 = await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 'soon' } });
   assert.equal(bad3.status, 400);
 });
 
-test('PUT /schedule/reminders mit null schaltet ab', async () => {
+test('PUT /schedule/preferences mit reminderOffsetMinutes: null schaltet ab', async () => {
   clearAll();
   const early = insertType();
   insertOverride(alice, REAL_TOMORROW, early);
-  await call('PUT', '/schedule/reminders', { body: { offsetMinutes: 30 } });
+  await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
   assert.ok(anchorFor(alice, REAL_TOMORROW));
 
-  const r = await call('PUT', '/schedule/reminders', { body: { offsetMinutes: null } });
+  const r = await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: null } });
   assert.equal(r.status, 200);
-  assert.equal(r.body.data.offsetMinutes, null);
+  assert.equal(r.body.data.reminderOffsetMinutes, null);
   assert.equal(anchorFor(alice, REAL_TOMORROW), undefined);
+});
+
+test('PUT /schedule/preferences setzt die Wochenstunden, ohne den Vorlauf anzufassen', async () => {
+  clearAll();
+  await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
+
+  const r = await call('PUT', '/schedule/preferences', { body: { weeklyHours: 20 } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.weeklyHours, 20);
+  assert.equal(r.body.data.reminderOffsetMinutes, 30, 'ein Feld ohne Erwaehnung im Body bleibt unangetastet');
+
+  const get = await call('GET', '/schedule/preferences');
+  assert.equal(get.body.data.weeklyHours, 20);
+  assert.equal(get.body.data.reminderOffsetMinutes, 30);
+});
+
+test('PUT /schedule/preferences lehnt ungültige Wochenstunden ab', async () => {
+  clearAll();
+  const bad1 = await call('PUT', '/schedule/preferences', { body: { weeklyHours: 0 } });
+  assert.equal(bad1.status, 400);
+  const bad2 = await call('PUT', '/schedule/preferences', { body: { weeklyHours: 169 } });
+  assert.equal(bad2.status, 400);
+  const bad3 = await call('PUT', '/schedule/preferences', { body: { weeklyHours: 12.5 } });
+  assert.equal(bad3.status, 400);
+});
+
+test('PUT /schedule/preferences mit weeklyHours: null setzt auf den Rückfallwert zurück', async () => {
+  clearAll();
+  await call('PUT', '/schedule/preferences', { body: { weeklyHours: 20 } });
+  const r = await call('PUT', '/schedule/preferences', { body: { weeklyHours: null } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.weeklyHours, null);
 });
 
 test('POST /reminders lehnt ein handgesetztes schedule_entry mit 400 ab', async () => {
   clearAll();
   const early = insertType();
   insertOverride(alice, REAL_TOMORROW, early);
-  await call('PUT', '/schedule/reminders', { body: { offsetMinutes: 30 } });
+  await call('PUT', '/schedule/preferences', { body: { reminderOffsetMinutes: 30 } });
   const anchor = anchorFor(alice, REAL_TOMORROW);
 
   const r = await call('POST', '/reminders', { body: { entity_type: 'schedule_entry', entity_id: anchor.id, remind_at: '2026-09-10T05:00:00' } });

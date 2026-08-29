@@ -17,7 +17,7 @@ let scheduleFab = null;
 let currentUserId = null;
 let canManageOthers = false;
 let activeView = 'patterns';
-let state = { users: [], types: [], patterns: [], overrides: [], entries: [], warnings: [], reminderOffsetMinutes: null };
+let state = { users: [], types: [], patterns: [], overrides: [], entries: [], warnings: [], reminderOffsetMinutes: null, weeklyHours: null };
 let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', from: '', to: '', entries: [], bounds: null, loading: false };
 // Schichtfarben sind NUTZERFARBEN (freier Waehler im Formular); die Presets
 // sind nur Startwerte. Eine Grenze gilt trotzdem: keine davon darf die STIMME
@@ -69,13 +69,13 @@ const clockLabel = (shiftType) => {
 
 async function load() {
   const day = todayKey();
-  const [users, types, patternResult, overrides, entries, reminders] = await Promise.all([
+  const [users, types, patternResult, overrides, entries, preferences] = await Promise.all([
     api.get('/auth/users'),
     api.get('/schedule/shift-types'),
     api.get('/schedule/patterns'),
     api.get('/schedule/overrides'),
     api.get(`/schedule/entries?from=${day}&to=${day}`),
-    api.get('/schedule/reminders'),
+    api.get('/schedule/preferences'),
   ]);
   const patterns = patternResult.data ?? [];
   const days = await Promise.all(patterns.map((pattern) => api.get(`/schedule/patterns/${pattern.id}/days`)));
@@ -86,7 +86,8 @@ async function load() {
     overrides: overrides.data ?? [],
     entries: entries.data?.entries ?? [],
     warnings: entries.data?.warnings ?? [],
-    reminderOffsetMinutes: reminders.data?.offsetMinutes ?? null,
+    reminderOffsetMinutes: preferences.data?.reminderOffsetMinutes ?? null,
+    weeklyHours: preferences.data?.weeklyHours ?? null,
   };
 }
 
@@ -131,25 +132,27 @@ function formatHours(minutes) {
   return t('schedule.hoursValue', { value });
 }
 
-// Kein Haushaltsfeld, bewusst: eine Schwelle je Wochentakt, skaliert auf die
-// Tage der gewaehlten Spanne (statt eine feste Zahl je Bereichsart zu pflegen -
+// Personenbezogen und konfigurierbar (users.schedule_weekly_hours), NICHT ein
+// Haushaltsfeld - ein Teilzeit- und ein Vollzeit-Mitglied im selben Haushalt
+// haben unterschiedliche Sollstunden. Die Schwelle skaliert auf die Tage der
+// gewaehlten Spanne (statt eine feste Zahl je Bereichsart zu pflegen -
 // "aktueller Monat", "gewaehlte Monate" und "eigener Zeitraum" haben alle eine
 // unterschiedliche Laenge, aber dieselbe Frage: wie viele Wochen stecken darin).
-// 40 ist der verbreitetste Vollzeit-Richtwert; wer einen anderen Rhythmus faehrt,
-// sieht die Markierung als Hinweis, nicht als Urteil - es gibt keine Ablehnung,
-// nur eine Zahl neben einer anderen.
-const OVERTIME_WEEKLY_HOURS = 40;
+// 40 ist der Rueckfall, solange niemand einen eigenen Wert gesetzt hat; die
+// Markierung bleibt ein Hinweis, kein Urteil - es gibt keine Ablehnung, nur
+// eine Zahl neben einer anderen.
+const DEFAULT_WEEKLY_HOURS = 40;
 
-function overtimeInfo(bounds, totalMinutes) {
+function overtimeInfo(bounds, totalMinutes, weeklyHours = DEFAULT_WEEKLY_HOURS) {
   if (!bounds) return null;
   const days = Math.round((parseLocalDateKey(bounds.to) - parseLocalDateKey(bounds.from)) / 86400000) + 1;
   if (days < 1) return null;
-  const expectedMinutes = Math.round((OVERTIME_WEEKLY_HOURS * 60 * days) / 7);
+  const expectedMinutes = Math.round((weeklyHours * 60 * days) / 7);
   return { expectedMinutes, over: totalMinutes > expectedMinutes };
 }
 
 // Feste Presets statt eines freien Zahlenfelds: der Server deckelt ohnehin auf
-// 24h (server/routes/schedule-reminders.js), und eine Handvoll sprechender
+// 24h (server/routes/schedule-preferences.js), und eine Handvoll sprechender
 // Werte ist schneller getroffen als eine Minutenzahl zu tippen.
 const REMINDER_OFFSET_PRESETS = [0, 5, 10, 15, 30, 60, 120];
 
@@ -158,17 +161,24 @@ function renderReminderSettings() {
   const options = REMINDER_OFFSET_PRESETS.map((minutes) =>
     `<option value="${minutes}"${Number(state.reminderOffsetMinutes) === minutes ? ' selected' : ''}>${esc(t(minutes === 0 ? 'schedule.reminderAtStart' : 'schedule.reminderMinutesBefore', { minutes }))}</option>`
   ).join('');
+  const weeklyHours = state.weeklyHours ?? DEFAULT_WEEKLY_HOURS;
   return '<div class="card card--padded schedule-reminder-settings">'
+    + '<h2 class="u-section-title">' + esc(t('schedule.mySettings')) + '</h2>'
     + '<div class="schedule-reminder-settings__row">'
     + toggleRowHtml({ label: t('schedule.reminderToggle'), checked: active, attrs: { id: 'schedule-reminder-toggle' } })
     + '<select class="input" id="schedule-reminder-offset"' + (active ? '' : ' disabled') + '>' + options + '</select>'
-    + '</div><p class="form-hint">' + esc(t('schedule.reminderHint')) + '</p></div>';
+    + '</div><p class="form-hint">' + esc(t('schedule.reminderHint')) + '</p>'
+    + '<div class="schedule-reminder-settings__row schedule-reminder-settings__row--hours">'
+    + '<label class="label" for="schedule-weekly-hours">' + esc(t('schedule.weeklyHoursLabel')) + '</label>'
+    + '<input class="input" type="number" min="1" max="168" step="1" id="schedule-weekly-hours" value="' + esc(String(weeklyHours)) + '">'
+    + '</div><p class="form-hint">' + esc(t('schedule.weeklyHoursHint')) + '</p></div>';
 }
 
-async function saveReminderSettings(offsetMinutes) {
+async function savePreference(patch) {
   try {
-    const result = await api.put('/schedule/reminders', { offsetMinutes });
-    state.reminderOffsetMinutes = result.data?.offsetMinutes ?? null;
+    const result = await api.put('/schedule/preferences', patch);
+    state.reminderOffsetMinutes = result.data?.reminderOffsetMinutes ?? null;
+    state.weeklyHours = result.data?.weeklyHours ?? null;
   } catch (err) {
     window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
   }
@@ -434,7 +444,8 @@ function overrideRows() {
 function renderStatistics() {
   const bounds = statistics.bounds || statisticBounds();
   const summary = statisticsSummary();
-  const overtime = overtimeInfo(bounds, summary.totalMinutes);
+  const weeklyHours = state.weeklyHours ?? DEFAULT_WEEKLY_HOURS;
+  const overtime = overtimeInfo(bounds, summary.totalMinutes, weeklyHours);
   const selectedUser = statistics.userId || currentUserId;
   const range = statistics.range;
   const countItems = [...summary.values];
@@ -460,7 +471,7 @@ function renderStatistics() {
       + '<div class="metric-grid schedule-stat-metrics' + (overtime?.over ? ' schedule-stat-metrics--with-overtime' : '') + '">'
       + '<article class="metric-card"><div class="metric-card__label">' + esc(t('schedule.shiftCounts')) + '</div><div class="metric-card__value">' + esc(String(summary.totalCount)) + '</div><div class="metric-card__note">' + esc(t('schedule.shifts')) + '</div></article>'
       + '<article class="metric-card"><div class="metric-card__label">' + esc(t('schedule.workedHours')) + '</div><div class="metric-card__value">' + esc(formatHours(summary.totalMinutes)) + '</div><div class="metric-card__note">' + esc(t('schedule.total')) + '</div></article>'
-      + (overtime?.over ? '<article class="metric-card metric-card--warning"><div class="metric-card__label">' + esc(t('schedule.overtime')) + '</div><div class="metric-card__value">+' + esc(formatHours(summary.totalMinutes - overtime.expectedMinutes)) + '</div><div class="metric-card__note">' + esc(t('schedule.overtimeNote', { hours: OVERTIME_WEEKLY_HOURS })) + '</div></article>' : '')
+      + (overtime?.over ? '<article class="metric-card metric-card--warning"><div class="metric-card__label">' + esc(t('schedule.overtime')) + '</div><div class="metric-card__value">+' + esc(formatHours(summary.totalMinutes - overtime.expectedMinutes)) + '</div><div class="metric-card__note">' + esc(t('schedule.overtimeNote', { hours: weeklyHours })) + '</div></article>' : '')
       + '</div>'
       + '<div class="schedule-stat-sections">'
       + '<section class="card card--padded schedule-stat-card"><div><h2 class="u-section-title">' + esc(t('schedule.shiftCounts')) + '</h2><p class="u-meta">' + esc(t('schedule.shiftCountsDescription')) + '</p></div>' + statisticsRows(countItems, (item) => String(item.count), (item) => item.count, t('schedule.noStatistics')) + '<div class="schedule-stat-total"><span>' + esc(t('schedule.total')) + '</span><strong>' + esc(String(summary.totalCount)) + '</strong></div></section>'
@@ -557,9 +568,12 @@ function renderShell() {
   root.addEventListener('change', (event) => {
     if (event.target.id === 'schedule-reminder-toggle') {
       const offset = event.target.checked ? Number(root.querySelector('#schedule-reminder-offset')?.value ?? 15) : null;
-      saveReminderSettings(offset);
+      savePreference({ reminderOffsetMinutes: offset });
     } else if (event.target.id === 'schedule-reminder-offset') {
-      saveReminderSettings(Number(event.target.value));
+      savePreference({ reminderOffsetMinutes: Number(event.target.value) });
+    } else if (event.target.id === 'schedule-weekly-hours') {
+      const hours = Math.min(168, Math.max(1, Math.round(Number(event.target.value) || DEFAULT_WEEKLY_HOURS)));
+      savePreference({ weeklyHours: hours });
     }
   });
 }

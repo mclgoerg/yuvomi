@@ -93,11 +93,11 @@ export function schedulePaths() {
     '/api/v1/schedule/feed/regenerate': {
       post: op({ summary: 'Regenerate own schedule ICS feed token', tag: 'Schedule', stateChanging: true }),
     },
-    '/api/v1/schedule/reminders': {
-      get: op({ summary: 'Get own shift-start reminder offset', tag: 'Schedule' }),
+    '/api/v1/schedule/preferences': {
+      get: op({ summary: 'Get own shift-start reminder offset and weekly-hours target', tag: 'Schedule' }),
       put: op({
-        summary: 'Set own shift-start reminder offset',
-        description: 'Minutes before a shift starts to be reminded; null disables the reminder. Triggers an immediate resync so the change takes effect without waiting for the next periodic pass.',
+        summary: 'Set own shift-start reminder offset and/or weekly-hours target',
+        description: 'Either field may be omitted to leave it unchanged; either may be set to null to reset it to its default (reminder off, 40h/week). A change to reminderOffsetMinutes triggers an immediate resync so it takes effect without waiting for the next periodic pass.',
         tag: 'Schedule',
         stateChanging: true,
         requestBody: jsonBody(null),

@@ -443,13 +443,25 @@ test('the shift-type icon picker is wired for both the create modal and inline e
 // A fixed weekly figure would be wrong for every range except a single week -
 // "current month" and "custom range" both need the same threshold SCALED to
 // however many days they actually span, not a flat 40h regardless of length.
-test('overtime scales its threshold to the selected range instead of a flat weekly figure', () => {
+// The threshold itself is also per-user configurable (schedule_weekly_hours,
+// server/routes/schedule-preferences.js), not a hardcoded constant - a
+// part-time and a full-time member of the same household work to different
+// targets.
+test('overtime scales its threshold to the selected range and to the user\'s own configured weekly hours', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  assert.match(schedulePage, /const OVERTIME_WEEKLY_HOURS = 40;/);
+  assert.match(schedulePage, /const DEFAULT_WEEKLY_HOURS = 40;/);
   const fnBody = schedulePage.slice(schedulePage.indexOf('function overtimeInfo'), schedulePage.indexOf('function statisticsSummary'));
   assert.match(fnBody, /days/, 'must derive a day count from the range, not assume a fixed period');
-  assert.match(fnBody, /OVERTIME_WEEKLY_HOURS \* 60 \* days\) \/ 7/, 'expected minutes must scale by days/7, not a constant');
+  assert.match(fnBody, /weeklyHours \* 60 \* days\) \/ 7/, 'expected minutes must scale by days/7 against the configurable target, not a constant');
+  assert.match(schedulePage, /state\.weeklyHours \?\? DEFAULT_WEEKLY_HOURS/, 'falls back to the default only when the user has not set their own target');
   assert.match(schedulePage, /overtime\?\.over/, 'the card only renders once the range is actually over its scaled threshold');
+});
+
+test('the weekly-hours target is a per-user preference, fetched and saved through /schedule/preferences', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /api\.get\('\/schedule\/preferences'\)/);
+  assert.match(schedulePage, /savePreference\(\{ weeklyHours: hours \}\)/);
+  assert.match(schedulePage, /id="schedule-weekly-hours"/);
 });
 
 test('the Statistics tab offers a print action that leaves nav/tabs/filters off the page', () => {

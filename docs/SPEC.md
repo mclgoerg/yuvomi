@@ -2570,6 +2570,14 @@ reassignment) instead of one `PUT` per day. Its cap is a separate constant from 
 *writes* real rows, cutting against the "computed on read, never materialized" rule above if it
 were allowed to run for years at a time; the number is sized for an absence, not a shadow pattern.
 
+**Overtime flag + print (Schedule v3):** the Statistics tab scales a per-user weekly-hours target
+(`schedule_weekly_hours`, see Personal preferences below; 40 by default) to the number of days in the
+selected range and, when the range's worked-hours total exceeds it, adds a third, warning-styled
+metric card showing the excess. A **Print** action in the same tab relies on the app's existing
+`@media print` baseline (`public/styles/layout.css`) layered with Schedule-specific print rules
+(`public/styles/schedule.css`) that hide the filters/tabs and lay out the two statistics tables for a
+clean page - no server-side PDF generation, the browser's native print-to-PDF does the rest.
+
 **Read-only export feed (Schedule v3):** Settings → Personal → Feed subscriptions → a schedule
 feed card exposes the signed-in member's own resolved shifts (a rolling window, 30 days back to
 365 days ahead) as a `webcal://`/`https://` ICS feed. Unlike the calendar and inventory-deadlines
@@ -2582,21 +2590,32 @@ days would be noise in a subscribed calendar app. Served by an unauthenticated
 recomputed on every request), managed via `GET/POST regenerate/DELETE /api/v1/schedule/feed`
 (each member manages only their own token). See `server/services/schedule-ics.js`.
 
-**Shift-start reminders (Schedule v3):** an opt-in push notification before an upcoming shift begins,
-set via `GET/PUT /api/v1/schedule/reminders` (`{ offsetMinutes }`, `null` disables it; `PUT` also
-triggers an immediate resync so the change takes effect without waiting for the next periodic pass).
-A pattern-derived shift is computed on read and has no stored row to hang a reminder off of, unlike
-every other reminder origin - `schedule_reminder_entries` (migration v172) is a small anchor table,
-one row per `(user_id, date_key)`, that `server/services/schedule-reminders.js`'s periodic sync
-(`syncAllScheduleReminders()`, called from the same notification pass as the pantry sync) creates for
-each upcoming qualifying day within a rolling 7-day window and cleans up once the day falls out of the
-window or stops qualifying. Only entries with a shift type carrying a `start_time` qualify - a free
-day has no start, and a timeless type (vacation, sick) has nothing to count down to, matching the ICS
-feed's "all day" rule above. The reminder fires at the shift's start time (converted from the
-household's wall-clock zone) minus the configured offset; a target that has already passed when the
-sync runs is not created, so a change doesn't retroactively fire for a shift that's already
-underway. `schedule_entry` is a **derived** reminder type like `pantry_item` (see Reminders below) -
-the sync rebuilds it every pass, so it cannot be hand-set through the generic reminders API.
+**Personal preferences (Schedule v3):** `GET/PUT /api/v1/schedule/preferences`
+(`{ reminderOffsetMinutes, weeklyHours }`, `server/routes/schedule-preferences.js`) holds two
+per-user settings, both nullable (either field may be omitted from a `PUT` to leave it unchanged, or
+set to `null` to reset it to its default):
+
+- **Shift-start reminders:** an opt-in push notification before an upcoming shift begins.
+  `reminderOffsetMinutes: null` (the default) disables it; setting it also triggers an immediate
+  resync so the change takes effect without waiting for the next periodic pass. A pattern-derived
+  shift is computed on read and has no stored row to hang a reminder off of, unlike every other
+  reminder origin - `schedule_reminder_entries` (migration v172) is a small anchor table, one row per
+  `(user_id, date_key)`, that `server/services/schedule-reminders.js`'s periodic sync
+  (`syncAllScheduleReminders()`, called from the same notification pass as the pantry sync) creates
+  for each upcoming qualifying day within a rolling 7-day window and cleans up once the day falls out
+  of the window or stops qualifying. Only entries with a shift type carrying a `start_time`
+  qualify - a free day has no start, and a timeless type (vacation, sick) has nothing to count down
+  to, matching the ICS feed's "all day" rule above. The reminder fires at the shift's start time
+  (converted from the household's wall-clock zone) minus the configured offset; a target that has
+  already passed when the sync runs is not created, so a change doesn't retroactively fire for a
+  shift that's already underway. `schedule_entry` is a **derived** reminder type like `pantry_item`
+  (see Reminders below) - the sync rebuilds it every pass, so it cannot be hand-set through the
+  generic reminders API.
+- **Weekly-hours target (`schedule_weekly_hours`, migration v173):** the personal full-time figure
+  the Statistics tab's overtime flag scales against (see "Overtime flag + print" above), `null`
+  falling back to 40h/week. Per-user rather than a household field, since a part-time and a full-time
+  member of the same household have different targets and the overtime card evaluates each member's
+  own range.
 
 ### Access Permissions (migration v74)
 

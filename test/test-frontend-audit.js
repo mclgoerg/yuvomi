@@ -14847,3 +14847,41 @@ test('der Lucide-Ausschnitt läuft nach dem Bundle und vor jedem Modul, das ihn 
   assert.deepEqual(early.map((s) => s.src), [],
     'Diese Skripte laufen vor dem Patch und rufen createIcons - der Aufruf ist dort ungescopt');
 });
+
+// --------------------------------------------------------------------------
+// SYMBOLAUSWAHL: die Scroll-Klasse der CSS trifft den Wrapper des Dialogs
+//
+// Gefunden auf einem echten Mobilgeraet (Schichtplan v3, Symbol-Feld): die CSS
+// setzte `display:flex; flex-direction:column; max-height:inherit;
+// min-height:0` auf `.icon-picker__form`, das erzeugte Markup in
+// buildDialog() (public/components/icon-picker.js) baut aber einen Wrapper
+// mit der Klasse `.icon-picker__body`. Ohne Treffer griff die Flex/Scroll-
+// Kette nie: das Ergebnis-Raster wuchs auf seine natuerliche Hoehe statt zu
+// scrollen, und die Fusszeile (Loeschen/Abbrechen) landete unterhalb des
+// `max-height`+`overflow:hidden` des Dialogs - auf kurzen Viewports komplett
+// abgeschnitten und unerreichbar. Betraf alle drei Verwendungsstellen
+// (Schnellzugriffe, Kalender, Schichtplan) gleichermassen, seit #873 - auf
+// dem Desktop blieb genug Raum, dass es nie auffiel.
+// --------------------------------------------------------------------------
+test('die Scroll-Klasse der Symbolauswahl-CSS trifft einen wirklich erzeugten Wrapper', () => {
+  const js = read('../public/components/icon-picker.js');
+  const css = read('../public/styles/icon-picker.css');
+
+  const wrapperMatch = /<div class="(icon-picker__\w+)">/.exec(js);
+  assert.ok(wrapperMatch, 'buildDialog() baut keinen icon-picker__*-Wrapper mehr - Guard veraltet');
+  const wrapperClass = wrapperMatch[1];
+
+  assert.ok(css.includes(`.${wrapperClass} {`),
+    `Die CSS setzt keine Regel fuer ".${wrapperClass}" - genau der Wrapper, den `
+    + 'buildDialog() tatsaechlich erzeugt. Ohne eine Regel hier bekommt der Dialog keinen '
+    + 'Flex-Kontext, das Ergebnis-Raster scrollt nicht und die Fusszeile (Loeschen/'
+    + 'Abbrechen) kann vom `overflow: hidden` des <dialog> abgeschnitten werden - auf '
+    + 'kurzen Viewports unerreichbar.');
+
+  const rule = new RegExp(`\\.${wrapperClass}\\s*\\{[^}]*\\}`).exec(css)[0];
+  for (const prop of ['display: flex', 'flex-direction: column', 'min-height: 0']) {
+    assert.ok(rule.includes(prop),
+      `.${wrapperClass} traegt kein "${prop}" - ohne das gibt der Wrapper seine Hoehe `
+      + 'nicht an .icon-picker__results weiter, das Raster scrollt dann nicht.');
+  }
+});
