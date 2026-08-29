@@ -2023,7 +2023,8 @@ function scheduleEntryLabel(entry) {
 function scheduleEntryTitle(entry) {
   const owner = scheduleOwnerName(entry);
   const time = scheduleTimeLabel(entry.shift_type);
-  return entry.shift_type.name + (owner ? " · " + owner : "") + (time ? " · " + time : "");
+  const extra = entry.source === 'extra' ? " · " + t('schedule.extraBadgeLabel') : "";
+  return entry.shift_type.name + (owner ? " · " + owner : "") + (time ? " · " + time : "") + extra;
 }
 
 function scheduleIsFullDayShift(entry) {
@@ -2038,11 +2039,19 @@ function scheduleTimeLabel(type) {
   return type.start_time + "–" + type.end_time + (crossesDay ? " +1" : "") + (fullDay ? " · 24 h" : "");
 }
 
+// Additiv zu Muster/Override, nie ein Ersatz (server/routes/schedule-extras.js)
+// - dieselbe Kennzeichnung wie in schedule.js/dashboard.js, damit Bereitschaft
+// neben einer regulaeren Schicht auch in der Kalender-Ueberlagerung als
+// ZUSAETZLICH erkennbar bleibt.
+function scheduleEntryExtraBadge(entry) {
+  return entry.source === 'extra' ? `<i data-lucide="layers" class="schedule-entry__extra-badge" aria-label="${esc(t('schedule.extraBadgeLabel'))}"></i>` : '';
+}
+
 function renderScheduleChip(entry, className = 'allday-holiday') {
   const type = entry.shift_type;
   const label = scheduleEntryLabel(entry);
   const start = type.start_time ? '<small class="schedule-entry__start">' + esc(type.start_time) + '</small>' : '';
-  return `<div class="${className} schedule-entry" style="--holi-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(label)}</span>${start}</div>`;
+  return `<div class="${className} schedule-entry" style="--holi-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(label)}</span>${scheduleEntryExtraBadge(entry)}${start}</div>`;
 }
 function renderScheduleTimeBlock(entry, className) {
   const type = entry.shift_type;
@@ -2050,7 +2059,7 @@ function renderScheduleTimeBlock(entry, className) {
   const end = timeToMinutes(type.end_time);
   const duration = Math.max((end > start ? end : 24 * 60) - start, 30);
   const bounds = className === 'week-event' ? 'left:2px;width:calc(100% - 4px);' : 'left:calc(4px);width:calc(100% - 14px);';
-  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);${bounds}--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(scheduleEntryLabel(entry))}</span><small>${esc(scheduleTimeLabel(type))}</small></div>`;
+  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);${bounds}--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(scheduleEntryLabel(entry))}</span>${scheduleEntryExtraBadge(entry)}<small>${esc(scheduleTimeLabel(type))}</small></div>`;
 }
 
 function monthDayAriaLabel(date, total) {
@@ -3041,6 +3050,8 @@ export const __test = {
   colorToSave,
   sameColor,
   EVENT_COLORS,
+  renderScheduleChip,
+  scheduleEntryTitle,
 };
 
 function renderAgendaEvent(ev, dayStr) {

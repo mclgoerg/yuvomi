@@ -3710,6 +3710,13 @@ svg.weather-forecast__icon {
   flex: 0 0 auto;
 }
 
+.schedule-widget-row__extra-badge {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+
 .schedule-widget-empty {
   padding: var(--space-2);
 }

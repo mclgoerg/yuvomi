@@ -4657,6 +4657,13 @@
         "typeOrphaned": "Der Ersteller ist nicht mehr im Haushalt - nur ein Admin kann diesen Schichttyp ändern.",
         "deletePatternTitle": "Muster „{{name}}\" löschen?",
         "deletePatternDetail": "Die {{count}} Zyklustage dieses Musters gehen mit verloren. Das lässt sich nicht rückgängig machen.",
-        "deletePatternDetail_one": "Der eine Zyklustag dieses Musters geht mit verloren. Das lässt sich nicht rückgängig machen."
+        "deletePatternDetail_one": "Der eine Zyklustag dieses Musters geht mit verloren. Das lässt sich nicht rückgängig machen.",
+        "extraShifts": "Zusatzschichten",
+        "addExtraShift": "Zusatzschicht hinzufügen",
+        "editExtraShift": "Zusatzschicht bearbeiten",
+        "emptyExtraShiftsTitle": "Noch keine Zusatzschichten",
+        "emptyExtraShiftsDescription": "Füge einer Schicht, die es schon gibt, eine Zusatzschicht hinzu - zum Beispiel Bereitschaft neben einer regulären Schicht.",
+        "extraReminderOffset": "Vor dieser Schicht erinnern",
+        "extraBadgeLabel": "Zusatz"
     }
 }

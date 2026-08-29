@@ -4657,6 +4657,13 @@
         "typeOrphaned": "Its creator has left the household - only an administrator can change this shift type.",
         "deletePatternTitle": "Delete pattern \"{{name}}\"?",
         "deletePatternDetail": "Its {{count}} cycle days go with it. This cannot be undone.",
-        "deletePatternDetail_one": "Its one cycle day goes with it. This cannot be undone."
+        "deletePatternDetail_one": "Its one cycle day goes with it. This cannot be undone.",
+        "extraShifts": "Extra shifts",
+        "addExtraShift": "Add extra shift",
+        "editExtraShift": "Edit extra shift",
+        "emptyExtraShiftsTitle": "No extra shifts yet",
+        "emptyExtraShiftsDescription": "Add an extra shift for a day that already has one - on-call alongside a regular shift, for example.",
+        "extraReminderOffset": "Remind me before this shift",
+        "extraBadgeLabel": "Extra"
     }
 }

@@ -2058,7 +2058,15 @@ function renderScheduleWidget(schedule, users, size) {
   // 1x2 nur der Punkt, an dem der Ueberlauf von fuenf Mitgliedern auf sechs
   // verschoben wird, nicht behoben - genau der Fehler, den #928 bei den
   // Notizen schon hatte (renderPinnedNotes ist das Vorbild hier).
-  const onShift = entries.filter((entry) => entry.shift_type).length;
+  //
+  // Zaehlt PERSONEN, nicht Schicht-Eintraege: eine Person mit einer regulaeren
+  // Schicht UND einem Extra (Bereitschaft daneben, server/routes/schedule-extras.js)
+  // hat zwei Eintraege am selben Tag, aber die Ueberschrift beantwortet "wie
+  // viele arbeiten heute", nicht "wie viele Schicht-Zeilen gibt es".
+  const onShift = new Set(entries.filter((entry) => entry.shift_type).map((entry) => Number(entry.user_id))).size;
+  // Ungekuerzt fuer die Ueberschrift (der wahre Bestand), gekuerzt nur fuer die
+  // sichtbaren Zeilen - dieselbe Teilung wie renderCountdowns (eigener `total`-
+  // Parameter neben den durch listRowCap() begrenzten Zeilen).
   const rows = entries.slice(0, listRowCap(size)).map((entry) => {
     const user = users.find((item) => Number(item.id) === Number(entry.user_id));
     const type = entry.shift_type;
@@ -2076,11 +2084,12 @@ function renderScheduleWidget(schedule, users, size) {
     // unsichtbare Abhaengigkeit zwischen zwei Stylesheets, die nie gemeinsam
     // laufen wuerden.
     const icon = type?.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-widget-row__icon" aria-hidden="true"></i>` : '';
+    const badge = entry.source === 'extra' ? `<i data-lucide="layers" class="schedule-widget-row__extra-badge" aria-label="${esc(t('schedule.extraBadgeLabel'))}"></i>` : '';
     return `
       <div class="schedule-widget-row" data-route="/schedule" role="button" tabindex="0">
         <span class="schedule-widget-row__avatar" style="background:${esc(accent)};color:${getReadableTextColor(accent)}">${avatarInner}</span>
         <span class="schedule-widget-row__name">${esc(user?.display_name ?? '')}</span>
-        <span class="schedule-widget-row__shift">${icon}<span class="schedule-widget-row__dot" style="--schedule-color:${esc(swatchColor)}"></span>${shiftLabel}</span>
+        <span class="schedule-widget-row__shift">${icon}<span class="schedule-widget-row__dot" style="--schedule-color:${esc(swatchColor)}"></span>${shiftLabel}${badge}</span>
       </div>`;
   }).join('');
 

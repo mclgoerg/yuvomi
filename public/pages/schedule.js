@@ -17,7 +17,7 @@ let scheduleFab = null;
 let currentUserId = null;
 let canManageOthers = false;
 let activeView = 'patterns';
-let state = { users: [], types: [], patterns: [], overrides: [], entries: [], warnings: [], reminderOffsetMinutes: null, weeklyHours: null };
+let state = { users: [], types: [], patterns: [], overrides: [], extras: [], entries: [], warnings: [], reminderOffsetMinutes: null, weeklyHours: null };
 let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', from: '', to: '', entries: [], bounds: null, loading: false };
 // Schichtfarben sind NUTZERFARBEN (freier Waehler im Formular); die Presets
 // sind nur Startwerte. Eine Grenze gilt trotzdem: keine davon darf die STIMME
@@ -69,11 +69,12 @@ const clockLabel = (shiftType) => {
 
 async function load() {
   const day = todayKey();
-  const [users, types, patternResult, overrides, entries, preferences] = await Promise.all([
+  const [users, types, patternResult, overrides, extras, entries, preferences] = await Promise.all([
     api.get('/auth/users'),
     api.get('/schedule/shift-types'),
     api.get('/schedule/patterns'),
     api.get('/schedule/overrides'),
+    api.get('/schedule/extras'),
     api.get(`/schedule/entries?from=${day}&to=${day}`),
     api.get('/schedule/preferences'),
   ]);
@@ -84,6 +85,7 @@ async function load() {
     types: types.data ?? [],
     patterns: patterns.map((pattern, index) => ({ ...pattern, days: days[index].data ?? [] })),
     overrides: overrides.data ?? [],
+    extras: extras.data ?? [],
     entries: entries.data?.entries ?? [],
     warnings: entries.data?.warnings ?? [],
     reminderOffsetMinutes: preferences.data?.reminderOffsetMinutes ?? null,
@@ -174,11 +176,27 @@ function overtimeInfo(entries, weeklyHours = DEFAULT_WEEKLY_HOURS) {
 // Werte ist schneller getroffen als eine Minutenzahl zu tippen.
 const REMINDER_OFFSET_PRESETS = [0, 5, 10, 15, 30, 60, 120];
 
+function reminderOffsetOptions(selectedMinutes) {
+  return REMINDER_OFFSET_PRESETS.map((minutes) =>
+    `<option value="${minutes}"${Number(selectedMinutes) === minutes ? ' selected' : ''}>${esc(t(minutes === 0 ? 'schedule.reminderAtStart' : 'schedule.reminderMinutesBefore', { minutes }))}</option>`
+  ).join('');
+}
+
+// Ein eigener Vorlauf je Extra, unabhaengig vom haushaltweiten Feld unten -
+// eine Bereitschaft will vielleicht einen laengeren Vorlauf als die eigene
+// regulaere Schicht (server/services/schedule-reminders.js#syncExtraRemindersForUser).
+// Gleiches Umschalter-plus-Auswahl-Muster wie renderReminderSettings() unten,
+// damit sich beide Stellen gleich bedienen, auch wenn diese hier in einem
+// Formular statt einer Karte lebt.
+function reminderOffsetField(selectedMinutes) {
+  const active = selectedMinutes != null;
+  return '<div class="form-field schedule-active-field"><span class="label">' + esc(t('schedule.extraReminderOffset')) + '</span><label class="toggle"><input name="reminder_enabled" type="checkbox"' + (active ? ' checked' : '') + '><span class="toggle__track"></span></label></div>'
+    + '<select class="input" name="reminder_offset_minutes"' + (active ? '' : ' disabled') + '>' + reminderOffsetOptions(selectedMinutes) + '</select>';
+}
+
 function renderReminderSettings() {
   const active = state.reminderOffsetMinutes != null;
-  const options = REMINDER_OFFSET_PRESETS.map((minutes) =>
-    `<option value="${minutes}"${Number(state.reminderOffsetMinutes) === minutes ? ' selected' : ''}>${esc(t(minutes === 0 ? 'schedule.reminderAtStart' : 'schedule.reminderMinutesBefore', { minutes }))}</option>`
-  ).join('');
+  const options = reminderOffsetOptions(state.reminderOffsetMinutes);
   const weeklyHours = state.weeklyHours ?? DEFAULT_WEEKLY_HOURS;
   return '<div class="card card--padded schedule-reminder-settings">'
     + '<h2 class="u-section-title">' + esc(t('schedule.mySettings')) + '</h2>'
@@ -459,6 +477,40 @@ function overrideRows() {
   }).join('') + '</div>';
 }
 
+// Additiv zu Muster/Override, nie ein Ersatz - dieselbe Kennzeichnung ueberall,
+// wo ein Eintrag mit source==='extra' auftauchen kann (Heute-Liste hier,
+// Uebersichts-Kachel in dashboard.js, Kalender-Ueberlagerung in calendar.js),
+// damit Bereitschaft neben einer regulaeren Schicht auf den ersten Blick als
+// ZUSAETZLICH erkennbar bleibt, nicht wie ein zweiter Haupttermin.
+function extraBadge() {
+  return '<i data-lucide="layers" class="schedule-extra-badge" aria-label="' + esc(t('schedule.extraBadgeLabel')) + '"></i>';
+}
+
+function emptyExtraShiftsState() {
+  return emptyStateHTML({
+    icon: 'calendar-clock',
+    title: t('schedule.emptyExtraShiftsTitle'),
+    description: t('schedule.emptyExtraShiftsDescription'),
+    action: { label: t('schedule.addExtraShift'), icon: 'plus', attrs: { 'data-action': 'open-create-extra' } },
+  });
+}
+
+function extraRows() {
+  if (!state.extras.length) return emptyExtraShiftsState();
+  const sorted = [...state.extras].sort((a, b) => Number(a.user_id) - Number(b.user_id) || a.date_key.localeCompare(b.date_key));
+  return '<div class="list-rows">' + sorted.map((extra) => {
+    const type = state.types.find((item) => Number(item.id) === Number(extra.shift_type_id));
+    const swatchColor = type ? type.color : 'var(--color-border)';
+    const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : '';
+    const meta = [userName(extra.user_id), typeLabel, extra.note].filter(Boolean).join(' · ');
+    const icon = type?.icon ? '<i data-lucide="' + esc(type.icon) + '" class="schedule-type-icon" aria-hidden="true"></i>' : '';
+    const actions = canWrite(extra.user_id)
+      ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-extra" data-id="' + extra.id + '">' + esc(t('common.edit')) + '</button><button type="button" class="btn btn--danger" data-action="delete-extra" data-id="' + extra.id + '">' + esc(t('schedule.delete')) + '</button></span>'
+      : '';
+    return '<div class="list-row schedule-override"><span class="schedule-swatch" style="--schedule-color:' + esc(swatchColor) + '"></span>' + icon + extraBadge() + '<div class="list-row__main"><span class="list-row__name">' + esc(formatDate(extra.date_key)) + '</span><span class="list-row__meta">' + esc(meta) + '</span></div>' + actions + '</div>';
+  }).join('') + '</div>';
+}
+
 function renderStatistics() {
   const bounds = statistics.bounds || statisticBounds();
   const summary = statisticsSummary();
@@ -541,7 +593,8 @@ function renderToday() {
     const name = type ? esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name) : esc(t('schedule.freeDay'));
     const meta = type ? `${esc(userName(entry.user_id))} · ${esc(clockLabel(type))}` : esc(userName(entry.user_id));
     const icon = type?.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-type-icon" aria-hidden="true"></i>` : '';
-    return `<div class="list-row schedule-entry-row"><span class="schedule-swatch" style="--schedule-color:${esc(swatchColor)}"></span>${icon}<div class="list-row__main"><span class="list-row__name">${name}</span><span class="list-row__meta">${meta}</span></div></div>`;
+    const badge = entry.source === 'extra' ? extraBadge() : '';
+    return `<div class="list-row schedule-entry-row"><span class="schedule-swatch" style="--schedule-color:${esc(swatchColor)}"></span>${icon}${badge}<div class="list-row__main"><span class="list-row__name">${name}</span><span class="list-row__meta">${meta}</span></div></div>`;
   }).join('')}</div>`;
 }
 
@@ -618,6 +671,7 @@ function renderPage() {
       ? '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? state.patterns.map(patternCard).join('') : emptyPatternState()) + '</section>'
       : activeView === 'overrides'
         ? '<section class="schedule-library schedule-library--overrides"><h2 class="u-section-title">' + esc(t('schedule.overrides')) + '</h2>' + overrideRows() + '</section>'
+          + '<section class="schedule-library schedule-library--extras"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.extraShifts')) + '</h2><button type="button" class="btn btn--secondary" data-action="open-create-extra"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.addExtraShift')) + '</button></div>' + extraRows() + '</section>'
         : renderStatistics();
   const body = root.querySelector('.schedule-body');
   body.replaceChildren();
@@ -681,6 +735,68 @@ function openOverrideEditModal(group) {
     size: 'md',
     content,
     onSave: (modal) => modal.querySelector('#schedule-create-form')?.addEventListener('submit', saveCreatedSchedule),
+  });
+}
+
+/**
+ * Additiv zu Muster/Override, deshalb ein eigenes, kleineres Formular statt
+ * einer weiteren Verzweigung in openScheduleCreateModal(): kein Umschalter
+ * zwischen Einzeltag und Bereich fehlt trotzdem - "Bereitschaft die ganze
+ * Woche" ist derselbe reale Fall wie beim Muster-Fuellen, nur ohne dessen
+ * ON-CONFLICT-Semantik (jede Zeile ist unabhaengig, server/routes/schedule-extras.js).
+ */
+function openExtraCreateModal() {
+  const content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="extra-create">'
+    + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + userOptions(selectedOwner()) + '</select>')
+    + '<div class="form-field schedule-active-field"><span class="label">' + esc(t('schedule.fillRange')) + '</span><label class="toggle"><input name="fill_range" type="checkbox"><span class="toggle__track"></span></label></div>'
+    + '<div data-field="single-date">' + formField(t('schedule.date'), '<yuvomi-datepicker required name="date_key" type="date" label="' + esc(t('schedule.date')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>') + '</div>'
+    + '<div data-field="range-dates" hidden>'
+    + formField(t('schedule.rangeFrom'), '<yuvomi-datepicker name="range_from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>')
+    + formField(t('schedule.rangeTo'), '<yuvomi-datepicker name="range_to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>')
+    + '</div>'
+    + formField(t('schedule.shiftTypes'), '<select class="input" required name="shift_type_id">' + typeOptions(null, false) + '</select>')
+    + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000">')
+    + reminderOffsetField(null)
+    + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
+  openModal({
+    title: t('schedule.addExtraShift'),
+    size: 'md',
+    content,
+    onSave: (modal) => {
+      const form = modal.querySelector('#schedule-create-form');
+      form?.querySelector('[name="fill_range"]')?.addEventListener('change', (event) => {
+        const range = event.currentTarget.checked;
+        form.querySelector('[data-field="single-date"]').hidden = range;
+        form.querySelector('[data-field="range-dates"]').hidden = !range;
+      });
+      form?.querySelector('[name="reminder_enabled"]')?.addEventListener('change', (event) => {
+        form.querySelector('[name="reminder_offset_minutes"]').disabled = !event.currentTarget.checked;
+      });
+      form?.addEventListener('submit', saveCreatedSchedule);
+    },
+  });
+}
+
+function openExtraEditModal(extra) {
+  const content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="extra-edit">'
+    + '<input type="hidden" name="id" value="' + extra.id + '">'
+    + formField(t('schedule.owner'), '<input class="input" readonly value="' + esc(userName(extra.user_id)) + '">')
+    + formField(t('schedule.date'), '<yuvomi-datepicker required name="date_key" type="date" label="' + esc(t('schedule.date')) + '" value="' + esc(extra.date_key) + '"></yuvomi-datepicker>')
+    + formField(t('schedule.shiftTypes'), '<select class="input" required name="shift_type_id">' + typeOptions(extra.shift_type_id, false) + '</select>')
+    + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000" value="' + esc(extra.note ?? '') + '">')
+    + reminderOffsetField(extra.reminder_offset_minutes)
+    + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
+  openModal({
+    title: t('schedule.editExtraShift'),
+    size: 'md',
+    content,
+    onSave: (modal) => {
+      const form = modal.querySelector('#schedule-create-form');
+      form?.querySelector('[name="reminder_enabled"]')?.addEventListener('change', (event) => {
+        form.querySelector('[name="reminder_offset_minutes"]').disabled = !event.currentTarget.checked;
+      });
+      form?.addEventListener('submit', saveCreatedSchedule);
+    },
   });
 }
 
@@ -786,6 +902,27 @@ async function saveCreatedSchedule(event) {
       for (const span of leftovers) {
         await api.delete(`/schedule/overrides?user_id=${userId}&from=${span.from}&to=${span.to}`);
       }
+    }
+    if (form.dataset.form === 'extra-create') {
+      const payload = {
+        user_id: Number(data.user_id),
+        shift_type_id: Number(data.shift_type_id),
+        note: data.note,
+        reminder_offset_minutes: form.elements.reminder_enabled.checked ? Number(data.reminder_offset_minutes) : null,
+      };
+      if (form.elements.fill_range?.checked) {
+        await api.post('/schedule/extras/fill', { ...payload, from: data.range_from, to: data.range_to });
+      } else {
+        await api.post('/schedule/extras', { ...payload, date_key: data.date_key });
+      }
+    }
+    if (form.dataset.form === 'extra-edit') {
+      await api.put(`/schedule/extras/${data.id}`, {
+        date_key: data.date_key,
+        shift_type_id: Number(data.shift_type_id),
+        note: data.note,
+        reminder_offset_minutes: form.elements.reminder_enabled.checked ? Number(data.reminder_offset_minutes) : null,
+      });
     }
     await load();
     renderPage();
@@ -941,6 +1078,18 @@ async function action(event) {
       if (!confirmed) return;
       await api.delete(`/schedule/overrides?user_id=${userId}&from=${from}&to=${to}`);
     }
+    if (button.dataset.action === 'open-create-extra') {
+      openExtraCreateModal();
+      return;
+    }
+    if (button.dataset.action === 'edit-extra') {
+      const extra = state.extras.find((item) => Number(item.id) === Number(button.dataset.id));
+      if (extra) openExtraEditModal(extra);
+      return;
+    }
+    // Eine Zeile, kein Bereich - dieselbe Begruendung wie 'delete-shift': keine
+    // Rueckfrage noetig, wo genau eine Zeile verschwindet, nicht mehrere Tage.
+    if (button.dataset.action === 'delete-extra') await api.delete(`/schedule/extras/${button.dataset.id}`);
     if (button.dataset.action === 'save-days') {
       const details = button.closest('[data-pattern]');
       const days = [...details.querySelectorAll('[data-day]')].map((select) => ({

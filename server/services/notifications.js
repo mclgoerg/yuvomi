@@ -104,6 +104,7 @@ const REMINDER_ORIGINS = {
   inventory_tracked_date: { titleKey: 'nav.inventory',          url: '/inventory' },
   pantry_item:            { titleKey: 'nav.pantry',             url: '/pantry' },
   schedule_entry:         { titleKey: 'nav.schedule',           url: '/schedule' },
+  schedule_extra_entry:   { titleKey: 'nav.schedule',           url: '/schedule' },
 };
 
 /**
@@ -159,7 +160,7 @@ function reminderPayload(reminder, locale) {
     body = trackedDateBody(reminder);
   } else if (reminder.entity_type === 'pantry_item' && reminder.entity_title) {
     body = pantryExpiryBody(reminder);
-  } else if (reminder.entity_type === 'schedule_entry' && reminder.entity_title) {
+  } else if ((reminder.entity_type === 'schedule_entry' || reminder.entity_type === 'schedule_extra_entry') && reminder.entity_title) {
     body = scheduleEntryBody(reminder);
   }
   return {
@@ -339,6 +340,10 @@ export async function processDueNotifications({
           SELECT t.name FROM schedule_reminder_entries e JOIN schedule_shift_types t ON t.id = e.shift_type_id
           WHERE e.id = r.entity_id
         )
+        WHEN 'schedule_extra_entry' THEN (
+          SELECT t.name FROM schedule_extra_shifts e JOIN schedule_shift_types t ON t.id = e.shift_type_id
+          WHERE e.id = r.entity_id
+        )
       END AS entity_title,
       CASE WHEN r.entity_type = 'inventory_item'
         THEN (SELECT purchase_date FROM inventory_items WHERE id = r.entity_id) END AS inv_purchase_date,
@@ -348,10 +353,16 @@ export async function processDueNotifications({
         THEN (SELECT date FROM inventory_item_dates WHERE id = r.entity_id) END AS inv_tracked_date,
       CASE WHEN r.entity_type = 'pantry_item'
         THEN (SELECT expires_on FROM pantry_items WHERE id = r.entity_id) END AS pantry_expires_on,
-      CASE WHEN r.entity_type = 'schedule_entry' THEN (
-        SELECT t.start_time FROM schedule_reminder_entries e JOIN schedule_shift_types t ON t.id = e.shift_type_id
-        WHERE e.id = r.entity_id
-      ) END AS schedule_start_time,
+      CASE
+        WHEN r.entity_type = 'schedule_entry' THEN (
+          SELECT t.start_time FROM schedule_reminder_entries e JOIN schedule_shift_types t ON t.id = e.shift_type_id
+          WHERE e.id = r.entity_id
+        )
+        WHEN r.entity_type = 'schedule_extra_entry' THEN (
+          SELECT t.start_time FROM schedule_extra_shifts e JOIN schedule_shift_types t ON t.id = e.shift_type_id
+          WHERE e.id = r.entity_id
+        )
+      END AS schedule_start_time,
       CASE WHEN r.entity_type = 'subscription'
         THEN (SELECT amount FROM budget_subscriptions WHERE id = r.entity_id) END AS sub_amount,
       CASE WHEN r.entity_type = 'subscription'

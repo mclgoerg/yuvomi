@@ -102,6 +102,17 @@ export function scheduleData(from, to, userId) {
     const overrides = database.prepare('SELECT * FROM schedule_overrides WHERE user_id = ? AND date_key BETWEEN ? AND ?').all(memberId, from, to);
     const resolved = resolveEntries({ from, to, userId: memberId, patterns: patterns.filter((p) => p.user_id === memberId), patternDays, overrides });
     entries.push(...resolved.entries); warnings.push(...resolved.warnings);
+    // Additiv zum Ergebnis von resolveEntries(), nie ein Ersatz dafuer: ein
+    // Extra (Bereitschaft neben einer regulaeren Schicht) zaehlt unabhaengig
+    // davon, ob der Tag ueberhaupt eine primaere Schicht hat. Deshalb kein
+    // Umweg ueber resolveEntries()'s Tag-fuer-Tag-Schleife - eine
+    // schedule_extra_shifts-Zeile ist schon eine fertige Tatsache fuer genau
+    // dieses Datum, es gibt nichts an ihr aufzuloesen.
+    const extras = database.prepare('SELECT * FROM schedule_extra_shifts WHERE user_id = ? AND date_key BETWEEN ? AND ?').all(memberId, from, to);
+    for (const row of extras) {
+      entries.push({ user_id: memberId, date_key: row.date_key, source: 'extra', extra_id: row.id,
+        shift_type_id: row.shift_type_id, note: row.note ?? null, reminder_offset_minutes: row.reminder_offset_minutes, is_free: false });
+    }
   }
   const typeIds = [...new Set(entries.map((entry) => entry.shift_type_id).filter(Boolean))];
   const types = new Map();

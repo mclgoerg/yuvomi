@@ -2570,10 +2570,71 @@ reassignment) instead of one `PUT` per day. Its cap is a separate constant from 
 *writes* real rows, cutting against the "computed on read, never materialized" rule above if it
 were allowed to run for years at a time; the number is sized for an absence, not a shadow pattern.
 
-**Overtime flag + print (Schedule v3):** the Statistics tab scales a per-user weekly-hours target
-(`schedule_weekly_hours`, see Personal preferences below; 40 by default) to the number of days in the
-selected range and, when the range's worked-hours total exceeds it, adds a third, warning-styled
-metric card showing the excess. A **Print** action in the same tab relies on the app's existing
+#### Schedule Extra Shifts (Schedule v4, migration 174)
+
+Additive to whatever the primary pattern/override slot resolves for a day - never a replacement
+for it, and deliberately not a generalization of Schedule Overrides' one-row-per-day model. The
+motivating case: on-call stacked on top of a regular shift on the same date.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| user_id | INTEGER | NOT NULL, FK → Users (CASCADE) |
+| date_key | TEXT | NOT NULL, YYYY-MM-DD |
+| shift_type_id | INTEGER | NOT NULL, FK → Schedule Shift Types (RESTRICT) — unlike an override, an extra only exists to *add* a shift, so there's no "extra-free" concept to encode |
+| note | TEXT | optional |
+| reminder_offset_minutes | INTEGER | optional, own per-extra shift-start reminder lead time — independent of the household-wide `schedule_reminder_offset_minutes` below |
+| created_by | INTEGER | FK → Users (SET NULL) |
+| created_at | TEXT | ISO 8601 |
+
+Deliberately **no `UNIQUE` constraint** — arbitrarily many rows per user per day are allowed,
+including duplicate `shift_type_id` (a genuine split shift of the same type is as valid a case as
+two different types). `server/routes/schedule.js#scheduleData()` merges extras into the resolved
+entries list (`source: 'extra'`, `extra_id`) after the primary pattern/override resolution, not
+inside `resolveEntries()` itself — that function's whole job is date-range materialization and
+override-beats-pattern precedence, and an extra needs neither: it's unconditionally additive
+regardless of what the primary slot resolved (or failed to resolve) for that date, including a day
+with no primary shift at all.
+
+CRUD lives in its own router, `server/routes/schedule-extras.js` (mounted at
+`/api/v1/schedule/extras`, same "own file to dodge a cycle" reason as `schedule-feed.js` and
+`schedule-preferences.js` — it calls `syncScheduleRemindersForUser()` after every write for an
+immediate resync): `GET /` (list), `POST /` (single day), `POST /fill` (a date range in one call,
+capped at `MAX_FILL_DAYS` like `/overrides/fill` but a plain insert loop, no `ON CONFLICT` upsert
+needed since every row is independent), `PUT /:id` and `DELETE /:id` — addressed by the extra's own
+id, never by `(user_id, date_key)` like overrides, since a day can hold more than one.
+
+**ICS export:** the UID scheme widens for extras only (`schedule-entry-{userId}-{dateKey}@yuvomi`
+stays as-is for the primary entry; an extra appends `-extra-{id}`) — without it, two VEVENTs for the
+same user and date would share a UID, and a subscribed calendar client (Google/Apple/Outlook)
+dedupes by UID per RFC 5545, silently hiding one of the two shifts.
+
+**Shift-start reminders:** extras get their **own** `entity_type` (`schedule_extra_entry`, migration
+175, the sixth widening of `reminders.entity_type`) and their **own** configurable offset
+(`reminder_offset_minutes` above) rather than inheriting the household-wide setting — on-call
+plausibly wants a different lead time than a regular shift. No anchor table needed here, unlike
+`schedule_entry`: an extra is already a real stored row with a stable id from the moment it's
+created, so `reminders.entity_id` points directly at `schedule_extra_shifts.id`.
+`server/services/schedule-reminders.js`'s primary-path sync filters to `source !== 'extra'` before
+computing its own qualifying set — otherwise a same-day extra would collide with the primary
+anchor's `(user_id, date_key)`-keyed lookup.
+
+**Frontend:** a separate "Extra shifts" list on the Schedule page's Overrides tab (not folded into
+the grouped override editor, whose merge key assumes at most one row per `(user_id, date_key)` and
+has no per-day disambiguator), each row shown with a small distinguishing badge (also applied to the
+dashboard "who's working today" widget and the Calendar overlay) so an extra reads as *additional*
+rather than a second primary entry.
+
+**Overtime flag + print (Schedule v3):** the Statistics tab checks every rolling 7-day window
+within the selected range against a per-user weekly-hours target (`schedule_weekly_hours`, see
+Personal preferences below; 40 by default) and, if any window's worked-hours total exceeds it, adds
+a third, warning-styled metric card showing the worst window's excess. Deliberately a rolling window,
+not fixed calendar weeks or an average over the whole range: a fixed week would cut a contiguous
+run of shifts that straddles a week boundary in half, and an average over the whole range let a
+quiet week elsewhere in the same month cancel out a real overtime week (most people don't work all
+7 days, so spreading the weekly target evenly across every calendar day in the range set a target a
+real week's hours could rarely cross). Only the worst window's excess is reported, never the sum
+across all crossings - overlapping windows share days, so summing would count the same hours
+repeatedly. A **Print** action in the same tab relies on the app's existing
 `@media print` baseline (`public/styles/layout.css`) layered with Schedule-specific print rules
 (`public/styles/schedule.css`) that hide the filters/tabs and lay out the two statistics tables for a
 clean page - no server-side PDF generation, the browser's native print-to-PDF does the rest.

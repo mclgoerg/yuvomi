@@ -44,6 +44,11 @@ function insertOverride(userId, dateKey, shiftTypeId, note = null) {
     .run(userId, dateKey, shiftTypeId, note);
 }
 
+function insertExtra(userId, dateKey, shiftTypeId, note = null) {
+  return db.prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, note) VALUES (?, ?, ?, ?)')
+    .run(userId, dateKey, shiftTypeId, note).lastInsertRowid;
+}
+
 // --------------------------------------------------------
 // buildScheduleFeed
 // --------------------------------------------------------
@@ -59,6 +64,25 @@ test('buildScheduleFeed enthält nur die eigenen Einträge des Feed-Besitzers', 
   assert.match(ics, new RegExp(`UID:schedule-entry-${alice}-${today}@yuvomi`));
 
   db.exec('DELETE FROM schedule_overrides');
+});
+
+// Ohne die eigene Id in der UID trueg ein Extra dieselbe UID wie der primaere
+// Eintrag desselben Tages - ein Kalender-Client dedupliziert per RFC 5545
+// danach, eine der beiden Schichten verschwaende beim Abonnenten spurlos.
+test('ein Extra am selben Tag wie der primaere Eintrag bekommt eine eigene UID, beide VEVENTs bleiben erhalten', () => {
+  const early = insertType({ name: 'Fruehschicht' });
+  const onCall = insertType({ name: 'Bereitschaft', short_code: 'B' });
+  const today = db.prepare("SELECT date('now') AS d").get().d;
+  insertOverride(alice, today, early);
+  const extraId = insertExtra(alice, today, onCall, 'On-call');
+
+  const ics = scheduleIcs.buildScheduleFeed(db, alice);
+  assert.equal((ics.match(/BEGIN:VEVENT/g) || []).length, 2, 'both the primary shift and the extra produce their own VEVENT');
+  assert.match(ics, new RegExp(`UID:schedule-entry-${alice}-${today}@yuvomi`), 'the primary entry keeps its plain UID');
+  assert.match(ics, new RegExp(`UID:schedule-entry-${alice}-${today}-extra-${extraId}@yuvomi`), 'the extra carries its own id so the UID never collides with the primary entry');
+
+  db.exec('DELETE FROM schedule_overrides');
+  db.exec('DELETE FROM schedule_extra_shifts');
 });
 
 test('buildScheduleFeed überspringt freie Tage (NULL-Override)', () => {

@@ -7014,7 +7014,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 173,
+    version: 177,
     description: 'Schedule: a personal weekly-hours target for the overtime flag',
     up: `
       -- NULL faellt auf den bisherigen festen Wert (40) zurueck - ein
@@ -7023,6 +7023,63 @@ const MIGRATIONS = [
       -- selben Haushalt haben unterschiedliche Sollstunden, und die
       -- Ueberstundenkarte in der Statistik rechnet je Person.
       ALTER TABLE users ADD COLUMN schedule_weekly_hours INTEGER;
+    `,
+  },
+  {
+    version: 178,
+    description: 'Schedule: extra shifts, additive to the primary pattern/override slot (on-call alongside a regular shift)',
+    // Bewusst OHNE UNIQUE(user_id, date_key) - anders als schedule_overrides,
+    // dessen genau eine Zeile je Tag der ganze Punkt ist. Ein "extra" ist
+    // additiv zu dem, was resolveEntries() fuer den Tag ohnehin ausgibt (auch
+    // wenn das nichts ist - ein reiner Bereitschaftstag ohne regulaere Schicht
+    // braucht keine Sonderbehandlung), nie ein Ersatz dafuer, daher beliebig
+    // viele Zeilen je Nutzer und Tag, auch mit demselben shift_type_id.
+    // shift_type_id ist NOT NULL, weil ein Extra nur existiert, um eine
+    // zusaetzliche Schicht hinzuzufuegen - anders als bei einem Override gibt
+    // es kein "Extra, das ausdruecklich frei bedeutet".
+    up: `
+      CREATE TABLE schedule_extra_shifts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date_key TEXT NOT NULL,
+        shift_type_id INTEGER NOT NULL REFERENCES schedule_shift_types(id) ON DELETE RESTRICT,
+        note TEXT,
+        reminder_offset_minutes INTEGER,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE INDEX idx_schedule_extra_shifts_user ON schedule_extra_shifts(user_id, date_key);
+    `,
+  },
+  {
+    version: 179,
+    description: 'Reminders: widen for schedule_extra_entry, extra shifts get their own independent reminders',
+    foreignKeysOff: true,
+    // DIE SECHSTE ERWEITERUNG DERSELBEN SPALTE, gleiche Bauart wie v137/v141/v148/v162/v176.
+    // Anders als schedule_entry (Migration 176) braucht dieser Typ KEINE
+    // Anker-Tabelle: eine schedule_extra_shifts-Zeile ist schon eine echte,
+    // gespeicherte Zeile mit eigener stabiler Id, sobald sie angelegt wird -
+    // reminders.entity_id zeigt direkt darauf.
+    up: `
+      CREATE TABLE reminders_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT    NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'schedule_entry', 'schedule_extra_entry')),
+        entity_id   INTEGER NOT NULL,
+        remind_at   TEXT    NOT NULL,
+        dismissed   INTEGER NOT NULL DEFAULT 0,
+        created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        pushed_at   TEXT,
+        assigned_from INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+      INSERT INTO reminders_new (id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from)
+        SELECT id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from FROM reminders;
+      DROP TABLE reminders;
+      ALTER TABLE reminders_new RENAME TO reminders;
+      CREATE INDEX idx_reminders_entity ON reminders(entity_type, entity_id);
+      CREATE INDEX idx_reminders_remind ON reminders(remind_at);
+      CREATE INDEX idx_reminders_user ON reminders(created_by);
+      CREATE INDEX idx_reminders_assigned_from ON reminders(assigned_from);
     `,
   },
 ];

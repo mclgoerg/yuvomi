@@ -42,7 +42,14 @@ function buildVEvent(entry, dtstamp) {
   const summary = type.short_code ? `${type.short_code} · ${type.name}` : type.name;
   const lines = [
     'BEGIN:VEVENT',
-    `UID:schedule-entry-${entry.user_id}-${entry.date_key}@yuvomi`,
+    // Der primaere Pfad (Muster/Override) bleibt bei hoechstens einem Eintrag
+    // je (Nutzer, Tag), der UID braucht dort nichts weiter. Ein Extra dagegen
+    // kann NEBEN dem primaeren Eintrag stehen, auch mehrfach am selben Tag -
+    // ohne die eigene Id in der UID traegen zwei VEVENTs desselben Tages
+    // dieselbe UID, und ein Kalender-Client (Google/Apple/Outlook) dedupliziert
+    // per RFC 5545 danach: eine der beiden Schichten verschwaende beim
+    // Abonnenten spurlos.
+    `UID:schedule-entry-${entry.user_id}-${entry.date_key}${entry.source === 'extra' ? `-extra-${entry.extra_id}` : ''}@yuvomi`,
     `DTSTAMP:${dtstamp}`,
   ];
   // Ein Schichttyp ohne Zeiten (z.B. Urlaub, Krank) ist ein GANZTAGS-Eintrag,

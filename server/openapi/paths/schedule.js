@@ -86,6 +86,29 @@ export function schedulePaths() {
       }),
       delete: op({ summary: 'Remove a per-day override', tag: 'Schedule', params: [stringPathParam('dateKey', 'Date (YYYY-MM-DD)')], stateChanging: true }),
     },
+    '/api/v1/schedule/extras': {
+      get: op({ summary: 'List extra shifts (additive to the primary pattern/override slot)', tag: 'Schedule' }),
+      post: op({
+        summary: 'Add an extra shift on a day',
+        description: 'Additive to whatever the primary slot resolves for that day - never an upsert, so multiple extras (even sharing a shift type) may exist on the same date. Addressed by its own id, not by (user_id, date_key) like overrides.',
+        tag: 'Schedule',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
+    },
+    '/api/v1/schedule/extras/fill': {
+      post: op({
+        summary: 'Add the same extra shift across a date range in one call',
+        description: 'An insert loop, not an upsert - every day in range gets its own new row. Writes real rows, capped at 100 days like /overrides/fill.',
+        tag: 'Schedule',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
+    },
+    '/api/v1/schedule/extras/{id}': {
+      put: op({ summary: 'Update an extra shift', description: 'Any field left out of the body keeps its previous value. user_id may never be reassigned.', tag: 'Schedule', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Remove an extra shift', tag: 'Schedule', params: [idParam()], stateChanging: true }),
+    },
     '/api/v1/schedule/feed': {
       get: op({ summary: 'Get own schedule ICS feed status', tag: 'Schedule' }),
       delete: op({ summary: 'Disable own schedule ICS feed', tag: 'Schedule', stateChanging: true }),

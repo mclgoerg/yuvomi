@@ -81,11 +81,46 @@ function lacksSchedule(database, userId) {
 }
 
 /**
+ * Extras haben ihren EIGENEN Vorlauf (schedule_extra_shifts.reminder_offset_minutes),
+ * unabhaengig vom haushaltweiten Feld auf `users` - ein Extra kann Erinnerungen
+ * wollen, obwohl der Nutzer den Vorlauf fuer seine regulaere Schicht nie
+ * eingeschaltet hat, oder umgekehrt. Keine Anker-Tabelle noetig: eine
+ * schedule_extra_shifts-Zeile IST schon die stabile Id, sobald sie angelegt
+ * wird - anders als ein Musterzyklus-Tag (siehe Modulkommentar oben).
+ */
+function syncExtraRemindersForUser(database, userId, entries, tz, now) {
+  const qualifying = entries.filter((e) => e.source === 'extra' && e.shift_type?.start_time && e.shift_type?.end_time && e.reminder_offset_minutes != null);
+  const qualifyingIds = new Set(qualifying.map((e) => e.extra_id));
+
+  const existing = database.prepare(`SELECT id, entity_id, remind_at FROM reminders WHERE entity_type = 'schedule_extra_entry' AND created_by = ?`).all(userId);
+  for (const row of existing) {
+    if (!qualifyingIds.has(row.entity_id)) database.prepare('DELETE FROM reminders WHERE id = ?').run(row.id);
+  }
+  const byExtraId = new Map(existing.map((row) => [row.entity_id, row]));
+
+  for (const entry of qualifying) {
+    const remindAt = shiftReminderAt(entry.date_key, entry.shift_type.start_time, entry.reminder_offset_minutes, tz);
+    const current = byExtraId.get(entry.extra_id);
+    if (current) {
+      if (current.remind_at === remindAt) continue;
+      database.prepare('DELETE FROM reminders WHERE id = ?').run(current.id);
+    }
+    if (`${remindAt}Z` > isoNow(now)) {
+      database.prepare(`INSERT INTO reminders (entity_type, entity_id, remind_at, created_by) VALUES ('schedule_extra_entry', ?, ?, ?)`).run(entry.extra_id, remindAt, userId);
+    }
+  }
+}
+
+function dropExtraReminders(database, userId) {
+  database.prepare(`DELETE FROM reminders WHERE entity_type = 'schedule_extra_entry' AND created_by = ?`).run(userId);
+}
+
+/**
  * Soll-Zustand fuer EINEN Nutzer herstellen: Anker anlegen/abraeumen und die
  * zugehoerigen `reminders`-Zeilen nachziehen.
  */
 function syncScheduleRemindersForUser(database, userId, now = new Date()) {
-  const drop = () => {
+  const dropPrimary = () => {
     // Anker zuerst abfragen, dann beides loeschen - reminders.entity_id
     // traegt keinen echten Fremdschluessel auf schedule_reminder_entries
     // (dasselbe polymorphe Muster wie bei jedem anderen entity_type).
@@ -97,10 +132,9 @@ function syncScheduleRemindersForUser(database, userId, now = new Date()) {
     database.prepare('DELETE FROM schedule_reminder_entries WHERE user_id = ?').run(userId);
   };
 
-  const user = database.prepare('SELECT id, schedule_reminder_offset_minutes FROM users WHERE id = ?').get(userId);
-  const offsetMinutes = user?.schedule_reminder_offset_minutes;
-  if (offsetMinutes == null || scheduleDisabled(database) || lacksSchedule(database, userId)) {
-    drop();
+  if (scheduleDisabled(database) || lacksSchedule(database, userId)) {
+    dropPrimary();
+    dropExtraReminders(database, userId);
     return;
   }
 
@@ -109,10 +143,26 @@ function syncScheduleRemindersForUser(database, userId, now = new Date()) {
   const to = shiftDateKey(today, REMINDER_WINDOW_DAYS);
   const { entries } = scheduleData(today, to, userId);
 
+  // Extras werden UNABHAENGIG vom haushaltweiten Vorlauf synchronisiert (siehe
+  // syncExtraRemindersForUser oben) - immer, gleich ob der primaere Pfad unten
+  // ueberhaupt laeuft.
+  syncExtraRemindersForUser(database, userId, entries, tz, now);
+
+  const user = database.prepare('SELECT id, schedule_reminder_offset_minutes FROM users WHERE id = ?').get(userId);
+  const offsetMinutes = user?.schedule_reminder_offset_minutes;
+  if (offsetMinutes == null) {
+    dropPrimary();
+    return;
+  }
+
   // Nur Tage mit einer UHRZEIT qualifizieren sich - ein freier Tag hat keinen
   // Beginn, und ein zeitloser Typ (Urlaub, Krank) ebenso wenig. Dieselbe Regel
   // wie der ICS-Export (server/services/schedule-ics.js) fuer "ganztaegig".
-  const qualifying = entries.filter((e) => e.shift_type?.start_time && e.shift_type?.end_time);
+  // `source !== 'extra'` haelt den primaeren Pfad auf hoechstens einem
+  // Eintrag je Tag, wie vor den Extras - sonst wuerde ein Extra am selben
+  // Datum die Map ueberschreiben oder einen bestehenden Anker als
+  // "gegenstandslos" abraeumen, obwohl der Tag noch die primaere Schicht hat.
+  const qualifying = entries.filter((e) => e.source !== 'extra' && e.shift_type?.start_time && e.shift_type?.end_time);
   const qualifyingByDate = new Map(qualifying.map((e) => [e.date_key, e]));
 
   // GEGENSTANDSLOSES ZUERST, gleiche Reihenfolge wie der Vorrats-Sync: ein
@@ -189,7 +239,12 @@ export function syncAllScheduleReminders(database, now = new Date()) {
   // Berechtigung entzogen) - drop() in syncScheduleRemindersForUser() raeumt
   // sie ueber die dortigen Gates ab, auch wenn diese Auswahl sie nicht traf.
   const anyAnchor = database.prepare('SELECT user_id FROM schedule_reminder_entries GROUP BY user_id').all();
-  const candidateIds = new Set([...users.map((u) => u.id), ...anyAnchor.map((a) => a.user_id)]);
+  // Extras haben ihren eigenen Vorlauf (siehe syncExtraRemindersForUser) - ein
+  // Nutzer ohne eigenen users.schedule_reminder_offset_minutes taucht sonst
+  // nirgends in dieser Auswahl auf, obwohl ein Extra ihn durchaus braucht.
+  const anyExtraOffset = database.prepare('SELECT DISTINCT user_id FROM schedule_extra_shifts WHERE reminder_offset_minutes IS NOT NULL').all();
+  const anyExtraReminder = database.prepare(`SELECT DISTINCT created_by AS user_id FROM reminders WHERE entity_type = 'schedule_extra_entry'`).all();
+  const candidateIds = new Set([...users.map((u) => u.id), ...anyAnchor.map((a) => a.user_id), ...anyExtraOffset.map((r) => r.user_id), ...anyExtraReminder.map((r) => r.user_id)]);
   for (const userId of candidateIds) {
     try {
       syncScheduleRemindersForUser(database, userId, now);
