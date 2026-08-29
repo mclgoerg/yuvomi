@@ -17,7 +17,7 @@ function makeDb() {
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL,
-      role TEXT NOT NULL DEFAULT 'member', family_role TEXT);
+      role TEXT NOT NULL DEFAULT 'member', family_role TEXT, schedule_reminder_offset_minutes INTEGER);
     CREATE TABLE sync_config (key TEXT PRIMARY KEY, value TEXT);
     -- Zweite Rechte-Achse des Vorrats-Voll-Syncs (#467).
     CREATE TABLE access_permissions (
@@ -35,9 +35,20 @@ function makeDb() {
       label TEXT NOT NULL, date TEXT NOT NULL);
     CREATE TABLE pantry_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
       quantity REAL NOT NULL DEFAULT 1, expires_on TEXT, created_by INTEGER REFERENCES users(id) ON DELETE SET NULL);
+    -- Minimal, wie inventory_items/pantry_items daneben - nur genug fuer die
+    -- CASE-Zweige in processDueNotifications() und den Schichtplan-Sync.
+    CREATE TABLE schedule_shift_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      start_time TEXT, end_time TEXT);
+    CREATE TABLE schedule_reminder_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date_key TEXT NOT NULL,
+      shift_type_id INTEGER NOT NULL REFERENCES schedule_shift_types(id) ON DELETE CASCADE,
+      UNIQUE(user_id, date_key)
+    );
     CREATE TABLE reminders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item')),
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item','schedule_entry')),
       entity_id INTEGER NOT NULL,
       remind_at TEXT NOT NULL,
       dismissed INTEGER NOT NULL DEFAULT 0,

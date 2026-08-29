@@ -2075,11 +2075,12 @@ function renderScheduleWidget(schedule, users, size) {
     // dashboard.css, schedule.css nie. Ein geteilter Klassenname waere eine
     // unsichtbare Abhaengigkeit zwischen zwei Stylesheets, die nie gemeinsam
     // laufen wuerden.
+    const icon = type?.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-widget-row__icon" aria-hidden="true"></i>` : '';
     return `
       <div class="schedule-widget-row" data-route="/schedule" role="button" tabindex="0">
         <span class="schedule-widget-row__avatar" style="background:${esc(accent)};color:${getReadableTextColor(accent)}">${avatarInner}</span>
         <span class="schedule-widget-row__name">${esc(user?.display_name ?? '')}</span>
-        <span class="schedule-widget-row__shift"><span class="schedule-widget-row__dot" style="--schedule-color:${esc(swatchColor)}"></span>${shiftLabel}</span>
+        <span class="schedule-widget-row__shift">${icon}<span class="schedule-widget-row__dot" style="--schedule-color:${esc(swatchColor)}"></span>${shiftLabel}</span>
       </div>`;
   }).join('');
 

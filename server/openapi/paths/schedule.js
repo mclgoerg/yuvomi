@@ -86,5 +86,22 @@ export function schedulePaths() {
       }),
       delete: op({ summary: 'Remove a per-day override', tag: 'Schedule', params: [stringPathParam('dateKey', 'Date (YYYY-MM-DD)')], stateChanging: true }),
     },
+    '/api/v1/schedule/feed': {
+      get: op({ summary: 'Get own schedule ICS feed status', tag: 'Schedule' }),
+      delete: op({ summary: 'Disable own schedule ICS feed', tag: 'Schedule', stateChanging: true }),
+    },
+    '/api/v1/schedule/feed/regenerate': {
+      post: op({ summary: 'Regenerate own schedule ICS feed token', tag: 'Schedule', stateChanging: true }),
+    },
+    '/api/v1/schedule/reminders': {
+      get: op({ summary: 'Get own shift-start reminder offset', tag: 'Schedule' }),
+      put: op({
+        summary: 'Set own shift-start reminder offset',
+        description: 'Minutes before a shift starts to be reminded; null disables the reminder. Triggers an immediate resync so the change takes effect without waiting for the next periodic pass.',
+        tag: 'Schedule',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
+    },
   };
 }

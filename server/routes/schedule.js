@@ -15,6 +15,20 @@ const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id =
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);
 const mineOrAdmin = (req, userId) => isAdmin(req) || actorId(req) === userId;
 
+/** Lucides laengster Name liegt bei 34 Zeichen; 48 laesst Luft nach oben - dieselbe Grenze wie bei den Schnellzugriffen (quick-links.js). */
+const MAX_ICON_NAME_LENGTH = 48;
+const ICON_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Wie iconName() in quick-links.js: der Name ist zur Laufzeit gewaehlt, geprueft wird nur die Form, nicht gegen Lucides Vorrat - das Vorrat-Modul (utils/lucide-icons.js) liegt auf `window.lucide` und ist serverseitig nicht erreichbar. */
+function shiftIcon(value) {
+  if (value === undefined || value === null || value === '') return { value: null, error: null };
+  if (typeof value !== 'string') return { value: null, error: 'icon must be a string.' };
+  const trimmed = value.trim();
+  if (!trimmed) return { value: null, error: null };
+  if (trimmed.length > MAX_ICON_NAME_LENGTH) return { value: null, error: 'icon is too long.' };
+  if (!ICON_NAME_RE.test(trimmed)) return { value: null, error: 'icon must contain only lowercase letters, digits, and hyphens.' };
+  return { value: trimmed, error: null };
+}
+
 /**
  * Ein Schichttyp gehoert dem Haushalt, nicht einer Person: er taucht in den
  * Mustern aller Mitglieder auf. Anlegen darf ihn deshalb jeder - das nimmt
@@ -43,7 +57,7 @@ const ownTypeOrAdmin = (req, type) => isAdmin(req) || (type.created_by != null &
 export function isStillReferenced(err) {
   return String(err?.code || '').startsWith('SQLITE_CONSTRAINT');
 }
-const typeColumns = 'id, name, short_code, start_time, end_time, color, created_by, created_at, updated_at';
+const typeColumns = 'id, name, short_code, start_time, end_time, color, icon, created_by, created_at, updated_at';
 
 // Der Zeitraum von `/entries` muss eine Obergrenze haben: `dateKeysInRange()`
 // baut EINEN String je Tag, und `resolveEntries()` laeuft ihn je Haushaltsmitglied
@@ -67,7 +81,11 @@ const MAX_RANGE_DAYS = 731;
 // sie keine Schatten-Rotation traegt.
 const MAX_FILL_DAYS = 100;
 
-function scheduleData(from, to, userId) {
+// Exportiert fuer server/services/schedule-ics.js: derselbe Ausloese-Weg
+// (Muster + Ausnahmen zum Lesezeitpunkt aufgeloest, Schichttyp eingebettet)
+// statt einer zweiten Fassung, die bei der naechsten Aenderung hier
+// auseinanderlaeuft.
+export function scheduleData(from, to, userId) {
   const database = db.get();
   const condition = userId ? 'AND user_id = ?' : '';
   const patterns = database.prepare(`SELECT * FROM schedule_patterns WHERE is_active = 1
@@ -112,10 +130,11 @@ router.get('/shift-types', (_req, res) => res.json({ data: db.get().prepare(`SEL
 router.post('/shift-types', (req, res) => {
   const name = str(req.body?.name, 'name'); const shortCode = str(req.body?.short_code, 'short_code', { required: false, max: 12 });
   const start = time(req.body?.start_time, 'start_time'); const end = time(req.body?.end_time, 'end_time'); const shade = color(req.body?.color || '#6C3AED', 'color');
-  const errors = collectErrors([name, shortCode, start, end, shade]);
+  const icon = shiftIcon(req.body?.icon);
+  const errors = collectErrors([name, shortCode, start, end, shade, icon]);
   if ((start.value == null) !== (end.value == null)) errors.push('start_time and end_time must be provided together.');
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
-  const result = db.get().prepare('INSERT INTO schedule_shift_types (name, short_code, start_time, end_time, color, created_by) VALUES (?, ?, ?, ?, ?, ?)').run(name.value, shortCode.value, start.value, end.value, shade.value, actorId(req));
+  const result = db.get().prepare('INSERT INTO schedule_shift_types (name, short_code, start_time, end_time, color, icon, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name.value, shortCode.value, start.value, end.value, shade.value, icon.value, actorId(req));
   res.status(201).json({ data: db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(result.lastInsertRowid) });
 });
 router.delete('/shift-types/:id', (req, res) => {
@@ -187,10 +206,11 @@ router.put('/shift-types/:id', (req, res) => {
   const shade = req.body?.color === undefined || !req.body.color
     ? { value: old.color, error: null }
     : color(req.body.color, 'color');
-  const errors = collectErrors([name, shortCode, start, end, shade]);
+  const icon = req.body?.icon === undefined ? { value: old.icon, error: null } : shiftIcon(req.body.icon);
+  const errors = collectErrors([name, shortCode, start, end, shade, icon]);
   if ((start.value == null) !== (end.value == null)) errors.push('start_time and end_time must be provided together.');
   if (errors.length) return fail(res, 400, errors.join(' '));
-  db.get().prepare('UPDATE schedule_shift_types SET name=?, short_code=?, start_time=?, end_time=?, color=? WHERE id=?').run(name.value, shortCode.value, start.value, end.value, shade.value, key.value);
+  db.get().prepare('UPDATE schedule_shift_types SET name=?, short_code=?, start_time=?, end_time=?, color=?, icon=? WHERE id=?').run(name.value, shortCode.value, start.value, end.value, shade.value, icon.value, key.value);
   return res.json({ data: db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(key.value) });
 });
 router.put('/patterns/:id', (req, res) => {

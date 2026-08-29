@@ -1398,11 +1398,11 @@ Planned/estimated budget (Budget → Plan). A **steady monthly plan**: one amoun
 
 ### Reminders
 
-Per-user reminders attached to tasks, calendar events, subscriptions, inventory items, inventory tracked dates, or pantry items.
+Per-user reminders attached to tasks, calendar events, subscriptions, inventory items, inventory tracked dates, pantry items, or upcoming schedule shifts.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
-| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, or `pantry_item`, NOT NULL |
+| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item`, or `schedule_entry` (migration v172), NOT NULL |
 | entity_id | INTEGER | Entity identifier, NOT NULL |
 | remind_at | TEXT | ISO 8601 datetime, NOT NULL |
 | dismissed | INTEGER | 0/1, default 0 |
@@ -1410,27 +1410,34 @@ Per-user reminders attached to tasks, calendar events, subscriptions, inventory 
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL — whose reminder this row *is*: who gets notified, and who may change or dismiss it |
 | assigned_from | INTEGER | FK → Users (SET NULL), nullable (migration v169) — whose action the row was derived from. `NULL` means self-set, which is what every pre-v169 row is |
 
-All types except `pantry_item` can be set and deleted through `POST`/`PUT`/`DELETE
-/api/v1/reminders`. Four of them are **derived** - their module recreates the reminder whenever the
+All types except `pantry_item` and `schedule_entry` can be set and deleted through `POST`/`PUT`/`DELETE
+/api/v1/reminders`. Five of them are **derived** - their module recreates the reminder whenever the
 underlying object is written (renewal date, warranty end, inventory deadline, best-before date) - but
-only the pantry is additionally rebuilt on **every notification run**. A hand-set `pantry_item`
-reminder is therefore gone within a minute and a deleted one is back, so all four write paths
-(`POST`, `PUT`, `DELETE /:id`, `DELETE` by filter) answer 400 for it; for the other three derived types a hand-set date survives until the next change to
-their object, which is a half-life you can work with, and closing them would break a published
-`/api/v1` surface for no reason.
+`pantry_item` and `schedule_entry` are additionally rebuilt on **every notification run**
+(`syncAllPantryExpiryReminders()`, `syncAllScheduleReminders()`). A hand-set reminder of either kind is
+therefore gone within a minute and a deleted one is back, so all four write paths
+(`POST`, `PUT`, `DELETE /:id`, `DELETE` by filter) answer 400 for both; for the other three derived
+types a hand-set date survives until the next change to their object, which is a half-life you can
+work with, and closing them would break a published `/api/v1` surface for no reason.
 
-Reading and **dismissing** (`PATCH /:id/dismiss`) stay open for all six - the reminder toast has to
+`schedule_entry` additionally has no user-supplyable `entity_id`: a pattern-derived shift is computed
+on read and has no stored row of its own (see Schedule above), so `entity_id` points at an anchor row
+in `schedule_reminder_entries` (one per `(user_id, date_key)`, migration v172) that the sync
+maintains - not something a caller could construct even if the type were settable.
+
+Reading and **dismissing** (`PATCH /:id/dismiss`) stay open for all seven - the reminder toast has to
 show a derived notification and let the user wave it away, and dismissing holds precisely because
 the row stays.
 
 Calendar events support **multiple reminders** (e.g. "15 minutes before" *and* "1 day before").
 Each reminder is an independent row and is delivered separately by the notification scheduler.
 Every delivery carries the linked entity's title as the notification body (task title, event title,
-subscription name, inventory item, `item · label` for a tracked date, pantry item), so the reminder
-is identifiable without opening the app; the fallback text only applies once the linked entity has
-been deleted. Some origins add the date the reminder is about: subscription reminders carry amount
-and renewal date as `Name - 12.99 EUR - 2026-08-03`, warranty reminders the warranty end, tracked
-dates and pantry items their date as `Name - 2026-09-01`. That line is deliberately data
+subscription name, inventory item, `item · label` for a tracked date, pantry item, shift type name),
+so the reminder is identifiable without opening the app; the fallback text only applies once the
+linked entity has been deleted. Some origins add the date the reminder is about: subscription
+reminders carry amount and renewal date as `Name - 12.99 EUR - 2026-08-03`, warranty reminders the
+warranty end, tracked dates and pantry items their date as `Name - 2026-09-01`, and a shift-start
+reminder its start time as `Name - 06:00`. That line is deliberately data
 only, with no sentence around it: the notification is assembled on the server, which has no way to
 know the **recipient's** language, since locale, date and number formats live in the client's
 local storage. The household data language (#631, #632) does not close this gap — it governs what the
@@ -2514,6 +2521,7 @@ patterns. Any member may add one; renaming or deleting one is the creator's call
 | short_code | TEXT | optional, max 12 chars — the compact calendar strip shows this |
 | start_time / end_time | TEXT | HH:MM, both or neither (`CHECK`). `end <= start` means the shift crosses midnight; it stays on its start day |
 | color | TEXT | NOT NULL (default `#6C3AED`) |
+| icon | TEXT | optional Lucide icon name (migration 170), validated for form only (lowercase/digits/hyphens, ≤48 chars) — the same rule quick-links applies to its icon field, since the vocabulary itself lives client-side (`window.lucide`) and isn't reachable from the server |
 | created_by | INTEGER | FK → Users (SET NULL) — decides who may change it |
 | created_at / updated_at | TEXT | ISO 8601 |
 
@@ -2561,6 +2569,34 @@ reassignment) instead of one `PUT` per day. Its cap is a separate constant from 
 `MAX_RANGE_DAYS` (731 days) — `MAX_FILL_DAYS` (100 days) is deliberately smaller, because a fill
 *writes* real rows, cutting against the "computed on read, never materialized" rule above if it
 were allowed to run for years at a time; the number is sized for an absence, not a shadow pattern.
+
+**Read-only export feed (Schedule v3):** Settings → Personal → Feed subscriptions → a schedule
+feed card exposes the signed-in member's own resolved shifts (a rolling window, 30 days back to
+365 days ahead) as a `webcal://`/`https://` ICS feed. Unlike the calendar and inventory-deadlines
+feeds, this one is personal on *both* axes — the secret token (`users.schedule_feed_token`,
+migration 171, partial UNIQUE index) identifies the subscriber, and the feed content itself is
+that subscriber's own entries only (`scheduleData(from, to, userId)` called with a real
+`userId`, never household-wide). Free/no-entry days are skipped — a feed of "nothing happening"
+days would be noise in a subscribed calendar app. Served by an unauthenticated
+`GET /feed/schedule/:token.ics` route outside `/api/v1` (rate-limited to 30 requests/minute,
+recomputed on every request), managed via `GET/POST regenerate/DELETE /api/v1/schedule/feed`
+(each member manages only their own token). See `server/services/schedule-ics.js`.
+
+**Shift-start reminders (Schedule v3):** an opt-in push notification before an upcoming shift begins,
+set via `GET/PUT /api/v1/schedule/reminders` (`{ offsetMinutes }`, `null` disables it; `PUT` also
+triggers an immediate resync so the change takes effect without waiting for the next periodic pass).
+A pattern-derived shift is computed on read and has no stored row to hang a reminder off of, unlike
+every other reminder origin - `schedule_reminder_entries` (migration v172) is a small anchor table,
+one row per `(user_id, date_key)`, that `server/services/schedule-reminders.js`'s periodic sync
+(`syncAllScheduleReminders()`, called from the same notification pass as the pantry sync) creates for
+each upcoming qualifying day within a rolling 7-day window and cleans up once the day falls out of the
+window or stops qualifying. Only entries with a shift type carrying a `start_time` qualify - a free
+day has no start, and a timeless type (vacation, sick) has nothing to count down to, matching the ICS
+feed's "all day" rule above. The reminder fires at the shift's start time (converted from the
+household's wall-clock zone) minus the configured offset; a target that has already passed when the
+sync runs is not created, so a change doesn't retroactively fire for a shift that's already
+underway. `schedule_entry` is a **derived** reminder type like `pantry_item` (see Reminders below) -
+the sync rebuilds it every pass, so it cannot be hand-set through the generic reminders API.
 
 ### Access Permissions (migration v74)
 

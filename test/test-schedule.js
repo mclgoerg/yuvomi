@@ -285,6 +285,35 @@ test('schedule routes reject invalid shift times and return data envelopes', asy
   assert.ok(Array.isArray(listed.body.data));
 });
 
+// The icon vocabulary itself (Lucide's ~1700 names) lives client-side on
+// `window.lucide` - unreachable from the server, same reason quick-links'
+// icon field only checks the FORM (lowercase/digits/hyphens, a length cap),
+// not the name against a real list. Mirrors quick-links.js's own guard.
+test('a shift type may carry an optional icon, validated for form only', async () => {
+  const created = await call('POST', '/shift-types', { as: ALICE, body: { name: 'Iconic', color: '#123456', icon: 'sunrise' } });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.data.icon, 'sunrise');
+  const shiftId = created.body.data.id;
+
+  const malformed = await call('POST', '/shift-types', { as: ALICE, body: { name: 'Bad icon', color: '#123456', icon: 'Sun Rise!' } });
+  assert.equal(malformed.status, 400);
+  assert.match(malformed.body.error, /icon must contain only lowercase letters, digits, and hyphens/);
+
+  const noIcon = await call('POST', '/shift-types', { as: ALICE, body: { name: 'No icon', color: '#123456' } });
+  assert.equal(noIcon.status, 201, 'icon stays optional');
+  assert.equal(noIcon.body.data.icon, null);
+
+  const updated = await call('PUT', `/shift-types/${shiftId}`, { as: ALICE, body: { icon: 'moon' } });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.data.icon, 'moon');
+
+  const untouched = await call('PUT', `/shift-types/${shiftId}`, { as: ALICE, body: { name: 'Iconic v2' } });
+  assert.equal(untouched.status, 200);
+  assert.equal(untouched.body.data.icon, 'moon', 'omitting icon on update must not clear it');
+
+  await call('DELETE', `/shift-types/${shiftId}`, { as: ALICE });
+});
+
 
 test('overlapping patterns return a warning and the newer valid_from pattern wins', async () => {
   const carol = database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('schedule-carol', 'Carol', 'x', 'member')").run().lastInsertRowid;
@@ -395,6 +424,42 @@ test('quick-start includes Vacation and Sick as timeless presets, not just work 
   const presetsBlock = schedulePage.slice(schedulePage.indexOf('const SHIFT_PRESETS'), schedulePage.indexOf(']);') + 3);
   assert.match(presetsBlock, /key: 'vacation'.*startTime: null.*endTime: null/, 'vacation must carry no times, like a real absence rather than a shift');
   assert.match(presetsBlock, /key: 'sick'.*startTime: null.*endTime: null/, 'sick must carry no times, like a real absence rather than a shift');
+});
+
+// The icon-picker button is wired twice, on purpose: the create modal hangs
+// off document.body (openScheduleCreateModal's onSave attaches directly,
+// root's click delegate never reaches it), the inline shift-type edit form
+// lives inside `root` and goes through action()'s delegate instead. Missing
+// either wiring leaves that form's icon button doing nothing on click.
+test('the shift-type icon picker is wired for both the create modal and inline edit', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /async function pickShiftIcon\(button\)/);
+  assert.match(schedulePage, /data-action="pick-shift-icon"/);
+  assert.match(schedulePage, /querySelector\('\[data-action="pick-shift-icon"\]'\)\?\.addEventListener\('click'/, 'the create modal must attach its own listener - root\'s delegate cannot reach it');
+  assert.match(schedulePage, /button\.dataset\.action === 'pick-shift-icon'/, 'the inline edit form relies on the action() delegate');
+  assert.match(schedulePage, /import\('\/components\/icon-picker\.js'\)/, 'reuses the shared icon picker rather than a new dialog');
+});
+
+// A fixed weekly figure would be wrong for every range except a single week -
+// "current month" and "custom range" both need the same threshold SCALED to
+// however many days they actually span, not a flat 40h regardless of length.
+test('overtime scales its threshold to the selected range instead of a flat weekly figure', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /const OVERTIME_WEEKLY_HOURS = 40;/);
+  const fnBody = schedulePage.slice(schedulePage.indexOf('function overtimeInfo'), schedulePage.indexOf('function statisticsSummary'));
+  assert.match(fnBody, /days/, 'must derive a day count from the range, not assume a fixed period');
+  assert.match(fnBody, /OVERTIME_WEEKLY_HOURS \* 60 \* days\) \/ 7/, 'expected minutes must scale by days/7, not a constant');
+  assert.match(schedulePage, /overtime\?\.over/, 'the card only renders once the range is actually over its scaled threshold');
+});
+
+test('the Statistics tab offers a print action that leaves nav/tabs/filters off the page', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /data-action="print-statistics"/);
+  assert.match(schedulePage, /window\.print\(\)/);
+  const scheduleCss = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const printBlock = scheduleCss.slice(scheduleCss.indexOf('@media print'));
+  assert.match(printBlock, /\.schedule-tabs/, 'the tab bar has no purpose on a single printed view');
+  assert.match(printBlock, /\.schedule-stat-filter-actions/, 'Save/Print buttons must not print themselves');
 });
 
 test('calendar defaults to compact Schedule strips, includes their start time, and keeps 24-hour shifts in their start-day strip', () => {

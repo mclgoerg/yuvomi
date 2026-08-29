@@ -1,11 +1,12 @@
 import { api } from '/api.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { todayKey, addLocalDays } from '/utils/date.js';
+import { todayKey, addLocalDays, parseLocalDateKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal } from '/components/modal.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { wireScrollFade } from '/utils/ux.js';
+import { toggleRowHtml } from '/settings/components.js';
 
 // ZWEISPALTIG: Schedule is a full-width responsive library and statistics view;
 // constraining its row lists to the narrow reading measure would recreate the
@@ -16,7 +17,7 @@ let scheduleFab = null;
 let currentUserId = null;
 let canManageOthers = false;
 let activeView = 'patterns';
-let state = { users: [], types: [], patterns: [], overrides: [], entries: [], warnings: [] };
+let state = { users: [], types: [], patterns: [], overrides: [], entries: [], warnings: [], reminderOffsetMinutes: null };
 let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', from: '', to: '', entries: [], bounds: null, loading: false };
 // Schichtfarben sind NUTZERFARBEN (freier Waehler im Formular); die Presets
 // sind nur Startwerte. Eine Grenze gilt trotzdem: keine davon darf die STIMME
@@ -35,13 +36,13 @@ let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', f
 // Blaugrau fuer Urlaub (Abwesenheit, keine Dringlichkeit), Rot fuer krank
 // (der einzige Rot-Ton unter den Presets).
 const SHIFT_PRESETS = Object.freeze([
-  { key: 'early', shortCode: 'E', startTime: '06:00', endTime: '14:00', color: '#0E7490' },
-  { key: 'late', shortCode: 'L', startTime: '14:00', endTime: '22:00', color: '#A21CAF' },
-  { key: 'night', shortCode: 'N', startTime: '22:00', endTime: '06:00', color: '#4338CA' },
-  { key: 'day', shortCode: 'D', startTime: '08:00', endTime: '16:00', color: '#15803D' },
-  { key: 'fullDay', shortCode: '24', startTime: '10:00', endTime: '10:00', color: '#A16207' },
-  { key: 'vacation', shortCode: 'V', startTime: null, endTime: null, color: '#475569' },
-  { key: 'sick', shortCode: 'S', startTime: null, endTime: null, color: '#B91C1C' },
+  { key: 'early', shortCode: 'E', startTime: '06:00', endTime: '14:00', color: '#0E7490', icon: 'sunrise' },
+  { key: 'late', shortCode: 'L', startTime: '14:00', endTime: '22:00', color: '#A21CAF', icon: 'sunset' },
+  { key: 'night', shortCode: 'N', startTime: '22:00', endTime: '06:00', color: '#4338CA', icon: 'moon' },
+  { key: 'day', shortCode: 'D', startTime: '08:00', endTime: '16:00', color: '#15803D', icon: 'sun' },
+  { key: 'fullDay', shortCode: '24', startTime: '10:00', endTime: '10:00', color: '#A16207', icon: 'clock' },
+  { key: 'vacation', shortCode: 'V', startTime: null, endTime: null, color: '#475569', icon: 'tree-palm' },
+  { key: 'sick', shortCode: 'S', startTime: null, endTime: null, color: '#B91C1C', icon: 'thermometer' },
 ]);
 const SHIFT_COLOR_FALLBACK = SHIFT_PRESETS[0].color;
 
@@ -68,12 +69,13 @@ const clockLabel = (shiftType) => {
 
 async function load() {
   const day = todayKey();
-  const [users, types, patternResult, overrides, entries] = await Promise.all([
+  const [users, types, patternResult, overrides, entries, reminders] = await Promise.all([
     api.get('/auth/users'),
     api.get('/schedule/shift-types'),
     api.get('/schedule/patterns'),
     api.get('/schedule/overrides'),
     api.get(`/schedule/entries?from=${day}&to=${day}`),
+    api.get('/schedule/reminders'),
   ]);
   const patterns = patternResult.data ?? [];
   const days = await Promise.all(patterns.map((pattern) => api.get(`/schedule/patterns/${pattern.id}/days`)));
@@ -84,6 +86,7 @@ async function load() {
     overrides: overrides.data ?? [],
     entries: entries.data?.entries ?? [],
     warnings: entries.data?.warnings ?? [],
+    reminderOffsetMinutes: reminders.data?.offsetMinutes ?? null,
   };
 }
 
@@ -126,6 +129,50 @@ function formatHours(minutes) {
   const hours = minutes / 60;
   const value = Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace(/\.0$/, '');
   return t('schedule.hoursValue', { value });
+}
+
+// Kein Haushaltsfeld, bewusst: eine Schwelle je Wochentakt, skaliert auf die
+// Tage der gewaehlten Spanne (statt eine feste Zahl je Bereichsart zu pflegen -
+// "aktueller Monat", "gewaehlte Monate" und "eigener Zeitraum" haben alle eine
+// unterschiedliche Laenge, aber dieselbe Frage: wie viele Wochen stecken darin).
+// 40 ist der verbreitetste Vollzeit-Richtwert; wer einen anderen Rhythmus faehrt,
+// sieht die Markierung als Hinweis, nicht als Urteil - es gibt keine Ablehnung,
+// nur eine Zahl neben einer anderen.
+const OVERTIME_WEEKLY_HOURS = 40;
+
+function overtimeInfo(bounds, totalMinutes) {
+  if (!bounds) return null;
+  const days = Math.round((parseLocalDateKey(bounds.to) - parseLocalDateKey(bounds.from)) / 86400000) + 1;
+  if (days < 1) return null;
+  const expectedMinutes = Math.round((OVERTIME_WEEKLY_HOURS * 60 * days) / 7);
+  return { expectedMinutes, over: totalMinutes > expectedMinutes };
+}
+
+// Feste Presets statt eines freien Zahlenfelds: der Server deckelt ohnehin auf
+// 24h (server/routes/schedule-reminders.js), und eine Handvoll sprechender
+// Werte ist schneller getroffen als eine Minutenzahl zu tippen.
+const REMINDER_OFFSET_PRESETS = [0, 5, 10, 15, 30, 60, 120];
+
+function renderReminderSettings() {
+  const active = state.reminderOffsetMinutes != null;
+  const options = REMINDER_OFFSET_PRESETS.map((minutes) =>
+    `<option value="${minutes}"${Number(state.reminderOffsetMinutes) === minutes ? ' selected' : ''}>${esc(t(minutes === 0 ? 'schedule.reminderAtStart' : 'schedule.reminderMinutesBefore', { minutes }))}</option>`
+  ).join('');
+  return '<div class="card card--padded schedule-reminder-settings">'
+    + '<div class="schedule-reminder-settings__row">'
+    + toggleRowHtml({ label: t('schedule.reminderToggle'), checked: active, attrs: { id: 'schedule-reminder-toggle' } })
+    + '<select class="input" id="schedule-reminder-offset"' + (active ? '' : ' disabled') + '>' + options + '</select>'
+    + '</div><p class="form-hint">' + esc(t('schedule.reminderHint')) + '</p></div>';
+}
+
+async function saveReminderSettings(offsetMinutes) {
+  try {
+    const result = await api.put('/schedule/reminders', { offsetMinutes });
+    state.reminderOffsetMinutes = result.data?.offsetMinutes ?? null;
+  } catch (err) {
+    window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
+  }
+  renderPage();
 }
 
 function statisticsSummary() {
@@ -220,6 +267,13 @@ function applyShiftPreset(form) {
   form.elements.start_time.value = selected.startTime;
   form.elements.end_time.value = selected.endTime;
   form.elements.color.value = selected.color;
+  form.elements.icon.value = selected.icon ?? '';
+  const iconButton = form.querySelector('[data-action="pick-shift-icon"]');
+  if (iconButton) {
+    iconButton.querySelector('i')?.remove();
+    iconButton.insertAdjacentHTML('afterbegin', '<i data-lucide="' + esc(selected.icon || 'image-off') + '" aria-hidden="true"></i>');
+    window.lucide?.createIcons({ el: iconButton });
+  }
 }
 function userOptions(selected) {
   return state.users.filter((user) => canManageOthers || Number(user.id) === Number(currentUserId)).map((user) => option(user.id, user.display_name || user.username, Number(selected) === Number(user.id))).join('');
@@ -234,9 +288,34 @@ function shiftFields(type = {}) {
     formField(t('schedule.name'), '<input class="input" required name="name" maxlength="200" value="' + esc(type.name ?? '') + '">'),
     formField(t('schedule.shortCode'), '<input class="input" name="short_code" maxlength="12" value="' + esc(type.short_code ?? '') + '">'),
     formField(t('schedule.color'), '<input class="input form-input--color" required name="color" type="color" value="' + esc(type.color ?? SHIFT_COLOR_FALLBACK) + '">', 'schedule-color-field'),
+    formField(t('schedule.icon'), '<button type="button" class="btn btn--secondary schedule-icon-picker" data-action="pick-shift-icon">'
+      + (type.icon ? '<i data-lucide="' + esc(type.icon) + '" aria-hidden="true"></i>' : '<i data-lucide="image-off" aria-hidden="true"></i>')
+      + '<span>' + esc(t('schedule.chooseIcon')) + '</span></button>'
+      + '<input type="hidden" name="icon" value="' + esc(type.icon ?? '') + '">'),
     formField(t('schedule.startTime'), '<yuvomi-datepicker name="start_time" type="time" label="' + esc(t('schedule.startTime')) + '" value="' + esc(type.start_time ?? '') + '"></yuvomi-datepicker>'),
     formField(t('schedule.endTime'), '<yuvomi-datepicker name="end_time" type="time" label="' + esc(t('schedule.endTime')) + '" value="' + esc(type.end_time ?? '') + '"></yuvomi-datepicker>'),
   ].join('');
+}
+
+/**
+ * Oeffnet die Symbolauswahl fuer den Knopf, der gerade geklickt wurde, und
+ * schreibt das Ergebnis ins versteckte `icon`-Feld desselben Formulars -
+ * gemeinsame Logik fuer beide Wege dorthin: den Klick-Delegierten von
+ * action() (Inline-Bearbeitung, im DOM von `root`) und die Verdrahtung in
+ * openScheduleCreateModal()'s onSave (das Modal haengt an document.body,
+ * ausserhalb von `root`, der Delegierte erreicht es nicht).
+ */
+async function pickShiftIcon(button) {
+  const form = button.closest('form');
+  const hidden = form?.elements?.icon;
+  if (!hidden) return;
+  const { openIconPicker } = await import('/components/icon-picker.js');
+  const chosen = await openIconPicker(hidden.value || null);
+  if (chosen === undefined) return;
+  hidden.value = chosen ?? '';
+  button.querySelector('i')?.remove();
+  button.insertAdjacentHTML('afterbegin', '<i data-lucide="' + esc(chosen || 'image-off') + '" aria-hidden="true"></i>');
+  window.lucide?.createIcons({ el: button });
 }
 
 function patternFields(pattern = {}) {
@@ -258,7 +337,8 @@ function shiftTypeCard(type) {
     : `<p class="schedule-readonly">${esc(type?.created_by == null
         ? t('schedule.typeOrphaned')
         : t('schedule.typeOwnedBy', { user: userName(type.created_by) }))}</p>`;
-  return `<details class="card schedule-details"><summary><span class="schedule-swatch" style="--schedule-color:${esc(type.color)}"></span><span class="u-card-title u-compact">${esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name)}</span> <small>${esc(clockLabel(type))}</small></summary>
+  const icon = type.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-type-icon" aria-hidden="true"></i>` : '';
+  return `<details class="card schedule-details"><summary><span class="schedule-swatch" style="--schedule-color:${esc(type.color)}"></span>${icon}<span class="u-card-title u-compact">${esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name)}</span> <small>${esc(clockLabel(type))}</small></summary>
     ${body}
   </details>`;
 }
@@ -346,13 +426,15 @@ function overrideRows() {
     const actions = canWrite(group.user_id)
       ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-override" data-from="' + esc(group.from) + '" data-user-id="' + group.user_id + '">' + esc(t('common.edit')) + '</button><button type="button" class="btn btn--danger" data-action="delete-override-range" data-from="' + esc(group.from) + '" data-to="' + esc(group.to) + '" data-user-id="' + group.user_id + '">' + esc(t('schedule.delete')) + '</button></span>'
       : '';
-    return '<div class="list-row schedule-override"><span class="schedule-swatch" style="--schedule-color:' + esc(swatchColor) + '"></span><div class="list-row__main"><span class="list-row__name">' + esc(label) + '</span><span class="list-row__meta">' + esc(meta) + '</span></div>' + actions + '</div>';
+    const icon = type?.icon ? '<i data-lucide="' + esc(type.icon) + '" class="schedule-type-icon" aria-hidden="true"></i>' : '';
+    return '<div class="list-row schedule-override"><span class="schedule-swatch" style="--schedule-color:' + esc(swatchColor) + '"></span>' + icon + '<div class="list-row__main"><span class="list-row__name">' + esc(label) + '</span><span class="list-row__meta">' + esc(meta) + '</span></div>' + actions + '</div>';
   }).join('') + '</div>';
 }
 
 function renderStatistics() {
   const bounds = statistics.bounds || statisticBounds();
   const summary = statisticsSummary();
+  const overtime = overtimeInfo(bounds, summary.totalMinutes);
   const selectedUser = statistics.userId || currentUserId;
   const range = statistics.range;
   const countItems = [...summary.values];
@@ -375,21 +457,24 @@ function renderStatistics() {
     : !bounds
       ? '<p class="card card--padded schedule-stat-empty" role="status">' + esc(t('schedule.invalidRange')) + '</p>'
       : '<p class="schedule-stat-period u-meta">' + esc(t('schedule.statisticsFor', { user: userName(selectedUser), from: formatDate(bounds.from), to: formatDate(bounds.to) })) + '</p>'
-      + '<div class="metric-grid schedule-stat-metrics">'
+      + '<div class="metric-grid schedule-stat-metrics' + (overtime?.over ? ' schedule-stat-metrics--with-overtime' : '') + '">'
       + '<article class="metric-card"><div class="metric-card__label">' + esc(t('schedule.shiftCounts')) + '</div><div class="metric-card__value">' + esc(String(summary.totalCount)) + '</div><div class="metric-card__note">' + esc(t('schedule.shifts')) + '</div></article>'
       + '<article class="metric-card"><div class="metric-card__label">' + esc(t('schedule.workedHours')) + '</div><div class="metric-card__value">' + esc(formatHours(summary.totalMinutes)) + '</div><div class="metric-card__note">' + esc(t('schedule.total')) + '</div></article>'
+      + (overtime?.over ? '<article class="metric-card metric-card--warning"><div class="metric-card__label">' + esc(t('schedule.overtime')) + '</div><div class="metric-card__value">+' + esc(formatHours(summary.totalMinutes - overtime.expectedMinutes)) + '</div><div class="metric-card__note">' + esc(t('schedule.overtimeNote', { hours: OVERTIME_WEEKLY_HOURS })) + '</div></article>' : '')
       + '</div>'
       + '<div class="schedule-stat-sections">'
       + '<section class="card card--padded schedule-stat-card"><div><h2 class="u-section-title">' + esc(t('schedule.shiftCounts')) + '</h2><p class="u-meta">' + esc(t('schedule.shiftCountsDescription')) + '</p></div>' + statisticsRows(countItems, (item) => String(item.count), (item) => item.count, t('schedule.noStatistics')) + '<div class="schedule-stat-total"><span>' + esc(t('schedule.total')) + '</span><strong>' + esc(String(summary.totalCount)) + '</strong></div></section>'
       + '<section class="card card--padded schedule-stat-card"><div><h2 class="u-section-title">' + esc(t('schedule.workedHours')) + '</h2><p class="u-meta">' + esc(t('schedule.workedHoursDescription')) + '</p></div>' + statisticsRows(hourItems, (item) => formatHours(item.minutes), (item) => item.minutes, t('schedule.noStatistics')) + '<div class="schedule-stat-total"><span>' + esc(t('schedule.total')) + '</span><strong>' + esc(formatHours(summary.totalMinutes)) + '</strong></div></section>'
       + '</div>';
   return '<section class="schedule-statistics">'
+    + renderReminderSettings()
     + '<form class="card card--padded schedule-stat-filters" data-form="statistics">'
     + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + state.users.map((user) => option(user.id, user.display_name || user.username, Number(selectedUser) === Number(user.id))).join('') + '</select>')
     + '<div class="form-field schedule-stat-range"><span class="label">' + esc(t('schedule.statisticsRange')) + '</span><div class="segmented schedule-stat-range__choices" role="group" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
     + [['current', 'schedule.currentMonth'], ['months', 'schedule.selectedMonths'], ['custom', 'schedule.customRange']].map(([value, label]) => '<button type="button" class="segmented__item' + (range === value ? ' is-active' : '') + '" data-action="statistics-range" data-range="' + value + '" aria-pressed="' + (range === value ? 'true' : 'false') + '">' + esc(t(label)) + '</button>').join('')
     + '</div></div>' + (controls ? '<div class="schedule-stat-dates">' + controls + '</div>' : '')
-    + '<div class="schedule-stat-filter-actions"><button class="btn btn--primary">' + esc(t('schedule.applyStatistics')) + '</button></div></form>'
+    + '<div class="schedule-stat-filter-actions"><button class="btn btn--primary">' + esc(t('schedule.applyStatistics')) + '</button>'
+    + '<button type="button" class="btn btn--secondary" data-action="print-statistics"><i data-lucide="printer" aria-hidden="true"></i>' + esc(t('schedule.print')) + '</button></div></form>'
     + results + '</section>';
 }
 function emptyPatternState() {
@@ -426,7 +511,8 @@ function renderToday() {
     const swatchColor = type ? type.color : 'var(--color-border)';
     const name = type ? esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name) : esc(t('schedule.freeDay'));
     const meta = type ? `${esc(userName(entry.user_id))} · ${esc(clockLabel(type))}` : esc(userName(entry.user_id));
-    return `<div class="list-row schedule-entry-row"><span class="schedule-swatch" style="--schedule-color:${esc(swatchColor)}"></span><div class="list-row__main"><span class="list-row__name">${name}</span><span class="list-row__meta">${meta}</span></div></div>`;
+    const icon = type?.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-type-icon" aria-hidden="true"></i>` : '';
+    return `<div class="list-row schedule-entry-row"><span class="schedule-swatch" style="--schedule-color:${esc(swatchColor)}"></span>${icon}<div class="list-row__main"><span class="list-row__name">${name}</span><span class="list-row__meta">${meta}</span></div></div>`;
   }).join('')}</div>`;
 }
 
@@ -467,6 +553,14 @@ function renderShell() {
     if (tabButton) { activateView(tabButton.dataset.tab); return; }
     const actionButton = event.target.closest('[data-action]');
     if (actionButton) action({ currentTarget: actionButton });
+  });
+  root.addEventListener('change', (event) => {
+    if (event.target.id === 'schedule-reminder-toggle') {
+      const offset = event.target.checked ? Number(root.querySelector('#schedule-reminder-offset')?.value ?? 15) : null;
+      saveReminderSettings(offset);
+    } else if (event.target.id === 'schedule-reminder-offset') {
+      saveReminderSettings(Number(event.target.value));
+    }
   });
 }
 
@@ -583,6 +677,10 @@ function openScheduleCreateModal(view) {
     onSave: (modal) => {
       const form = modal.querySelector('#schedule-create-form');
       form?.querySelector('[name="shift_preset"]')?.addEventListener('change', () => applyShiftPreset(form));
+      // Wie der Fuell-Umschalter direkt darunter: das Modal haengt an
+      // document.body, ausserhalb von `root` - der Klick-Delegierte in
+      // action() erreicht es nicht, also eigens verdrahten.
+      form?.querySelector('[data-action="pick-shift-icon"]')?.addEventListener('click', (event) => pickShiftIcon(event.currentTarget));
       // Ein Umschalter statt zweier getrennter Formulare: beide Feldsaetze
       // leben im selben `<form>`, damit Besitzer/Schichtart/Notiz nicht doppelt
       // gepflegt werden muessen. `yuvomi-datepicker` kennt kein `required`
@@ -741,6 +839,7 @@ async function action(event) {
             start_time: preset.startTime,
             end_time: preset.endTime,
             color: preset.color,
+            icon: preset.icon,
           });
         }
       } finally {
@@ -748,6 +847,14 @@ async function action(event) {
         renderPage();
       }
       window.yuvomi?.showToast(t('schedule.saved'), 'success');
+      return;
+    }
+    if (button.dataset.action === 'pick-shift-icon') {
+      await pickShiftIcon(button);
+      return;
+    }
+    if (button.dataset.action === 'print-statistics') {
+      window.print();
       return;
     }
     if (button.dataset.action === 'statistics-range') {

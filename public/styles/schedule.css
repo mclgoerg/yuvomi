@@ -187,6 +187,23 @@
   gap: var(--space-2);
 }
 
+/* Neben dem Farbpunkt, nicht statt ihm - Farbe und Symbol beantworten
+ * verschiedene Fragen ("welcher Ton" vs. "welche Art Tag") und sollen sich
+ * nicht gegenseitig ersetzen koennen. */
+.schedule-type-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--color-text-secondary);
+}
+
+.schedule-icon-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+}
+
 
 @media (max-width: 639px) {
   .schedule-page {
@@ -367,8 +384,49 @@
   --summary-cards: 2;
 }
 
+/* Nur gesetzt, wenn die Ueberstunden-Kachel tatsaechlich dabei ist - die
+ * Kartenzahl in --summary-cards muss zur tatsaechlichen Kartenzahl passen,
+ * sonst zieht die dritte Karte eine leere Spalte oder bricht in eine
+ * eigene Zeile mit nur sich selbst. */
+.schedule-stat-metrics--with-overtime {
+  --summary-cards: 3;
+}
+
+/* Ein Hinweis, kein Urteil: die Karte nennt sich selbst "Ueberstunden" im
+ * Label (Text traegt die Aussage, nicht nur die Farbe) und tont sich am
+ * reservierten Warnton, denselben, den Budget und Gesundheit fuer ihre
+ * eigenen Schwellenwerte schon verwenden. */
+.metric-card--warning {
+  border-color: color-mix(in oklch, var(--color-warning) 40%, transparent);
+}
+
+.metric-card--warning .metric-card__value {
+  color: var(--color-warning);
+}
+
 .schedule-stat-card > div > h2 {
   margin-bottom: var(--space-1);
+}
+
+.schedule-reminder-settings {
+  margin-bottom: var(--space-4);
+}
+
+.schedule-reminder-settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.schedule-reminder-settings__row .toggle-row {
+  flex: 1 1 auto;
+}
+
+.schedule-reminder-settings__row select {
+  width: auto;
+  flex: 0 0 auto;
 }
 
 .schedule-stat-list {
@@ -500,5 +558,42 @@
 @container schedule-page (max-width: 639px) {
   .schedule-stat-dates {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Druckansicht der Statistik-Auswertung: layout.css raeumt bereits Navigation,
+ * FAB und Toasts weg (app-weit); hier faellt zusaetzlich das, was nur auf dem
+ * Bildschirm einen Zweck hat - die Tab-Leiste (die Statistik ist die einzige
+ * Ansicht auf dem Blatt, eine Reihe Reiter dazu waere Bedienoberflaeche ohne
+ * Bedienung), die "Heute"-Karte (beantwortet "was jetzt", nicht "was in der
+ * Spanne war") und die Formular-Bedienelemente (Speichern/Drucken ergeben auf
+ * Papier nichts). Die Auswertung selbst - Kopfzeile, Kennzahlen, Tabellen -
+ * bleibt unveraendert, dieselbe Information, die schon auf dem Bildschirm
+ * stand. */
+@media print {
+  .schedule-tabs,
+  .schedule-today,
+  .schedule-stat-filters .form-field,
+  .schedule-stat-filter-actions {
+    display: none !important;
+  }
+
+  .schedule-statistics {
+    display: block;
+  }
+
+  .schedule-stat-period {
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-text-primary);
+  }
+
+  .schedule-stat-sections {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid var(--color-border);
   }
 }

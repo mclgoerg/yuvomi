@@ -23,7 +23,8 @@ function makeDb({ withNotificationTables = true } = {}) {
       username TEXT UNIQUE NOT NULL,
       role TEXT NOT NULL DEFAULT 'member',
       -- resolvePermissions() liest das Rollen-Profil ueber family_role.
-      family_role TEXT
+      family_role TEXT,
+      schedule_reminder_offset_minutes INTEGER
     );
     -- Der Vorrats-Voll-Sync fragt beide Rechte-Achsen (#467): sync_config fuer
     -- die haushaltweite Abschaltung, access_permissions je Empfaenger. Fehlt
@@ -74,9 +75,26 @@ function makeDb({ withNotificationTables = true } = {}) {
       expires_on TEXT,
       created_by INTEGER REFERENCES users(id) ON DELETE SET NULL
     );
+    -- Minimal, wie inventory_items/pantry_items daneben: nur genug Spalten,
+    -- damit die CASE-Zweige in processDueNotifications() und der
+    -- Schichtplan-Sync (server/services/schedule-reminders.js) sich preparen
+    -- lassen. schedule_reminder_offset_minutes sitzt auf users, nicht hier.
+    CREATE TABLE schedule_shift_types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      start_time TEXT,
+      end_time TEXT
+    );
+    CREATE TABLE schedule_reminder_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date_key TEXT NOT NULL,
+      shift_type_id INTEGER NOT NULL REFERENCES schedule_shift_types(id) ON DELETE CASCADE,
+      UNIQUE(user_id, date_key)
+    );
     CREATE TABLE reminders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item')),
+      entity_type TEXT NOT NULL CHECK(entity_type IN ('task','event','subscription','inventory_item','inventory_tracked_date','pantry_item','schedule_entry')),
       entity_id INTEGER NOT NULL,
       remind_at TEXT NOT NULL,
       dismissed INTEGER NOT NULL DEFAULT 0,

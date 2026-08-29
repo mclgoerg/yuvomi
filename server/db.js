@@ -6939,6 +6939,80 @@ const MIGRATIONS = [
       ALTER TABLE users ADD COLUMN changelog_seen_latest  TEXT;
     `,
   },
+  {
+    version: 174,
+    description: 'Schedule: an optional icon alongside a shift type\'s color (#786 follow-up)',
+    // Ein Lucide-Name wie ueberall sonst, wo ein Symbol erst zur Laufzeit
+    // feststeht (quick-links, Kalender-Termine) - nullable, weil bestehende
+    // Schichtarten schon ohne Icon leben und weiterhin duerfen.
+    up: `
+      ALTER TABLE schedule_shift_types ADD COLUMN icon TEXT;
+    `,
+  },
+  {
+    version: 175,
+    description: 'add per-user read-only schedule feed token',
+    up: `
+      -- Gleiches Muster wie Migration 61/144, aber hier ist der Inhalt selbst
+      -- schon persoenlich (die eigenen aufgeloesten Schichten), nicht nur der
+      -- Zugriff - anders als beim haushaltweiten Inventar-Fristen-Feed.
+      ALTER TABLE users ADD COLUMN schedule_feed_token TEXT;
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_schedule_feed_token
+        ON users(schedule_feed_token)
+        WHERE schedule_feed_token IS NOT NULL;
+    `,
+  },
+  {
+    version: 176,
+    description: 'Schedule: shift-start reminders - widen reminders for schedule_entry, add an anchor table for pattern days',
+    foreignKeysOff: true,
+    // DIE FUENFTE ERWEITERUNG DERSELBEN SPALTE, gleiche Bauart wie v137/v141/v148/v162.
+    up: `
+      CREATE TABLE reminders_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT    NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'schedule_entry')),
+        entity_id   INTEGER NOT NULL,
+        remind_at   TEXT    NOT NULL,
+        dismissed   INTEGER NOT NULL DEFAULT 0,
+        created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        pushed_at   TEXT,
+        assigned_from INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+      INSERT INTO reminders_new (id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from)
+        SELECT id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from FROM reminders;
+      DROP TABLE reminders;
+      ALTER TABLE reminders_new RENAME TO reminders;
+      CREATE INDEX idx_reminders_entity ON reminders(entity_type, entity_id);
+      CREATE INDEX idx_reminders_remind ON reminders(remind_at);
+      CREATE INDEX idx_reminders_user ON reminders(created_by);
+      CREATE INDEX idx_reminders_assigned_from ON reminders(assigned_from);
+
+      -- Ein Musterzyklus-Tag ist keine gespeicherte Zeile (das ist der ganze
+      -- Punkt von "computed on read", siehe resolveEntries()) und hat deshalb
+      -- keine stabile Id, an die reminders.entity_id haengen koennte - anders
+      -- als bei jedem bisherigen entity_type, wo die Zeile schon existiert.
+      -- Diese Tabelle ist NICHT die Wahrheit ueber den Schichtplan (die bleibt
+      -- resolveEntries()); sie ist nur ein Anker je (Nutzer, Tag), den der
+      -- periodische Sync (server/services/schedule-reminders.js) fuer sein
+      -- rollierendes Fenster anlegt und wieder abraeumt, sobald der Tag aus
+      -- dem Fenster faellt oder keine Erinnerung mehr braucht.
+      CREATE TABLE schedule_reminder_entries (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date_key      TEXT    NOT NULL,
+        shift_type_id INTEGER NOT NULL REFERENCES schedule_shift_types(id) ON DELETE CASCADE,
+        UNIQUE(user_id, date_key)
+      );
+
+      -- NULL = abgeschaltet (Standard), sonst der Vorlauf in Minuten vor
+      -- Schichtbeginn. Anders als calendar_feed_token keine eigene
+      -- Aktiv/Inaktiv-Spalte: der Vorlauf selbst ist der Schalter, wie schon
+      -- bei den Vorrats-Ablauferinnerungen (EXPIRY_REMINDER_OFFSET_DAYS).
+      ALTER TABLE users ADD COLUMN schedule_reminder_offset_minutes INTEGER;
+    `,
+  },
 ];
 
 /**
