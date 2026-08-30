@@ -4664,6 +4664,9 @@
         "emptyExtraShiftsTitle": "No extra shifts yet",
         "emptyExtraShiftsDescription": "Add an extra shift for a day that already has one - on-call alongside a regular shift, for example.",
         "extraReminderOffset": "Remind me before this shift",
-        "extraBadgeLabel": "Extra"
+        "extraBadgeLabel": "Extra",
+        "recurring": "Recurring",
+        "replaceExisting": "Replace what's scheduled",
+        "addShiftPlan": "Add shift plan"
     }
 }

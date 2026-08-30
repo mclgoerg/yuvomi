@@ -2618,11 +2618,14 @@ created, so `reminders.entity_id` points directly at `schedule_extra_shifts.id`.
 computing its own qualifying set — otherwise a same-day extra would collide with the primary
 anchor's `(user_id, date_key)`-keyed lookup.
 
-**Frontend:** a separate "Extra shifts" list on the Schedule page's Overrides tab (not folded into
+**Frontend:** a separate "Extra shifts" list on the Schedule page's Patterns tab (not folded into
 the grouped override editor, whose merge key assumes at most one row per `(user_id, date_key)` and
 has no per-day disambiguator), each row shown with a small distinguishing badge (also applied to the
 dashboard "who's working today" widget and the Calendar overlay) so an extra reads as *additional*
-rather than a second primary entry.
+rather than a second primary entry. There is no separate Overrides tab — the Patterns tab shows all
+three lists (patterns, overrides, extras), and one create modal reaches all three kinds via two
+toggles: **Recurring** (a pattern vs. a one-time entry) and, if one-time, **Replace** (an override,
+which may carry a free/no-shift value) vs. **Add** (an extra, which must always name a real shift).
 
 **Overtime flag + print (Schedule v3):** the Statistics tab checks every rolling 7-day window
 within the selected range against a per-user weekly-hours target (`schedule_weekly_hours`, see
@@ -3305,7 +3308,7 @@ Off by default. Four tabs (shift types, patterns, overrides, statistics) plus a 
   call (e.g. a vacation), instead of one `PUT` per day — see Schedule Overrides above for its cap.
   The client always confirms before submitting, since it silently overwrites any existing overrides
   in range the way the single-date `PUT` already does, just at a larger blast radius.
-- **Grouped display and range editing:** the Overrides tab groups consecutive days for the same
+- **Grouped display and range editing:** the Overrides section (Patterns tab) groups consecutive days for the same
   member with the same shift type (or free day) and note into a single row — display and
   bulk-action only, the table stays exactly one row per day. Editing a group shows its current
   From/To as editable fields; saving reconciles automatically (`POST /overrides/fill` for the new

@@ -456,7 +456,7 @@ function emptyOverrideState() {
     icon: 'calendar-clock',
     title: t('schedule.emptyOverridesTitle'),
     description: t('schedule.emptyOverridesDescription'),
-    action: { label: t('schedule.createOverride'), icon: 'plus', attrs: { 'data-action': 'open-create', 'data-view': 'overrides' } },
+    action: { label: t('schedule.createOverride'), icon: 'plus', attrs: { 'data-action': 'open-create-override' } },
   });
 }
 
@@ -613,7 +613,6 @@ function renderShell() {
   const tabs = [
     ['shifts', t('schedule.shiftTypes')],
     ['patterns', t('schedule.patterns')],
-    ['overrides', t('schedule.overrides')],
     ['statistics', t('schedule.statistics')],
   ];
   root.replaceChildren();
@@ -669,10 +668,9 @@ function renderPage() {
     ? '<section class="schedule-library schedule-library--shifts"><h2 class="u-section-title">' + esc(t('schedule.shiftTypes')) + '</h2>' + (state.types.length ? state.types.map(shiftTypeCard).join('') : emptyShiftTypesState()) + '</section>'
     : activeView === 'patterns'
       ? '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? state.patterns.map(patternCard).join('') : emptyPatternState()) + '</section>'
-      : activeView === 'overrides'
-        ? '<section class="schedule-library schedule-library--overrides"><h2 class="u-section-title">' + esc(t('schedule.overrides')) + '</h2>' + overrideRows() + '</section>'
-          + '<section class="schedule-library schedule-library--extras"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.extraShifts')) + '</h2><button type="button" class="btn btn--secondary" data-action="open-create-extra"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.addExtraShift')) + '</button></div>' + extraRows() + '</section>'
-        : renderStatistics();
+        + '<section class="schedule-library schedule-library--overrides"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.overrides')) + '</h2><button type="button" class="btn btn--secondary" data-action="open-create-override"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.createOverride')) + '</button></div>' + overrideRows() + '</section>'
+        + '<section class="schedule-library schedule-library--extras"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.extraShifts')) + '</h2><button type="button" class="btn btn--secondary" data-action="open-create-extra"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.addExtraShift')) + '</button></div>' + extraRows() + '</section>'
+      : renderStatistics();
   const body = root.querySelector('.schedule-body');
   body.replaceChildren();
   // Die Heute-Karte erst, wenn das Modul in Betrieb ist: ein frischer Haushalt
@@ -693,13 +691,11 @@ function updateScheduleFab() {
   if (!scheduleFab) return;
   const labels = {
     shifts: t('schedule.createShiftType'),
-    patterns: t('schedule.addPattern'),
-    overrides: t('schedule.createOverride'),
+    patterns: t('schedule.addShiftPlan'),
   };
   const dockLabels = {
     shifts: t('schedule.shiftType'),
     patterns: t('schedule.pattern'),
-    overrides: t('schedule.override'),
   };
   setPageFabAction(scheduleFab, {
     label: labels[activeView],
@@ -745,38 +741,6 @@ function openOverrideEditModal(group) {
  * Woche" ist derselbe reale Fall wie beim Muster-Fuellen, nur ohne dessen
  * ON-CONFLICT-Semantik (jede Zeile ist unabhaengig, server/routes/schedule-extras.js).
  */
-function openExtraCreateModal() {
-  const content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="extra-create">'
-    + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + userOptions(selectedOwner()) + '</select>')
-    + '<div class="form-field schedule-active-field"><span class="label">' + esc(t('schedule.fillRange')) + '</span><label class="toggle"><input name="fill_range" type="checkbox"><span class="toggle__track"></span></label></div>'
-    + '<div data-field="single-date">' + formField(t('schedule.date'), '<yuvomi-datepicker required name="date_key" type="date" label="' + esc(t('schedule.date')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>') + '</div>'
-    + '<div data-field="range-dates" hidden>'
-    + formField(t('schedule.rangeFrom'), '<yuvomi-datepicker name="range_from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>')
-    + formField(t('schedule.rangeTo'), '<yuvomi-datepicker name="range_to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>')
-    + '</div>'
-    + formField(t('schedule.shiftTypes'), '<select class="input" required name="shift_type_id">' + typeOptions(null, false) + '</select>')
-    + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000">')
-    + reminderOffsetField(null)
-    + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
-  openModal({
-    title: t('schedule.addExtraShift'),
-    size: 'md',
-    content,
-    onSave: (modal) => {
-      const form = modal.querySelector('#schedule-create-form');
-      form?.querySelector('[name="fill_range"]')?.addEventListener('change', (event) => {
-        const range = event.currentTarget.checked;
-        form.querySelector('[data-field="single-date"]').hidden = range;
-        form.querySelector('[data-field="range-dates"]').hidden = !range;
-      });
-      form?.querySelector('[name="reminder_enabled"]')?.addEventListener('change', (event) => {
-        form.querySelector('[name="reminder_offset_minutes"]').disabled = !event.currentTarget.checked;
-      });
-      form?.addEventListener('submit', saveCreatedSchedule);
-    },
-  });
-}
-
 function openExtraEditModal(extra) {
   const content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="extra-edit">'
     + '<input type="hidden" name="id" value="' + extra.id + '">'
@@ -800,7 +764,7 @@ function openExtraEditModal(extra) {
   });
 }
 
-function openScheduleCreateModal(view) {
+function openScheduleCreateModal(view, { recurring = true, mode = 'add' } = {}) {
   let title;
   let content;
   if (view === 'shifts') {
@@ -810,23 +774,38 @@ function openScheduleCreateModal(view) {
       + shiftFields()
       + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('common.create')) + '</button></div></form>';
   } else if (view === 'patterns') {
-    title = t('schedule.addPattern');
+    // EIN Formular fuer drei Faelle statt drei getrennter Modale: eine
+    // wiederkehrende Rotation (Muster), eine einmalige ERSETZUNG eines Tages
+    // (frueher "Override", ersetzt was das Muster sagt - NULL ist ein
+    // ausdruecklich freier Tag) und eine einmalige ZUSAETZLICHE Schicht
+    // (Extra, stapelt sich immer, egal was sonst an dem Tag steht). Zwei
+    // unabhaengige Umschalter statt drei Formen: "Wiederkehrend" waehlt
+    // zwischen Muster und Einmalig, "Ersetzt..." waehlt innerhalb von
+    // Einmalig zwischen den beiden bestehenden, unveraenderten Backends
+    // (server/routes/schedule.js#/overrides* vs. server/routes/schedule-extras.js).
+    title = t('schedule.addShiftPlan');
+    const replaceChecked = mode === 'replace';
     content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="pattern-create">'
       + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + userOptions(selectedOwner()) + '</select>')
-      + patternFields()
-      + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('common.create')) + '</button></div></form>';
-  } else {
-    title = t('schedule.createOverride');
-    content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="override-create">'
-      + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + userOptions(selectedOwner()) + '</select>')
+      + '<div class="form-field schedule-active-field"><span class="label">' + esc(t('schedule.recurring')) + '</span><label class="toggle"><input name="recurring" type="checkbox"' + (recurring ? ' checked' : '') + '><span class="toggle__track"></span></label></div>'
+      + '<div data-field="recurring-fields"' + (recurring ? '' : ' hidden') + '>' + patternFields() + '</div>'
+      + '<div data-field="one-time-fields"' + (recurring ? ' hidden' : '') + '>'
+      + '<div class="form-field schedule-active-field"><span class="label">' + esc(t('schedule.replaceExisting')) + '</span><label class="toggle"><input name="replace_existing" type="checkbox"' + (replaceChecked ? ' checked' : '') + '><span class="toggle__track"></span></label></div>'
       + '<div class="form-field schedule-active-field"><span class="label">' + esc(t('schedule.fillRange')) + '</span><label class="toggle"><input name="fill_range" type="checkbox"><span class="toggle__track"></span></label></div>'
       + '<div data-field="single-date">' + formField(t('schedule.date'), '<yuvomi-datepicker required name="date_key" type="date" label="' + esc(t('schedule.date')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>') + '</div>'
       + '<div data-field="range-dates" hidden>'
       + formField(t('schedule.rangeFrom'), '<yuvomi-datepicker name="range_from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>')
       + formField(t('schedule.rangeTo'), '<yuvomi-datepicker name="range_to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(todayKey()) + '"></yuvomi-datepicker>')
       + '</div>'
-      + formField(t('schedule.shiftTypes'), '<select class="input" name="shift_type_id">' + typeOptions(null) + '</select>')
+      // Zwei Auswahlfelder, nicht eins: ein Override darf frei sein (NULL,
+      // schedule_overrides.shift_type_id ist nullable), ein Extra nicht
+      // (schedule_extra_shifts.shift_type_id ist NOT NULL) - deshalb traegt
+      // nur die Ersetzen-Variante die Option "Freier Tag".
+      + '<div data-field="type-replace"' + (replaceChecked ? '' : ' hidden') + '>' + formField(t('schedule.shiftTypes'), '<select class="input" name="shift_type_id"' + (replaceChecked ? '' : ' disabled') + '>' + typeOptions(null) + '</select>') + '</div>'
+      + '<div data-field="type-add"' + (replaceChecked ? ' hidden' : '') + '>' + formField(t('schedule.shiftTypes'), '<select class="input" name="shift_type_id"' + (replaceChecked ? ' disabled' : '') + '>' + typeOptions(null, false) + '</select>') + '</div>'
       + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000">')
+      + '<div data-field="reminder-field"' + (replaceChecked ? ' hidden' : '') + '>' + reminderOffsetField(null) + '</div>'
+      + '</div>'
       + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
   }
   openModal({
@@ -851,6 +830,22 @@ function openScheduleCreateModal(view) {
         form.querySelector('[data-field="single-date"]').hidden = range;
         form.querySelector('[data-field="range-dates"]').hidden = !range;
       });
+      form?.querySelector('[name="recurring"]')?.addEventListener('change', (event) => {
+        const isRecurring = event.currentTarget.checked;
+        form.querySelector('[data-field="recurring-fields"]').hidden = !isRecurring;
+        form.querySelector('[data-field="one-time-fields"]').hidden = isRecurring;
+      });
+      form?.querySelector('[name="replace_existing"]')?.addEventListener('change', (event) => {
+        const replace = event.currentTarget.checked;
+        form.querySelector('[data-field="type-replace"]').hidden = !replace;
+        form.querySelector('[data-field="type-replace"] select').disabled = !replace;
+        form.querySelector('[data-field="type-add"]').hidden = replace;
+        form.querySelector('[data-field="type-add"] select').disabled = replace;
+        form.querySelector('[data-field="reminder-field"]').hidden = replace;
+      });
+      form?.querySelector('[name="reminder_enabled"]')?.addEventListener('change', (event) => {
+        form.querySelector('[name="reminder_offset_minutes"]').disabled = !event.currentTarget.checked;
+      });
       form?.addEventListener('submit', saveCreatedSchedule);
     },
   });
@@ -863,25 +858,38 @@ async function saveCreatedSchedule(event) {
   try {
     if (form.dataset.form === 'shift-create') await api.post('/schedule/shift-types', data);
     if (form.dataset.form === 'pattern-create') {
-      data.user_id = Number(data.user_id);
-      data.cycle_length = Number(data.cycle_length);
-      data.is_active = form.elements.is_active.checked;
-      await api.post('/schedule/patterns', data);
-    }
-    if (form.dataset.form === 'override-create') {
-      const userId = Number(data.user_id);
-      const shiftTypeId = data.shift_type_id ? Number(data.shift_type_id) : null;
-      if (form.elements.fill_range?.checked) {
-        const type = state.types.find((item) => Number(item.id) === shiftTypeId);
-        const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
-        const confirmed = await confirmModal(
-          t('schedule.fillRangeConfirmTitle'),
-          { confirmLabel: t('schedule.fillRange'), detail: t('schedule.fillRangeConfirmDetail', { from: formatDate(data.range_from), to: formatDate(data.range_to), type: typeLabel }) },
-        );
-        if (!confirmed) return;
-        await api.post('/schedule/overrides/fill', { user_id: userId, from: data.range_from, to: data.range_to, shift_type_id: shiftTypeId, note: data.note });
+      if (form.elements.recurring.checked) {
+        data.user_id = Number(data.user_id);
+        data.cycle_length = Number(data.cycle_length);
+        data.is_active = form.elements.is_active.checked;
+        await api.post('/schedule/patterns', data);
+      } else if (form.elements.replace_existing.checked) {
+        const userId = Number(data.user_id);
+        const shiftTypeId = data.shift_type_id ? Number(data.shift_type_id) : null;
+        if (form.elements.fill_range?.checked) {
+          const type = state.types.find((item) => Number(item.id) === shiftTypeId);
+          const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
+          const confirmed = await confirmModal(
+            t('schedule.fillRangeConfirmTitle'),
+            { confirmLabel: t('schedule.fillRange'), detail: t('schedule.fillRangeConfirmDetail', { from: formatDate(data.range_from), to: formatDate(data.range_to), type: typeLabel }) },
+          );
+          if (!confirmed) return;
+          await api.post('/schedule/overrides/fill', { user_id: userId, from: data.range_from, to: data.range_to, shift_type_id: shiftTypeId, note: data.note });
+        } else {
+          await api.put('/schedule/overrides/' + encodeURIComponent(data.date_key), { user_id: userId, shift_type_id: shiftTypeId, note: data.note });
+        }
       } else {
-        await api.put('/schedule/overrides/' + encodeURIComponent(data.date_key), { user_id: userId, shift_type_id: shiftTypeId, note: data.note });
+        const payload = {
+          user_id: Number(data.user_id),
+          shift_type_id: Number(data.shift_type_id),
+          note: data.note,
+          reminder_offset_minutes: form.elements.reminder_enabled.checked ? Number(data.reminder_offset_minutes) : null,
+        };
+        if (form.elements.fill_range?.checked) {
+          await api.post('/schedule/extras/fill', { ...payload, from: data.range_from, to: data.range_to });
+        } else {
+          await api.post('/schedule/extras', { ...payload, date_key: data.date_key });
+        }
       }
     }
     if (form.dataset.form === 'override-edit') {
@@ -901,19 +909,6 @@ async function saveCreatedSchedule(event) {
       const leftovers = rangeDifference(data.original_from, data.original_to, data.from, data.to);
       for (const span of leftovers) {
         await api.delete(`/schedule/overrides?user_id=${userId}&from=${span.from}&to=${span.to}`);
-      }
-    }
-    if (form.dataset.form === 'extra-create') {
-      const payload = {
-        user_id: Number(data.user_id),
-        shift_type_id: Number(data.shift_type_id),
-        note: data.note,
-        reminder_offset_minutes: form.elements.reminder_enabled.checked ? Number(data.reminder_offset_minutes) : null,
-      };
-      if (form.elements.fill_range?.checked) {
-        await api.post('/schedule/extras/fill', { ...payload, from: data.range_from, to: data.range_to });
-      } else {
-        await api.post('/schedule/extras', { ...payload, date_key: data.date_key });
       }
     }
     if (form.dataset.form === 'extra-edit') {
@@ -963,25 +958,16 @@ async function submitForm(event) {
       renderPage();
       return;
     }
-    if (form.dataset.form === 'shift-create') await api.post('/schedule/shift-types', data);
+    // Keine Zweige fuer 'shift-create'/'pattern-create'/'override-create' hier:
+    // alle drei werden ausschliesslich im Erstellen-Modal gebaut (an
+    // document.body, nicht in `root`), das direkt an saveCreatedSchedule()
+    // verdrahtet - dieser Delegierte an `root` sieht so ein Formular nie.
+    // Nur die INLINE-Bearbeitungsformulare (Update) leben in `root`.
     if (form.dataset.form === 'shift-update') await api.put(`/schedule/shift-types/${form.dataset.id}`, data);
-    if (form.dataset.form === 'pattern-create') {
-      data.user_id = Number(data.user_id);
-      data.cycle_length = Number(data.cycle_length);
-      data.is_active = form.elements.is_active.checked;
-      await api.post('/schedule/patterns', data);
-    }
     if (form.dataset.form === 'pattern-update') {
       data.cycle_length = Number(data.cycle_length);
       data.is_active = form.elements.is_active.checked;
       await api.put(`/schedule/patterns/${form.dataset.id}`, data);
-    }
-    if (form.dataset.form === 'override-create') {
-      const dateKey = data.date_key;
-      delete data.date_key;
-      data.user_id = Number(data.user_id);
-      data.shift_type_id = data.shift_type_id ? Number(data.shift_type_id) : null;
-      await api.put(`/schedule/overrides/${dateKey}`, data);
     }
     await load();
     renderPage();
@@ -1079,7 +1065,11 @@ async function action(event) {
       await api.delete(`/schedule/overrides?user_id=${userId}&from=${from}&to=${to}`);
     }
     if (button.dataset.action === 'open-create-extra') {
-      openExtraCreateModal();
+      openScheduleCreateModal('patterns', { recurring: false, mode: 'add' });
+      return;
+    }
+    if (button.dataset.action === 'open-create-override') {
+      openScheduleCreateModal('patterns', { recurring: false, mode: 'replace' });
       return;
     }
     if (button.dataset.action === 'edit-extra') {

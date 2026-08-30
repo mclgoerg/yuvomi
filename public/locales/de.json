@@ -4664,6 +4664,9 @@
         "emptyExtraShiftsTitle": "Noch keine Zusatzschichten",
         "emptyExtraShiftsDescription": "Füge einer Schicht, die es schon gibt, eine Zusatzschicht hinzu - zum Beispiel Bereitschaft neben einer regulären Schicht.",
         "extraReminderOffset": "Vor dieser Schicht erinnern",
-        "extraBadgeLabel": "Zusatz"
+        "extraBadgeLabel": "Zusatz",
+        "recurring": "Wiederkehrend",
+        "replaceExisting": "Ersetzt den bestehenden Eintrag",
+        "addShiftPlan": "Schichtplan hinzufügen"
     }
 }

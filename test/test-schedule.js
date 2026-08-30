@@ -337,7 +337,7 @@ test('overlapping patterns return a warning and the newer valid_from pattern win
 // a range delete asks first (a single day did not, until it became a group of
 // its own - one confirm dialog now covers both, so there is exactly one place
 // that can forget to ask before deleting many days at once).
-test('the Overrides tab groups consecutive same-type days and edits/deletes them as a range', () => {
+test('the Overrides section groups consecutive same-type days and edits/deletes them as a range', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   assert.match(schedulePage, /function overrideGroups\(overrides = state\.overrides\)/);
   assert.match(schedulePage, /function rangeDifference\(oldFrom, oldTo, newFrom, newTo\)/);
@@ -438,6 +438,48 @@ test('the shift-type icon picker is wired for both the create modal and inline e
   assert.match(schedulePage, /querySelector\('\[data-action="pick-shift-icon"\]'\)\?\.addEventListener\('click'/, 'the create modal must attach its own listener - root\'s delegate cannot reach it');
   assert.match(schedulePage, /button\.dataset\.action === 'pick-shift-icon'/, 'the inline edit form relies on the action() delegate');
   assert.match(schedulePage, /import\('\/components\/icon-picker\.js'\)/, 'reuses the shared icon picker rather than a new dialog');
+});
+
+// Overrides (replaces what a pattern says for a day) and extras (adds
+// alongside it) are NOT folded into the same tab because they're the same
+// thing - a separate Overrides tab was removed in favor of one Patterns tab
+// showing all three lists (patterns, overrides, extras) and one create modal
+// with two independent toggles: Recurring (pattern vs one-time) and, if
+// one-time, Replace vs Add - which decides whether the one-time entry can
+// carry a free/no-shift value (an override's shift_type_id is nullable) or
+// must always name a real shift (an extra's is NOT NULL).
+test('the Patterns tab folds patterns, overrides, and extras into one tab and one two-toggle create modal', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const tabsBlock = schedulePage.slice(schedulePage.indexOf('const tabs = ['), schedulePage.indexOf('];', schedulePage.indexOf('const tabs = [')));
+  assert.doesNotMatch(tabsBlock, /'overrides'/, 'overrides must not be its own tab anymore');
+  assert.match(tabsBlock, /'shifts'/);
+  assert.match(tabsBlock, /'patterns'/);
+  assert.match(tabsBlock, /'statistics'/);
+
+  const patternsBranch = schedulePage.slice(schedulePage.indexOf("activeView === 'patterns'"), schedulePage.indexOf(': renderStatistics()'));
+  assert.match(patternsBranch, /schedule-library--patterns/);
+  assert.match(patternsBranch, /schedule-library--overrides/, 'the overrides list must render inside the patterns branch, not a separate view');
+  assert.match(patternsBranch, /schedule-library--extras/, 'the extras list must render inside the patterns branch, not a separate view');
+  assert.match(patternsBranch, /data-action="open-create-override"/);
+  assert.match(patternsBranch, /data-action="open-create-extra"/);
+
+  const modalFn = schedulePage.slice(schedulePage.indexOf("function openScheduleCreateModal"), schedulePage.indexOf('async function saveCreatedSchedule'));
+  assert.match(modalFn, /name="recurring"/, 'the Recurring toggle must exist');
+  assert.match(modalFn, /name="replace_existing"/, 'the Replace/Add toggle must exist');
+  assert.match(modalFn, /data-field="recurring-fields"/);
+  assert.match(modalFn, /data-field="one-time-fields"/);
+  assert.match(modalFn, /data-field="type-replace"/);
+  assert.match(modalFn, /data-field="type-add"/);
+  assert.match(modalFn, /typeOptions\(null\)[^,]/, 'the replace-mode type select must include the free-day option (default includeFree=true)');
+  assert.match(modalFn, /typeOptions\(null, false\)/, 'the add-mode type select must exclude the free-day option - an extra always names a real shift');
+
+  const saveFn = schedulePage.slice(schedulePage.indexOf('async function saveCreatedSchedule'), schedulePage.indexOf('function formData'));
+  assert.match(saveFn, /form\.elements\.recurring\.checked/, 'must branch on the Recurring toggle');
+  assert.match(saveFn, /form\.elements\.replace_existing\.checked/, 'must branch on the Replace/Add toggle');
+  assert.match(saveFn, /api\.post\('\/schedule\/patterns', data\)/, 'recurring branch still posts a pattern');
+  assert.match(saveFn, /api\.put\('\/schedule\/overrides\/'/, 'replace branch still posts an override');
+  assert.match(saveFn, /api\.post\('\/schedule\/extras', /, 'add branch still posts an extra');
+  assert.doesNotMatch(schedulePage, /function openExtraCreateModal/, 'the standalone extras-only create modal must be fully replaced by the unified one');
 });
 
 // Lucide's createIcons() replaces an <i data-lucide> element with an <svg
