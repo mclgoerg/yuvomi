@@ -1460,7 +1460,7 @@ test('module-specific settings leaves only reference their owned preferences and
     },
     '../public/settings/pages/modules-options.js': {
       endpoints: ['/preferences'],
-      preferences: ['budget_mode', 'health_cycle_enabled', 'housekeeping_payment_tasks', 'tasks_subtasks_expanded'],
+      preferences: ['budget_mode', 'health_cycle_enabled', 'housekeeping_payment_tasks', 'tasks_subtasks_expanded', 'schedule_hidden_templates'],
     },
   };
 
@@ -1577,9 +1577,18 @@ test('module-specific settings leaves preserve their required controls and behav
   for (const id of ['budget-mode-personal', 'health-cycle-enabled', 'housekeeping-payment-tasks', 'tasks-subtasks-expanded']) {
     assert.match(options, controlIdPattern(id));
   }
+  // Die drei Schichtplan-Vorlagen-Kontrollkaestchen teilen sich EINE
+  // `.map(...)`-Aufrufstelle statt vier einzelner TOGGLES-Eintraege (ein
+  // Array-Praeferenzwert, nicht ein Schluessel je Schalter) - deshalb kein
+  // literales `id: 'schedule-template-work'` im Quelltext, das
+  // `controlIdPattern` finden koennte. Die erzeugende Vorlage selbst pruefen.
+  assert.match(options, /const SCHEDULE_TEMPLATES = \[/);
+  assert.match(options, /id: `schedule-template-\$\{key\}`/, 'the three schedule template checkboxes must use the reviewed id pattern');
   // Genau diese Schalter, sonst nichts: sie kommen aus dem geteilten Primitiv,
-  // deshalb zählt das Blatt keine `<input>`-Literale mehr.
-  assert.equal([...options.matchAll(/toggleRowHtml\(\{/g)].length, 4);
+  // deshalb zählt das Blatt keine `<input>`-Literale mehr. Fuenf statt vier
+  // Fundstellen im QUELLTEXT, nicht Aufrufe zur Laufzeit: die drei
+  // Schichtplan-Vorlagen teilen sich die eine `.map(...)`-Aufrufstelle oben.
+  assert.equal([...options.matchAll(/toggleRowHtml\(\{/g)].length, 5);
   assert.equal([...options.matchAll(/<(?:input|select|textarea)\b/g)].length, 0);
   assert.equal([...options.matchAll(/getPreferences\(\)/g)].length, 1);
   assert.match(options, /budget_mode: checked \? 'personal' : 'shared'/);
