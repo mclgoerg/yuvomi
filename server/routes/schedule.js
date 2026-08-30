@@ -91,10 +91,17 @@ export function scheduleData(from, to, userId) {
   const patterns = database.prepare(`SELECT * FROM schedule_patterns WHERE is_active = 1
     AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until >= ?) ${condition}
     ORDER BY user_id, valid_from DESC, id DESC`).all(...(userId ? [to, from, userId] : [to, from]));
+  // Ein Zyklustag kann mehrere Zeilen tragen (Stundenplan, mehrere Klassen am
+  // selben Tag) - deshalb ein Array je Schluessel, nicht die letzte Zeile
+  // gewinnt wie frueher.
   const patternDays = new Map();
   if (patterns.length) {
     const ids = patterns.map((p) => p.id);
-    for (const row of database.prepare(`SELECT * FROM schedule_pattern_days WHERE pattern_id IN (${ids.map(() => '?').join(',')})`).all(...ids)) patternDays.set(`${row.pattern_id}:${row.position}`, row);
+    for (const row of database.prepare(`SELECT * FROM schedule_pattern_days WHERE pattern_id IN (${ids.map(() => '?').join(',')})`).all(...ids)) {
+      const key = `${row.pattern_id}:${row.position}`;
+      if (patternDays.has(key)) patternDays.get(key).push(row);
+      else patternDays.set(key, [row]);
+    }
   }
   const users = userId ? [userId] : database.prepare('SELECT id FROM users ORDER BY id').all().map((row) => row.id);
   const entries = []; const warnings = [];
@@ -184,16 +191,6 @@ router.post('/patterns', (req, res) => {
   const result = db.get().prepare('INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from, valid_until, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)').run(user.value, name.value, anchor.value, length.value, from.value, until.value, Number(active.value));
   res.status(201).json({ data: db.get().prepare('SELECT * FROM schedule_patterns WHERE id = ?').get(result.lastInsertRowid) });
 });
-router.put('/patterns/:id/days/:position', (req, res) => {
-  const patternId = id(req.params.id, 'pattern_id'); const position = num(req.params.position, 'position', { required: true });
-  const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id');
-  const pattern = patternId.value && db.get().prepare('SELECT * FROM schedule_patterns WHERE id = ?').get(patternId.value);
-  if (!pattern) return res.status(404).json({ error: 'Pattern not found.', code: 404 }); if (!mineOrAdmin(req, pattern.user_id)) return res.status(403).json({ error: 'Forbidden.', code: 403 });
-  if (patternId.error || !Number.isInteger(position.value) || position.value < 0 || position.value >= pattern.cycle_length || typeId?.error) return res.status(400).json({ error: 'Invalid pattern day.', code: 400 });
-  if (typeId && !typeExists(typeId.value)) return fail(res, 400, 'shift_type_id does not exist.');
-  db.get().prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, ?, ?) ON CONFLICT(pattern_id, position) DO UPDATE SET shift_type_id = excluded.shift_type_id').run(pattern.id, position.value, typeId?.value ?? null);
-  res.json({ data: db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id = ? AND position = ?').get(pattern.id, position.value) });
-});
 router.put('/overrides/:dateKey', (req, res) => {
   const key = date(req.params.dateKey, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: 5000 });
   const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); if (typeId && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
@@ -251,19 +248,29 @@ router.delete('/patterns/:id', (req, res) => {
 router.get('/patterns/:id/days', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   if (!db.get().prepare('SELECT 1 FROM schedule_patterns WHERE id=?').get(key.value)) return fail(res, 404, 'Pattern not found.');
-  return res.json({ data: db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position').all(key.value) });
+  return res.json({ data: db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position, id').all(key.value) });
 });
+// Ersetzt IMMER alle Zyklustage des Musters in einem Rutsch (loeschen, neu
+// anlegen) statt einzelner Upserts - es gibt kein natuerliches Merkmal, an dem
+// sich "unveraendert" von "geloescht" unterscheiden liesse (derselbe Grund wie
+// server/routes/inventory/item-dates.js). Dieselbe Position darf jetzt
+// MEHRFACH vorkommen - ein Zyklustag kann mehrere Klassen zu verschiedenen
+// Zeiten tragen (Stundenplan) statt hoechstens einer. Das bedeutet: JEDES
+// Speichern vergibt allen Zeilen des Musters frische Ids, auch unveraenderten -
+// server/services/schedule-reminders.js's Anker-Sync und die ICS-UIDs
+// (server/services/schedule-ics.js) sind bewusst so gebaut, dass sie das
+// verkraften (Selbstheilung beim naechsten Sync-Lauf statt einer Kaskade).
 router.put('/patterns/:id/days', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_patterns WHERE id=?').get(key.value);
   if (!old) return fail(res, 404, 'Pattern not found.'); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
   if (!Array.isArray(req.body?.days)) return fail(res, 400, 'days must be an array.');
-  const seen = new Set(); const days = [];
+  const days = [];
   for (const row of req.body.days) {
     const position = num(row?.position, 'position', { required: true }); const shiftType = row?.shift_type_id == null ? null : id(row.shift_type_id, 'shift_type_id');
-    if (position.error || !Number.isInteger(position.value) || position.value < 0 || position.value >= old.cycle_length || shiftType?.error || seen.has(position.value)) return fail(res, 400, 'Invalid pattern day.');
+    if (position.error || !Number.isInteger(position.value) || position.value < 0 || position.value >= old.cycle_length || shiftType?.error) return fail(res, 400, 'Invalid pattern day.');
     if (shiftType && !typeExists(shiftType.value)) return fail(res, 400, 'shift_type_id does not exist.');
-    seen.add(position.value); days.push([position.value, shiftType?.value ?? null]);
+    days.push([position.value, shiftType?.value ?? null]);
   }
   db.get().transaction(() => { db.get().prepare('DELETE FROM schedule_pattern_days WHERE pattern_id=?').run(old.id); const add = db.get().prepare('INSERT INTO schedule_pattern_days (pattern_id,position,shift_type_id) VALUES (?,?,?)'); days.forEach((day) => add.run(old.id, ...day)); })();
   return res.json({ data: db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position').all(old.id) });

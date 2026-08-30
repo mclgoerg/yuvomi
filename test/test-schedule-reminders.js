@@ -55,8 +55,26 @@ function insertOverride(userId, dateKey, shiftTypeId) {
     .run(userId, dateKey, shiftTypeId);
 }
 
+// cycle_length 1, anchored on TODAY: position 0 always resolves to TODAY.
+// `validUntil` defaults to TODAY too - the sync window is 8 days
+// (today..today+7 inclusive), and an unconstrained cycle_length-1 pattern
+// would otherwise recur identically on every one of those days, multiplying
+// every anchor/reminder count in a test by 8 for no reason relevant to what's
+// being tested here.
+function insertPattern(userId, { anchorDate = TODAY, validUntil = TODAY } = {}) {
+  return db.prepare('INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_until) VALUES (?, ?, ?, 1, ?)')
+    .run(userId, 'Timetable', anchorDate, validUntil).lastInsertRowid;
+}
+
+function insertPatternDay(patternId, shiftTypeId, position = 0) {
+  return db.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, ?, ?)')
+    .run(patternId, position, shiftTypeId).lastInsertRowid;
+}
+
 function clearAll() {
   db.exec('DELETE FROM schedule_overrides');
+  db.exec('DELETE FROM schedule_patterns');
+  db.exec('DELETE FROM schedule_pattern_days');
   db.exec('DELETE FROM schedule_reminder_entries');
   db.exec("DELETE FROM reminders WHERE entity_type = 'schedule_entry'");
   db.exec('UPDATE users SET schedule_reminder_offset_minutes = NULL');
@@ -64,6 +82,12 @@ function clearAll() {
 
 function anchorFor(userId, dateKey) {
   return db.prepare('SELECT * FROM schedule_reminder_entries WHERE user_id = ? AND date_key = ?').get(userId, dateKey);
+}
+
+// Plural counterpart for a timetable day: a pattern day can now resolve to
+// several qualifying entries on the same date, each its own anchor.
+function anchorsFor(userId, dateKey) {
+  return db.prepare('SELECT * FROM schedule_reminder_entries WHERE user_id = ? AND date_key = ? ORDER BY id').all(userId, dateKey);
 }
 
 function reminderFor(anchorId) {
@@ -191,6 +215,66 @@ test('offsetMinutes = null räumt bestehende Anker/Erinnerungen vollständig ab'
   setOffset(alice, null);
   scheduleReminders.syncScheduleRemindersForUser(db, alice, NOW);
   assert.equal(anchorFor(alice, TODAY), undefined);
+});
+
+// A timetable's whole point: two classes, same day, different times - each
+// needs its own anchor (schedule_reminder_entries used to be one row per
+// (user, date), full stop) and its own reminder.
+test('zwei Klassen am selben Tag bekommen zwei unabhaengige Anker und Erinnerungen', () => {
+  clearAll();
+  const math = insertType({ name: 'Mathe', short_code: 'M', start_time: '08:00', end_time: '09:00' });
+  const bio = insertType({ name: 'Bio', short_code: 'B', start_time: '09:15', end_time: '10:00' });
+  const pattern = insertPattern(alice);
+  insertPatternDay(pattern, math);
+  insertPatternDay(pattern, bio);
+  setOffset(alice, 10);
+
+  scheduleReminders.syncScheduleRemindersForUser(db, alice, NOW);
+
+  const anchors = anchorsFor(alice, TODAY);
+  assert.equal(anchors.length, 2, 'jede Klasse bekommt ihren eigenen Anker');
+  assert.deepEqual(anchors.map((a) => a.shift_type_id).sort(), [bio, math].sort());
+  assert.notEqual(anchors[0].pattern_day_id, anchors[1].pattern_day_id);
+
+  const reminders = anchors.map((a) => reminderFor(a.id));
+  assert.ok(reminders.every(Boolean), 'jeder Anker bekommt seine eigene Erinnerung');
+  const mathReminder = reminderFor(anchors.find((a) => a.shift_type_id === Number(math)).id);
+  const bioReminder = reminderFor(anchors.find((a) => a.shift_type_id === Number(bio)).id);
+  assert.equal(mathReminder.remind_at, '2026-09-10T07:50');
+  assert.equal(bioReminder.remind_at, '2026-09-10T09:05');
+});
+
+// PUT /patterns/:id/days (server/routes/schedule.js) loescht und legt bei
+// JEDEM Speichern ALLE Tage des Musters neu an, auch unveraenderte - simuliert
+// hier direkt an der Tabelle, ohne den Router zu bemuehen. Der Sync darf sich
+// davon nicht aus dem Tritt bringen lassen: nach dem naechsten Lauf muss
+// wieder GENAU ein Anker+Erinnerung je aktueller Klasse stehen, keine Leichen
+// unter den alten Ids und keine Duplikate.
+test('ein Speichern im Tageseditor vergibt frische pattern_day_ids - der naechste Sync-Lauf heilt das selbst', () => {
+  clearAll();
+  const math = insertType({ name: 'Mathe', short_code: 'M', start_time: '08:00', end_time: '09:00' });
+  const bio = insertType({ name: 'Bio', short_code: 'B', start_time: '09:15', end_time: '10:00' });
+  const history = insertType({ name: 'Geschichte', short_code: 'G', start_time: '10:15', end_time: '11:00' });
+  const pattern = insertPattern(alice);
+  insertPatternDay(pattern, math);
+  insertPatternDay(pattern, bio);
+  setOffset(alice, 10);
+  scheduleReminders.syncScheduleRemindersForUser(db, alice, NOW);
+  assert.equal(anchorsFor(alice, TODAY).length, 2);
+
+  // "Speichern": alle Zeilen des Musters weg, alle neu - Bio bleibt inhaltlich
+  // gleich, aber unter neuer Id; Mathe wird durch Geschichte ersetzt.
+  db.prepare('DELETE FROM schedule_pattern_days WHERE pattern_id = ?').run(pattern);
+  insertPatternDay(pattern, bio);
+  insertPatternDay(pattern, history);
+
+  scheduleReminders.syncScheduleRemindersForUser(db, alice, NOW);
+
+  const anchors = anchorsFor(alice, TODAY);
+  assert.equal(anchors.length, 2, 'weiterhin genau ein Anker je aktueller Klasse, keine Leichen unter den alten Ids');
+  assert.deepEqual(anchors.map((a) => a.shift_type_id).sort(), [bio, history].sort(), 'Mathe ist weg, Geschichte ist da, Bio blieb inhaltlich gleich');
+  assert.ok(anchors.every((a) => reminderFor(a.id)), 'jeder aktuelle Anker traegt seine Erinnerung, auch der unter neuer Id neu angelegte fuer Bio');
+  assert.equal(db.prepare(`SELECT count(*) AS n FROM reminders WHERE entity_type = 'schedule_entry'`).get().n, 2, 'keine verwaisten Erinnerungen unter den abgeraeumten alten Ankern');
 });
 
 // --------------------------------------------------------

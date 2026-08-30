@@ -1515,6 +1515,9 @@
         "tasksSubtasksExpandedHint": "Lege fest, ob Unteraufgaben standardmäßig aufgeklappt angezeigt werden.",
         "tasksSubtasksExpandedLabel": "Unteraufgaben in Aufgaben aufgeklappt lassen",
         "tasksSubtasksExpandedSaved": "Anzeigeeinstellung für Unteraufgaben gespeichert.",
+        "scheduleTemplatesTitle": "Quickstart-Vorlagen",
+        "scheduleTemplatesHint": "Welche Vorlagen der Schnellstart bei den Schichtarten anbietet. Angelegte Schichtarten bleiben unabhängig davon bestehen und lassen sich jederzeit umbenennen oder löschen.",
+        "scheduleTemplatesSaved": "Quickstart-Vorlagen gespeichert.",
         "breadcrumbLabel": "Navigationspfad",
         "sectionPersonal": "Persönlich",
         "sectionModulesNav": "Module",
@@ -4612,7 +4615,15 @@
             "day": "Tagschicht",
             "fullDay": "24-Stunden-Schicht",
             "vacation": "Urlaub",
-            "sick": "Krank"
+            "sick": "Krank",
+            "period1": "1. Stunde",
+            "period2": "2. Stunde",
+            "period3": "3. Stunde",
+            "period4": "4. Stunde",
+            "exam": "Prüfung",
+            "lecture": "Vorlesung",
+            "seminar": "Seminar",
+            "lab": "Praktikum"
         },
         "overlapWarning": "Überlappende Schichtpläne am {{date}} für {{user}}; der neuere Plan wird angezeigt.",
         "overlapWarningShort": "Überlappende Schichtpläne",
@@ -4667,6 +4678,10 @@
         "extraBadgeLabel": "Zusatz",
         "recurring": "Wiederkehrend",
         "replaceExisting": "Ersetzt den bestehenden Eintrag",
-        "addShiftPlan": "Schichtplan hinzufügen"
+        "planning": "Planung",
+        "addEntry": "Eintrag hinzufügen",
+        "templateWork": "Arbeit",
+        "templateSchool": "Schule",
+        "templateUniversity": "Universität"
     }
 }

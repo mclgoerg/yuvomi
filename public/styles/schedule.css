@@ -98,6 +98,32 @@
   align-self: start;
 }
 
+/* Bare <fieldset> carries a browser-default border/padding/min-width this
+   form never wants - it's used purely to disable a field group in one line
+   (disabled excludes it from FormData and native validation together). */
+.schedule-modal-form fieldset[data-field] {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+}
+
+/* The rule above's `display: flex` otherwise outranks the browser's own
+   `[hidden] { display: none }` (class+attribute beats a lone attribute
+   selector) - without this, a hidden mode's fieldset stayed visually
+   stacked under the active one even though `disabled` correctly kept it
+   out of FormData/validation. */
+.schedule-modal-form fieldset[data-field][hidden] {
+  display: none;
+}
+
+.schedule-create-mode {
+  margin-top: 4px;
+}
+
 @media screen and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .schedule-page input[type="time"],
   :root:not([data-theme="light"]) .schedule-modal-form input[type="time"] {
@@ -163,6 +189,29 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+/* A cycle day can carry several classes (a timetable), not just one - a small
+ * add/remove list instead of a single <select>, same grid cell as before. */
+.schedule-day-group {
+  min-width: 0;
+}
+
+.schedule-day-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.schedule-day-row {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.schedule-day-row .input {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Shift types keep their actions inside the edit form; give that nested row

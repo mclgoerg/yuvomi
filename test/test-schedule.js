@@ -27,7 +27,17 @@ const patternId = database.prepare("INSERT INTO schedule_patterns (user_id, name
 database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, ?, ?)').run(patternId, 7, typeId);
 
 const patterns = () => database.prepare('SELECT * FROM schedule_patterns WHERE user_id = 1').all();
-const days = () => new Map(database.prepare('SELECT * FROM schedule_pattern_days').all().map((row) => [`${row.pattern_id}:${row.position}`, row]));
+// Ein Array je Schluessel, nicht eine einzelne Zeile - ein Zyklustag kann
+// mehrere Klassen tragen (Stundenplan), resolveEntries() erwartet das jetzt so.
+function days() {
+  const map = new Map();
+  for (const row of database.prepare('SELECT * FROM schedule_pattern_days').all()) {
+    const key = `${row.pattern_id}:${row.position}`;
+    if (map.has(key)) map.get(key).push(row);
+    else map.set(key, [row]);
+  }
+  return map;
+}
 function resolve(from, to, overrides = database.prepare('SELECT * FROM schedule_overrides WHERE user_id = 1').all()) {
   return resolveEntries({ from, to, userId: 1, patterns: patterns(), patternDays: days(), overrides });
 }
@@ -48,13 +58,42 @@ test('override beats pattern, and a pattern beats nothing', () => {
   const result = resolveEntries({
     from: '2026-10-01', to: '2026-10-01', userId: 1,
     patterns: [{ id: 44, anchor_date: '2026-10-01', cycle_length: 1, valid_from: null, valid_until: null }],
-    patternDays: new Map([['44:0', { shift_type_id: typeId }]]),
+    patternDays: new Map([['44:0', [{ id: 999, shift_type_id: typeId }]]]),
     overrides: [{ id: 55, date_key: '2026-10-01', shift_type_id: null, note: 'Vacation' }],
   });
   assert.equal(result.entries[0].source, 'override');
   assert.equal(result.entries[0].is_free, true);
   const noPattern = resolveEntries({ from: '2026-10-01', to: '2026-10-01', userId: 1, patterns: [], patternDays: new Map(), overrides: [] });
   assert.deepEqual(noPattern.entries, []);
+});
+
+// A timetable's whole point: one cycle position, several classes at
+// different times. Each row keeps its own stable pattern_day_id (the
+// disambiguator reminders/ICS rely on to give each class its own anchor/UID),
+// and an empty position still resolves to exactly one free-day entry, never
+// zero - the same placeholder a single-class pattern has always produced.
+test('a pattern day can carry several classes, each its own entry with its own pattern_day_id', () => {
+  const bioType = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Bio', '09:00', '10:00', '#123456')").run().lastInsertRowid;
+  const result = resolveEntries({
+    from: '2026-11-02', to: '2026-11-02', userId: 1,
+    patterns: [{ id: 77, anchor_date: '2026-11-02', cycle_length: 7, valid_from: null, valid_until: null }],
+    patternDays: new Map([['77:0', [{ id: 501, shift_type_id: typeId }, { id: 502, shift_type_id: bioType }]]]),
+    overrides: [],
+  });
+  assert.equal(result.entries.length, 2, 'both classes on the day must resolve, not just the last one');
+  assert.deepEqual(result.entries.map((e) => e.shift_type_id).sort(), [bioType, typeId].sort());
+  assert.deepEqual(result.entries.map((e) => e.pattern_day_id).sort(), [501, 502]);
+  assert.ok(result.entries.every((e) => e.source === 'pattern' && e.position === 0));
+
+  const empty = resolveEntries({
+    from: '2026-11-02', to: '2026-11-02', userId: 1,
+    patterns: [{ id: 77, anchor_date: '2026-11-02', cycle_length: 7, valid_from: null, valid_until: null }],
+    patternDays: new Map(),
+    overrides: [],
+  });
+  assert.equal(empty.entries.length, 1, 'zero classes must still resolve to one explicit free day, not zero entries');
+  assert.equal(empty.entries[0].is_free, true);
+  assert.equal(empty.entries[0].pattern_day_id, null);
 });
 
 test('a referenced shift type cannot be deleted', () => {
@@ -329,6 +368,51 @@ test('overlapping patterns return a warning and the newer valid_from pattern win
   assert.deepEqual(response.body.data.warnings, [{ user_id: Number(carol), date_key: '2027-01-20', pattern_ids: [Number(newPattern), Number(oldPattern)] }]);
 });
 
+// Multi-class positions (a timetable) live entirely WITHIN one pattern's one
+// day - they must not change what happens BETWEEN two different overlapping
+// patterns. The newer pattern still wins outright and the older one's
+// classes must not leak into the result just because the winner has several.
+test('a multi-class winning pattern still fully replaces an older overlapping one, not merges with it', async () => {
+  const dana = database.prepare("INSERT INTO users (username, display_name, password_hash, role) VALUES ('schedule-dana', 'Dana', 'x', 'member')").run().lastInsertRowid;
+  const mathType = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Math', '08:00', '09:00', '#111111')").run().lastInsertRowid;
+  const bioType = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Bio', '09:00', '10:00', '#222222')").run().lastInsertRowid;
+  const oldJob = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from) VALUES (?, 'Old job', '2027-02-01', 1, '2027-02-01')").run(dana).lastInsertRowid;
+  const timetable = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from) VALUES (?, 'Timetable', '2027-02-15', 7, '2027-02-15')").run(dana).lastInsertRowid;
+  database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 0, ?)').run(oldJob, typeId);
+  database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 0, ?)').run(timetable, mathType);
+  database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 0, ?)').run(timetable, bioType);
+
+  const response = await call('GET', '/entries?from=2027-02-22&to=2027-02-22&user_id=' + dana, { as: ALICE });
+  assert.equal(response.status, 200);
+  assert.equal(response.body.data.entries.length, 2, 'both of the winning pattern\'s classes appear, and nothing from the older pattern');
+  assert.deepEqual(response.body.data.entries.map((e) => e.shift_type_id).sort(), [bioType, mathType].sort());
+  assert.deepEqual(response.body.data.warnings, [{ user_id: Number(dana), date_key: '2027-02-22', pattern_ids: [Number(timetable), Number(oldJob)] }]);
+});
+
+// First HTTP-level coverage for the bulk days route accepting the SAME
+// position more than once - the whole point of this feature. It used to
+// reject that with 400 (a `seen` Set guarded against it); replacing every
+// day on every save (not diffing) means a second save with fewer rows for a
+// position must also correctly shrink it back down, not leave orphans.
+test('PUT /patterns/:id/days accepts several classes at the same position, and a later save can shrink it back down', async () => {
+  const mathType = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Math class', '08:00', '09:00', '#333333')").run().lastInsertRowid;
+  const bioType = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Bio class', '09:00', '10:00', '#444444')").run().lastInsertRowid;
+  const timetableId = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (1, 'Monday timetable', '2027-03-01', 7)").run().lastInsertRowid;
+
+  const filled = await call('PUT', `/patterns/${timetableId}/days`, {
+    as: ALICE,
+    body: { days: [{ position: 0, shift_type_id: mathType }, { position: 0, shift_type_id: bioType }] },
+  });
+  assert.equal(filled.status, 200);
+  assert.equal(filled.body.data.length, 2);
+  assert.deepEqual(filled.body.data.map((d) => d.shift_type_id).sort(), [bioType, mathType].sort());
+
+  const shrunk = await call('PUT', `/patterns/${timetableId}/days`, { as: ALICE, body: { days: [{ position: 0, shift_type_id: mathType }] } });
+  assert.equal(shrunk.status, 200);
+  assert.equal(shrunk.body.data.length, 1, 'a save with fewer rows for the position must remove what is no longer sent, not add to it');
+  assert.equal(shrunk.body.data[0].shift_type_id, Number(mathType));
+});
+
 // The date arithmetic itself (rangeDifference) is exercised end-to-end by the
 // server test above - deleting the middle of a filled range and asserting the
 // exact remaining days IS the same computation the client runs locally before
@@ -399,6 +483,38 @@ test('rangeDifference() finds exactly what fell outside a shrunk range, and noth
   assert.deepEqual(__test.rangeDifference('2027-04-03', '2027-04-07', '2027-04-01', '2027-04-10'), []);
 });
 
+// Extras used to render one row per day even for a range created via
+// /extras/fill - the same "nice summary" overrides already had was missing
+// here (user feedback). Extras have no ON CONFLICT like overrides though (no
+// unique (user_id, date_key) to upsert against), so editing a group can't
+// reuse rangeDifference()/fill-in-place - it creates fresh rows for the new
+// range first and only deletes the old ids afterwards, so a failed second
+// step leaves a duplicate rather than losing data.
+test('the Extra shifts section groups consecutive same-type days and edits/deletes them as a range', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /function extraGroups\(\)/);
+  assert.match(schedulePage, /data-form="extra-edit-range"/);
+  assert.match(schedulePage, /data-action="edit-extra-range"/);
+  assert.match(schedulePage, /data-action="delete-extra-range"/);
+  assert.match(schedulePage, /extraGroups\(\)\.find\(/);
+  assert.doesNotMatch(schedulePage, /function openExtraEditModal\(/, 'the single-row edit modal is fully replaced by the group modal');
+  assert.doesNotMatch(schedulePage, /data-action="edit-extra"/, 'no single-row edit action should remain');
+
+  const groupsFn = schedulePage.slice(schedulePage.indexOf('function extraGroups()'), schedulePage.indexOf('function extraRows()'));
+  assert.match(groupsFn, /reminder_offset_minutes/, 'grouping must not merge extras with different reminder offsets into one row');
+
+  const editBranch = schedulePage.slice(schedulePage.indexOf("form.dataset.form === 'extra-edit-range'"), schedulePage.indexOf('await load();'));
+  assert.match(editBranch, /api\.post\('\/schedule\/extras'/, 'a single-day edit still uses the plain create endpoint');
+  assert.match(editBranch, /api\.post\('\/schedule\/extras\/fill'/, 'a multi-day edit still uses the fill endpoint');
+  assert.match(editBranch, /data\.ids\.split\(','\)/, 'the old ids are deleted individually, extras have no range-delete endpoint');
+  const postIndex = editBranch.indexOf("api.post('/schedule/extras");
+  const deleteIndex = editBranch.indexOf('api.delete');
+  assert.ok(postIndex < deleteIndex, 'the new rows must be created before the old ones are deleted, so a failed create never loses data');
+
+  const deleteBranch = schedulePage.slice(schedulePage.indexOf("'delete-extra-range'"), schedulePage.indexOf("'save-days'"));
+  assert.match(deleteBranch, /confirmModal\(/, 'deleting a range confirms first, matching the override range delete');
+});
+
 // The three library tabs (shift types, patterns, overrides) are one module,
 // not three, and their empty states used to say otherwise: overrides fell back
 // to a bare paragraph while its siblings already used the shared
@@ -419,11 +535,49 @@ test('all three Schedule library tabs share the same empty-state grammar', () =>
 // column or endpoint, only two more preset entries. Verified server-side too,
 // by the existing 'schedule routes reject invalid shift times' test elsewhere
 // in this file exercising the same POST /shift-types with null times.
+// Shared across every quickstart template (work/school/university), not
+// duplicated per template - absence-marking is the same need everywhere.
 test('quick-start includes Vacation and Sick as timeless presets, not just work shifts', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  const presetsBlock = schedulePage.slice(schedulePage.indexOf('const SHIFT_PRESETS'), schedulePage.indexOf(']);') + 3);
+  const presetsBlock = schedulePage.slice(schedulePage.indexOf('const SHARED_PRESETS'), schedulePage.indexOf(']);') + 3);
   assert.match(presetsBlock, /key: 'vacation'.*startTime: null.*endTime: null/, 'vacation must carry no times, like a real absence rather than a shift');
   assert.match(presetsBlock, /key: 'sick'.*startTime: null.*endTime: null/, 'sick must carry no times, like a real absence rather than a shift');
+});
+
+// Quickstart used to be a single fixed 7-preset button, gated by "does the
+// household have any shift type yet" - fine for one template, wrong once a
+// second one might reasonably run later (Work for a parent, then School for
+// a kid). It must offer all three, key its guard on the shift-type's own
+// short_code (skip what's already there) rather than blocking outright, and
+// stay reachable after the first type exists, not just from the empty state.
+test('quickstart offers three templates and only skips presets already present, not the whole run', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /const PRESET_TEMPLATES = Object\.freeze\(\{/);
+  assert.match(schedulePage, /work: Object\.freeze\(\[/);
+  assert.match(schedulePage, /school: Object\.freeze\(\[/);
+  assert.match(schedulePage, /university: Object\.freeze\(\[/);
+  assert.match(schedulePage, /const QUICKSTART_TEMPLATES = \[\['work', 'schedule\.templateWork'\], \['school', 'schedule\.templateSchool'\], \['university', 'schedule\.templateUniversity'\]\];/);
+  assert.match(schedulePage, /'data-action': 'quick-start-shifts', 'data-template': key/, 'the empty state builds one quickstart action per still-visible template');
+  assert.match(schedulePage, /data-action="quick-start-shifts" data-template="' \+ template \+ '"/, 'the persistent header picker offers the same still-visible templates, not just the empty state');
+
+  const handler = schedulePage.slice(schedulePage.indexOf("button.dataset.action === 'quick-start-shifts'"), schedulePage.indexOf("if (button.dataset.action === 'pick-shift-icon'"));
+  assert.doesNotMatch(handler, /if \(state\.types\.length\) return;/, 'a second template must not be blocked just because a first one already ran');
+  assert.match(handler, /existingCodes\.has\(preset\.shortCode\)/, 're-running (or a second) template must skip what already exists by short_code, not error or duplicate');
+});
+
+// Which templates are even offered is itself a household-wide preference
+// (server/routes/preferences.js#schedule_hidden_templates) - a household that
+// only needs Work shouldn't see School/University buttons forever. Both
+// entry points (empty state and the persistent header) must respect it, and
+// hiding every template must not leave a broken empty wrapper behind.
+test('the quickstart template list is filtered by the household schedule_hidden_templates preference', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /function visibleQuickstartTemplates\(\)/);
+  assert.match(schedulePage, /const hidden = new Set\(state\.hiddenTemplates \?\? \[\]\);/);
+  assert.match(schedulePage, /QUICKSTART_TEMPLATES\.filter\(\(\[key\]\) => !hidden\.has\(key\)\)/);
+  assert.match(schedulePage, /visibleQuickstartTemplates\(\)\.map/, 'the empty state must consume the filtered list, not the raw one');
+  assert.match(schedulePage, /state\.types\.length && visibleQuickstartTemplates\(\)\.length \? '<div class="segmented"/, 'the header picker must not render an empty wrapper once every template is hidden');
+  assert.match(schedulePage, /hiddenTemplates: Array\.isArray\(householdPrefs\.data\?\.schedule_hidden_templates\)/, 'load() must read the household preference, not just default to showing everything');
 });
 
 // The icon-picker button is wired twice, on purpose: the create modal hangs
@@ -444,11 +598,13 @@ test('the shift-type icon picker is wired for both the create modal and inline e
 // alongside it) are NOT folded into the same tab because they're the same
 // thing - a separate Overrides tab was removed in favor of one Patterns tab
 // showing all three lists (patterns, overrides, extras) and one create modal
-// with two independent toggles: Recurring (pattern vs one-time) and, if
-// one-time, Replace vs Add - which decides whether the one-time entry can
-// carry a free/no-shift value (an override's shift_type_id is nullable) or
-// must always name a real shift (an extra's is NOT NULL).
-test('the Patterns tab folds patterns, overrides, and extras into one tab and one two-toggle create modal', () => {
+// with a single upfront 3-way mode picker (pattern / replace / add) instead
+// of two nested toggles - each mode lives in its own <fieldset> that's
+// `disabled` whenever it isn't the active mode, so FormData and native
+// validation both skip the inactive fields automatically (a hidden-but-still-
+// required field previously blocked Save silently - see the git history for
+// the repro).
+test('the Patterns tab folds patterns, overrides, and extras into one tab and one 3-way create modal', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   const tabsBlock = schedulePage.slice(schedulePage.indexOf('const tabs = ['), schedulePage.indexOf('];', schedulePage.indexOf('const tabs = [')));
   assert.doesNotMatch(tabsBlock, /'overrides'/, 'overrides must not be its own tab anymore');
@@ -464,19 +620,24 @@ test('the Patterns tab folds patterns, overrides, and extras into one tab and on
   assert.match(patternsBranch, /data-action="open-create-extra"/);
 
   const modalFn = schedulePage.slice(schedulePage.indexOf("function openScheduleCreateModal"), schedulePage.indexOf('async function saveCreatedSchedule'));
-  assert.match(modalFn, /name="recurring"/, 'the Recurring toggle must exist');
-  assert.match(modalFn, /name="replace_existing"/, 'the Replace/Add toggle must exist');
-  assert.match(modalFn, /data-field="recurring-fields"/);
-  assert.match(modalFn, /data-field="one-time-fields"/);
-  assert.match(modalFn, /data-field="type-replace"/);
-  assert.match(modalFn, /data-field="type-add"/);
-  assert.match(modalFn, /typeOptions\(null\)[^,]/, 'the replace-mode type select must include the free-day option (default includeFree=true)');
+  assert.match(modalFn, /name="mode"/, 'a hidden field must carry the active mode');
+  assert.match(modalFn, /\[\['pattern', 'schedule\.pattern'\], \['replace', 'schedule\.override'\], \['add', 'schedule\.extraBadgeLabel'\]\]/, 'the 3-way mode picker must offer pattern/replace/add');
+  assert.match(modalFn, /data-mode="'\s*\+\s*value\s*\+\s*'"/, 'each segmented button must carry its own mode via data-mode');
+  assert.match(modalFn, /data-field="mode-pattern"/);
+  assert.match(modalFn, /data-field="one-time-shared"/);
+  assert.match(modalFn, /data-field="mode-replace"/);
+  assert.match(modalFn, /data-field="mode-add"/);
+  // Every non-active fieldset must ship `disabled` in its initial markup too,
+  // not just `hidden` - `hidden` alone is exactly the bug that shipped.
+  assert.match(modalFn, /data-field="mode-pattern"'\s*\+\s*\(mode === 'pattern' \? '' : ' hidden disabled'\)/);
+  assert.match(modalFn, /setGroup\('mode-pattern', mode === 'pattern'\)/, 'the mode-switch handler must toggle disabled, not just hidden');
+  assert.match(modalFn, /typeOptions\(null\)/, 'the replace-mode type select must include the free-day option (default includeFree=true)');
   assert.match(modalFn, /typeOptions\(null, false\)/, 'the add-mode type select must exclude the free-day option - an extra always names a real shift');
 
   const saveFn = schedulePage.slice(schedulePage.indexOf('async function saveCreatedSchedule'), schedulePage.indexOf('function formData'));
-  assert.match(saveFn, /form\.elements\.recurring\.checked/, 'must branch on the Recurring toggle');
-  assert.match(saveFn, /form\.elements\.replace_existing\.checked/, 'must branch on the Replace/Add toggle');
-  assert.match(saveFn, /api\.post\('\/schedule\/patterns', data\)/, 'recurring branch still posts a pattern');
+  assert.match(saveFn, /data\.mode === 'pattern'/, 'must branch on the pattern mode');
+  assert.match(saveFn, /data\.mode === 'replace'/, 'must branch on the replace mode');
+  assert.match(saveFn, /api\.post\('\/schedule\/patterns', data\)/, 'pattern branch still posts a pattern');
   assert.match(saveFn, /api\.put\('\/schedule\/overrides\/'/, 'replace branch still posts an override');
   assert.match(saveFn, /api\.post\('\/schedule\/extras', /, 'add branch still posts an extra');
   assert.doesNotMatch(schedulePage, /function openExtraCreateModal/, 'the standalone extras-only create modal must be fully replaced by the unified one');

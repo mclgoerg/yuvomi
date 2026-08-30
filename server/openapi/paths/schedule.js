@@ -40,14 +40,11 @@ export function schedulePaths() {
     },
     '/api/v1/schedule/patterns/{id}/days': {
       get: op({ summary: 'List the cycle days of a pattern', tag: 'Schedule', params: [idParam()] }),
-      put: op({ summary: 'Replace all cycle days of a pattern', tag: 'Schedule', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
-    },
-    '/api/v1/schedule/patterns/{id}/days/{position}': {
       put: op({
-        summary: 'Set one cycle day',
-        description: 'A NULL shift type is a free day within the cycle.',
+        summary: 'Replace all cycle days of a pattern',
+        description: 'Deletes and re-inserts every day of the cycle in one transaction. A position may repeat - a cycle day can carry several classes at different times (a timetable), each its own shift type; an omitted position is a free day.',
         tag: 'Schedule',
-        params: [idParam(), { name: 'position', in: 'path', required: true, description: 'Zero-based position within the cycle', schema: { type: 'integer' } }],
+        params: [idParam()],
         stateChanging: true,
         requestBody: jsonBody(null),
       }),

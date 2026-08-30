@@ -1919,6 +1919,9 @@
         "tasksSubtasksExpandedHint": "サブタスクをデフォルトで開いた状態で表示するか選択します。",
         "tasksSubtasksExpandedLabel": "タスク内でサブタスクを開いたままにする",
         "tasksSubtasksExpandedSaved": "サブタスクの表示設定を保存しました。",
+        "scheduleTemplatesTitle": "Quickstart templates",
+        "scheduleTemplatesHint": "Which templates the shift-type quickstart offers. Shift types already created stay untouched either way, and can always be renamed or deleted.",
+        "scheduleTemplatesSaved": "Quickstart templates saved.",
         "breadcrumbLabel": "ナビゲーション経路",
         "caldavAccountAdded": "CalDAV アカウントを追加しました",
         "caldavAccountDeleted": "CalDAV アカウントを削除しました",
@@ -4612,7 +4615,15 @@
             "day": "Day shift",
             "fullDay": "24-hour shift",
             "vacation": "Vacation",
-            "sick": "Sick"
+            "sick": "Sick",
+            "period1": "Period 1",
+            "period2": "Period 2",
+            "period3": "Period 3",
+            "period4": "Period 4",
+            "exam": "Exam",
+            "lecture": "Lecture",
+            "seminar": "Seminar",
+            "lab": "Lab"
         },
         "overlapWarning": "Overlapping schedules on {{date}} for {{user}}; the newer pattern is shown.",
         "overlapWarningShort": "Overlapping schedules",
@@ -4667,6 +4678,10 @@
         "extraBadgeLabel": "Extra",
         "recurring": "Recurring",
         "replaceExisting": "Replace what's scheduled",
-        "addShiftPlan": "Add shift plan"
+        "planning": "Planning",
+        "addEntry": "Add entry",
+        "templateWork": "Work",
+        "templateSchool": "School",
+        "templateUniversity": "University"
     }
 }

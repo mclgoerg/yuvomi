@@ -44,8 +44,10 @@ function makeDb() {
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       date_key TEXT NOT NULL,
       shift_type_id INTEGER NOT NULL REFERENCES schedule_shift_types(id) ON DELETE CASCADE,
-      UNIQUE(user_id, date_key)
+      pattern_day_id INTEGER
     );
+    CREATE UNIQUE INDEX idx_schedule_reminder_entries_slot_test
+      ON schedule_reminder_entries(user_id, date_key, COALESCE(pattern_day_id, 0));
     CREATE TABLE schedule_extra_shifts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

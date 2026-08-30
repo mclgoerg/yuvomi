@@ -2015,6 +2015,9 @@
         "tasksSubtasksExpandedHint": "Chọn xem công việc con có được hiển thị mở theo mặc định hay không.",
         "tasksSubtasksExpandedLabel": "Giữ công việc con mở trong Công việc",
         "tasksSubtasksExpandedSaved": "Đã lưu cài đặt hiển thị công việc con.",
+        "scheduleTemplatesTitle": "Quickstart templates",
+        "scheduleTemplatesHint": "Which templates the shift-type quickstart offers. Shift types already created stay untouched either way, and can always be renamed or deleted.",
+        "scheduleTemplatesSaved": "Quickstart templates saved.",
         "breadcrumbLabel": "Đường dẫn điều hướng",
         "emptyStateAddFirst": "Thêm tài khoản đầu tiên của bạn",
         "emptyStateNoAccounts": "Chưa có tài khoản nào được kết nối",
@@ -4612,7 +4615,15 @@
             "day": "Day shift",
             "fullDay": "24-hour shift",
             "vacation": "Vacation",
-            "sick": "Sick"
+            "sick": "Sick",
+            "period1": "Period 1",
+            "period2": "Period 2",
+            "period3": "Period 3",
+            "period4": "Period 4",
+            "exam": "Exam",
+            "lecture": "Lecture",
+            "seminar": "Seminar",
+            "lab": "Lab"
         },
         "overlapWarning": "Overlapping schedules on {{date}} for {{user}}; the newer pattern is shown.",
         "overlapWarningShort": "Overlapping schedules",
@@ -4667,6 +4678,10 @@
         "extraBadgeLabel": "Extra",
         "recurring": "Recurring",
         "replaceExisting": "Replace what's scheduled",
-        "addShiftPlan": "Add shift plan"
+        "planning": "Planning",
+        "addEntry": "Add entry",
+        "templateWork": "Work",
+        "templateSchool": "School",
+        "templateUniversity": "University"
     }
 }

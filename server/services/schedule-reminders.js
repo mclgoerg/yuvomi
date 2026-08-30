@@ -158,19 +158,31 @@ function syncScheduleRemindersForUser(database, userId, now = new Date()) {
   // Nur Tage mit einer UHRZEIT qualifizieren sich - ein freier Tag hat keinen
   // Beginn, und ein zeitloser Typ (Urlaub, Krank) ebenso wenig. Dieselbe Regel
   // wie der ICS-Export (server/services/schedule-ics.js) fuer "ganztaegig".
-  // `source !== 'extra'` haelt den primaeren Pfad auf hoechstens einem
-  // Eintrag je Tag, wie vor den Extras - sonst wuerde ein Extra am selben
-  // Datum die Map ueberschreiben oder einen bestehenden Anker als
-  // "gegenstandslos" abraeumen, obwohl der Tag noch die primaere Schicht hat.
+  // `source !== 'extra'` haelt den primaeren Pfad getrennt von Extras - sonst
+  // wuerde ein Extra am selben Datum die Map ueberschreiben oder einen
+  // bestehenden Anker als "gegenstandslos" abraeumen, obwohl der Tag noch die
+  // primaere Schicht hat. Ein Musterzyklus-Tag kann jetzt MEHRERE qualifizierende
+  // Eintraege am selben Datum liefern (Stundenplan) - der Schluessel traegt
+  // deshalb pattern_day_id mit, sonst wuerde die Map alle bis auf den letzten
+  // stillschweigend verwerfen. Ein Override bleibt weiterhin hoechstens einer
+  // je Tag (pattern_day_id ist dort immer null), der leere String dahinter
+  // ist nur eine Map-Schluessel-Bequemlichkeit, keine SQL-NULL-Semantik.
   const qualifying = entries.filter((e) => e.source !== 'extra' && e.shift_type?.start_time && e.shift_type?.end_time);
-  const qualifyingByDate = new Map(qualifying.map((e) => [e.date_key, e]));
+  const slotKey = (dateKey, patternDayId) => `${dateKey}:${patternDayId ?? ''}`;
+  const qualifyingBySlot = new Map(qualifying.map((e) => [slotKey(e.date_key, e.pattern_day_id), e]));
 
   // GEGENSTANDSLOSES ZUERST, gleiche Reihenfolge wie der Vorrats-Sync: ein
-  // Anker, dessen Tag nicht mehr qualifiziert (Override entfernt eine
-  // Zeit-Schicht, Musters geaendert, ...), geht mitsamt seiner Erinnerung.
-  const existingAnchors = database.prepare('SELECT id, date_key, shift_type_id FROM schedule_reminder_entries WHERE user_id = ?').all(userId);
+  // Anker, dessen Tag/Slot nicht mehr qualifiziert (Override entfernt eine
+  // Zeit-Schicht, Musters geaendert, eine Klasse verschwunden, ...), geht
+  // mitsamt seiner Erinnerung. Ein Speichern im Muster-Tageseditor vergibt
+  // JEDER Zeile eine frische pattern_day_id (server/routes/schedule.js's
+  // PUT /patterns/:id/days loescht und legt immer alle Tage neu an) - ein
+  // Anker unter der alten Id qualifiziert deshalb beim naechsten Lauf nicht
+  // mehr und wird hier abgeraeumt, dann unten unter der neuen Id neu angelegt.
+  // Absichtlich keine DB-Kaskade dafuer (siehe Migration 176's Kommentar).
+  const existingAnchors = database.prepare('SELECT id, date_key, shift_type_id, pattern_day_id FROM schedule_reminder_entries WHERE user_id = ?').all(userId);
   for (const anchor of existingAnchors) {
-    const entry = qualifyingByDate.get(anchor.date_key);
+    const entry = qualifyingBySlot.get(slotKey(anchor.date_key, anchor.pattern_day_id));
     if (!entry || entry.shift_type_id !== anchor.shift_type_id) {
       database.prepare(`DELETE FROM reminders WHERE entity_type = 'schedule_entry' AND entity_id = ?`).run(anchor.id);
       database.prepare('DELETE FROM schedule_reminder_entries WHERE id = ?').run(anchor.id);
@@ -178,13 +190,13 @@ function syncScheduleRemindersForUser(database, userId, now = new Date()) {
   }
 
   const upsertAnchor = database.prepare(`
-    INSERT INTO schedule_reminder_entries (user_id, date_key, shift_type_id) VALUES (?, ?, ?)
-    ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id
+    INSERT INTO schedule_reminder_entries (user_id, date_key, shift_type_id, pattern_day_id) VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id, date_key, COALESCE(pattern_day_id, 0)) DO UPDATE SET shift_type_id = excluded.shift_type_id
     RETURNING id
   `);
 
   for (const entry of qualifying) {
-    const anchorId = upsertAnchor.get(userId, entry.date_key, entry.shift_type_id).id;
+    const anchorId = upsertAnchor.get(userId, entry.date_key, entry.shift_type_id, entry.pattern_day_id).id;
     const remindAt = shiftReminderAt(entry.date_key, entry.shift_type.start_time, offsetMinutes, tz);
 
     const existing = database.prepare(`

@@ -49,6 +49,21 @@ function insertExtra(userId, dateKey, shiftTypeId, note = null) {
     .run(userId, dateKey, shiftTypeId, note).lastInsertRowid;
 }
 
+// cycle_length 1, anchored on `date` and valid only that one day - the feed
+// spans a wide window (FEED_PAST_DAYS..FEED_FUTURE_DAYS), and an
+// unconstrained cycle-1 pattern would otherwise recur identically across all
+// of it, producing far more VEVENTs than a test that only cares about one day
+// wants to reason about.
+function insertPattern(userId, date) {
+  return db.prepare('INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length, valid_from, valid_until) VALUES (?, ?, ?, 1, ?, ?)')
+    .run(userId, 'Timetable', date, date, date).lastInsertRowid;
+}
+
+function insertPatternDay(patternId, shiftTypeId) {
+  return db.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 0, ?)')
+    .run(patternId, shiftTypeId).lastInsertRowid;
+}
+
 // --------------------------------------------------------
 // buildScheduleFeed
 // --------------------------------------------------------
@@ -83,6 +98,25 @@ test('ein Extra am selben Tag wie der primaere Eintrag bekommt eine eigene UID, 
 
   db.exec('DELETE FROM schedule_overrides');
   db.exec('DELETE FROM schedule_extra_shifts');
+});
+
+// Same reasoning as the extra above, for a timetable's own case: two classes
+// on the same day are two entries with source:'pattern', and without the
+// pattern_day_id disambiguator both would collide on one UID.
+test('zwei Klassen am selben Tag (ein Musterzyklus-Tag) bekommen je eine eigene UID', () => {
+  const math = insertType({ name: 'Mathe', short_code: 'M' });
+  const bio = insertType({ name: 'Bio', short_code: 'B' });
+  const today = db.prepare("SELECT date('now') AS d").get().d;
+  const pattern = insertPattern(alice, today);
+  const mathDayId = insertPatternDay(pattern, math);
+  const bioDayId = insertPatternDay(pattern, bio);
+
+  const ics = scheduleIcs.buildScheduleFeed(db, alice);
+  assert.equal((ics.match(/BEGIN:VEVENT/g) || []).length, 2, 'both classes produce their own VEVENT');
+  assert.match(ics, new RegExp(`UID:schedule-entry-${alice}-${today}-pattern-${mathDayId}@yuvomi`));
+  assert.match(ics, new RegExp(`UID:schedule-entry-${alice}-${today}-pattern-${bioDayId}@yuvomi`));
+
+  db.exec('DELETE FROM schedule_patterns');
 });
 
 test('buildScheduleFeed überspringt freie Tage (NULL-Override)', () => {
