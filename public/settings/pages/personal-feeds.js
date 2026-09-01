@@ -7,7 +7,7 @@
  * Warum ein eigenes Blatt und warum unter `personal`: alle Tokens haengen an
  * der eigenen users-Zeile (calendar_feed_token, Migration 61;
  * inventory_deadlines_feed_token, Migration 144; schedule_feed_token,
- * Migration 171), und alle Routen tragen serverseitig bewusst keinen
+ * Migration 175), und alle Routen tragen serverseitig bewusst keinen
  * Admin-Check. Der Kalender-Feed lag trotzdem auf `sync-calendar`, das
  * adminOnly ist - in einem Haushalt mit fuenf Mitgliedern konnte also genau
  * eine Person ihr eigenes Abo einrichten oder zurueckziehen.

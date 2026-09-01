@@ -4,7 +4,7 @@
  *        EIGENEN aufgeloesten Eintraege des Feed-Besitzers, freie Tage
  *        uebersprungen, Ganztags- vs. Uhrzeit-Events je nach Schichttyp.
  *        (2) Token-Lebenszyklus (get/regenerate/clear) gegen die per-Nutzer-
- *        Spalte users.schedule_feed_token (Migration 171).
+ *        Spalte users.schedule_feed_token (Migration 175).
  *        (3) Der Verwaltungs-Router (/schedule/feed) end-to-end.
  * Ausführen: node --experimental-sqlite --test test/test-schedule-feed.js
  */
@@ -189,10 +189,10 @@ test('buildScheduleFeed liefert ein valides VCALENDAR-Gerüst auch ohne Einträg
 });
 
 // --------------------------------------------------------
-// Migration 171: Token-Spalte auf users
+// Migration 175: Token-Spalte auf users
 // --------------------------------------------------------
 
-test('Migration 171 legt die Token-Spalte samt partiellem UNIQUE-Index an', () => {
+test('Migration 175 legt die Token-Spalte samt partiellem UNIQUE-Index an', () => {
   const cols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   assert.ok(cols.includes('schedule_feed_token'));
 

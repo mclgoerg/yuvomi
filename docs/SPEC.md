@@ -1402,7 +1402,7 @@ Per-user reminders attached to tasks, calendar events, subscriptions, inventory 
 
 | Column | Type | Constraint |
 |--------|------|-----------|
-| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item`, or `schedule_entry` (migration v172), NOT NULL |
+| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item`, or `schedule_entry` (migration v176), NOT NULL |
 | entity_id | INTEGER | Entity identifier, NOT NULL |
 | remind_at | TEXT | ISO 8601 datetime, NOT NULL |
 | dismissed | INTEGER | 0/1, default 0 |
@@ -1422,7 +1422,7 @@ work with, and closing them would break a published `/api/v1` surface for no rea
 
 `schedule_entry` additionally has no user-supplyable `entity_id`: a pattern-derived shift is computed
 on read and has no stored row of its own (see Schedule above), so `entity_id` points at an anchor row
-in `schedule_reminder_entries` (one per `(user_id, date_key)`, migration v172) that the sync
+in `schedule_reminder_entries` (one per `(user_id, date_key)`, migration v176) that the sync
 maintains - not something a caller could construct even if the type were settable.
 
 Reading and **dismissing** (`PATCH /:id/dismiss`) stay open for all seven - the reminder toast has to
@@ -2570,7 +2570,7 @@ reassignment) instead of one `PUT` per day. Its cap is a separate constant from 
 *writes* real rows, cutting against the "computed on read, never materialized" rule above if it
 were allowed to run for years at a time; the number is sized for an absence, not a shadow pattern.
 
-#### Schedule Extra Shifts (Schedule v4, migration 174)
+#### Schedule Extra Shifts (Schedule v4, migration 178)
 
 Additive to whatever the primary pattern/override slot resolves for a day - never a replacement
 for it, and deliberately not a generalization of Schedule Overrides' one-row-per-day model. The
@@ -2663,7 +2663,7 @@ set to `null` to reset it to its default):
   `reminderOffsetMinutes: null` (the default) disables it; setting it also triggers an immediate
   resync so the change takes effect without waiting for the next periodic pass. A pattern-derived
   shift is computed on read and has no stored row to hang a reminder off of, unlike every other
-  reminder origin - `schedule_reminder_entries` (migration v172) is a small anchor table, one row per
+  reminder origin - `schedule_reminder_entries` (migration v176) is a small anchor table, one row per
   `(user_id, date_key)`, that `server/services/schedule-reminders.js`'s periodic sync
   (`syncAllScheduleReminders()`, called from the same notification pass as the pantry sync) creates
   for each upcoming qualifying day within a rolling 7-day window and cleans up once the day falls out
@@ -2675,7 +2675,7 @@ set to `null` to reset it to its default):
   shift that's already underway. `schedule_entry` is a **derived** reminder type like `pantry_item`
   (see Reminders below) - the sync rebuilds it every pass, so it cannot be hand-set through the
   generic reminders API.
-- **Weekly-hours target (`schedule_weekly_hours`, migration v173):** the personal full-time figure
+- **Weekly-hours target (`schedule_weekly_hours`, migration v177):** the personal full-time figure
   the Statistics tab's overtime flag scales against (see "Overtime flag + print" above), `null`
   falling back to 40h/week. Per-user rather than a household field, since a part-time and a full-time
   member of the same household have different targets and the overtime card evaluates each member's
