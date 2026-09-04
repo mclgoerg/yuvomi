@@ -126,6 +126,28 @@ async function call(method, path, { as = ALICE, body } = {}) {
   return { status: response.status, body: contentType.includes('application/json') ? await response.json() : null };
 }
 
+test('GET /household-members lists real members only, never staff or split-expense guests', async () => {
+  const workerUserId = database.prepare(
+    "INSERT INTO users (username, display_name, password_hash, role) VALUES ('schedule-worker', 'Worker', 'x', 'member')"
+  ).run().lastInsertRowid;
+  database.prepare('INSERT INTO housekeeping_workers (user_id) VALUES (?)').run(workerUserId);
+
+  const guestUserId = database.prepare(
+    "INSERT INTO users (username, display_name, password_hash, role) VALUES ('schedule-guest', 'Guest', 'x', 'member')"
+  ).run().lastInsertRowid;
+  const groupId = database.prepare(
+    "INSERT INTO expense_groups (name, default_currency, created_by) VALUES ('Overview test group', 'EUR', ?)"
+  ).run(ADMIN.id).lastInsertRowid;
+  database.prepare('INSERT INTO split_expense_guest_users (user_id, group_id, created_by) VALUES (?, ?, ?)').run(guestUserId, groupId, ADMIN.id);
+
+  const response = await call('GET', '/household-members', { as: ALICE });
+  assert.equal(response.status, 200);
+  const ids = response.body.data.map((row) => row.id);
+  assert.ok(ids.includes(ALICE.id), 'an ordinary member is offered');
+  assert.ok(!ids.includes(workerUserId), 'a housekeeping worker is never offered');
+  assert.ok(!ids.includes(guestUserId), 'a split-expense guest is never offered');
+});
+
 test('entries are household-readable, include type data, and never materialize calendar events', async () => {
   const nightType = database.prepare("INSERT INTO schedule_shift_types (name, short_code, start_time, end_time, color) VALUES ('Night', 'N', '22:00', '06:00', '#123456')").run().lastInsertRowid;
   const bobPattern = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (2, 'Nights', '2026-10-01', 1)").run().lastInsertRowid;
@@ -675,6 +697,131 @@ test('overlayMeta() joins the note with show_in_overlay fields that have a value
   assert.equal(__test.overlayMeta({ note: 'Bring textbook', shift_type, field_values: { 1: 'Room 204' } }), 'Bring textbook · Room: Room 204', 'note comes first');
   assert.equal(__test.overlayMeta({ note: null, shift_type, field_values: { 3: '' } }), '', 'an overlay field with no value contributes nothing');
   assert.equal(__test.overlayMeta({ note: null, shift_type: null, field_values: {} }), '', 'a free day (no shift type) has no fields to show');
+});
+
+// Overview tab: lane order tracks SELECTION order, never activity - the whole
+// point of the side-by-side view is that "person 2's column" stays put day
+// to day, so a person with more entries must not be promoted ahead of one
+// selected before them.
+test('buildOverviewLanes() keeps lane order fixed by selection, and always renders an empty lane', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const entries = [
+    { user_id: 2, date_key: '2026-09-07', shift_type_id: 10 },
+    { user_id: 2, date_key: '2026-09-07', shift_type_id: 11 },
+    { user_id: 2, date_key: '2026-09-07', shift_type_id: 12 },
+  ];
+  const result = __test.buildOverviewLanes(['2026-09-07'], [1, 2], entries);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].lanes.length, 2, 'a lane exists for every selected person, even one with nothing');
+  assert.equal(result[0].lanes[0].userId, 1, 'the first-selected person stays in lane 0');
+  assert.deepEqual(result[0].lanes[0].entries, [], 'lane 0 is empty, not skipped');
+  assert.equal(result[0].lanes[1].userId, 2);
+  assert.equal(result[0].lanes[1].entries.length, 3, 'lane 1 carries all three of person 2\'s entries');
+});
+
+test('buildOverviewLanes() only matches entries on the same day and person', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const entries = [
+    { user_id: 1, date_key: '2026-09-07', shift_type_id: 10 },
+    { user_id: 1, date_key: '2026-09-08', shift_type_id: 11 },
+    { user_id: 2, date_key: '2026-09-07', shift_type_id: 12 },
+  ];
+  const result = __test.buildOverviewLanes(['2026-09-07', '2026-09-08'], [1], entries);
+  assert.equal(result[0].lanes[0].entries.length, 1);
+  assert.equal(result[0].lanes[0].entries[0].shift_type_id, 10);
+  assert.equal(result[1].lanes[0].entries.length, 1);
+  assert.equal(result[1].lanes[0].entries[0].shift_type_id, 11);
+});
+
+// Fix 2026-09-04: a night shift (22:00-06:00) only ever showed its
+// before-midnight half - the after-midnight half vanished entirely once the
+// start day was over. buildOverviewLanes() now injects a continuation entry
+// onto the following day so the whole shift stays visible.
+test('buildOverviewLanes() carries an overnight shift onto the next day as a continuation entry', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const night = { user_id: 3, date_key: '2026-09-11', shift_type_id: 9, shift_type: { start_time: '22:00', end_time: '06:00' } };
+  const result = __test.buildOverviewLanes(['2026-09-11', '2026-09-12'], [3], [night]);
+  assert.equal(result[0].lanes[0].entries.length, 1, 'the real entry stays on its own start day');
+  assert.equal(result[0].lanes[0].entries[0].__continuation, undefined);
+  assert.equal(result[1].lanes[0].entries.length, 1, 'a continuation entry appears on the following day');
+  assert.equal(result[1].lanes[0].entries[0].__continuation, true);
+  assert.equal(result[1].lanes[0].entries[0].shift_type_id, 9, 'the continuation carries the same shift data');
+});
+
+test('buildOverviewLanes() does not carry a continuation past the visible days, and does not double it for a same-day-ending shift', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const night = { user_id: 3, date_key: '2026-09-11', shift_type_id: 9, shift_type: { start_time: '22:00', end_time: '06:00' } };
+  const dayShift = { user_id: 1, date_key: '2026-09-11', shift_type_id: 7, shift_type: { start_time: '06:00', end_time: '14:00' } };
+  const result = __test.buildOverviewLanes(['2026-09-11'], [1, 3], [night, dayShift]);
+  assert.equal(result[0].lanes[0].entries.length, 1, 'a plain day shift never gets a continuation');
+  assert.equal(result[0].lanes[1].entries.length, 1, 'the overnight shift itself is unaffected when its next day is not even shown');
+});
+
+test('a continuation entry sorts to the very top of its lane, ahead of the day\'s own early entries', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const night = { user_id: 3, date_key: '2026-09-11', shift_type_id: 9, shift_type: { start_time: '22:00', end_time: '06:00' }, label: 'night' };
+  const earlyNextDay = { user_id: 3, date_key: '2026-09-12', shift_type_id: 1, shift_type: { start_time: '01:00', end_time: '02:00' }, label: 'oddly-early' };
+  const result = __test.buildOverviewLanes(['2026-09-11', '2026-09-12'], [3], [night, earlyNextDay]);
+  const labels = result[1].lanes[0].entries.map((e) => e.label);
+  assert.deepEqual(labels, ['night', 'oddly-early'], 'the continuation (00:00) sorts before a 01:00 entry on the same day');
+});
+
+test('a "free day" marker on the day a continuation lands is dropped, not shown alongside it', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const night = { user_id: 3, date_key: '2026-09-12', shift_type_id: 9, shift_type: { start_time: '22:00', end_time: '06:00' } };
+  const freeMarker = { user_id: 3, date_key: '2026-09-13', shift_type: null, is_free: true };
+  const result = __test.buildOverviewLanes(['2026-09-12', '2026-09-13'], [3], [night, freeMarker]);
+  const sundayEntries = result[1].lanes[0].entries;
+  assert.equal(sundayEntries.length, 1, 'only the continuation remains - the misleading "free" marker is dropped');
+  assert.equal(sundayEntries[0].__continuation, true);
+});
+
+// Jede Spur wird chronologisch nach Beginn sortiert, unabhaengig von der
+// Reihenfolge, in der GET /entries die Bloecke eines Tages liefert - sonst
+// koennte "5. Stunde" vor "1. Stunde" in der Liste stehen.
+test('buildOverviewLanes() sorts each lane chronologically by start time, regardless of input order', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const entries = [
+    { user_id: 1, date_key: '2026-09-07', shift_type: { start_time: '11:40', end_time: '12:25' }, label: 'late' },
+    { user_id: 1, date_key: '2026-09-07', shift_type: { start_time: '08:00', end_time: '08:45' }, label: 'early' },
+    { user_id: 1, date_key: '2026-09-07', shift_type: null, label: 'free-marker' },
+  ];
+  const result = __test.buildOverviewLanes(['2026-09-07'], [1], entries);
+  const labels = result[0].lanes[0].entries.map((entry) => entry.label);
+  assert.deepEqual(labels, ['free-marker', 'early', 'late'], 'untimed first, then ascending by start time');
+});
+
+// Kurskorrektur nach Live-Test (2026-09-04): eine gemeinsame, durchgehende
+// 24h-Skala zwang eine 45-Minuten-Schulstunde und eine 8-Stunden-Schicht auf
+// denselben Massstab. computeActiveHours() traegt nur noch Stunden, die
+// irgendjemand aus der Auswahl tatsaechlich belegt.
+test('computeActiveHours() drops hours nobody selected occupies, and falls back with no timed entries at all', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  assert.deepEqual(__test.computeActiveHours([]), Array.from({ length: 14 }, (_, i) => i + 6), 'fallback band with nothing timed');
+  const school = [{ shift_type: { start_time: '08:00', end_time: '08:45' } }, { shift_type: { start_time: '12:30', end_time: '13:15' } }];
+  assert.deepEqual(__test.computeActiveHours(school), [8, 12, 13], '09-11 has nothing in it and is dropped entirely');
+  // Beide Haelften einer Nachtschicht zaehlen (Fix 2026-09-04) - sonst haette
+  // eine Fortsetzungszeile auf dem Folgetag keine aktive Stunde zum Andocken.
+  const overnight = [{ shift_type: { start_time: '22:00', end_time: '06:00' } }];
+  assert.deepEqual(__test.computeActiveHours(overnight), [0, 1, 2, 3, 4, 5, 22, 23], 'both the before- and after-midnight hours count as active');
+});
+
+test('collapsedMinutes() maps clock time onto the collapsed scale, and puts an exact-hour end at the end of the PRECEDING hour', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const activeHours = [8, 12, 13]; // 09-11 dropped, matching the fixture above
+  assert.equal(__test.collapsedMinutes(8 * 60, activeHours), 0, 'start of the first active hour is the very top');
+  assert.equal(__test.collapsedMinutes(8 * 60 + 45, activeHours), 45, 'still inside hour 8, no jump yet');
+  assert.equal(__test.collapsedMinutes(12 * 60, activeHours), 60, 'hour 12 starts right after hour 8 ends - 09-11 contribute nothing');
+  assert.equal(__test.collapsedMinutes(9 * 60, activeHours), 60, 'an entry ending exactly at 09:00 (a dropped hour) belongs to the end of hour 8s row, not a hour that contributes nothing');
+  assert.equal(__test.collapsedMinutes(13 * 60 + 15, activeHours), 135, '13 is itself active, so 13:15 is a plain lookup - no boundary special-case needed');
+});
+
+test('normalizeOverviewSelection() drops ids no longer eligible, without throwing', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  assert.deepEqual(__test.normalizeOverviewSelection([1, 2, 3], [1, 3]), [1, 3], 'a since-demoted/removed id is silently dropped');
+  assert.deepEqual(__test.normalizeOverviewSelection([], [1, 2]), []);
+  assert.deepEqual(__test.normalizeOverviewSelection(null, [1, 2]), [], 'a non-array input is treated as no selection, not an error');
+  assert.deepEqual(__test.normalizeOverviewSelection(undefined, [1, 2]), []);
 });
 
 test('rangeDifference() finds exactly what fell outside a shrunk range, and nothing when it only grew', async () => {

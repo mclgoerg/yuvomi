@@ -5,6 +5,7 @@ import { bool, color, collectErrors, date, id, num, str, time } from '../middlew
 import { createLogger } from '../logger.js';
 import { resolveEntries, dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
+import { isHouseholdMember } from '../services/member-email.js';
 
 const router = express.Router();
 const log = createLogger('Schedule');
@@ -15,6 +16,19 @@ const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id =
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);
 const customFieldExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_custom_fields WHERE id = ?').get(value);
 const mineOrAdmin = (req, userId) => isAdmin(req) || actorId(req) === userId;
+
+// Wer darf als eigene Spalte in der Uebersicht (Overview-Tab) auftauchen? Nur
+// echte Haushaltsmitglieder - Haushaltshilfen (housekeeping_workers) und
+// Split-Expense-Gaeste (split_expense_guest_users) sollen nie eine leere Spur
+// bekommen. isHouseholdMember() ist die einzige Kopie dieser Regel im ganzen
+// Repo (server/services/member-email.js) - hier absichtlich wiederverwendet,
+// nicht neu geschrieben.
+router.get('/household-members', (_req, res) => {
+  const rows = db.get()
+    .prepare('SELECT id, display_name, avatar_color, avatar_data FROM users ORDER BY display_name COLLATE NOCASE')
+    .all();
+  res.json({ data: rows.filter((row) => isHouseholdMember(row.id)) });
+});
 
 /** Lucides laengster Name liegt bei 34 Zeichen; 48 laesst Luft nach oben - dieselbe Grenze wie bei den Schnellzugriffen (quick-links.js). */
 const MAX_ICON_NAME_LENGTH = 48;

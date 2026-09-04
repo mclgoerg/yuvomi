@@ -4764,6 +4764,10 @@
         "addEntry": "Item toevoegen",
         "templateWork": "Werk",
         "templateSchool": "School",
-        "templateUniversity": "Universiteit"
+        "templateUniversity": "Universiteit",
+        "overview": "Overzicht",
+        "overviewPeopleLabel": "Personen vergelijken",
+        "overviewEmptyTitle": "Kies personen om te vergelijken",
+        "overviewEmptyDescription": "Selecteer hierboven twee of meer huisgenoten om hun weekroosters naast elkaar te zien."
     }
 }

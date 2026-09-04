@@ -4764,6 +4764,10 @@
         "addEntry": "Přidat záznam",
         "templateWork": "Práce",
         "templateSchool": "Škola",
-        "templateUniversity": "Univerzita"
+        "templateUniversity": "Univerzita",
+        "overview": "Přehled",
+        "overviewPeopleLabel": "Porovnat osoby",
+        "overviewEmptyTitle": "Vyberte osoby k porovnání",
+        "overviewEmptyDescription": "Vyberte výše dva nebo více členů domácnosti a zobrazte jejich týdenní rozvrhy vedle sebe."
     }
 }

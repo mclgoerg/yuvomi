@@ -4764,6 +4764,10 @@
         "addEntry": "Add entry",
         "templateWork": "Work",
         "templateSchool": "School",
-        "templateUniversity": "University"
+        "templateUniversity": "University",
+        "overview": "Overview",
+        "overviewPeopleLabel": "Compare people",
+        "overviewEmptyTitle": "Pick people to compare",
+        "overviewEmptyDescription": "Select two or more household members above to see their weekly timetables side by side."
     }
 }

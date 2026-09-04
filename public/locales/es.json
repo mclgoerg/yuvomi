@@ -4764,6 +4764,10 @@
         "addEntry": "Añadir entrada",
         "templateWork": "Trabajo",
         "templateSchool": "Colegio",
-        "templateUniversity": "Universidad"
+        "templateUniversity": "Universidad",
+        "overview": "Resumen",
+        "overviewPeopleLabel": "Comparar personas",
+        "overviewEmptyTitle": "Elige personas para comparar",
+        "overviewEmptyDescription": "Selecciona arriba dos o más miembros del hogar para ver sus horarios semanales uno junto al otro."
     }
 }

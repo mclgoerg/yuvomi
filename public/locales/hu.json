@@ -4764,6 +4764,10 @@
         "addEntry": "Bejegyzés hozzáadása",
         "templateWork": "Munka",
         "templateSchool": "Iskola",
-        "templateUniversity": "Egyetem"
+        "templateUniversity": "Egyetem",
+        "overview": "Áttekintés",
+        "overviewPeopleLabel": "Személyek összehasonlítása",
+        "overviewEmptyTitle": "Válassz személyeket az összehasonlításhoz",
+        "overviewEmptyDescription": "Válassz fent két vagy több háztartástagot, hogy heti beosztásukat egymás mellett lásd."
     }
 }

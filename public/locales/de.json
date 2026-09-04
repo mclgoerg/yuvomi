@@ -4764,6 +4764,10 @@
         "addEntry": "Eintrag hinzufügen",
         "templateWork": "Arbeit",
         "templateSchool": "Schule",
-        "templateUniversity": "Universität"
+        "templateUniversity": "Universität",
+        "overview": "Übersicht",
+        "overviewPeopleLabel": "Personen vergleichen",
+        "overviewEmptyTitle": "Personen zum Vergleichen auswählen",
+        "overviewEmptyDescription": "Wähle oben zwei oder mehr Haushaltsmitglieder aus, um ihre Wochenpläne nebeneinander zu sehen."
     }
 }

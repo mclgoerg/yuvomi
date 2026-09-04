@@ -4764,6 +4764,10 @@
         "addEntry": "Lägg till post",
         "templateWork": "Arbete",
         "templateSchool": "Skola",
-        "templateUniversity": "Universitet"
+        "templateUniversity": "Universitet",
+        "overview": "Översikt",
+        "overviewPeopleLabel": "Jämför personer",
+        "overviewEmptyTitle": "Välj personer att jämföra",
+        "overviewEmptyDescription": "Välj två eller fler hushållsmedlemmar ovan för att se deras veckoscheman sida vid sida."
     }
 }

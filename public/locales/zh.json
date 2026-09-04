@@ -4764,6 +4764,10 @@
         "addEntry": "添加条目",
         "templateWork": "工作",
         "templateSchool": "学校",
-        "templateUniversity": "大学"
+        "templateUniversity": "大学",
+        "overview": "总览",
+        "overviewPeopleLabel": "比较成员",
+        "overviewEmptyTitle": "选择要比较的成员",
+        "overviewEmptyDescription": "在上方选择两个或更多家庭成员,即可并排查看他们的每周时间表。"
     }
 }

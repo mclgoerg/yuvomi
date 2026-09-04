@@ -4764,6 +4764,10 @@
         "addEntry": "Προσθήκη καταχώρισης",
         "templateWork": "Εργασία",
         "templateSchool": "Σχολείο",
-        "templateUniversity": "Πανεπιστήμιο"
+        "templateUniversity": "Πανεπιστήμιο",
+        "overview": "Επισκόπηση",
+        "overviewPeopleLabel": "Σύγκριση ατόμων",
+        "overviewEmptyTitle": "Επιλέξτε άτομα για σύγκριση",
+        "overviewEmptyDescription": "Επιλέξτε παραπάνω δύο ή περισσότερα μέλη του νοικοκυριού για να δείτε τα εβδομαδιαία τους προγράμματα το ένα δίπλα στο άλλο."
     }
 }

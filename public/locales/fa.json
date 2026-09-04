@@ -4764,6 +4764,10 @@
         "addEntry": "افزودن مورد",
         "templateWork": "کار",
         "templateSchool": "مدرسه",
-        "templateUniversity": "دانشگاه"
+        "templateUniversity": "دانشگاه",
+        "overview": "نمای کلی",
+        "overviewPeopleLabel": "مقایسه افراد",
+        "overviewEmptyTitle": "افرادی را برای مقایسه انتخاب کن",
+        "overviewEmptyDescription": "بالا دو یا چند عضو خانواده را انتخاب کن تا برنامه هفتگی آن‌ها را کنار هم ببینی."
     }
 }

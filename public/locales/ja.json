@@ -4764,6 +4764,10 @@
         "addEntry": "エントリーを追加",
         "templateWork": "仕事",
         "templateSchool": "学校",
-        "templateUniversity": "大学"
+        "templateUniversity": "大学",
+        "overview": "一覧",
+        "overviewPeopleLabel": "メンバーを比較",
+        "overviewEmptyTitle": "比較するメンバーを選択",
+        "overviewEmptyDescription": "上で2人以上の家族メンバーを選ぶと、週間予定を並べて表示できます。"
     }
 }

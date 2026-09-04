@@ -4764,6 +4764,10 @@
         "addEntry": "Tambah entri",
         "templateWork": "Kerja",
         "templateSchool": "Sekolah",
-        "templateUniversity": "Universitas"
+        "templateUniversity": "Universitas",
+        "overview": "Ikhtisar",
+        "overviewPeopleLabel": "Bandingkan orang",
+        "overviewEmptyTitle": "Pilih orang untuk dibandingkan",
+        "overviewEmptyDescription": "Pilih dua anggota keluarga atau lebih di atas untuk melihat jadwal mingguan mereka berdampingan."
     }
 }

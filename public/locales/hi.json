@@ -4764,6 +4764,10 @@
         "addEntry": "प्रविष्टि जोड़ें",
         "templateWork": "काम",
         "templateSchool": "स्कूल",
-        "templateUniversity": "विश्वविद्यालय"
+        "templateUniversity": "विश्वविद्यालय",
+        "overview": "अवलोकन",
+        "overviewPeopleLabel": "लोगों की तुलना करें",
+        "overviewEmptyTitle": "तुलना के लिए लोग चुनें",
+        "overviewEmptyDescription": "उनके साप्ताहिक समय-सारिणी को साथ-साथ देखने के लिए ऊपर दो या अधिक घर के सदस्य चुनें।"
     }
 }

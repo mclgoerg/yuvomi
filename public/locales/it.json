@@ -4764,6 +4764,10 @@
         "addEntry": "Aggiungi voce",
         "templateWork": "Lavoro",
         "templateSchool": "Scuola",
-        "templateUniversity": "Università"
+        "templateUniversity": "Università",
+        "overview": "Panoramica",
+        "overviewPeopleLabel": "Confronta persone",
+        "overviewEmptyTitle": "Scegli le persone da confrontare",
+        "overviewEmptyDescription": "Seleziona sopra due o più membri della famiglia per vedere i loro orari settimanali affiancati."
     }
 }

@@ -4764,6 +4764,10 @@
         "addEntry": "Ajouter une entrée",
         "templateWork": "Travail",
         "templateSchool": "École",
-        "templateUniversity": "Université"
+        "templateUniversity": "Université",
+        "overview": "Vue d'ensemble",
+        "overviewPeopleLabel": "Comparer des personnes",
+        "overviewEmptyTitle": "Choisissez des personnes à comparer",
+        "overviewEmptyDescription": "Sélectionnez ci-dessus deux membres du foyer ou plus pour voir leurs emplois du temps hebdomadaires côte à côte."
     }
 }

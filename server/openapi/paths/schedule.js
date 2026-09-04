@@ -40,6 +40,13 @@ export function schedulePaths() {
         requestBody: jsonBody(null),
       }),
     },
+    '/api/v1/schedule/household-members': {
+      get: op({
+        summary: 'List people selectable for the Overview tab',
+        description: 'Real household members only - filtered through isHouseholdMember(), so housekeeping staff and split-expense guests never appear.',
+        tag: 'Schedule',
+      }),
+    },
     '/api/v1/schedule/custom-fields': {
       get: op({ summary: 'List custom fields', description: 'Household-wide definitions, defined once and attachable to any number of shift types.', tag: 'Schedule' }),
       post: op({ summary: 'Create a custom field', description: 'Any member may add one.', tag: 'Schedule', stateChanging: true, requestBody: jsonBody(null) }),

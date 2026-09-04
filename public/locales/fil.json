@@ -4764,6 +4764,10 @@
         "addEntry": "Magdagdag ng entry",
         "templateWork": "Trabaho",
         "templateSchool": "Paaralan",
-        "templateUniversity": "Unibersidad"
+        "templateUniversity": "Unibersidad",
+        "overview": "Pangkalahatang-ideya",
+        "overviewPeopleLabel": "Ikumpara ang mga tao",
+        "overviewEmptyTitle": "Pumili ng mga tao na ikukumpara",
+        "overviewEmptyDescription": "Pumili sa itaas ng dalawa o higit pang miyembro ng sambahayan para makita ang kanilang lingguhang iskedyul nang magkatabi."
     }
 }

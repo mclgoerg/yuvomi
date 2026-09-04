@@ -4764,6 +4764,10 @@
         "addEntry": "Adicionar entrada",
         "templateWork": "Trabalho",
         "templateSchool": "Escola",
-        "templateUniversity": "Universidade"
+        "templateUniversity": "Universidade",
+        "overview": "Visão geral",
+        "overviewPeopleLabel": "Comparar pessoas",
+        "overviewEmptyTitle": "Escolhe pessoas para comparar",
+        "overviewEmptyDescription": "Seleciona acima dois ou mais membros do agregado para ver os horários semanais lado a lado."
     }
 }

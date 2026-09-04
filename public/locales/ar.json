@@ -4764,6 +4764,10 @@
         "addEntry": "إضافة إدخال",
         "templateWork": "العمل",
         "templateSchool": "المدرسة",
-        "templateUniversity": "الجامعة"
+        "templateUniversity": "الجامعة",
+        "overview": "نظرة عامة",
+        "overviewPeopleLabel": "مقارنة الأشخاص",
+        "overviewEmptyTitle": "اختر أشخاصًا للمقارنة",
+        "overviewEmptyDescription": "اختر أعلاه عضوين أو أكثر من أفراد الأسرة لرؤية جداولهم الأسبوعية جنبًا إلى جنب."
     }
 }

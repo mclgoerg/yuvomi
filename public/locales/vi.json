@@ -4764,6 +4764,10 @@
         "addEntry": "Thêm mục",
         "templateWork": "Công việc",
         "templateSchool": "Trường học",
-        "templateUniversity": "Đại học"
+        "templateUniversity": "Đại học",
+        "overview": "Tổng quan",
+        "overviewPeopleLabel": "So sánh mọi người",
+        "overviewEmptyTitle": "Chọn người để so sánh",
+        "overviewEmptyDescription": "Chọn phía trên hai thành viên gia đình trở lên để xem lịch trình hằng tuần của họ cạnh nhau."
     }
 }

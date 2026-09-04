@@ -1,13 +1,14 @@
 import { api } from '/api.js';
-import { t, formatDate } from '/i18n.js';
+import { t, formatDate, formatDayMonth } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { todayKey, addLocalDays, parseLocalDateKey } from '/utils/date.js';
+import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, advancedSection } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { toggleRowHtml } from '/settings/components.js';
+import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect } from '/components/user-multi-select.js';
 
 // ZWEISPALTIG: Schedule is a full-width responsive library and statistics view;
 // constraining its row lists to the narrow reading measure would recreate the
@@ -20,6 +21,47 @@ let canManageOthers = false;
 let activeView = 'patterns';
 let state = { users: [], types: [], customFields: [], patterns: [], overrides: [], extras: [], entries: [], warnings: [], reminderOffsetMinutes: null, weeklyHours: null, hiddenTemplates: [] };
 let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', from: '', to: '', entries: [], bounds: null, loading: false };
+// "Uebersicht"-Tab: mehrere Haushaltsmitglieder nebeneinander vergleichen
+// (#1018 - Stundenplaene mehrerer Kinder). people kommt vorgefiltert vom
+// Server (GET /schedule/household-members, isHouseholdMember()); selectedIds
+// ist rein clientseitig und loest nie einen Fetch aus - nur der Wochenwechsel
+// tut das (siehe refreshOverview()).
+const OVERVIEW_SELECTION_KEY = 'yuvomi:schedule:overview:people';
+const OVERVIEW_VIEW_KEY = 'yuvomi:schedule:overview:mode';
+let overview = { people: [], selectedIds: [], weekCursor: todayKey(), viewMode: loadSavedOverviewViewMode(), entries: [], holidays: [], loading: false };
+
+function loadSavedOverviewViewMode() {
+  try { return localStorage.getItem(OVERVIEW_VIEW_KEY) === 'day' ? 'day' : 'week'; } catch { return 'week'; }
+}
+
+function saveOverviewViewMode(mode) {
+  try { localStorage.setItem(OVERVIEW_VIEW_KEY, mode); } catch {}
+}
+
+/**
+ * Reine Filterfunktion: eine gespeicherte Auswahl gegen die Liste der heute
+ * tatsaechlich waehlbaren Personen pruefen. Eine veraltete Id (Haushaltshilfe
+ * geworden, entfernter Gast, geloeschtes Konto) faellt still heraus statt
+ * einen Fehler zu werfen - dieselbe Toleranz wie calendar.js'
+ * normalizeCalendarView() gegenueber einem unbekannten gespeicherten Wert.
+ */
+function normalizeOverviewSelection(rawIds, eligibleIds) {
+  if (!Array.isArray(rawIds)) return [];
+  const eligible = new Set(eligibleIds);
+  return rawIds.filter((id) => eligible.has(id));
+}
+
+function loadSavedOverviewSelection() {
+  try {
+    const raw = localStorage.getItem(OVERVIEW_SELECTION_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(Number) : [];
+  } catch { return []; }
+}
+
+function saveOverviewSelection(ids) {
+  try { localStorage.setItem(OVERVIEW_SELECTION_KEY, JSON.stringify(ids)); } catch {}
+}
 // Schichtfarben sind NUTZERFARBEN (freier Waehler im Formular); die Presets
 // sind nur Startwerte. Eine Grenze gilt trotzdem: keine davon darf die STIMME
 // imitieren. „Spaet" trug #7C3AED - eine Ziffer neben der Marke #6C3AED - und
@@ -118,7 +160,7 @@ const clockLabel = (shiftType) => {
 
 async function load() {
   const day = todayKey();
-  const [users, types, customFields, patternResult, overrides, extras, entries, preferences, householdPrefs] = await Promise.all([
+  const [users, types, customFields, patternResult, overrides, extras, entries, preferences, householdPrefs, householdMembers] = await Promise.all([
     api.get('/auth/users'),
     api.get('/schedule/shift-types'),
     api.get('/schedule/custom-fields'),
@@ -131,6 +173,9 @@ async function load() {
     // Quickstart-Vorlagen ueberhaupt angeboten werden, nicht zu verwechseln
     // mit den per-Nutzer-Werten oben aus /schedule/preferences.
     api.get('/preferences').catch(() => ({ data: {} })),
+    // Vorgefiltert (isHouseholdMember()) fuer den Uebersicht-Tab - Haushaltshilfen
+    // und Split-Expense-Gaeste sollen dort nie eine eigene Spur bekommen.
+    api.get('/schedule/household-members').catch(() => ({ data: [] })),
   ]);
   const patterns = patternResult.data ?? [];
   const days = await Promise.all(patterns.map((pattern) => api.get(`/schedule/patterns/${pattern.id}/days`)));
@@ -146,6 +191,12 @@ async function load() {
     reminderOffsetMinutes: preferences.data?.reminderOffsetMinutes ?? null,
     weeklyHours: preferences.data?.weeklyHours ?? null,
     hiddenTemplates: Array.isArray(householdPrefs.data?.schedule_hidden_templates) ? householdPrefs.data.schedule_hidden_templates : [],
+    weekStartPref: householdPrefs.data?.week_start ?? null,
+  };
+  overview = {
+    ...overview,
+    people: householdMembers.data ?? [],
+    selectedIds: normalizeOverviewSelection(loadSavedOverviewSelection(), (householdMembers.data ?? []).map((person) => person.id)),
   };
 }
 
@@ -327,6 +378,17 @@ async function refreshStatistics() {
 
 async function activateView(view) {
   activeView = view;
+  if (view === 'overview') {
+    overview = { ...overview, entries: [], holidays: [], loading: true };
+    renderPage();
+    try { await refreshOverview(); }
+    catch (error) {
+      overview = { ...overview, loading: false };
+      window.yuvomi?.showToast(error.data?.error ?? error.message ?? t('common.errorGeneric'), 'danger');
+    }
+    renderPage();
+    return;
+  }
   if (view !== 'statistics') { renderPage(); return; }
   statistics = { ...statistics, entries: [], bounds: null, loading: true };
   renderPage();
@@ -336,6 +398,28 @@ async function activateView(view) {
     window.yuvomi?.showToast(error.data?.error ?? error.message ?? t('common.errorGeneric'), 'danger');
   }
   renderPage();
+}
+
+/**
+ * Woche neu laden, wenn overview.weekCursor sich aendert - die Auswahl der
+ * Personen (overview.selectedIds) loest NIE einen Fetch aus, nur eine
+ * Neuzeichnung; nur der Wochenwechsel tut das (siehe activateView()/
+ * navigateOverviewWeek()).
+ */
+async function refreshOverview() {
+  const weekStart = weekStartIndex(state.weekStartPref);
+  const from = startOfLocalWeekKey(overview.weekCursor, weekStart);
+  const to = addLocalDays(from, 6);
+  const [entriesRes, holidaysRes] = await Promise.all([
+    api.get(`/schedule/entries?from=${from}&to=${to}`),
+    api.get(`/calendar/holidays?from=${from}&to=${to}`).catch(() => ({ data: [] })),
+  ]);
+  overview = {
+    ...overview,
+    entries: entriesRes.data?.entries ?? [],
+    holidays: holidaysRes.data ?? [],
+    loading: false,
+  };
 }
 
 function typeOptions(selected, includeFree = true) {
@@ -826,6 +910,258 @@ function renderToday() {
   }).join('')}</div>`;
 }
 
+// Uebersicht-Tab: mehrere Personen nebeneinander vergleichen.
+//
+// Feste Spur je Person, nach AUSWAHLREIHENFOLGE - nie nach Aktivitaet
+// umsortiert. Der ganze Sinn der Ansicht ist, dass "Kind 2s Spalte" jeden Tag
+// an derselben Stelle steht, damit das Auge sie ueber eine Woche verfolgen
+// kann; eine Person mit vielen Eintraegen darf ihr nicht mehr Platz oder eine
+// andere Position erkaufen (anders als layoutOverlaps() in calendar.js, das
+// bewusst dynamisch ist - dort geht es um sich ueberschneidende Termine EINER
+// Spalte, nicht um Personen-Identitaet). Jede Spur wird gerendert, auch mit
+// leerem entries-Array - eine ausgelassene Spur wuerde jede spaetere Spur an
+// diesem Tag verschieben und genau das Scan-Muster zerstoeren, fuer das die
+// Ansicht existiert.
+function isOvernightEntry(entry) {
+  const type = entry.shift_type;
+  return !!(type?.start_time && type?.end_time && type.end_time <= type.start_time);
+}
+
+function buildOverviewLanes(days, selectedUserIds, entries) {
+  const byDayAndUser = new Map();
+  for (const entry of entries) {
+    const key = `${entry.date_key}:${entry.user_id}`;
+    if (!byDayAndUser.has(key)) byDayAndUser.set(key, []);
+    byDayAndUser.get(key).push(entry);
+  }
+  // Eine Nachtschicht (Ende <= Beginn, ueber Mitternacht) bekommt eine ZWEITE
+  // Zeile auf dem FOLGETag - 00:00 bis zum echten Ende - sonst verschwindet
+  // ihre zweite Haelfte komplett, sobald der Starttag vorbei ist (nur die
+  // ersten paar Stunden bis Mitternacht waren je sichtbar). Aus den
+  // ORIGINALEN Eintraegen erzeugt, nie aus bereits eingefuegten
+  // Fortsetzungen - sonst kaeme jeden Tag eine weitere hinzu.
+  for (const entry of entries) {
+    if (!isOvernightEntry(entry)) continue;
+    const nextKey = `${addLocalDays(entry.date_key, 1)}:${entry.user_id}`;
+    // Ein "frei"-Eintrag (kein Schichttyp) fuer den Folgetag ist irrefuehrend,
+    // sobald eine Fortsetzung von gestern noch bis in den Morgen reicht - die
+    // Person ist erst ab Schichtende wirklich frei, nicht den ganzen Tag, und
+    // der unbezeitete "Frei"-Block wuerde sonst optisch mit der Fortsetzung
+    // an derselben Stelle (oben in der Spur) kollidieren.
+    const withoutFreeMarker = (byDayAndUser.get(nextKey) ?? []).filter((item) => item.shift_type);
+    byDayAndUser.set(nextKey, [...withoutFreeMarker, { ...entry, __continuation: true }]);
+  }
+  // Chronologisch innerhalb der Spur - eine Fortsetzung zaehlt als 00:00 (sie
+  // IST der Tagesanfang), dann untimed (frei), dann nach Beginn. Wichtig,
+  // weil GET /entries keine Sortiergarantie ueber mehrere Bloecke desselben
+  // Tages gibt (Migration 182, mehrere Bloecke je Zyklustag).
+  const startMinutes = (entry) => {
+    if (entry.__continuation) return -1;
+    const start = entry.shift_type?.start_time;
+    if (!start) return -1;
+    const [h, m] = start.split(':').map(Number);
+    return h * 60 + m;
+  };
+  for (const list of byDayAndUser.values()) list.sort((a, b) => startMinutes(a) - startMinutes(b));
+  return days.map((dateKey) => ({
+    dateKey,
+    lanes: selectedUserIds.map((userId, laneIndex) => ({
+      userId,
+      laneIndex,
+      entries: byDayAndUser.get(`${dateKey}:${userId}`) ?? [],
+    })),
+  }));
+}
+
+function overviewVisibleDays() {
+  if (overview.viewMode === 'day') return [overview.weekCursor];
+  const weekStart = weekStartIndex(state.weekStartPref);
+  const from = startOfLocalWeekKey(overview.weekCursor, weekStart);
+  return Array.from({ length: 7 }, (_, i) => addLocalDays(from, i));
+}
+
+/** Haushaltsweite Ferien-/Feiertagsbanner ueber dem Wochenraster - kein user_id, also keine eigene Spur. */
+function overviewHolidaysOnDay(dateKey) {
+  return overview.holidays.filter((holiday) => holiday.start_date <= dateKey && holiday.end_date >= dateKey);
+}
+
+function overviewLaneHeader(userId) {
+  const person = overview.people.find((p) => Number(p.id) === Number(userId));
+  const name = person?.display_name ?? userName(userId);
+  const initials = (name ?? '').split(' ').map((w) => w[0] ?? '').join('').toUpperCase().slice(0, 2);
+  const inner = person?.avatar_data ? `<img src="${esc(person.avatar_data)}" alt="${esc(name)}" loading="lazy">` : esc(initials);
+  return `<div class="schedule-overview__lane-head"><span class="schedule-overview__lane-avatar" style="background-color:${esc(person?.avatar_color ?? 'var(--color-border)')}">${inner}</span><span class="schedule-overview__lane-name">${esc(name)}</span></div>`;
+}
+
+const OVERVIEW_HOUR_PX = 56;
+const OVERVIEW_DEFAULT_HOURS = Array.from({ length: 14 }, (_, i) => i + 6); // 06:00-19:59 Rueckfall ohne bezeitete Eintraege
+
+function overviewPad(n) { return String(n).padStart(2, '0'); }
+
+/**
+ * Welche Kalenderstunden (0-23) traegt IRGENDEIN bezeiteter Eintrag der
+ * sichtbaren Auswahl - ueber die ganze Woche, nicht je Tag, damit alle Tage
+ * dieselbe (verdichtete) Skala teilen und vergleichbar bleiben. Stunden ohne
+ * jede Belegung (z. B. 00-08 Uhr an einer Schulwoche ohne Nachtschicht)
+ * fallen komplett weg, statt als leerer Platz zu zaehlen - genau das macht
+ * eine 45-Minuten-Stunde neben einer 8-Stunden-Schicht wieder lesbar UND
+ * masstabsgetreu (Live-Test-Feedback, 2026-09-04).
+ *
+ * Eine Nachtschicht traegt BEIDE Haelften bei - die Stunden bis Mitternacht
+ * UND die Stunden ab 00:00 - nicht nur die erste (Fix 2026-09-04): sonst
+ * haette buildOverviewLanes()' Fortsetzungszeile auf dem Folgetag keine
+ * einzige aktive Stunde, in die sie sich einordnen koennte.
+ */
+function computeActiveHours(entries) {
+  const active = new Set();
+  for (const entry of entries) {
+    const type = entry.shift_type;
+    if (!type?.start_time || !type?.end_time) continue;
+    const [startH] = type.start_time.split(':').map(Number);
+    const [endH, endM] = type.end_time.split(':').map(Number);
+    if (type.end_time <= type.start_time) {
+      for (let h = startH; h < 24; h++) active.add(h);
+      const endExclusive = endH + (endM > 0 ? 1 : 0);
+      for (let h = 0; h < endExclusive; h++) active.add(h);
+    } else {
+      const endExclusive = endH + (endM > 0 ? 1 : 0);
+      for (let h = startH; h < endExclusive; h++) active.add(h);
+    }
+  }
+  if (!active.size) return OVERVIEW_DEFAULT_HOURS;
+  return [...active].sort((a, b) => a - b);
+}
+
+/**
+ * Minutenwert auf der VERDICHTETEN Skala (nur die Stunden aus activeHours,
+ * der Reihe nach, je 60 "verdichtete Minuten"). Ein Eintrag beruehrt nur
+ * Stunden, die er selbst beitraegt - computeActiveHours() garantiert also,
+ * dass jede von ihm beruehrte Stunde in activeHours steht. Die einzige
+ * Ausnahme ist ein Endzeitpunkt genau auf einer Stundengrenze (z. B. endet um
+ * 09:00): die gehoert ans Ende der VORIGEN Stunde, nicht an den Anfang einer
+ * Stunde, die dieser Eintrag gar nicht mehr beruehrt.
+ */
+function collapsedMinutes(minutesOfDay, activeHours) {
+  let hour = Math.floor(minutesOfDay / 60);
+  let minuteInHour = minutesOfDay % 60;
+  if (hour >= 24) { hour = 23; minuteInHour = 60; }
+  let idx = activeHours.indexOf(hour);
+  if (idx === -1 && minuteInHour === 0) {
+    idx = activeHours.indexOf(hour - 1);
+    if (idx !== -1) minuteInHour = 60;
+  }
+  if (idx === -1) return null;
+  return idx * 60 + minuteInHour;
+}
+
+// KEINE ZEITPROPORTIONALE PLATZIERUNG AUF EINER DURCHGEHENDEN 24H-SKALA
+// (Kurskorrektur nach Live-Test, 2026-09-04) - eine 45-Minuten-Schulstunde
+// neben einer 8-Stunden-Schicht auf DERSELBEN durchgehenden Skala schrumpfte
+// auf ein paar Pixel, genau dort, wo Fach/Raum stehen sollten. Die Skala
+// traegt jetzt nur noch Stunden, die irgendjemand aus der Auswahl belegt
+// (computeActiveHours) - lesbar UND weiterhin masstabsgetreu, nur ohne die
+// leeren Stunden dazwischen.
+function overviewEntryBlock(entry, activeHours) {
+  const type = entry.shift_type;
+  const overlay = overlayMeta(entry);
+  const label = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
+  if (!type?.start_time || !type?.end_time) {
+    return `<div class="schedule-overview__block schedule-overview__block--allday" title="${esc(scheduleOverviewEntryTitle(entry))}"><span>${esc(overlay ? `${label} · ${overlay}` : label)}</span></div>`;
+  }
+  const [startH, startM] = type.start_time.split(':').map(Number);
+  const [endH, endM] = type.end_time.split(':').map(Number);
+  // Eine Fortsetzungszeile (siehe buildOverviewLanes()) IST der Tagesanfang -
+  // sie beginnt bei 00:00, nicht beim echten (gestrigen) Beginn der Schicht.
+  // Die ORIGINALZeile auf dem Starttag bleibt weiter bei Mitternacht gekappt.
+  const startMin = entry.__continuation ? 0 : startH * 60 + startM;
+  const endMin = entry.__continuation ? endH * 60 + endM : ((endH * 60 + endM) <= startMin ? 24 * 60 : endH * 60 + endM);
+  const startCollapsed = collapsedMinutes(startMin, activeHours) ?? 0;
+  const endCollapsed = collapsedMinutes(endMin, activeHours) ?? startCollapsed;
+  const top = (startCollapsed / 60) * OVERVIEW_HOUR_PX;
+  const height = Math.max(((endCollapsed - startCollapsed) / 60) * OVERVIEW_HOUR_PX, 18);
+  const timeLine = overlay ? `${clockLabel(type)} · ${overlay}` : clockLabel(type);
+  return `<div class="schedule-overview__block" style="top:${top}px;height:${height}px;--schedule-color:${esc(type.color)}" title="${esc(scheduleOverviewEntryTitle(entry))}"><span class="schedule-overview__block-title">${esc(label)}</span><small class="schedule-overview__block-time">${esc(timeLine)}</small></div>`;
+}
+
+function scheduleOverviewEntryTitle(entry) {
+  const type = entry.shift_type;
+  const base = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
+  const overlay = overlayMeta(entry);
+  return overlay ? `${base} · ${overlay}` : base;
+}
+
+function renderOverview() {
+  const picker = renderUserMultiSelect(overview.people, overview.selectedIds, 'overview-people', 'schedule.overviewPeopleLabel');
+  const weekDays = overviewVisibleDays();
+  const weekLabel = overview.viewMode === 'day'
+    ? formatDayMonth(weekDays[0])
+    : `${formatDayMonth(weekDays[0])} – ${formatDayMonth(weekDays[weekDays.length - 1])}`;
+  const viewToggle = `<div class="segmented" role="group" aria-label="${esc(t('calendar.viewWeek'))}/${esc(t('calendar.viewDay'))}">
+    <button type="button" class="segmented__item${overview.viewMode === 'week' ? ' is-active' : ''}" data-action="overview-view-mode" data-mode="week" aria-pressed="${overview.viewMode === 'week' ? 'true' : 'false'}">${esc(t('calendar.viewWeek'))}</button>
+    <button type="button" class="segmented__item${overview.viewMode === 'day' ? ' is-active' : ''}" data-action="overview-view-mode" data-mode="day" aria-pressed="${overview.viewMode === 'day' ? 'true' : 'false'}">${esc(t('calendar.viewDay'))}</button>
+  </div>`;
+  const header = `<div class="schedule-overview__toolbar">
+    ${picker}
+    <div class="schedule-overview__week-nav" role="group" aria-label="${esc(weekLabel)}">
+      ${viewToggle}
+      <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="prev" aria-label="${esc(t('calendar.back'))}"><i data-lucide="chevron-left" aria-hidden="true"></i></button>
+      <button type="button" class="btn btn--secondary" data-action="overview-week" data-direction="today">${esc(t('calendar.today'))}</button>
+      <button type="button" class="btn btn--icon" data-action="overview-week" data-direction="next" aria-label="${esc(t('calendar.forward'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+      <span class="schedule-overview__week-label">${esc(weekLabel)}</span>
+    </div>
+  </div>`;
+
+  if (!overview.selectedIds.length) {
+    return `<section class="schedule-overview">${header}${emptyStateHTML({ title: t('schedule.overviewEmptyTitle'), description: t('schedule.overviewEmptyDescription') })}</section>`;
+  }
+
+  const lanesByDay = buildOverviewLanes(weekDays, overview.selectedIds, overview.entries);
+  const laneCount = overview.selectedIds.length;
+  // Nur die AUSGEWAEHLTEN Personen UND nur die sichtbaren Tage duerfen die
+  // verdichtete Skala bestimmen - overview.entries traegt immer die ganze
+  // Woche (der Fetch spart sich einen Refetch beim Wechsel Tag/Woche/Personen,
+  // siehe refreshOverview()), eine abgewaehlte Person oder ein gerade nicht
+  // sichtbarer Tag (Tagesansicht) soll aber keine Stunde mehr "aktiv" halten,
+  // die hier gar nicht zu sehen ist.
+  const visibleDateKeys = new Set(weekDays);
+  const selectedEntries = overview.entries.filter((entry) => overview.selectedIds.includes(entry.user_id) && visibleDateKeys.has(entry.date_key));
+  const activeHours = computeActiveHours(selectedEntries);
+  const gridHeight = activeHours.length * OVERVIEW_HOUR_PX;
+  const hourLines = activeHours.map((_, i) => `<div class="schedule-overview__hour-line" style="top:${i * OVERVIEW_HOUR_PX}px"></div>`).join('');
+
+  // Die Zeitspalte ist strukturell ein Tag ohne Inhalt (leerer Tageskopf,
+  // leere Feiertage, EINE leere Spur) statt eines separat vermessenen
+  // Platzhalters - so bleibt sie garantiert auf derselben Hoehe wie jede
+  // echte Tagesspalte ausgerichtet, ohne Zahlen zu erraten.
+  const gutterHours = activeHours.map((h, i) => `<div class="schedule-overview__hour-label" style="top:${i * OVERVIEW_HOUR_PX}px">${overviewPad(h)}:00</div>`).join('');
+  const gutter = `<div class="schedule-overview__day schedule-overview__gutter">
+    <div class="schedule-overview__day-head">&nbsp;</div>
+    <div class="schedule-overview__holidays"></div>
+    <div class="schedule-overview__lanes" style="grid-template-columns:1fr">
+      <div class="schedule-overview__lane">
+        <div class="schedule-overview__lane-head">&nbsp;</div>
+        <div class="schedule-overview__lane-body" style="height:${gridHeight}px">${gutterHours}</div>
+      </div>
+    </div>
+  </div>`;
+
+  const days = lanesByDay.map(({ dateKey, lanes }) => {
+    const holidays = overviewHolidaysOnDay(dateKey);
+    const holidayHtml = holidays.map((h) => `<div class="schedule-overview__holiday" style="--holi-color:${esc(h.color)}" title="${esc(h.name)}"><span>${esc(h.name)}</span></div>`).join('');
+    const laneHtml = lanes.map((lane) => `<div class="schedule-overview__lane" data-user="${lane.userId}">
+      ${overviewLaneHeader(lane.userId)}
+      <div class="schedule-overview__lane-body" style="height:${gridHeight}px">${hourLines}${lane.entries.map((entry) => overviewEntryBlock(entry, activeHours)).join('')}</div>
+    </div>`).join('');
+    return `<div class="schedule-overview__day" data-date="${dateKey}">
+      <div class="schedule-overview__day-head">${esc(t(`calendar.dayShort${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][parseLocalDateKey(dateKey).getDay()]}`))} ${esc(formatDayMonth(dateKey))}</div>
+      <div class="schedule-overview__holidays">${holidayHtml}</div>
+      <div class="schedule-overview__lanes" style="grid-template-columns:repeat(${laneCount},minmax(220px,1fr))">${laneHtml}</div>
+    </div>`;
+  }).join('');
+
+  return `<section class="schedule-overview">${header}<div class="schedule-overview__scroll"><div class="schedule-overview__grid">${gutter}${days}</div></div></section>`;
+}
+
 function renderScheduleWarnings() {
   if (!state.warnings.length) return '';
   return '<div class="schedule-warnings" role="status">' + state.warnings.map((warning) => '<p>' + esc(t('schedule.overlapWarning', { date: warning.date_key, user: userName(warning.user_id) })) + '</p>').join('') + '</div>';
@@ -842,6 +1178,7 @@ function renderShell() {
     ['shifts', t('schedule.shiftTypes')],
     ['patterns', t('schedule.planning')],
     ['statistics', t('schedule.statistics')],
+    ['overview', t('schedule.overview')],
   ];
   root.replaceChildren();
   root.insertAdjacentHTML('beforeend', `<div class="schedule-page app-page app-page--full" data-composition="full">
@@ -872,6 +1209,12 @@ function renderShell() {
     } else if (event.target.id === 'schedule-weekly-hours') {
       const hours = Math.min(168, Math.max(1, Math.round(Number(event.target.value) || DEFAULT_WEEKLY_HOURS)));
       savePreference({ weeklyHours: hours });
+    } else if (event.target.closest('[data-ms-input="overview-people"]')) {
+      // Auswahl ist rein clientseitig - kein Fetch, nur eine Neuzeichnung
+      // (siehe Kommentar an overview weiter oben).
+      overview = { ...overview, selectedIds: getSelectedUserIds(root, 'overview-people') };
+      saveOverviewSelection(overview.selectedIds);
+      renderPage();
     } else if (event.target.matches('[data-day]')) {
       // Der gewaehlte Schichttyp entscheidet, welche Felder die Zeile zeigt -
       // ein Wechsel baut den Unterblock neu aus dem NEUEN Typ, ohne die bereits
@@ -918,22 +1261,30 @@ function renderPage() {
       ? '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? state.patterns.map(patternCard).join('') : emptyPatternState()) + '</section>'
         + '<section class="schedule-library schedule-library--overrides"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.overrides')) + '</h2><button type="button" class="btn btn--secondary" data-action="open-create-override"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.createOverride')) + '</button></div>' + overrideRows() + '</section>'
         + '<section class="schedule-library schedule-library--extras"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.extraShifts')) + '</h2><button type="button" class="btn btn--secondary" data-action="open-create-extra"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.addExtraShift')) + '</button></div>' + extraRows() + '</section>'
-      : renderStatistics();
+      : activeView === 'overview'
+        ? renderOverview()
+        : renderStatistics();
   const body = root.querySelector('.schedule-body');
   body.replaceChildren();
   // Die Heute-Karte erst, wenn das Modul in Betrieb ist: ein frischer Haushalt
   // sah sonst ZWEI Leerzustaende uebereinander („Noch keine Schichteintraege."
   // + „Noch kein Schichtplan") - zwei Meldungen fuer eine Tatsache, und die
   // Onboarding-Anleitung des Panels stand erst an zweiter Stelle
-  // (Critique 2026-08-27, P2).
+  // (Critique 2026-08-27, P2). Die Uebersicht zeigt bereits mehrere Personen
+  // ueber eine ganze Woche - dieselbe "Heute"-Karte daneben waere redundant,
+  // genau wie bei Statistics.
   const inUse = state.types.length || state.patterns.length
     || state.overrides.length || state.entries.length;
   body.insertAdjacentHTML('beforeend',
-    (activeView === 'statistics' || !inUse ? '' : '<section class="card card--padded schedule-today"><h2 class="u-section-title">' + esc(t('schedule.today')) + '</h2>' + renderToday() + renderScheduleWarnings() + '</section>')
+    (activeView === 'statistics' || activeView === 'overview' || !inUse ? '' : '<section class="card card--padded schedule-today"><h2 class="u-section-title">' + esc(t('schedule.today')) + '</h2>' + renderToday() + renderScheduleWarnings() + '</section>')
     + `<div class="schedule-content">${panel}</div>`);
   updateScheduleFab();
   window.lucide?.createIcons({ el: body });
   wireShiftTypeFieldSortables(body);
+  if (activeView === 'overview') {
+    bindUserMultiSelect(body, 'overview-people');
+    wireScrollFade(body.querySelector('.schedule-overview__scroll'));
+  }
   if (scrollPort) scrollPort.scrollTop = scrollTop;
 }
 
@@ -961,7 +1312,8 @@ function updateScheduleFab() {
   setPageFabAction(scheduleFab, {
     label: labels[activeView],
     dockLabel: dockLabels[activeView],
-    hidden: activeView === 'statistics',
+    // Statistics und Overview sind beide reine Leseansichten - kein "Anlegen".
+    hidden: activeView === 'statistics' || activeView === 'overview',
     onClick: () => openScheduleCreateModal(activeView),
   });
 }
@@ -1411,6 +1763,19 @@ async function action(event) {
       renderPage();
       return;
     }
+    if (button.dataset.action === 'overview-week') {
+      const step = overview.viewMode === 'day' ? 1 : 7;
+      const days = button.dataset.direction === 'prev' ? -step : button.dataset.direction === 'next' ? step : null;
+      overview = { ...overview, weekCursor: days ? addLocalDays(overview.weekCursor, days) : todayKey() };
+      await activateView('overview');
+      return;
+    }
+    if (button.dataset.action === 'overview-view-mode') {
+      overview = { ...overview, viewMode: button.dataset.mode };
+      saveOverviewViewMode(overview.viewMode);
+      renderPage();
+      return;
+    }
     if (button.dataset.action === 'edit-override') {
       const group = overrideGroups().find((item) => item.from === button.dataset.from && Number(item.user_id) === Number(button.dataset.userId));
       if (group) openOverrideEditModal(group);
@@ -1590,4 +1955,4 @@ export async function render(container, { user } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { overrideGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta };
+export const __test = { overrideGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry };

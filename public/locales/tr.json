@@ -4764,6 +4764,10 @@
         "addEntry": "Giriş ekle",
         "templateWork": "İş",
         "templateSchool": "Okul",
-        "templateUniversity": "Üniversite"
+        "templateUniversity": "Üniversite",
+        "overview": "Genel bakış",
+        "overviewPeopleLabel": "Kişileri karşılaştır",
+        "overviewEmptyTitle": "Karşılaştırılacak kişileri seç",
+        "overviewEmptyDescription": "Haftalık ders programlarını yan yana görmek için yukarıdan iki veya daha fazla hane üyesi seç."
     }
 }

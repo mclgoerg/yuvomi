@@ -4764,6 +4764,10 @@
         "addEntry": "Добавить запись",
         "templateWork": "Работа",
         "templateSchool": "Школа",
-        "templateUniversity": "Университет"
+        "templateUniversity": "Университет",
+        "overview": "Обзор",
+        "overviewPeopleLabel": "Сравнить людей",
+        "overviewEmptyTitle": "Выберите людей для сравнения",
+        "overviewEmptyDescription": "Выберите выше двух или более членов семьи, чтобы увидеть их недельные расписания рядом друг с другом."
     }
 }
