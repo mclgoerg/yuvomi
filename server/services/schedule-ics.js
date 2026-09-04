@@ -12,9 +12,10 @@
 
 import { randomBytes } from 'node:crypto';
 import { createLogger } from '../logger.js';
-import { escapeICSText, foldLine } from './ics-export.js';
+import { escapeICSText, foldLine, resolveFeedZone, stampProp } from './ics-export.js';
 import { scheduleData } from '../routes/schedule.js';
-import { todayKey, shiftDateKey } from '../utils/timezone.js';
+import { todayKey, shiftDateKey, householdTimeZone } from '../utils/timezone.js';
+import { vtimezoneFor } from '../utils/vtimezone.js';
 
 const log = createLogger('ScheduleICS');
 
@@ -46,7 +47,7 @@ function overlayMeta(entry) {
   return [entry.note, ...overlayFields.map((field) => `${field.name}: ${entry.field_values[field.id]}`)].filter(Boolean).join(' · ');
 }
 
-function buildVEvent(entry, dtstamp) {
+function buildVEvent(entry, dtstamp, feedZone) {
   const type = entry.shift_type;
   const summary = type.short_code ? `${type.short_code} · ${type.name}` : type.name;
   const lines = [
@@ -73,10 +74,15 @@ function buildVEvent(entry, dtstamp) {
       `DTEND;VALUE=DATE:${formatDateValue(shiftDateKeyUTC(entry.date_key, 1))}`,
     );
   } else {
+    // Naiv wie jede Wanduhrzeit im Modul (Migration 176ff.) - ohne Verankerung
+    // legen Google/Apple/Thunderbird/Outlook/Home Assistant sie in der Praxis
+    // auf UTC (#818, ics-export.js): eine 16:00-Schicht in Madrid erschiene um
+    // 18:00, sofort, im eigenen Kalender. stampProp() verankert an feedZone
+    // (bzw. haengt ein 'Z' an, wenn die Haushaltszone UTC-gleich ist).
     const endDate = entry.crosses_midnight ? shiftDateKeyUTC(entry.date_key, 1) : entry.date_key;
     lines.push(
-      `DTSTART:${formatDateValue(entry.date_key)}T${type.start_time.replace(':', '')}00`,
-      `DTEND:${formatDateValue(endDate)}T${type.end_time.replace(':', '')}00`,
+      stampProp('DTSTART', `${entry.date_key}T${type.start_time}`, feedZone),
+      stampProp('DTEND', `${endDate}T${type.end_time}`, feedZone),
     );
   }
   lines.push(`SUMMARY:${escapeICSText(summary)}`);
@@ -102,6 +108,11 @@ function buildScheduleFeed(conn, userId, now = new Date()) {
   const from = shiftDateKey(today, -FEED_PAST_DAYS);
   const to = shiftDateKey(today, FEED_FUTURE_DAYS);
   const { entries } = scheduleData(from, to, userId);
+  const timedEntries = entries.filter((entry) => entry.shift_type && entry.shift_type.start_time && entry.shift_type.end_time);
+
+  // Gleiche Verankerung wie der Kalender-Feed (#818, ics-export.js): naive
+  // Wanduhrzeit bekommt die Haushaltszone statt floating/UTC-per-Client-Rauten.
+  const feedZone = resolveFeedZone(householdTimeZone(conn));
 
   const dtstamp = formatUTCStamp(now);
   const out = [
@@ -112,11 +123,17 @@ function buildScheduleFeed(conn, userId, now = new Date()) {
     'METHOD:PUBLISH',
     'X-WR-CALNAME:Yuvomi Schedule',
   ];
+  if (feedZone) out.push(`X-WR-TIMEZONE:${feedZone}`);
+  // Genau ein VTIMEZONE fuer die Feed-Zone (RFC 5545: vor den VEVENTs), nur
+  // wenn ueberhaupt ein zeitgebundener Eintrag im Fenster liegt.
+  if (feedZone && timedEntries.length) {
+    out.push(...vtimezoneFor(feedZone, now.getUTCFullYear()).map(foldLine));
+  }
   // Freie Tage bleiben aussen vor - ein Feed voller "nichts los" waere Rauschen
   // im abonnierten Kalender, den Zweck (die Schichten sehen) verfehlte er.
   for (const entry of entries) {
     if (!entry.shift_type) continue;
-    out.push(...buildVEvent(entry, dtstamp));
+    out.push(...buildVEvent(entry, dtstamp, feedZone));
   }
   out.push('END:VCALENDAR');
   return out.join('\r\n') + '\r\n';

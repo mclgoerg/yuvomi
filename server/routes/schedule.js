@@ -10,7 +10,7 @@ import { isHouseholdMember } from '../services/member-email.js';
 const router = express.Router();
 const log = createLogger('Schedule');
 const actorId = (req) => req.authUserId || req.session?.userId;
-const isAdmin = (req) => req.authRole === 'admin' || req.session?.role === 'admin';
+export const isAdmin = (req) => req.authRole === 'admin' || req.session?.role === 'admin';
 const fail = (res, code, error) => res.status(code).json({ error, code });
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);

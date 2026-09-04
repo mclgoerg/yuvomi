@@ -19,11 +19,10 @@ import { collectErrors, date, id, str } from '../middleware/validate.js';
 import { dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
-import { validateFieldValues, replaceFieldValues, fieldValuesFor } from './schedule.js';
+import { validateFieldValues, replaceFieldValues, fieldValuesFor, isAdmin } from './schedule.js';
 
 const router = express.Router();
 const actorId = (req) => req.authUserId || req.session?.userId;
-const isAdmin = (req) => req.authRole === 'admin' || req.session?.role === 'admin';
 const fail = (res, code, error) => res.status(code).json({ error, code });
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);

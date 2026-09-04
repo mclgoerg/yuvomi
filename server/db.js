@@ -7097,13 +7097,23 @@ const MIGRATIONS = [
       -- periodische Sync (server/services/schedule-reminders.js) fuer sein
       -- rollierendes Fenster anlegt und wieder abraeumt, sobald der Tag aus
       -- dem Fenster faellt oder keine Erinnerung mehr braucht.
+      --
+      -- pattern_day_id steht von Anfang an hier (nicht erst ab Migration 182):
+      -- ein Musterzyklus-Tag kann mehrere Klassen tragen (Stundenplan, siehe
+      -- schedule_pattern_days weiter unten), jede mit ihrem eigenen Anker, und
+      -- diese Tabelle hat vor dem allerersten Release noch nie eine andere
+      -- Form gehabt - ein Rebuild in einer spaeteren Migration haette nur eine
+      -- Tabelle abgerissen, die niemand je mit der alten Form befuellt hat.
+      -- NULL bleibt fuer einen Override-Anker (hoechstens einer je Tag).
       CREATE TABLE schedule_reminder_entries (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        date_key      TEXT    NOT NULL,
-        shift_type_id INTEGER NOT NULL REFERENCES schedule_shift_types(id) ON DELETE CASCADE,
-        UNIQUE(user_id, date_key)
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        date_key       TEXT    NOT NULL,
+        shift_type_id  INTEGER NOT NULL REFERENCES schedule_shift_types(id) ON DELETE CASCADE,
+        pattern_day_id INTEGER
       );
+      CREATE UNIQUE INDEX idx_schedule_reminder_entries_slot
+        ON schedule_reminder_entries(user_id, date_key, COALESCE(pattern_day_id, 0));
 
       -- NULL = abgeschaltet (Standard), sonst der Vorlauf in Minuten vor
       -- Schichtbeginn. Anders als calendar_feed_token keine eigene
@@ -7193,31 +7203,9 @@ const MIGRATIONS = [
     // rein additiv/rueckwirkungsfrei, jede bestehende Zeile erfuellt die
     // lockerere Form schon 1:1.
     //
-    // schedule_reminder_entries (Migration 178) war bewusst auf GENAU EINEN
-    // Anker je (Nutzer, Tag) gebaut - das galt, solange ein Musterzyklus-Tag
-    // hoechstens einen Eintrag lieferte. Jetzt kann ein Tag mehrere liefern,
-    // jeder mit einer eigenen schedule_pattern_days.id - pattern_day_id haengt
-    // den Anker an die richtige Zeile, NULL bleibt fuer einen Override-Anker
-    // (weiterhin hoechstens einer je Tag, unveraendert). Bewusst OHNE
-    // REFERENCES ... ON DELETE CASCADE: PUT /patterns/:id/days loescht und
-    // legt bei JEDEM Speichern ALLE Zeilen des Musters neu an (nicht nur die
-    // geaenderten), eine Kaskade wuerde also bei jedem Speichern Anker
-    // stillschweigend mitreissen und ihre reminders-Zeile verwaist zurueck-
-    // lassen (reminders.entity_id traegt ohnehin nirgends einen echten
-    // Fremdschluessel, dasselbe polymorphe Muster wie jeder andere
-    // entity_type). Ein veralteter Anker faellt stattdessen beim naechsten
-    // periodischen Sync-Lauf einfach durchs Soll-Ist-Sieb (kein aktuell
-    // qualifizierender Eintrag mehr passend) und wird sauber abgeraeumt und
-    // unter der neuen Id neu angelegt - derselbe Selbstheilungsweg, auf den
-    // sich ein geloeschtes Muster (DELETE /patterns/:id, ebenfalls ohne FK
-    // auf diese Tabelle) schon heute verlaesst.
-    //
-    // Die Tabelle ist ein Ausleihschein, keine Wahrheit (siehe ihr eigener
-    // Kommentar bei Migration 178) - ihr Inhalt wird verworfen statt migriert,
-    // der naechste Sync-Lauf baut ihn binnen Minuten neu auf. Ein bereits
-    // gepushter/verworfener Erinnerungsstatus setzt sich dabei einmalig
-    // zurueck, wie schon beim urspruenglichen Tabellenentwurf in Kauf
-    // genommen.
+    // schedule_reminder_entries traegt pattern_day_id bereits seit ihrer
+    // Entstehung (Migration 178) - kein zweiter Rebuild hier noetig, siehe
+    // deren eigener Kommentar.
     up: `
       CREATE TABLE schedule_pattern_days_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -7230,18 +7218,6 @@ const MIGRATIONS = [
       DROP TABLE schedule_pattern_days;
       ALTER TABLE schedule_pattern_days_new RENAME TO schedule_pattern_days;
       CREATE INDEX idx_schedule_pattern_days_pattern_position ON schedule_pattern_days(pattern_id, position);
-
-      DELETE FROM reminders WHERE entity_type = 'schedule_entry';
-      DROP TABLE schedule_reminder_entries;
-      CREATE TABLE schedule_reminder_entries (
-        id             INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        date_key       TEXT    NOT NULL,
-        shift_type_id  INTEGER NOT NULL REFERENCES schedule_shift_types(id) ON DELETE CASCADE,
-        pattern_day_id INTEGER
-      );
-      CREATE UNIQUE INDEX idx_schedule_reminder_entries_slot
-        ON schedule_reminder_entries(user_id, date_key, COALESCE(pattern_day_id, 0));
     `,
   },
   {

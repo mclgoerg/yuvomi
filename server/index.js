@@ -542,10 +542,15 @@ app.use('/api/v1/email', emailRouter);
 app.use('/api/v1/notifications', notificationsRouter);
 app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/rewards', rewardsRouter);
-app.use('/api/v1/schedule', scheduleRouter);
+// The specific /schedule/* prefixes must mount before the general /schedule
+// router: schedule.js has no first-segment param route today, so a request
+// like /schedule/feed still falls through to the right router either way -
+// but that only holds by accident, and breaks silently (no error, just a 404)
+// the day someone adds a router.get('/:id') to schedule.js.
 app.use('/api/v1/schedule/feed', scheduleFeedRouter);
 app.use('/api/v1/schedule/preferences', schedulePreferencesRouter);
 app.use('/api/v1/schedule/extras', scheduleExtrasRouter);
+app.use('/api/v1/schedule', scheduleRouter);
 app.use('/api/v1/permissions', permissionsRouter);
 
 // --------------------------------------------------------
