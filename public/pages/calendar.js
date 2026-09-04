@@ -2074,12 +2074,17 @@ function renderScheduleTimeBlock(entry, className) {
   // (es ist eine Hintergrundflaeche, echte Termine malen darueber, siehe die
   // Begruendung an der Klasse in calendar.css) - ein Hover erreicht dieses
   // Element in der Praxis kaum je, der title blieb also meist ungelesen. Eine
-  // eigene Zeile bleibt bei kurzen Bloecken einfach abgeschnitten (overflow:clip
-  // an .week-event/.day-event), dieselbe Kuerzung, die die Uhrzeit-Zeile
-  // schon immer hinnimmt.
+  // DRITTE Zeile war bei den ueblichen 30-60-min-Bloecken (Wochenansicht, schmale
+  // Spalte) nie zu sehen: Titel+Uhrzeit fuellten den Block schon als
+  // unvorhersehbar umgebrochener Fliesstext, bevor eine eigene Meta-Zeile
+  // ueberhaupt Platz gehabt haette. Jetzt zwei FESTE einzeilige Zeilen (Titel,
+  // Uhrzeit+Feldwert zusammen) statt Fliesstext - das Feld faehrt auf der
+  // Uhrzeit-Zeile mit, statt eine eigene zu brauchen, und wird selbst dort per
+  // Ellipse gekuerzt statt spurlos unter der Blockkante zu verschwinden.
   const overlay = scheduleOverlayMeta(entry);
-  const meta = overlay ? `<small class="schedule-time-block__meta">${esc(overlay)}</small>` : '';
-  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);${bounds}--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(scheduleEntryLabel(entry))}</span>${scheduleEntryExtraBadge(entry)}<small>${esc(scheduleTimeLabel(type))}</small>${meta}</div>`;
+  const time = esc(scheduleTimeLabel(type));
+  const timeLine = overlay ? `${time} · ${esc(overlay)}` : time;
+  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);${bounds}--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span class="schedule-time-block__title">${esc(scheduleEntryLabel(entry))}${scheduleEntryExtraBadge(entry)}</span><small class="schedule-time-block__time">${timeLine}</small></div>`;
 }
 
 function monthDayAriaLabel(date, total) {
