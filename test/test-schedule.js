@@ -145,6 +145,38 @@ test('entries are household-readable, include type data, and never materialize c
   assert.equal(database.prepare('SELECT count(*) AS count FROM calendar_events').get().count, before);
 });
 
+// Migration 181: GET /entries embeds each resolved entry's field_values (keyed
+// by the RIGHT id column for its source - pattern_day_id/override_id/extra_id
+// are three different lookups, see scheduleData()) and each shift_type's own
+// attached-field list, so the frontend never needs a second round trip to
+// know what to show or how to label it.
+test('GET /entries embeds field_values (keyed correctly per source) and each shift type\'s attached fields', async () => {
+  const type = database.prepare("INSERT INTO schedule_shift_types (name, start_time, end_time, color) VALUES ('Period 3', '09:55', '10:40', '#111111')").run().lastInsertRowid;
+  const room = database.prepare("INSERT INTO schedule_custom_fields (name) VALUES ('Room')").run().lastInsertRowid;
+  database.prepare('INSERT INTO schedule_shift_type_fields (shift_type_id, custom_field_id, position, show_in_overlay) VALUES (?, ?, 0, 1)').run(type, room);
+
+  const pattern = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (1, 'Fields entries', '2026-11-01', 1)").run().lastInsertRowid;
+  const dayId = database.prepare('INSERT INTO schedule_pattern_days (pattern_id, position, shift_type_id) VALUES (?, 0, ?)').run(pattern, type).lastInsertRowid;
+  database.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('pattern_day', ?, ?, 'Room 1')").run(dayId, room);
+
+  database.prepare('INSERT INTO schedule_overrides (user_id, date_key, shift_type_id) VALUES (1, ?, ?)').run('2026-11-02', type);
+  const overrideId = database.prepare('SELECT id FROM schedule_overrides WHERE user_id = 1 AND date_key = ?').get('2026-11-02').id;
+  database.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('override', ?, ?, 'Room 2')").run(overrideId, room);
+
+  database.prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id) VALUES (1, ?, ?)').run('2026-11-01', type);
+  const extraId = database.prepare('SELECT id FROM schedule_extra_shifts WHERE user_id = 1 AND date_key = ?').get('2026-11-01').id;
+  database.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('extra_shift', ?, ?, 'Room 3')").run(extraId, room);
+
+  const response = await call('GET', '/entries?from=2026-11-01&to=2026-11-02&user_id=1', { as: ALICE });
+  assert.equal(response.status, 200);
+  const byDate = Object.fromEntries(response.body.data.entries.map((e) => [`${e.date_key}:${e.source}`, e]));
+
+  assert.deepEqual(byDate['2026-11-01:pattern'].field_values, { [room]: 'Room 1' });
+  assert.deepEqual(byDate['2026-11-02:override'].field_values, { [room]: 'Room 2' });
+  assert.deepEqual(byDate['2026-11-01:extra'].field_values, { [room]: 'Room 3' }, 'the extra keys off extra_id, not pattern_day_id, even on the same date as the pattern entry');
+  assert.deepEqual(byDate['2026-11-01:pattern'].shift_type.fields, [{ id: room, name: 'Room', position: 0, show_in_overlay: true }]);
+});
+
 test('members may write only themselves while admins may write any household schedule', async () => {
   const body = { user_id: BOB.id, name: 'Blocked', anchor_date: '2026-11-01', cycle_length: 7, is_active: true };
   const denied = await call('POST', '/patterns', { as: ALICE, body });
@@ -245,6 +277,46 @@ test('a date range of overrides can be deleted in one call, self or admin-on-beh
   assert.equal(asAdmin.body.data.deleted, 3);
 });
 
+// Migration 181: an override's field_values round-trip through the single-day
+// PUT, /overrides/fill applies the same values to every day in the range
+// (matching the existing note/reminder_offset_minutes sharing semantics), and
+// deleting a value's owning row (single or range) cleans up its values too -
+// entry_id is polymorphic (no real FK, see schema comment), so nothing does
+// that automatically.
+test('an override\'s field_values round-trip, fill shares one set across the range, and deleting an override cleans up its values', async () => {
+  const type = (await call('POST', '/shift-types', { as: ALICE, body: { name: 'On call (fields)' } })).body.data.id;
+  const client = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Client' } })).body.data.id;
+  await call('PUT', `/shift-types/${type}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: client, position: 0 }] } });
+
+  const set = await call('PUT', '/overrides/2027-05-01', { as: ALICE, body: { user_id: ALICE.id, shift_type_id: type, field_values: { [client]: 'Acme Corp' } } });
+  assert.equal(set.status, 200);
+  assert.deepEqual(set.body.data.field_values, { [client]: 'Acme Corp' });
+  const overrideId = set.body.data.id;
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(overrideId).c, 1);
+
+  const listed = await call('GET', '/overrides?user_id=' + ALICE.id + '&from=2027-05-01&to=2027-05-01', { as: ALICE });
+  assert.deepEqual(listed.body.data[0].field_values, { [client]: 'Acme Corp' });
+
+  const deleted = await call('DELETE', '/overrides/2027-05-01?user_id=' + ALICE.id, { as: ALICE });
+  assert.equal(deleted.status, 204);
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(overrideId).c, 0, 'deleting the override cleans up its values');
+
+  const filled = await call('POST', '/overrides/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2027-05-10', to: '2027-05-12', shift_type_id: type, field_values: { [client]: 'Beta LLC' } } });
+  assert.equal(filled.status, 200);
+  const filledRows = database.prepare("SELECT id FROM schedule_overrides WHERE user_id=? AND date_key BETWEEN ? AND ?").all(ALICE.id, '2027-05-10', '2027-05-12');
+  assert.equal(filledRows.length, 3);
+  for (const row of filledRows) {
+    assert.equal(database.prepare("SELECT value FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=? AND custom_field_id=?").get(row.id, client)?.value, 'Beta LLC');
+  }
+
+  const rangeDeleted = await call('DELETE', '/overrides?user_id=' + ALICE.id + '&from=2027-05-10&to=2027-05-12', { as: ALICE });
+  assert.equal(rangeDeleted.status, 200);
+  assert.equal(rangeDeleted.body.data.deleted, 3);
+  for (const row of filledRows) {
+    assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id=?").get(row.id).c, 0, 'a range delete cleans up every affected row\'s values');
+  }
+});
+
 test('a shift type may be added by anyone but only changed by its creator or an admin', async () => {
   const created = await call('POST', '/shift-types', { as: ALICE, body: { name: 'Standby', start_time: '18:00', end_time: '20:00' } });
   assert.equal(created.status, 201, 'every member may add a shift type');
@@ -299,6 +371,61 @@ test('deleting a shift type that is still in use answers 409, and 404 stays 404'
 
   const missing = await call('DELETE', '/shift-types/999999', { as: ADMIN });
   assert.equal(missing.status, 404, 'an unknown id is not "in use"');
+});
+
+// Migration 181 (custom fields): a shift type's attached-field set is replaced
+// wholesale on every save, same shape as PUT /patterns/:id/days - no natural
+// way to tell "unchanged" from "removed" apart in the submitted list either.
+test('a shift type\'s attached custom fields can be replaced, reordered, and are ownership-guarded', async () => {
+  const type = await call('POST', '/shift-types', { as: ALICE, body: { name: 'Fields host' } });
+  const shiftId = type.body.data.id;
+  assert.deepEqual(type.body.data.fields, [], 'a freshly created type starts with no fields');
+
+  const room = await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Room' } });
+  const instructor = await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Instructor' } });
+  const roomId = room.body.data.id;
+  const instructorId = instructor.body.data.id;
+
+  const foreign = await call('PUT', `/shift-types/${shiftId}/fields`, { as: BOB, body: { fields: [{ custom_field_id: roomId, position: 0 }] } });
+  assert.equal(foreign.status, 403, 'attaching fields is the same ownership rule as editing the shift type itself');
+
+  const attached = await call('PUT', `/shift-types/${shiftId}/fields`, {
+    as: ALICE,
+    body: { fields: [
+      { custom_field_id: roomId, position: 0, show_in_overlay: true },
+      { custom_field_id: instructorId, position: 1 },
+    ] },
+  });
+  assert.equal(attached.status, 200);
+  assert.equal(attached.body.data.fields.length, 2);
+  assert.deepEqual(attached.body.data.fields.map((f) => f.name), ['Room', 'Instructor'], 'order follows position');
+  assert.equal(attached.body.data.fields[0].show_in_overlay, true);
+  assert.equal(attached.body.data.fields[1].show_in_overlay, false, 'omitted show_in_overlay defaults to false');
+
+  const listed = await call('GET', '/shift-types', { as: ALICE });
+  const listedType = listed.body.data.find((t) => t.id === shiftId);
+  assert.equal(listedType.fields.length, 2, 'GET /shift-types embeds the same attachment');
+
+  // Re-ordering is the same wholesale replace, not a partial patch - only one
+  // field survives here, which is itself the proof that it truly replaces.
+  const reordered = await call('PUT', `/shift-types/${shiftId}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: instructorId, position: 0 }] } });
+  assert.equal(reordered.status, 200);
+  assert.deepEqual(reordered.body.data.fields.map((f) => f.name), ['Instructor']);
+
+  const duplicate = await call('PUT', `/shift-types/${shiftId}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: roomId, position: 0 }, { custom_field_id: roomId, position: 1 }] } });
+  assert.equal(duplicate.status, 400);
+  assert.match(duplicate.body.error, /not repeat/);
+
+  const unknownField = await call('PUT', `/shift-types/${shiftId}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: 999999, position: 0 }] } });
+  assert.equal(unknownField.status, 400);
+  assert.match(unknownField.body.error, /does not exist/);
+
+  const notArray = await call('PUT', `/shift-types/${shiftId}/fields`, { as: ALICE, body: { fields: 'nope' } });
+  assert.equal(notArray.status, 400);
+
+  await call('DELETE', `/shift-types/${shiftId}`, { as: ALICE });
+  await call('DELETE', `/custom-fields/${roomId}`, { as: ALICE });
+  await call('DELETE', `/custom-fields/${instructorId}`, { as: ALICE });
 });
 
 // The status-code test above stays green either way - it measures the outcome,
@@ -413,6 +540,50 @@ test('PUT /patterns/:id/days accepts several classes at the same position, and a
   assert.equal(shrunk.body.data[0].shift_type_id, Number(mathType));
 });
 
+// Migration 181 (custom fields): a pattern day's field_values ride inside the
+// SAME wholesale-replace request as its position/shift_type_id, and every
+// save assigns the day rows fresh ids (see the comment above PUT
+// /patterns/:id/days) - the atomicity claim this design rests on is that the
+// FIRST save's values are truly gone after the SECOND, not orphaned under the
+// old (now-reused-elsewhere) id space.
+test('a pattern day carries field_values, validated against its shift type\'s attached fields, and a resave leaves no orphaned values behind', async () => {
+  const mathType = (await call('POST', '/shift-types', { as: ALICE, body: { name: 'Math (fields)' } })).body.data.id;
+  const room = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Room' } })).body.data.id;
+  const instructor = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Instructor' } })).body.data.id;
+  await call('PUT', `/shift-types/${mathType}/fields`, { as: ALICE, body: { fields: [{ custom_field_id: room, position: 0 }, { custom_field_id: instructor, position: 1 }] } });
+  const patternId = database.prepare("INSERT INTO schedule_patterns (user_id, name, anchor_date, cycle_length) VALUES (1, 'Fields pattern', '2027-04-01', 7)").run().lastInsertRowid;
+
+  // A field not attached to the day's shift type is rejected.
+  const rejected = await call('PUT', `/patterns/${patternId}/days`, { as: ALICE, body: { days: [{ position: 0, shift_type_id: mathType, field_values: { 999999: 'nope' } }] } });
+  assert.equal(rejected.status, 400);
+  assert.match(rejected.body.error, /not attached/);
+
+  const saved = await call('PUT', `/patterns/${patternId}/days`, {
+    as: ALICE,
+    body: { days: [{ position: 0, shift_type_id: mathType, field_values: { [room]: 'Room 204', [instructor]: '  Ms. Rivera  ' } } ] },
+  });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.body.data[0].field_values, { [room]: 'Room 204', [instructor]: 'Ms. Rivera' }, 'values are trimmed');
+  const firstDayId = saved.body.data[0].id;
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id=?").get(firstDayId).c, 2);
+
+  const listed = await call('GET', `/patterns/${patternId}/days`, { as: ALICE });
+  assert.deepEqual(listed.body.data[0].field_values, { [room]: 'Room 204', [instructor]: 'Ms. Rivera' });
+
+  // Re-save with different values - every row gets a fresh id (documented
+  // behaviour), so the OLD id's values must be gone, not merely superseded.
+  const resaved = await call('PUT', `/patterns/${patternId}/days`, {
+    as: ALICE,
+    body: { days: [{ position: 0, shift_type_id: mathType, field_values: { [room]: 'Room 105' } } ] },
+  });
+  assert.equal(resaved.status, 200);
+  const secondDayId = resaved.body.data[0].id;
+  assert.notEqual(secondDayId, firstDayId, 'the wholesale replace assigns a fresh id');
+  assert.deepEqual(resaved.body.data[0].field_values, { [room]: 'Room 105' }, 'instructor was dropped by omitting it');
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id=?").get(firstDayId).c, 0, 'no orphaned values under the old id');
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id=?").get(secondDayId).c, 1);
+});
+
 // The date arithmetic itself (rangeDifference) is exercised end-to-end by the
 // server test above - deleting the middle of a filled range and asserting the
 // exact remaining days IS the same computation the client runs locally before
@@ -461,6 +632,49 @@ test('overrideGroups() merges consecutive same-series days and splits on a gap o
   const otherTypeId = typeId + 1;
   const typeChange = __test.overrideGroups([row(1, '2027-03-01'), row(2, '2027-03-02', { shift_type_id: otherTypeId })]);
   assert.equal(typeChange.length, 2, 'a different shift_type_id must not merge with its neighbour');
+
+  // Migration 181: field_values carry the same "must match to merge" rule as
+  // note already did - two consecutive days with different values are not
+  // one range, even though shift type and note happen to be identical.
+  const differentFieldValues = __test.overrideGroups([
+    row(1, '2027-03-01', { field_values: { 7: 'Room 204' } }),
+    row(2, '2027-03-02', { field_values: { 7: 'Room 99' } }),
+  ]);
+  assert.equal(differentFieldValues.length, 2, 'different field_values must not merge with its neighbour');
+
+  const sameFieldValues = __test.overrideGroups([
+    row(1, '2027-03-01', { field_values: { 7: 'Room 204' } }),
+    row(2, '2027-03-02', { field_values: { 7: 'Room 204' } }),
+  ]);
+  assert.equal(sameFieldValues.length, 1, 'identical field_values must still merge');
+  assert.deepEqual(sameFieldValues[0].field_values, { 7: 'Room 204' });
+});
+
+test('sameFieldValues() compares by key and value, not by object identity or key order', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  assert.equal(__test.sameFieldValues(undefined, undefined), true, 'two absent field_values are equal');
+  assert.equal(__test.sameFieldValues({}, {}), true);
+  assert.equal(__test.sameFieldValues({ 1: 'a', 2: 'b' }, { 2: 'b', 1: 'a' }), true, 'key order does not matter');
+  assert.equal(__test.sameFieldValues({ 1: 'a' }, { 1: 'b' }), false, 'same key, different value');
+  assert.equal(__test.sameFieldValues({ 1: 'a' }, { 1: 'a', 2: 'b' }), false, 'a superset is not equal');
+  assert.equal(__test.sameFieldValues({}, undefined), true, 'an empty object and an absent value are both "nothing set"');
+});
+
+// Migration 181: overlayMeta() feeds the Today card's meta line - note plus
+// every show_in_overlay field that actually has a value, a field attached but
+// not flagged stays out even with a value, and a flagged field with no value
+// stays out too (nothing to show).
+test('overlayMeta() joins the note with show_in_overlay fields that have a value, and only those', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const shift_type = { fields: [
+    { id: 1, name: 'Room', show_in_overlay: true },
+    { id: 2, name: 'Instructor', show_in_overlay: false },
+    { id: 3, name: 'Notes', show_in_overlay: true },
+  ] };
+  assert.equal(__test.overlayMeta({ note: null, shift_type, field_values: { 1: 'Room 204', 2: 'Ms. Rivera' } }), 'Room: Room 204', 'the non-overlay field is excluded even with a value');
+  assert.equal(__test.overlayMeta({ note: 'Bring textbook', shift_type, field_values: { 1: 'Room 204' } }), 'Bring textbook · Room: Room 204', 'note comes first');
+  assert.equal(__test.overlayMeta({ note: null, shift_type, field_values: { 3: '' } }), '', 'an overlay field with no value contributes nothing');
+  assert.equal(__test.overlayMeta({ note: null, shift_type: null, field_values: {} }), '', 'a free day (no shift type) has no fields to show');
 });
 
 test('rangeDifference() finds exactly what fell outside a shrunk range, and nothing when it only grew', async () => {

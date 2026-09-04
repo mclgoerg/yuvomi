@@ -181,6 +181,29 @@ test('buildScheduleFeed escaped Sonderzeichen in der Notiz', () => {
   db.exec('DELETE FROM schedule_overrides');
 });
 
+// Migration 181: DESCRIPTION faltet die Notiz UND jedes ueberlagerungssichtbare
+// eigene Feld mit einem Wert zusammen - ein Feld ohne diesen Haken bleibt
+// draussen, auch wenn es einen Wert traegt.
+test('buildScheduleFeed nimmt ueberlagerungssichtbare Feldwerte in DESCRIPTION auf, andere nicht', () => {
+  const type = insertType({ name: 'Feld-Schicht' });
+  const room = db.prepare("INSERT INTO schedule_custom_fields (name) VALUES ('Room')").run().lastInsertRowid;
+  const instructor = db.prepare("INSERT INTO schedule_custom_fields (name) VALUES ('Instructor')").run().lastInsertRowid;
+  db.prepare('INSERT INTO schedule_shift_type_fields (shift_type_id, custom_field_id, position, show_in_overlay) VALUES (?, ?, 0, 1)').run(type, room);
+  db.prepare('INSERT INTO schedule_shift_type_fields (shift_type_id, custom_field_id, position, show_in_overlay) VALUES (?, ?, 1, 0)').run(type, instructor);
+
+  const today = db.prepare("SELECT date('now') AS d").get().d;
+  insertOverride(alice, today, type);
+  const overrideId = db.prepare('SELECT id FROM schedule_overrides WHERE user_id=? AND date_key=?').get(alice, today).id;
+  db.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('override', ?, ?, 'Room 204')").run(overrideId, room);
+  db.prepare("INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES ('override', ?, ?, 'Ms. Rivera')").run(overrideId, instructor);
+
+  const ics = scheduleIcs.buildScheduleFeed(db, alice);
+  assert.match(ics, /DESCRIPTION:Room: Room 204/);
+  assert.doesNotMatch(ics, /Ms\. Rivera/, 'Instructor is attached but not flagged show_in_overlay, so it stays out of the feed');
+
+  db.exec('DELETE FROM schedule_overrides; DELETE FROM schedule_custom_field_values; DELETE FROM schedule_shift_type_fields; DELETE FROM schedule_custom_fields;');
+});
+
 test('buildScheduleFeed liefert ein valides VCALENDAR-Gerüst auch ohne Einträge', () => {
   const ics = scheduleIcs.buildScheduleFeed(db, alice);
   assert.match(ics, /^BEGIN:VCALENDAR\r\n/);

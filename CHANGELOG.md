@@ -72,6 +72,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deleting fourteen rows one at a time to adjust a two-week range. An opt-in dashboard widget shows
   who has a shift or is free today, off by default like the module itself.
 
+- **Shift types can now carry custom fields, defined once and reused across as many shift types as
+  want them** (e.g. a "Room" field shared by every school-period shift type, or a "Client" field on a
+  work shift type) - deliberately not fixed columns like a timetable app's `room`/`instructor`, which
+  would be nonsensical on a work shift with no room or instructor at all. A new "Custom fields"
+  section on the Schedule module's Shift types tab manages the registry itself (create, rename,
+  delete - any member may add one, only its creator or an admin may change or remove it). Each shift
+  type's own card gains a second, collapsed section for attaching any number of these fields,
+  reordering them (drag or keyboard up/down buttons), and choosing whether each one's value shows on
+  the calendar overlay - hidden entirely for a shift type with none attached, so a household that
+  never touches this stays looking exactly as it did before. A pattern day, an override, or an extra
+  shift using a shift type with attached fields can now record its own value for each one - the
+  cycle-day editor and both the override and extra-shift create/edit modals grow a field-input block
+  right after their shift-type picker, appearing only for a type that actually has fields and rebuilt
+  whenever the picked type changes. Filling in a room for one Monday and a different one the next
+  works exactly like giving them different notes already did. A field only reaches the calendar
+  overlay, the Today card, and the subscribed ICS feed if it's explicitly flagged to show there - a
+  field can be filled in and stay purely informational (visible in the editors, nowhere else) if
+  that's all it's meant to be. "Room: 204" now shows up right alongside the shift name wherever a
+  resolved entry is already summarized.
+
 ### Fixed
 
 - **The shift-type colour picker no longer spans the full row on a phone.** `width: 100%` stretched

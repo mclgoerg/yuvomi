@@ -2020,11 +2020,22 @@ function scheduleEntryLabel(entry) {
   return owner ? shift + " · " + owner : shift;
 }
 
+// Note plus jedes ueberlagerungssichtbare eigene Feld mit einem Wert (Migration
+// 181) - dieselbe Berechnung wie schedule.js' overlayMeta(), hier eigenstaendig
+// nachgebaut statt importiert: diese Datei haelt schon fuer jede andere
+// Schichtplan-Anzeigeformel (scheduleTimeLabel, scheduleEntryLabel, ...) eine
+// eigene, unabhaengige Kopie statt schedule.js komplett zu importieren.
+function scheduleOverlayMeta(entry) {
+  const overlayFields = (entry.shift_type?.fields ?? []).filter((field) => field.show_in_overlay && entry.field_values?.[field.id]);
+  return [entry.note, ...overlayFields.map((field) => `${field.name}: ${entry.field_values[field.id]}`)].filter(Boolean).join(" · ");
+}
+
 function scheduleEntryTitle(entry) {
   const owner = scheduleOwnerName(entry);
   const time = scheduleTimeLabel(entry.shift_type);
   const extra = entry.source === 'extra' ? " · " + t('schedule.extraBadgeLabel') : "";
-  return entry.shift_type.name + (owner ? " · " + owner : "") + (time ? " · " + time : "") + extra;
+  const overlay = scheduleOverlayMeta(entry);
+  return entry.shift_type.name + (owner ? " · " + owner : "") + (time ? " · " + time : "") + extra + (overlay ? " · " + overlay : "");
 }
 
 function scheduleIsFullDayShift(entry) {

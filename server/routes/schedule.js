@@ -13,6 +13,7 @@ const isAdmin = (req) => req.authRole === 'admin' || req.session?.role === 'admi
 const fail = (res, code, error) => res.status(code).json({ error, code });
 const userExists = (value) => !!db.get().prepare('SELECT 1 FROM users WHERE id = ?').get(value);
 const typeExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_shift_types WHERE id = ?').get(value);
+const customFieldExists = (value) => !!db.get().prepare('SELECT 1 FROM schedule_custom_fields WHERE id = ?').get(value);
 const mineOrAdmin = (req, userId) => isAdmin(req) || actorId(req) === userId;
 
 /** Lucides laengster Name liegt bei 34 Zeichen; 48 laesst Luft nach oben - dieselbe Grenze wie bei den Schnellzugriffen (quick-links.js). */
@@ -124,7 +125,32 @@ export function scheduleData(from, to, userId) {
   const typeIds = [...new Set(entries.map((entry) => entry.shift_type_id).filter(Boolean))];
   const types = new Map();
   if (typeIds.length) for (const row of database.prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id IN (${typeIds.map(() => '?').join(',')})`).all(...typeIds)) types.set(row.id, row);
-  return { entries: entries.map((entry) => ({ ...entry, shift_type: entry.shift_type_id ? types.get(entry.shift_type_id) || null : null, crosses_midnight: Boolean(types.get(entry.shift_type_id)?.start_time && types.get(entry.shift_type_id)?.end_time && types.get(entry.shift_type_id).end_time <= types.get(entry.shift_type_id).start_time) })), warnings };
+  // Ein zweiter, unabhaengiger Aufruf gegenueber GET /shift-types - diese
+  // Funktion baut ihre eigene types-Map fuer nur die Typen, die im Zeitraum
+  // TATSAECHLICH aufgeloest wurden, nicht fuer alle Typen des Haushalts.
+  const typeFields = fieldsForShiftTypes(typeIds);
+  // Werte je Herkunftsart getrennt nachgeschlagen (ein Aufruf je Art statt
+  // N+1 je Eintrag) - welche Id-Spalte zaehlt, haengt von entry.source ab.
+  const patternDayValues = fieldValuesFor('pattern_day', entries.filter((e) => e.source === 'pattern' && e.pattern_day_id != null).map((e) => e.pattern_day_id));
+  const overrideValues = fieldValuesFor('override', entries.filter((e) => e.source === 'override').map((e) => e.override_id));
+  const extraValues = fieldValuesFor('extra_shift', entries.filter((e) => e.source === 'extra').map((e) => e.extra_id));
+  const fieldValuesForEntry = (entry) => {
+    if (entry.source === 'pattern') return patternDayValues.get(entry.pattern_day_id) ?? {};
+    if (entry.source === 'override') return overrideValues.get(entry.override_id) ?? {};
+    return extraValues.get(entry.extra_id) ?? {};
+  };
+  return {
+    entries: entries.map((entry) => {
+      const type = entry.shift_type_id ? types.get(entry.shift_type_id) : null;
+      return {
+        ...entry,
+        shift_type: type ? { ...type, fields: typeFields.get(type.id) ?? [] } : null,
+        crosses_midnight: Boolean(type?.start_time && type?.end_time && type.end_time <= type.start_time),
+        field_values: fieldValuesForEntry(entry),
+      };
+    }),
+    warnings,
+  };
 }
 
 router.get('/entries', (req, res) => {
@@ -144,7 +170,92 @@ router.get('/entries', (req, res) => {
   }
 });
 
-router.get('/shift-types', (_req, res) => res.json({ data: db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types ORDER BY name COLLATE NOCASE`).all() }));
+// Liefert je Schichttyp-Id die an ihm haengenden Felder (Migration 181), sortiert nach ihrer
+// gespeicherten Anzeige-Reihenfolge. Eine Map statt einer flachen Liste, weil der Aufrufer sie
+// je Schichttyp-Zeile braucht.
+function fieldsForShiftTypes(typeIds) {
+  const map = new Map();
+  if (!typeIds.length) return map;
+  const rows = db.get().prepare(`
+    SELECT stf.shift_type_id, cf.id, cf.name, stf.position, stf.show_in_overlay
+    FROM schedule_shift_type_fields stf
+    JOIN schedule_custom_fields cf ON cf.id = stf.custom_field_id
+    WHERE stf.shift_type_id IN (${typeIds.map(() => '?').join(',')})
+    ORDER BY stf.shift_type_id, stf.position
+  `).all(...typeIds);
+  for (const row of rows) {
+    if (!map.has(row.shift_type_id)) map.set(row.shift_type_id, []);
+    map.get(row.shift_type_id).push({ id: row.id, name: row.name, position: row.position, show_in_overlay: Boolean(row.show_in_overlay) });
+  }
+  return map;
+}
+// Bettet die eigenen Felder in EINE Schichttyp-Zeile ein - dasselbe fieldsForShiftTypes(), nur fuer
+// den Ein-Zeilen-Fall (create/update), damit eine Antwort nach POST/PUT dieselbe Form traegt wie
+// eine Zeile aus der Liste, statt "fields" nur dort zu zeigen, wo ohnehin schon gelistet wird.
+function withFields(type) {
+  return { ...type, fields: fieldsForShiftTypes([type.id]).get(type.id) ?? [] };
+}
+
+const MAX_FIELD_VALUE_LENGTH = 500;
+function fieldValue(v) {
+  if (v === undefined || v === null || v === '') return { value: null, error: null };
+  const s = String(v).trim();
+  if (!s) return { value: null, error: null };
+  if (s.length > MAX_FIELD_VALUE_LENGTH) return { value: null, error: `value may be at most ${MAX_FIELD_VALUE_LENGTH} characters long.` };
+  return { value: s, error: null };
+}
+/**
+ * Validiert ein `field_values`-Objekt ({custom_field_id: Wert}) gegen die Felder, die WIRKLICH an
+ * `shiftTypeId` haengen - ein Feld, das nicht angeheftet ist, waere ein Wert ohne Definition dahinter.
+ * Leere Werte werden stillschweigend uebersprungen (siehe schedule_custom_field_values' eigenem
+ * CHECK: "keine Zeile" heisst "nicht gesetzt", nie eine leere Zeichenkette).
+ * @returns {{ values: Array<[number, string]>, error: string|null }}
+ */
+export function validateFieldValues(raw, shiftTypeId) {
+  if (raw === undefined || raw === null) return { values: [], error: null };
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { values: [], error: 'field_values must be an object.' };
+  const keys = Object.keys(raw);
+  if (!keys.length) return { values: [], error: null };
+  if (shiftTypeId == null) return { values: [], error: 'field_values requires a shift_type_id.' };
+  const attached = new Set(db.get().prepare('SELECT custom_field_id FROM schedule_shift_type_fields WHERE shift_type_id = ?').all(shiftTypeId).map((r) => r.custom_field_id));
+  const values = [];
+  for (const key of keys) {
+    const fieldId = id(key, 'field_values key');
+    if (fieldId.error) return { values: [], error: fieldId.error };
+    if (!attached.has(fieldId.value)) return { values: [], error: `field ${key} is not attached to this shift type.` };
+    const parsed = fieldValue(raw[key]);
+    if (parsed.error) return { values: [], error: parsed.error };
+    if (parsed.value != null) values.push([fieldId.value, parsed.value]);
+  }
+  return { values, error: null };
+}
+/**
+ * Ersetzt alle Werte eines Vorkommens (loeschen, neu anlegen) - dieselbe
+ * delete-then-insert-Regel wie ueberall sonst in diesem Modul, hier fuer eine
+ * einzelne Zeile statt einer ganzen Menge.
+ */
+export function replaceFieldValues(entryType, entryId, values) {
+  db.get().prepare('DELETE FROM schedule_custom_field_values WHERE entry_type = ? AND entry_id = ?').run(entryType, entryId);
+  if (!values.length) return;
+  const insert = db.get().prepare('INSERT INTO schedule_custom_field_values (entry_type, entry_id, custom_field_id, value) VALUES (?, ?, ?, ?)');
+  for (const [fieldId, value] of values) insert.run(entryType, entryId, fieldId, value);
+}
+/** Batch-Nachschlag ueber mehrere Vorkommen derselben Art, ohne N+1. */
+export function fieldValuesFor(entryType, entryIds) {
+  const map = new Map();
+  if (!entryIds.length) return map;
+  const rows = db.get().prepare(`SELECT entry_id, custom_field_id, value FROM schedule_custom_field_values WHERE entry_type = ? AND entry_id IN (${entryIds.map(() => '?').join(',')})`).all(entryType, ...entryIds);
+  for (const row of rows) {
+    if (!map.has(row.entry_id)) map.set(row.entry_id, {});
+    map.get(row.entry_id)[row.custom_field_id] = row.value;
+  }
+  return map;
+}
+router.get('/shift-types', (_req, res) => {
+  const types = db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types ORDER BY name COLLATE NOCASE`).all();
+  const fields = fieldsForShiftTypes(types.map((type) => type.id));
+  res.json({ data: types.map((type) => ({ ...type, fields: fields.get(type.id) ?? [] })) });
+});
 router.post('/shift-types', (req, res) => {
   const name = str(req.body?.name, 'name'); const shortCode = str(req.body?.short_code, 'short_code', { required: false, max: 12 });
   const start = time(req.body?.start_time, 'start_time'); const end = time(req.body?.end_time, 'end_time'); const shade = color(req.body?.color || '#6C3AED', 'color');
@@ -153,7 +264,7 @@ router.post('/shift-types', (req, res) => {
   if ((start.value == null) !== (end.value == null)) errors.push('start_time and end_time must be provided together.');
   if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
   const result = db.get().prepare('INSERT INTO schedule_shift_types (name, short_code, start_time, end_time, color, icon, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name.value, shortCode.value, start.value, end.value, shade.value, icon.value, actorId(req));
-  res.status(201).json({ data: db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(result.lastInsertRowid) });
+  res.status(201).json({ data: withFields(db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(result.lastInsertRowid)) });
 });
 router.delete('/shift-types/:id', (req, res) => {
   const shiftType = id(req.params.id, 'id');
@@ -172,6 +283,40 @@ router.delete('/shift-types/:id', (req, res) => {
     log.error('Error deleting shift type:', err.message);
     return fail(res, 500, 'Internal error.');
   }
+});
+
+const customFieldColumns = 'id, name, created_by, created_at, updated_at';
+
+// Definiert einmal, angeheftet an beliebig viele Schichttypen (schedule_shift_type_fields,
+// siehe Migration 181) - derselbe "gehoert dem Haushalt, nicht einer Person"-Gedanke wie bei
+// Schichttypen: anlegen darf jeder, aendern/loeschen nur wer ihn angelegt hat oder ein Admin.
+router.get('/custom-fields', (_req, res) => res.json({ data: db.get().prepare(`SELECT ${customFieldColumns} FROM schedule_custom_fields ORDER BY name COLLATE NOCASE`).all() }));
+router.post('/custom-fields', (req, res) => {
+  const name = str(req.body?.name, 'name', { max: 100 });
+  if (name.error) return fail(res, 400, name.error);
+  const result = db.get().prepare('INSERT INTO schedule_custom_fields (name, created_by) VALUES (?, ?)').run(name.value, actorId(req));
+  res.status(201).json({ data: db.get().prepare(`SELECT ${customFieldColumns} FROM schedule_custom_fields WHERE id = ?`).get(result.lastInsertRowid) });
+});
+router.put('/custom-fields/:id', (req, res) => {
+  const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
+  const old = db.get().prepare(`SELECT ${customFieldColumns} FROM schedule_custom_fields WHERE id = ?`).get(key.value);
+  if (!old) return fail(res, 404, 'Custom field not found.');
+  if (!ownTypeOrAdmin(req, old)) return fail(res, 403, 'Forbidden.');
+  const name = req.body?.name === undefined ? { value: old.name, error: null } : str(req.body.name, 'name', { max: 100 });
+  if (name.error) return fail(res, 400, name.error);
+  db.get().prepare('UPDATE schedule_custom_fields SET name=? WHERE id=?').run(name.value, key.value);
+  res.json({ data: db.get().prepare(`SELECT ${customFieldColumns} FROM schedule_custom_fields WHERE id = ?`).get(key.value) });
+});
+router.delete('/custom-fields/:id', (req, res) => {
+  const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
+  const old = db.get().prepare('SELECT id, created_by FROM schedule_custom_fields WHERE id = ?').get(key.value);
+  if (!old) return fail(res, 404, 'Custom field not found.');
+  if (!ownTypeOrAdmin(req, old)) return fail(res, 403, 'Forbidden.');
+  // Kaskadiert ueber schedule_shift_type_fields/schedule_custom_field_values (ON DELETE CASCADE) -
+  // anders als ein Schichttyp (der `isStillReferenced`-409-Schutz) ist ein geloeschtes Feld eine
+  // bewusste, vom Frontend bestaetigte Aktion (siehe delete-pattern), kein Unfall.
+  db.get().prepare('DELETE FROM schedule_custom_fields WHERE id = ?').run(old.id);
+  return res.status(204).end();
 });
 
 router.get('/patterns', (req, res) => {
@@ -193,9 +338,12 @@ router.post('/patterns', (req, res) => {
 });
 router.put('/overrides/:dateKey', (req, res) => {
   const key = date(req.params.dateKey, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: 5000 });
-  const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); if (typeId && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
-  db.get().prepare('INSERT INTO schedule_overrides (user_id, date_key, shift_type_id, note) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id, note = excluded.note').run(user.value, key.value, typeId?.value ?? null, note.value);
-  res.json({ data: db.get().prepare('SELECT * FROM schedule_overrides WHERE user_id = ? AND date_key = ?').get(user.value, key.value) });
+  const errors = collectErrors([key, user, typeId, note].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); if (typeId && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.');
+  const fields = validateFieldValues(req.body?.field_values, typeId?.value ?? null); if (fields.error) errors.push(fields.error);
+  if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
+  const row = db.get().prepare('INSERT INTO schedule_overrides (user_id, date_key, shift_type_id, note) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id, note = excluded.note RETURNING *').get(user.value, key.value, typeId?.value ?? null, note.value);
+  replaceFieldValues('override', row.id, fields.values);
+  res.json({ data: { ...row, field_values: fieldValuesFor('override', [row.id]).get(row.id) ?? {} } });
 });
 
 router.put('/shift-types/:id', (req, res) => {
@@ -219,7 +367,35 @@ router.put('/shift-types/:id', (req, res) => {
   if ((start.value == null) !== (end.value == null)) errors.push('start_time and end_time must be provided together.');
   if (errors.length) return fail(res, 400, errors.join(' '));
   db.get().prepare('UPDATE schedule_shift_types SET name=?, short_code=?, start_time=?, end_time=?, color=?, icon=? WHERE id=?').run(name.value, shortCode.value, start.value, end.value, shade.value, icon.value, key.value);
-  return res.json({ data: db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(key.value) });
+  return res.json({ data: withFields(db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(key.value)) });
+});
+// Ersetzt IMMER die gesamte Feldzuordnung eines Schichttyps in einem Rutsch (loeschen, neu
+// anlegen) - derselbe Grund wie PUT /patterns/:id/days: kein natuerliches Merkmal, an dem sich
+// "unveraendert" von "entfernt" unterscheiden liesse.
+router.put('/shift-types/:id/fields', (req, res) => {
+  const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
+  const old = db.get().prepare('SELECT id, created_by FROM schedule_shift_types WHERE id = ?').get(key.value);
+  if (!old) return fail(res, 404, 'Shift type not found.');
+  if (!ownTypeOrAdmin(req, old)) return fail(res, 403, 'Forbidden.');
+  if (!Array.isArray(req.body?.fields)) return fail(res, 400, 'fields must be an array.');
+  const seen = new Set();
+  const rows = [];
+  for (const row of req.body.fields) {
+    const fieldId = id(row?.custom_field_id, 'custom_field_id');
+    const position = num(row?.position, 'position', { required: true });
+    const showInOverlay = row?.show_in_overlay === undefined ? { value: false, error: null } : bool(row.show_in_overlay, 'show_in_overlay');
+    if (fieldId.error || position.error || !Number.isInteger(position.value) || position.value < 0 || showInOverlay.error) return fail(res, 400, 'Invalid field entry.');
+    if (!customFieldExists(fieldId.value)) return fail(res, 400, 'custom_field_id does not exist.');
+    if (seen.has(fieldId.value)) return fail(res, 400, 'custom_field_id must not repeat.');
+    seen.add(fieldId.value);
+    rows.push([fieldId.value, position.value, Number(showInOverlay.value)]);
+  }
+  db.get().transaction(() => {
+    db.get().prepare('DELETE FROM schedule_shift_type_fields WHERE shift_type_id=?').run(old.id);
+    const add = db.get().prepare('INSERT INTO schedule_shift_type_fields (shift_type_id,custom_field_id,position,show_in_overlay) VALUES (?,?,?,?)');
+    rows.forEach((row) => add.run(old.id, ...row));
+  })();
+  return res.json({ data: withFields(db.get().prepare(`SELECT ${typeColumns} FROM schedule_shift_types WHERE id = ?`).get(old.id)) });
 });
 router.put('/patterns/:id', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
@@ -248,7 +424,9 @@ router.delete('/patterns/:id', (req, res) => {
 router.get('/patterns/:id/days', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   if (!db.get().prepare('SELECT 1 FROM schedule_patterns WHERE id=?').get(key.value)) return fail(res, 404, 'Pattern not found.');
-  return res.json({ data: db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position, id').all(key.value) });
+  const rows = db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position, id').all(key.value);
+  const values = fieldValuesFor('pattern_day', rows.map((row) => row.id));
+  return res.json({ data: rows.map((row) => ({ ...row, field_values: values.get(row.id) ?? {} })) });
 });
 // Ersetzt IMMER alle Zyklustage des Musters in einem Rutsch (loeschen, neu
 // anlegen) statt einzelner Upserts - es gibt kein natuerliches Merkmal, an dem
@@ -270,17 +448,38 @@ router.put('/patterns/:id/days', (req, res) => {
     const position = num(row?.position, 'position', { required: true }); const shiftType = row?.shift_type_id == null ? null : id(row.shift_type_id, 'shift_type_id');
     if (position.error || !Number.isInteger(position.value) || position.value < 0 || position.value >= old.cycle_length || shiftType?.error) return fail(res, 400, 'Invalid pattern day.');
     if (shiftType && !typeExists(shiftType.value)) return fail(res, 400, 'shift_type_id does not exist.');
-    days.push([position.value, shiftType?.value ?? null]);
+    const fields = validateFieldValues(row?.field_values, shiftType?.value ?? null);
+    if (fields.error) return fail(res, 400, fields.error);
+    days.push({ position: position.value, shiftTypeId: shiftType?.value ?? null, fieldValues: fields.values });
   }
-  db.get().transaction(() => { db.get().prepare('DELETE FROM schedule_pattern_days WHERE pattern_id=?').run(old.id); const add = db.get().prepare('INSERT INTO schedule_pattern_days (pattern_id,position,shift_type_id) VALUES (?,?,?)'); days.forEach((day) => add.run(old.id, ...day)); })();
-  return res.json({ data: db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position').all(old.id) });
+  // entry_id-Werte fuer schedule_custom_field_values haengen an KEINEM echten
+  // Fremdschluessel (polymorph, siehe Migration 181) - das Loeschen der alten
+  // Zyklustage kaskadiert also nicht automatisch zu ihren Werten. Beides in
+  // derselben Transaktion, in dieser Reihenfolge: alte Werte weg (ueber die
+  // NOCH bekannten alten Ids), alte Tage weg, neue Tage rein, neue Werte fuer
+  // die frischen Ids rein.
+  db.get().transaction(() => {
+    const oldIds = db.get().prepare('SELECT id FROM schedule_pattern_days WHERE pattern_id=?').all(old.id).map((row) => row.id);
+    if (oldIds.length) db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='pattern_day' AND entry_id IN (${oldIds.map(() => '?').join(',')})`).run(...oldIds);
+    db.get().prepare('DELETE FROM schedule_pattern_days WHERE pattern_id=?').run(old.id);
+    const add = db.get().prepare('INSERT INTO schedule_pattern_days (pattern_id,position,shift_type_id) VALUES (?,?,?)');
+    for (const day of days) {
+      const newId = add.run(old.id, day.position, day.shiftTypeId).lastInsertRowid;
+      if (day.fieldValues.length) replaceFieldValues('pattern_day', newId, day.fieldValues);
+    }
+  })();
+  const rows = db.get().prepare('SELECT * FROM schedule_pattern_days WHERE pattern_id=? ORDER BY position').all(old.id);
+  const values = fieldValuesFor('pattern_day', rows.map((row) => row.id));
+  return res.json({ data: rows.map((row) => ({ ...row, field_values: values.get(row.id) ?? {} })) });
 });
 router.get('/overrides', (req, res) => {
   const user = req.query.user_id == null ? null : id(req.query.user_id, 'user_id'); const from = date(req.query.from, 'from'); const to = date(req.query.to, 'to');
   const errors = collectErrors([user, from, to].filter(Boolean)); if (from.value && to.value && from.value > to.value) errors.push('from must be before to.');
   if (errors.length) return fail(res, 400, errors.join(' ')); if (user && !userExists(user.value)) return fail(res, 404, 'User not found.');
   const where = []; const args = []; if (user) { where.push('user_id=?'); args.push(user.value); } if (from.value) { where.push('date_key>=?'); args.push(from.value); } if (to.value) { where.push('date_key<=?'); args.push(to.value); }
-  return res.json({ data: db.get().prepare(`SELECT * FROM schedule_overrides${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY user_id,date_key`).all(...args) });
+  const rows = db.get().prepare(`SELECT * FROM schedule_overrides${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY user_id,date_key`).all(...args);
+  const values = fieldValuesFor('override', rows.map((row) => row.id));
+  return res.json({ data: rows.map((row) => ({ ...row, field_values: values.get(row.id) ?? {} })) });
 });
 /**
  * Fuellt einen Zeitraum in einem Aufruf statt einem PUT je Tag - fuer eine
@@ -295,7 +494,9 @@ router.post('/overrides/fill', (req, res) => {
   const to = date(req.body?.to, 'to', true);
   const typeId = req.body?.shift_type_id == null ? null : id(req.body.shift_type_id, 'shift_type_id');
   const note = str(req.body?.note, 'note', { required: false, max: 5000 });
+  const fields = validateFieldValues(req.body?.field_values, typeId?.value ?? null);
   const errors = collectErrors([user, from, to, typeId, note].filter(Boolean));
+  if (fields.error) errors.push(fields.error);
   if (from.value && to.value && from.value > to.value) errors.push('from must be before to.');
   if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
   if (typeId && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.');
@@ -313,9 +514,16 @@ router.post('/overrides/fill', (req, res) => {
   // "replacing any existing entries in that range", and a fill is meant to
   // read as one action overwriting a span, not a merge that could leave a
   // stale note from before the range was last edited (PR #930 review).
+  // Dieselbe Regel gilt jetzt fuer field_values: EIN Satz Werte fuer den
+  // ganzen Zeitraum, nicht je Tag verschieden.
   const upsert = db.get().prepare(`INSERT INTO schedule_overrides (user_id, date_key, shift_type_id, note)
-    VALUES (?, ?, ?, ?) ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id, note = excluded.note`);
-  db.get().transaction(() => { for (const key of keys) upsert.run(user.value, key, typeId?.value ?? null, note.value); })();
+    VALUES (?, ?, ?, ?) ON CONFLICT(user_id, date_key) DO UPDATE SET shift_type_id = excluded.shift_type_id, note = excluded.note RETURNING id`);
+  db.get().transaction(() => {
+    for (const key of keys) {
+      const row = upsert.get(user.value, key, typeId?.value ?? null, note.value);
+      replaceFieldValues('override', row.id, fields.values);
+    }
+  })();
   res.json({ data: { updated: keys.length } });
 });
 
@@ -340,14 +548,23 @@ router.delete('/overrides', (req, res) => {
   if (span === null || span + 1 > MAX_RANGE_DAYS) {
     return fail(res, 400, `The range must not exceed ${MAX_RANGE_DAYS} days.`);
   }
-  const result = db.get().prepare('DELETE FROM schedule_overrides WHERE user_id=? AND date_key BETWEEN ? AND ?').run(user.value, from.value, to.value);
+  // entry_id ist polymorph (kein echter Fremdschluessel, siehe Migration 181) -
+  // die Werte muessen VOR den Overrides selbst weg, solange die Unterabfrage
+  // sie noch findet.
+  const result = db.get().transaction(() => {
+    db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id IN (SELECT id FROM schedule_overrides WHERE user_id=? AND date_key BETWEEN ? AND ?)`).run(user.value, from.value, to.value);
+    return db.get().prepare('DELETE FROM schedule_overrides WHERE user_id=? AND date_key BETWEEN ? AND ?').run(user.value, from.value, to.value);
+  })();
   res.json({ data: { deleted: result.changes } });
 });
 
 router.delete('/overrides/:dateKey', (req, res) => {
   const key = date(req.params.dateKey, 'date_key', true); const user = id(req.query.user_id ?? actorId(req), 'user_id'); const errors = collectErrors([key, user]);
   if (!mineOrAdmin(req, user.value)) return fail(res, 403, 'Forbidden.'); if (errors.length) return fail(res, 400, errors.join(' '));
-  const result = db.get().prepare('DELETE FROM schedule_overrides WHERE user_id=? AND date_key=?').run(user.value, key.value);
+  const result = db.get().transaction(() => {
+    db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='override' AND entry_id IN (SELECT id FROM schedule_overrides WHERE user_id=? AND date_key=?)`).run(user.value, key.value);
+    return db.get().prepare('DELETE FROM schedule_overrides WHERE user_id=? AND date_key=?').run(user.value, key.value);
+  })();
   return result.changes ? res.status(204).end() : fail(res, 404, 'Override not found.');
 });
 

@@ -19,6 +19,7 @@ import { collectErrors, date, id, str } from '../middleware/validate.js';
 import { dateKeysInRange } from '../services/schedule.js';
 import { daysBetweenDateKeys } from '../utils/timezone.js';
 import { syncScheduleRemindersForUser } from '../services/schedule-reminders.js';
+import { validateFieldValues, replaceFieldValues, fieldValuesFor } from './schedule.js';
 
 const router = express.Router();
 const actorId = (req) => req.authUserId || req.session?.userId;
@@ -48,15 +49,20 @@ router.get('/', (req, res) => {
   const errors = collectErrors([user, from, to].filter(Boolean)); if (from.value && to.value && from.value > to.value) errors.push('from must be before to.');
   if (errors.length) return fail(res, 400, errors.join(' ')); if (user && !userExists(user.value)) return fail(res, 404, 'User not found.');
   const where = []; const args = []; if (user) { where.push('user_id=?'); args.push(user.value); } if (from.value) { where.push('date_key>=?'); args.push(from.value); } if (to.value) { where.push('date_key<=?'); args.push(to.value); }
-  return res.json({ data: db.get().prepare(`SELECT * FROM schedule_extra_shifts${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY user_id,date_key`).all(...args) });
+  const rows = db.get().prepare(`SELECT * FROM schedule_extra_shifts${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY user_id,date_key`).all(...args);
+  const values = fieldValuesFor('extra_shift', rows.map((row) => row.id));
+  return res.json({ data: rows.map((row) => ({ ...row, field_values: values.get(row.id) ?? {} })) });
 });
 
 router.post('/', (req, res) => {
   const key = date(req.body?.date_key, 'date_key', true); const user = id(req.body?.user_id ?? actorId(req), 'user_id'); const typeId = id(req.body?.shift_type_id, 'shift_type_id'); const note = str(req.body?.note, 'note', { required: false, max: 5000 }); const offset = reminderOffset(req.body?.reminder_offset_minutes);
-  const errors = collectErrors([key, user, typeId, note, offset].filter(Boolean)); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
+  const fields = validateFieldValues(req.body?.field_values, typeId.value ?? null);
+  const errors = collectErrors([key, user, typeId, note, offset].filter(Boolean)); if (fields.error) errors.push(fields.error); if (user.value && !userExists(user.value)) errors.push('user_id does not exist.'); if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.'); if (!mineOrAdmin(req, user.value)) errors.push('Forbidden.'); if (errors.length) return res.status(errors.includes('Forbidden.') ? 403 : 400).json({ error: errors.join(' '), code: errors.includes('Forbidden.') ? 403 : 400 });
   const result = db.get().prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, note, reminder_offset_minutes, created_by) VALUES (?, ?, ?, ?, ?, ?)').run(user.value, key.value, typeId.value, note.value, offset.value, actorId(req));
+  replaceFieldValues('extra_shift', result.lastInsertRowid, fields.values);
   syncScheduleRemindersForUser(db.get(), user.value);
-  res.status(201).json({ data: db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id = ?').get(result.lastInsertRowid) });
+  const row = db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json({ data: { ...row, field_values: fieldValuesFor('extra_shift', [row.id]).get(row.id) ?? {} } });
 });
 
 /**
@@ -70,7 +76,9 @@ router.post('/fill', (req, res) => {
   const typeId = id(req.body?.shift_type_id, 'shift_type_id');
   const note = str(req.body?.note, 'note', { required: false, max: 5000 });
   const offset = reminderOffset(req.body?.reminder_offset_minutes);
+  const fields = validateFieldValues(req.body?.field_values, typeId.value ?? null);
   const errors = collectErrors([user, from, to, typeId, note, offset].filter(Boolean));
+  if (fields.error) errors.push(fields.error);
   if (from.value && to.value && from.value > to.value) errors.push('from must be before to.');
   if (user.value && !userExists(user.value)) errors.push('user_id does not exist.');
   if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.');
@@ -81,8 +89,13 @@ router.post('/fill', (req, res) => {
     return fail(res, 400, `The range must not exceed ${MAX_FILL_DAYS} days.`);
   }
   const keys = dateKeysInRange(from.value, to.value);
-  const insert = db.get().prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, note, reminder_offset_minutes, created_by) VALUES (?, ?, ?, ?, ?, ?)');
-  db.get().transaction(() => { for (const key of keys) insert.run(user.value, key, typeId.value, note.value, offset.value, actorId(req)); })();
+  const insert = db.get().prepare('INSERT INTO schedule_extra_shifts (user_id, date_key, shift_type_id, note, reminder_offset_minutes, created_by) VALUES (?, ?, ?, ?, ?, ?) RETURNING id');
+  db.get().transaction(() => {
+    for (const key of keys) {
+      const row = insert.get(user.value, key, typeId.value, note.value, offset.value, actorId(req));
+      replaceFieldValues('extra_shift', row.id, fields.values);
+    }
+  })();
   syncScheduleRemindersForUser(db.get(), user.value);
   res.json({ data: { created: keys.length } });
 });
@@ -95,19 +108,29 @@ router.put('/:id', (req, res) => {
   const typeId = req.body?.shift_type_id === undefined ? { value: old.shift_type_id } : id(req.body.shift_type_id, 'shift_type_id');
   const note = req.body?.note === undefined ? { value: old.note } : str(req.body.note, 'note', { required: false, max: 5000 });
   const offset = req.body?.reminder_offset_minutes === undefined ? { value: old.reminder_offset_minutes, error: null } : reminderOffset(req.body.reminder_offset_minutes);
+  // Gegen den EFFEKTIVEN Schichttyp validieren (den neuen, falls ersetzt -
+  // sonst den bisherigen): field_values muessen zu dem Typ passen, der nach
+  // diesem Speichern tatsaechlich gilt, nicht zu einem, der gerade verlassen wird.
+  const fields = validateFieldValues(req.body?.field_values, typeId.value ?? null);
   const errors = collectErrors([dateKey, typeId, note, offset]);
+  if (fields.error) errors.push(fields.error);
   if (typeId.value && !typeExists(typeId.value)) errors.push('shift_type_id does not exist.');
   if (errors.length) return fail(res, 400, errors.join(' '));
   db.get().prepare('UPDATE schedule_extra_shifts SET date_key=?, shift_type_id=?, note=?, reminder_offset_minutes=? WHERE id=?').run(dateKey.value, typeId.value, note.value, offset.value, old.id);
+  if (req.body?.field_values !== undefined) replaceFieldValues('extra_shift', old.id, fields.values);
   syncScheduleRemindersForUser(db.get(), old.user_id);
-  return res.json({ data: db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id=?').get(old.id) });
+  const row = db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id=?').get(old.id);
+  return res.json({ data: { ...row, field_values: fieldValuesFor('extra_shift', [row.id]).get(row.id) ?? {} } });
 });
 
 router.delete('/:id', (req, res) => {
   const key = id(req.params.id, 'id'); if (key.error) return fail(res, 400, key.error);
   const old = db.get().prepare('SELECT * FROM schedule_extra_shifts WHERE id = ?').get(key.value);
   if (!old) return fail(res, 404, 'Extra shift not found.'); if (!mineOrAdmin(req, old.user_id)) return fail(res, 403, 'Forbidden.');
-  db.get().prepare('DELETE FROM schedule_extra_shifts WHERE id=?').run(old.id);
+  db.get().transaction(() => {
+    db.get().prepare(`DELETE FROM schedule_custom_field_values WHERE entry_type='extra_shift' AND entry_id=?`).run(old.id);
+    db.get().prepare('DELETE FROM schedule_extra_shifts WHERE id=?').run(old.id);
+  })();
   syncScheduleRemindersForUser(db.get(), old.user_id);
   return res.status(204).end();
 });

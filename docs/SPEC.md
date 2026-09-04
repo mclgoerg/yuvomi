@@ -2547,11 +2547,14 @@ formally closed.
 | Column | Type | Constraint |
 |--------|------|-----------|
 | pattern_id | INTEGER | NOT NULL, FK → Schedule Patterns (CASCADE) |
-| position | INTEGER | NOT NULL, `CHECK >= 0`, `UNIQUE (pattern_id, position)` — 0 … cycle_length-1 |
+| position | INTEGER | NOT NULL, `CHECK >= 0` — 0 … cycle_length-1 |
 | shift_type_id | INTEGER | FK → Schedule Shift Types (RESTRICT) — NULL is a free day within the cycle |
 
 Shortening a pattern is refused while days sit beyond the new length, rather than silently dropping
-them.
+them. As of migration 180, a position is **not** unique — a cycle day may carry several rows (a
+timetable's multiple classes at different times on the same weekday), each its own `shift_type_id`.
+`PUT /patterns/:id/days` always replaces every row of a pattern in one transaction (delete-all,
+re-insert-all), so every save assigns fresh ids to every row, even unchanged ones.
 
 #### Schedule Overrides
 
@@ -2609,7 +2612,7 @@ same user and date would share a UID, and a subscribed calendar client (Google/A
 dedupes by UID per RFC 5545, silently hiding one of the two shifts.
 
 **Shift-start reminders:** extras get their **own** `entity_type` (`schedule_extra_entry`, migration
-175, the sixth widening of `reminders.entity_type`) and their **own** configurable offset
+179, the sixth widening of `reminders.entity_type`) and their **own** configurable offset
 (`reminder_offset_minutes` above) rather than inheriting the household-wide setting — on-call
 plausibly wants a different lead time than a regular shift. No anchor table needed here, unlike
 `schedule_entry`: an extra is already a real stored row with a stable id from the moment it's
@@ -2626,6 +2629,108 @@ rather than a second primary entry. There is no separate Overrides tab — the P
 three lists (patterns, overrides, extras), and one create modal reaches all three kinds via two
 toggles: **Recurring** (a pattern vs. a one-time entry) and, if one-time, **Replace** (an override,
 which may carry a free/no-shift value) vs. **Add** (an extra, which must always name a real shift).
+
+#### Schedule Custom Fields (migration 181)
+
+A household-wide registry of extra fields (e.g. "Room", "Instructor") a shift type can carry beyond
+its own name — deliberately **not** fixed columns like Timetables' `subject`/`room`/`instructor`,
+since those read as nonsensical on a work shift (a night shift has no "room"). A field is defined
+once and can attach to any number of shift types, so "Room" doesn't need retyping per shift type
+that wants it.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| name | TEXT | NOT NULL |
+| created_by | INTEGER | FK → Users (SET NULL) — decides who may rename/delete it |
+| created_at / updated_at | TEXT | ISO 8601 |
+
+Anyone may create one; renaming or deleting is the creator's call or an admin's (`ownTypeOrAdmin()`,
+reused verbatim from Shift Types — it only reads `created_by`). Deleting a field cascades (unlike a
+shift type's `isStillReferenced` 409 guard): it's a deliberate, frontend-confirmed action, not an
+accidental loss of schedule meaning.
+
+Migration 181 also creates its two dependent tables up front — `schedule_shift_type_fields`
+(which shift types a field is attached to, in what order, and whether its value shows in the
+calendar-overlay entry) and `schedule_custom_field_values` (the per-occurrence value, polymorphic
+across `schedule_pattern_days`/`schedule_overrides`/`schedule_extra_shifts` via an `entry_type`/
+`entry_id` pair — the same compromise `reminders.entity_id` already makes, since `entry_id` varies by
+table and cannot carry a real foreign key). Both dependent tables, and every display surface that
+reads `show_in_overlay`, are fully wired now (see below).
+
+**Attaching fields to a shift type.** `PUT /api/v1/schedule/shift-types/{id}/fields` (body
+`{fields: [{custom_field_id, position, show_in_overlay}]}`) always replaces the shift type's whole
+attachment set in one transaction — same shape as `PUT /patterns/{id}/days`, for the same reason
+(no natural way to tell "unchanged" from "removed" apart in a submitted list). Rejects a
+`custom_field_id` that doesn't exist or repeats within one payload. Guarded by `ownTypeOrAdmin()` on
+the shift type, same rule as editing the type itself. `GET /shift-types` (and the `POST`/`PUT`
+single-resource responses) embed each type's `fields: [{id, name, position, show_in_overlay}]`,
+ordered by `position`.
+
+**Frontend:** a shift type's card gains a second, independently-saved "Custom fields" section
+(`shiftTypeFieldsEditor()`), collapsed via the shared `advancedSection()` disclosure component and
+only rendered at all when the household has defined at least one field — a shift type with nothing
+attached (the common work-shift case) stays exactly as compact as before. Attaching, detaching,
+reordering, and toggling "show on calendar" are all local DOM edits, same as the cycle-day editor;
+nothing is written until its own Save button is pressed. Reordering offers **both** a drag handle
+(`public/utils/sortable.js`'s `makeSortable()`) **and** keyboard-operable up/down buttons side by
+side — the wrapper's own rule is that drag is never the only path, and a structural guard
+(`test-frontend-audit.js`) enforces it for every `makeSortable()` caller in the codebase.
+
+**Capturing a value per occurrence.** Once a shift type carries attached fields, any occurrence using
+it — a pattern day, an override, or an extra shift — can record its own value for each one. All three
+write paths accept a `field_values` object (`{custom_field_id: value}`, values trimmed, max 500
+chars, blanks silently dropped) validated against the fields actually attached to the occurrence's
+*effective* shift type (the new one on a replace, not one being left behind); a field not attached is
+rejected. `PUT /patterns/{id}/days` folds `field_values` into its existing per-row payload and applies
+them inside the same delete-all/insert-all transaction, keyed to each row's fresh id — no separate
+staleness window, since capture and id assignment happen in one request. `PUT /overrides/{dateKey}`
+and `POST /overrides/fill` (and their extra-shift equivalents) follow the same sharing rule
+`note` already established: a fill applies one set of values to every day in the range, not a value
+per day. Every read endpoint (`GET /patterns/{id}/days`, `GET /overrides`, `GET /extras`) embeds
+`field_values` per row; every delete path (`DELETE /overrides/{dateKey}`, `DELETE /overrides`,
+`DELETE /extras/{id}`) explicitly deletes the matching `schedule_custom_field_values` rows first,
+since `entry_id` carries no real foreign key for a cascade to ride on.
+
+**Frontend (capture):** the cycle-day editor, the override create/edit modals, and the extra-shift
+create/edit modals all render a field-input block right after their shift-type selector, sourced from
+that type's attached fields (`dayRowFieldsHtml()`, one function shared by all three editors) and
+rebuilt whenever the selected shift type changes — a type with no fields shows no block at all. The
+cycle-day editor reacts through `renderShell()`'s existing delegate; the three modals live outside
+`root` (`document.body`) and wire their own `change` listener per shift-type select
+(`wireOccurrenceFieldReactivity()`) the same way `pick-shift-icon` already has to. `overrideGroups()`/
+`extraGroups()` (the client-side "collapse consecutive identical days into one row" summarizers) now
+also require matching `field_values` to merge two days into the same group, the same rule they already
+apply to `note` — two adjacent days with different values are never one range, even if their shift
+type and note happen to match.
+
+**Displaying `show_in_overlay` values.** `scheduleData()` (the single function every consumer of
+resolved entries goes through — `GET /entries`, the ICS feed, the reminders sync) embeds each
+resolved entry's `field_values` (keyed to the right id column for its `source` — `pattern_day_id`,
+`override_id`, or `extra_id`, three separate `fieldValuesFor()` lookups since an entry's identity
+column depends on where it came from) and each `shift_type`'s own attached-field list, batched rather
+than N+1 per entry. `resolveEntries()` itself (`server/services/schedule.js`) stays untouched — it
+already doesn't know about extras or shift-type embedding either; both are merged in by the caller,
+same as before.
+
+A field only reaches a display surface when its `show_in_overlay` flag is set - filling one in
+without the flag keeps it purely informational, visible in the editors but nowhere else. Three
+surfaces read it, each via its own small `overlayMeta()`/`scheduleOverlayMeta()` (the exact same
+computation — note, then every overlay-visible field with a value, `· `-joined — reimplemented
+independently in each context rather than shared, matching this module's existing convention: every
+schedule-entry rendering helper already has its own copy per file, e.g. `clockLabel()` in
+`schedule.js` versus `scheduleTimeLabel()` in `calendar.js`, since the two pages have never imported
+from each other):
+- The Schedule page's own Today card (`renderToday()`), appended to the existing owner/time meta line.
+- The Calendar module's overlay tooltip (`scheduleEntryTitle()` in `public/pages/calendar.js`) — the
+  chip/block label itself stays compact; only the hover title grows, matching how `note` already only
+  ever showed there and not on the chip.
+- The Schedule ICS feed (`server/services/schedule-ics.js`'s `buildVEvent()`): `DESCRIPTION` now comes
+  from `overlayMeta()` instead of `entry.note` directly, so a subscribed calendar app's event detail
+  view shows the same line a browser would.
+
+The dashboard "who's working today" widget deliberately does **not** show this — its rows are a
+single compact line (avatar, name, shift) with no existing meta slot, and adding one would be a
+bigger layout change than the value justifies for a glanceable tile.
 
 **Overtime flag + print (Schedule v3):** the Statistics tab checks every rolling 7-day window
 within the selected range against a per-user weekly-hours target (`schedule_weekly_hours`, see

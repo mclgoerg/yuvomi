@@ -121,6 +121,54 @@ test('extras CRUD: create, fill, update, and delete are addressed by the extra\'
   assert.match(overCap.body.error, /100 days/);
 });
 
+// Migration 181: an extra shift's field_values are validated against its
+// EFFECTIVE shift type (create, or the replacement type on update, not one
+// being left behind), /extras/fill shares one set across every created row,
+// and deleting an extra cleans up its values - entry_id is polymorphic
+// (no real FK, see the schema comment on schedule_custom_field_values).
+test('an extra shift\'s field_values round-trip through create/update, fill shares one set, and delete cleans up', async () => {
+  const room = (await call('POST', '/custom-fields', { as: ALICE, body: { name: 'Room' } })).body.data.id;
+  // typeId was inserted directly via SQL (created_by is NULL), so only an
+  // admin - not its non-owner creator ALICE - may attach fields to it.
+  const attach = await call('PUT', `/shift-types/${typeId}/fields`, { as: ADMIN, body: { fields: [{ custom_field_id: room, position: 0 }] } });
+  assert.equal(attach.status, 200);
+
+  const badField = await call('POST', '/extras', { as: ALICE, body: { user_id: ALICE.id, date_key: '2027-09-01', shift_type_id: typeId, field_values: { 999999: 'nope' } } });
+  assert.equal(badField.status, 400);
+  assert.match(badField.body.error, /not attached/);
+
+  const created = await call('POST', '/extras', { as: ALICE, body: { user_id: ALICE.id, date_key: '2027-09-01', shift_type_id: typeId, field_values: { [room]: 'Room 12' } } });
+  assert.equal(created.status, 201);
+  assert.deepEqual(created.body.data.field_values, { [room]: 'Room 12' });
+  const extraId = created.body.data.id;
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='extra_shift' AND entry_id=?").get(extraId).c, 1);
+
+  const listed = await call('GET', '/extras?user_id=' + ALICE.id + '&from=2027-09-01&to=2027-09-01', { as: ALICE });
+  assert.deepEqual(listed.body.data.find((e) => e.id === extraId).field_values, { [room]: 'Room 12' });
+
+  const updated = await call('PUT', `/extras/${extraId}`, { as: ALICE, body: { field_values: { [room]: 'Room 99' } } });
+  assert.equal(updated.status, 200);
+  assert.deepEqual(updated.body.data.field_values, { [room]: 'Room 99' });
+
+  // Omitting field_values on a PUT leaves existing values untouched - the
+  // same "undefined means unchanged" rule every other field on this route uses.
+  const untouched = await call('PUT', `/extras/${extraId}`, { as: ALICE, body: { note: 'Just a note change' } });
+  assert.equal(untouched.status, 200);
+  assert.deepEqual(untouched.body.data.field_values, { [room]: 'Room 99' });
+
+  const deleted = await call('DELETE', `/extras/${extraId}`, { as: ALICE });
+  assert.equal(deleted.status, 204);
+  assert.equal(database.prepare("SELECT COUNT(*) AS c FROM schedule_custom_field_values WHERE entry_type='extra_shift' AND entry_id=?").get(extraId).c, 0);
+
+  const filled = await call('POST', '/extras/fill', { as: ALICE, body: { user_id: ALICE.id, from: '2027-09-10', to: '2027-09-12', shift_type_id: typeId, field_values: { [room]: 'Room 7' } } });
+  assert.equal(filled.status, 200);
+  const filledRows = database.prepare('SELECT id FROM schedule_extra_shifts WHERE user_id = ? AND date_key BETWEEN ? AND ?').all(ALICE.id, '2027-09-10', '2027-09-12');
+  assert.equal(filledRows.length, 3);
+  for (const row of filledRows) {
+    assert.equal(database.prepare("SELECT value FROM schedule_custom_field_values WHERE entry_type='extra_shift' AND entry_id=? AND custom_field_id=?").get(row.id, room)?.value, 'Room 7');
+  }
+});
+
 test('two extras on the same day both appear, even sharing the same shift type - there is nothing to conflict on', async () => {
   await call('POST', '/extras', { as: ALICE, body: { user_id: ALICE.id, date_key: '2027-08-01', shift_type_id: typeId, note: 'First' } });
   await call('POST', '/extras', { as: ALICE, body: { user_id: ALICE.id, date_key: '2027-08-01', shift_type_id: typeId, note: 'Second' } });

@@ -30,6 +30,24 @@ export function schedulePaths() {
       put: op({ summary: 'Update a shift type', description: 'Only its creator or an administrator.', tag: 'Schedule', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete a shift type', description: 'Only its creator or an administrator. Answers 409 while a pattern or override still references it.', tag: 'Schedule', params: [idParam()], stateChanging: true }),
     },
+    '/api/v1/schedule/shift-types/{id}/fields': {
+      put: op({
+        summary: 'Replace which custom fields are attached to a shift type',
+        description: 'Deletes and re-inserts the whole attachment set in one transaction, same shape as PUT /patterns/{id}/days. Rejects a custom_field_id that does not exist or repeats within the payload.',
+        tag: 'Schedule',
+        params: [idParam()],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
+    },
+    '/api/v1/schedule/custom-fields': {
+      get: op({ summary: 'List custom fields', description: 'Household-wide definitions, defined once and attachable to any number of shift types.', tag: 'Schedule' }),
+      post: op({ summary: 'Create a custom field', description: 'Any member may add one.', tag: 'Schedule', stateChanging: true, requestBody: jsonBody(null) }),
+    },
+    '/api/v1/schedule/custom-fields/{id}': {
+      put: op({ summary: 'Rename a custom field', description: 'Only its creator or an administrator.', tag: 'Schedule', params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete a custom field', description: 'Only its creator or an administrator. Cascades: also removes its shift-type attachments and any values already recorded against it.', tag: 'Schedule', params: [idParam()], stateChanging: true }),
+    },
     '/api/v1/schedule/patterns': {
       get: op({ summary: 'List cycle patterns', tag: 'Schedule' }),
       post: op({ summary: 'Create a cycle pattern', tag: 'Schedule', stateChanging: true, requestBody: jsonBody(null) }),

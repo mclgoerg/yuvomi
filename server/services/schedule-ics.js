@@ -37,6 +37,15 @@ function formatDateValue(dateKey) {
   return dateKey.replace(/-/g, '');
 }
 
+// Note plus jedes ueberlagerungssichtbare eigene Feld mit einem Wert
+// (Migration 181) - dieselbe Berechnung wie schedule.js' overlayMeta() und
+// calendar.js' scheduleOverlayMeta(), hier eigenstaendig nachgebaut statt
+// importiert (server- vs. clientseitig, kein gemeinsames Modul).
+function overlayMeta(entry) {
+  const overlayFields = (entry.shift_type?.fields ?? []).filter((field) => field.show_in_overlay && entry.field_values?.[field.id]);
+  return [entry.note, ...overlayFields.map((field) => `${field.name}: ${entry.field_values[field.id]}`)].filter(Boolean).join(' · ');
+}
+
 function buildVEvent(entry, dtstamp) {
   const type = entry.shift_type;
   const summary = type.short_code ? `${type.short_code} · ${type.name}` : type.name;
@@ -71,7 +80,8 @@ function buildVEvent(entry, dtstamp) {
     );
   }
   lines.push(`SUMMARY:${escapeICSText(summary)}`);
-  if (entry.note) lines.push(`DESCRIPTION:${escapeICSText(entry.note)}`);
+  const description = overlayMeta(entry);
+  if (description) lines.push(`DESCRIPTION:${escapeICSText(description)}`);
   lines.push('END:VEVENT');
   return lines.map(foldLine);
 }

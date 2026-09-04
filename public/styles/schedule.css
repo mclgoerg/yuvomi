@@ -203,13 +203,78 @@
   gap: var(--space-1);
 }
 
+/* Zweistufig seit Migration 181: die Auswahl-Zeile (Schichttyp + Entfernen)
+ * bleibt eine Reihe, ein optionaler Feld-Unterblock (dayRowFieldsHtml())
+ * steht darunter - nur vorhanden, wenn der gewaehlte Schichttyp eigene Felder
+ * traegt, also fuer die meisten Haushalte unveraendert eine einzelne Zeile. */
 .schedule-day-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.schedule-day-row__main {
   display: flex;
   gap: var(--space-1);
   align-items: center;
 }
 
-.schedule-day-row .input {
+.schedule-day-row__main .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.schedule-day-row-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--color-border);
+}
+
+/* A shift type's attached custom fields (migration 181) - same list/row shape
+ * as the cycle-day editor above, plus a drag handle and the reorder buttons
+ * makeSortable() requires alongside it. */
+.schedule-type-fields-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.schedule-type-field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.schedule-type-field-row__handle {
+  background: none;
+  border: none;
+  padding: var(--space-1);
+  cursor: grab;
+  color: var(--color-text-secondary);
+  flex: 0 0 auto;
+}
+
+.schedule-type-field-row__name {
+  flex: 1;
+  min-width: 0;
+}
+
+.schedule-type-field-row__overlay {
+  flex: 0 0 auto;
+  font-size: var(--text-2xs);
+}
+
+.schedule-type-field-add {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.schedule-type-field-add .input {
   flex: 1;
   min-width: 0;
 }
