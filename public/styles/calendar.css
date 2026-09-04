@@ -1991,6 +1991,19 @@
   z-index: 0;
 }
 
+/* Migration 181 (eigene Felder): note plus jedes ueberlagerungssichtbare
+ * Feld mit einem Wert, als eigene Zeile unter der Uhrzeit statt nur im
+ * (durch pointer-events:none praktisch unerreichbaren) title. Einzeilig mit
+ * Ellipse statt Umbruch - ein schmaler Blick bei dicht gedraengten
+ * Terminen soll nicht mehrzeilig aus dem ohnehin knappen Block wachsen. */
+.schedule-time-block__meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: .82;
+}
+
 .cal-toolbar__schedule-warning {
   display: inline-flex;
   align-items: center;

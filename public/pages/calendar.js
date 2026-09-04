@@ -2070,7 +2070,16 @@ function renderScheduleTimeBlock(entry, className) {
   const end = timeToMinutes(type.end_time);
   const duration = Math.max((end > start ? end : 24 * 60) - start, 30);
   const bounds = className === 'week-event' ? 'left:2px;width:calc(100% - 4px);' : 'left:calc(4px);width:calc(100% - 14px);';
-  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);${bounds}--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(scheduleEntryLabel(entry))}</span>${scheduleEntryExtraBadge(entry)}<small>${esc(scheduleTimeLabel(type))}</small></div>`;
+  // Sichtbar statt nur im title: .schedule-time-block traegt pointer-events:none
+  // (es ist eine Hintergrundflaeche, echte Termine malen darueber, siehe die
+  // Begruendung an der Klasse in calendar.css) - ein Hover erreicht dieses
+  // Element in der Praxis kaum je, der title blieb also meist ungelesen. Eine
+  // eigene Zeile bleibt bei kurzen Bloecken einfach abgeschnitten (overflow:clip
+  // an .week-event/.day-event), dieselbe Kuerzung, die die Uhrzeit-Zeile
+  // schon immer hinnimmt.
+  const overlay = scheduleOverlayMeta(entry);
+  const meta = overlay ? `<small class="schedule-time-block__meta">${esc(overlay)}</small>` : '';
+  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);${bounds}--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(scheduleEntryLabel(entry))}</span>${scheduleEntryExtraBadge(entry)}<small>${esc(scheduleTimeLabel(type))}</small>${meta}</div>`;
 }
 
 function monthDayAriaLabel(date, total) {
