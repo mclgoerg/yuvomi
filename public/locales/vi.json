@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Tùy chỉnh…",
         "customReminderOffsetPrompt": "Thời gian tùy chỉnh (phút)",
         "mySettings": "Cài đặt của tôi",
+        "overtimeTrackingToggle": "Theo dõi làm thêm giờ",
+        "overtimeTrackingHint": "Tắt nếu bạn không muốn tab Thống kê đánh dấu các khoảng thời gian dài.",
         "weeklyHoursLabel": "Số giờ mỗi tuần (cho cờ báo làm thêm giờ)",
         "weeklyHoursHint": "Mục tiêu toàn thời gian của riêng bạn. Tab Thống kê đánh dấu làm thêm giờ khi tổng của bất kỳ 7 ngày liên tiếp nào trong khoảng đã chọn vượt quá giá trị này.",
         "shifts": "ca",

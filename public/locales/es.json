@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Personalizado…",
         "customReminderOffsetPrompt": "Antelación personalizada (minutos)",
         "mySettings": "Mis ajustes",
+        "overtimeTrackingToggle": "Registrar horas extra",
+        "overtimeTrackingHint": "Desactívalo si no quieres que Estadísticas marque los periodos largos en absoluto.",
         "weeklyHoursLabel": "Horas semanales (para la marca de horas extra)",
         "weeklyHoursHint": "Tu propio objetivo de jornada completa. La pestaña Estadísticas marca horas extra cuando cualquier periodo de 7 días consecutivos dentro del rango seleccionado supera este valor.",
         "shifts": "turnos",

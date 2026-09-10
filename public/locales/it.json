@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Personalizzato…",
         "customReminderOffsetPrompt": "Anticipo personalizzato (minuti)",
         "mySettings": "Le mie impostazioni",
+        "overtimeTrackingToggle": "Monitora gli straordinari",
+        "overtimeTrackingHint": "Disattiva se non vuoi che Statistiche segnali affatto i periodi lunghi.",
         "weeklyHoursLabel": "Ore settimanali (per il segnale di straordinario)",
         "weeklyHoursHint": "Il tuo obiettivo a tempo pieno. La scheda Statistiche segnala lo straordinario quando 7 giorni consecutivi qualsiasi nell'intervallo selezionato superano questo valore.",
         "shifts": "turni",

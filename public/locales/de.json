@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Eigene Eingabe…",
         "customReminderOffsetPrompt": "Eigener Vorlauf (Minuten)",
         "mySettings": "Meine Einstellungen",
+        "overtimeTrackingToggle": "Überstunden verfolgen",
+        "overtimeTrackingHint": "Ausschalten, wenn die Statistik lange Zeiträume gar nicht markieren soll.",
         "weeklyHoursLabel": "Wochenstunden (für die Überstunden-Markierung)",
         "weeklyHoursHint": "Dein eigener Vollzeit-Richtwert. Die Statistik markiert Überstunden, sobald 7 beliebige aufeinanderfolgende Tage im gewählten Zeitraum diesen Wert überschreiten.",
         "shifts": "Schichten",

@@ -3310,7 +3310,13 @@ quiet week elsewhere in the same month cancel out a real overtime week (most peo
 7 days, so spreading the weekly target evenly across every calendar day in the range set a target a
 real week's hours could rarely cross). Only the worst window's excess is reported, never the sum
 across all crossings - overlapping windows share days, so summing would count the same hours
-repeatedly. A **Print** action in the same tab relies on the app's existing
+repeatedly. Tracking overtime at all is its own per-user switch (`schedule_overtime_enabled`,
+migration 205, UX audit S-24) rather than a repurposed value on `schedule_weekly_hours` — that field
+keeps rejecting 0 as invalid input server-side either way, since 0 is never a real full-/part-time
+target. Off (`overtimeEnabled: false`) suppresses the overtime card entirely, independent of whatever
+number happens to sit in the weekly-hours field, and disables that field in the UI (there's nothing
+for it to affect while tracking is off). NULL/unset reads as **on**, so an existing account sees no
+silent behavior change. A **Print** action in the same tab relies on the app's existing
 `@media print` baseline (`public/styles/layout.css`) layered with Schedule-specific print rules
 (`public/styles/schedule.css`) that hide the filters/tabs and lay out the two statistics tables for a
 clean page - no server-side PDF generation, the browser's native print-to-PDF does the rest.
@@ -3328,9 +3334,8 @@ recomputed on every request), managed via `GET/POST regenerate/DELETE /api/v1/sc
 (each member manages only their own token). See `server/services/schedule-ics.js`.
 
 **Personal preferences (Schedule v3):** `GET/PUT /api/v1/schedule/preferences`
-(`{ reminderOffsetMinutes, weeklyHours }`, `server/routes/schedule-preferences.js`) holds two
-per-user settings, both nullable (either field may be omitted from a `PUT` to leave it unchanged, or
-set to `null` to reset it to its default):
+(`{ reminderOffsetMinutes, weeklyHours, overtimeEnabled }`, `server/routes/schedule-preferences.js`)
+holds three per-user settings (any field may be omitted from a `PUT` to leave it unchanged):
 
 - **Shift-start reminders:** an opt-in push notification before an upcoming shift begins.
   `reminderOffsetMinutes: null` (the default) disables it; setting it also triggers an immediate
@@ -3352,7 +3357,14 @@ set to `null` to reset it to its default):
   the Statistics tab's overtime flag scales against (see "Overtime flag + print" above), `null`
   falling back to 40h/week. Per-user rather than a household field, since a part-time and a full-time
   member of the same household have different targets and the overtime card evaluates each member's
-  own range.
+  own range. Always an integer 1-168 (168 = hours in a week) — 0 is rejected, not reinterpreted as
+  "no target" (see the next field for that).
+- **Overtime tracking toggle (`schedule_overtime_enabled`, migration v205, boolean, no null
+  state):** whether the overtime flag runs at all for this person, independent of the weekly-hours
+  number above. Unset reads as `true` (no silent behavior change for existing accounts). Off both
+  hides the overtime card and disables the weekly-hours field in the UI, since there's nothing left
+  for it to affect. A deliberate, separate switch rather than letting `weeklyHours: 0` mean "off" —
+  0 keeps its ordinary meaning (an invalid target) either way.
 
 **Overview tab (Schedule v3):** a fifth tab compares several household members' resolved schedules
 side by side, one lane per person, for a whole week or a single day (`GET /schedule/entries`, no new

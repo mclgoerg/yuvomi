@@ -216,7 +216,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   meant to be open to everyone. Shift-type presets are grouped by template (Work/School/University)
   instead of one flat list of fifteen, the reminder lead time accepts any custom value up to the
   server's own 24-hour cap instead of the seven fixed presets, and an expanded shift-type card spans
-  the full row instead of leaving a gap beside it. All of the above is translated into all 24
+  the full row instead of leaving a gap beside it. Tracking overtime at all is now its own switch
+  next to the weekly-hours target, instead of that number being the only way to affect whether the
+  Statistics tab flags anything - turning it off removes the overtime card entirely rather than
+  requiring a number nobody's schedule will ever cross. All of the above is translated into all 24
   languages.
 
 - **The person filter in the task history is no longer a row of blank buttons on a phone** (#1068).

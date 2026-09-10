@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "自定义…",
         "customReminderOffsetPrompt": "自定义提前时间(分钟)",
         "mySettings": "我的设置",
+        "overtimeTrackingToggle": "记录加班",
+        "overtimeTrackingHint": "如果不希望统计标签页标记长时间连续工作，请关闭此项。",
         "weeklyHoursLabel": "每周小时数（用于加班标记）",
         "weeklyHoursHint": "你自己的全职目标。当所选时间段内任意连续7天的总时长超过此值时，统计选项卡会将其标记为加班。",
         "shifts": "个班次",

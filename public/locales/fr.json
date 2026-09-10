@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Personnalisé…",
         "customReminderOffsetPrompt": "Délai personnalisé (minutes)",
         "mySettings": "Mes paramètres",
+        "overtimeTrackingToggle": "Suivre les heures supplémentaires",
+        "overtimeTrackingHint": "Désactivez si vous ne voulez pas que Statistiques signale les longues périodes.",
         "weeklyHoursLabel": "Heures hebdomadaires (pour le repère d'heures supplémentaires)",
         "weeklyHoursHint": "Votre propre objectif temps plein. L'onglet Statistiques signale des heures supplémentaires dès que 7 jours consécutifs quelconques de la période sélectionnée dépassent cette valeur.",
         "shifts": "postes",

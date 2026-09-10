@@ -2034,3 +2034,25 @@ test('an overnight shift\'s continuation fragment in Overview names its end time
   const fnBody = schedulePage.slice(schedulePage.indexOf('function overviewEntryBlock('), schedulePage.indexOf('function scheduleOverviewEntryTitle('));
   assert.match(fnBody, /entry\.__continuation\s*\n\s*\? t\('schedule\.continuesUntil', \{ time: type\.end_time \}\)/, 'a continuation block must use a distinct label naming only the end time, not clockLabel()\'s full origin-day range');
 });
+
+test('an "overtime tracking" toggle exists separate from the weekly-hours number, and turning it off suppresses the overtime card entirely (S-24)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+
+  const settingsFn = schedulePage.slice(schedulePage.indexOf('function renderReminderSettings()'), schedulePage.indexOf('async function savePreference'));
+  assert.match(settingsFn, /toggleRowHtml\(\{ label: t\('schedule\.overtimeTrackingToggle'\), checked: state\.overtimeEnabled, attrs: \{ id: 'schedule-overtime-toggle' \} \}\)/);
+  assert.match(settingsFn, /id="schedule-weekly-hours" value="' \+ esc\(String\(weeklyHours\)\) \+ '"' \+ \(state\.overtimeEnabled \? '' : ' disabled'\)/, 'the weekly-hours input must disable itself when overtime tracking is off, not just visually decorate around it');
+
+  const statsFn = schedulePage.slice(schedulePage.indexOf('function renderStatistics()'), schedulePage.indexOf('function renderStatistics()') + 800);
+  assert.match(statsFn, /const overtime = state\.overtimeEnabled \? overtimeInfo\(statistics\.entries, weeklyHours\) : null;/, 'the overtime card must not just hide visually - it must not compute at all when the toggle is off');
+
+  // The toggle change handler must save overtimeEnabled and immediately (dis)able the hours input,
+  // the same immediate-lock pattern the reminder toggle (S-25) already established.
+  assert.match(schedulePage, /event\.target\.id === 'schedule-overtime-toggle'/);
+  assert.match(schedulePage, /savePreference\(\{ overtimeEnabled: event\.target\.checked \}\)/);
+});
+
+test('weeklyHours: 0 stays rejected server-side - S-24 was answered with a separate toggle, not a repurposed sentinel (D-C)', () => {
+  const prefsRoute = readFileSync(new URL('../server/routes/schedule-preferences.js', import.meta.url), 'utf8');
+  assert.match(prefsRoute, /n < 1 \|\| n > MAX_WEEKLY_HOURS/, 'weeklyHours must still reject 0 - overtimeEnabled is the real answer to "disable overtime", not a reinterpreted 0');
+  assert.match(prefsRoute, /typeof raw !== 'boolean'/, 'overtimeEnabled must be validated as a real boolean, not loosely coerced');
+});

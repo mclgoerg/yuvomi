@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Custom…",
         "customReminderOffsetPrompt": "Custom lead time (minutes)",
         "mySettings": "My settings",
+        "overtimeTrackingToggle": "Track overtime",
+        "overtimeTrackingHint": "Turn off if you don't want the Statistics tab to flag long stretches at all.",
         "weeklyHoursLabel": "Weekly hours (for the overtime flag)",
         "weeklyHoursHint": "Your own full-time target. The Statistics tab flags overtime when any 7 consecutive days in the selected range exceed this.",
         "shifts": "shifts",

@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Egyéni…",
         "customReminderOffsetPrompt": "Egyéni előrejelzés (perc)",
         "mySettings": "Saját beállítások",
+        "overtimeTrackingToggle": "Túlóra követése",
+        "overtimeTrackingHint": "Kapcsold ki, ha nem szeretnéd, hogy a Statisztika egyáltalán jelezze a hosszú időszakokat.",
         "weeklyHoursLabel": "Heti órák (a túlóra-jelzéshez)",
         "weeklyHoursHint": "A saját teljes munkaidős célja. A Statisztika fül túlórát jelez, amint a kiválasztott időszakon belül bármely egymást követő 7 nap összege meghaladja ezt az értéket.",
         "shifts": "műszak",

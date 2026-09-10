@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Personalizado…",
         "customReminderOffsetPrompt": "Antecedência personalizada (minutos)",
         "mySettings": "As minhas definições",
+        "overtimeTrackingToggle": "Controlar horas extra",
+        "overtimeTrackingHint": "Desativa se não quiseres que as Estatísticas assinalem períodos longos.",
         "weeklyHoursLabel": "Horas semanais (para o sinalizador de horas extra)",
         "weeklyHoursHint": "O seu próprio objetivo de tempo inteiro. O separador Estatísticas assinala horas extra quando quaisquer 7 dias consecutivos dentro do período selecionado ultrapassam este valor.",
         "shifts": "turnos",

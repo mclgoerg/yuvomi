@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Vlastní…",
         "customReminderOffsetPrompt": "Vlastní předstih (minuty)",
         "mySettings": "Moje nastavení",
+        "overtimeTrackingToggle": "Sledovat přesčasy",
+        "overtimeTrackingHint": "Vypněte, pokud statistika nemá dlouhé úseky vůbec označovat.",
         "weeklyHoursLabel": "Týdenní hodiny (pro označení přesčasu)",
         "weeklyHoursHint": "Váš vlastní cíl pro plný úvazek. Karta Statistiky označí přesčas, jakmile součet libovolných 7 po sobě jdoucích dnů ve vybraném období překročí tuto hodnotu.",
         "shifts": "směn",

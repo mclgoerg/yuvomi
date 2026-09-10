@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Özel…",
         "customReminderOffsetPrompt": "Özel süre (dakika)",
         "mySettings": "Ayarlarım",
+        "overtimeTrackingToggle": "Fazla mesaiyi takip et",
+        "overtimeTrackingHint": "İstatistik sekmesinin uzun dönemleri hiç işaretlememesini istiyorsan kapat.",
         "weeklyHoursLabel": "Haftalık saat (fazla mesai işareti için)",
         "weeklyHoursHint": "Kendi tam zamanlı hedefiniz. İstatistikler sekmesi, seçilen aralıktaki herhangi 7 ardışık günün toplamı bu değeri aştığında fazla mesaiyi işaretler.",
         "shifts": "vardiya",

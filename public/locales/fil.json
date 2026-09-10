@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Custom…",
         "customReminderOffsetPrompt": "Custom na paunang oras (minuto)",
         "mySettings": "Aking mga setting",
+        "overtimeTrackingToggle": "Subaybayan ang overtime",
+        "overtimeTrackingHint": "I-off kung ayaw mong markahan ng Statistics ang mahahabang stretch.",
         "weeklyHoursLabel": "Lingguhang oras (para sa overtime flag)",
         "weeklyHoursHint": "Ang sarili mong full-time na target. Minamarkahan ng tab ng Estadistika ang overtime kapag ang kabuuan ng anumang 7 magkakasunod na araw sa loob ng napiling saklaw ay lumagpas sa halagang ito.",
         "shifts": "shift",

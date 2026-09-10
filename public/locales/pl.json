@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Niestandardowy…",
         "customReminderOffsetPrompt": "Własny czas wyprzedzenia (minuty)",
         "mySettings": "Moje ustawienia",
+        "overtimeTrackingToggle": "Śledź nadgodziny",
+        "overtimeTrackingHint": "Wyłącz, jeśli nie chcesz, aby zakładka Statystyki w ogóle oznaczała długie okresy.",
         "weeklyHoursLabel": "Godziny tygodniowo (do oznaczenia nadgodzin)",
         "weeklyHoursHint": "Twój własny cel pełnego etatu. Zakładka Statystyki oznacza nadgodziny, gdy suma dowolnych 7 kolejnych dni w wybranym zakresie przekroczy tę wartość.",
         "shifts": "zmian",

@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Anpassad…",
         "customReminderOffsetPrompt": "Anpassad förvarning (minuter)",
         "mySettings": "Mina inställningar",
+        "overtimeTrackingToggle": "Spåra övertid",
+        "overtimeTrackingHint": "Stäng av om du inte vill att Statistik ska flagga långa perioder alls.",
         "weeklyHoursLabel": "Veckotimmar (för övertidsflaggan)",
         "weeklyHoursHint": "Ditt eget heltidsmål. Fliken Statistik flaggar övertid så snart summan av 7 på varandra följande dagar i den valda perioden överstiger detta värde.",
         "shifts": "skift",

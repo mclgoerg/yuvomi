@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "사용자 지정…",
         "customReminderOffsetPrompt": "사용자 지정 시간(분)",
         "mySettings": "내 설정",
+        "overtimeTrackingToggle": "초과 근무 추적",
+        "overtimeTrackingHint": "통계 탭에서 긴 기간을 아예 표시하지 않으려면 꺼두세요.",
         "weeklyHoursLabel": "주간 시간(초과 근무 표시용)",
         "weeklyHoursHint": "본인의 전일제 목표입니다. 선택한 기간 내 연속된 7일의 합계가 이 값을 초과하면 통계 탭이 초과 근무로 표시합니다.",
         "shifts": "회",

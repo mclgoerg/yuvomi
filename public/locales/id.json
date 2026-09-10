@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Kustom…",
         "customReminderOffsetPrompt": "Waktu kustom (menit)",
         "mySettings": "Pengaturan saya",
+        "overtimeTrackingToggle": "Lacak lembur",
+        "overtimeTrackingHint": "Matikan jika kamu tidak ingin tab Statistik menandai rentang panjang sama sekali.",
         "weeklyHoursLabel": "Jam mingguan (untuk penanda lembur)",
         "weeklyHoursHint": "Target penuh waktu Anda sendiri. Tab Statistik menandai lembur ketika total 7 hari berturut-turut mana pun dalam rentang yang dipilih melebihi nilai ini.",
         "shifts": "shift",

@@ -5092,6 +5092,8 @@
         "reminderCustomOffset": "Aangepast…",
         "customReminderOffsetPrompt": "Aangepaste tijd (minuten)",
         "mySettings": "Mijn instellingen",
+        "overtimeTrackingToggle": "Overuren bijhouden",
+        "overtimeTrackingHint": "Zet uit als je niet wilt dat Statistieken lange periodes markeert.",
         "weeklyHoursLabel": "Wekelijkse uren (voor de overurenmarkering)",
         "weeklyHoursHint": "Je eigen fulltime-doel. Het tabblad Statistieken markeert overuren zodra een reeks van 7 opeenvolgende dagen in de gekozen periode deze waarde overschrijdt.",
         "shifts": "diensten",
