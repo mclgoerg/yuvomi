@@ -111,8 +111,13 @@ const REMINDER_ORIGINS = {
   // entity_type fuer zwei Sync-Quellen, eine Modul-Beschriftung.
   cycle_period:           { titleKey: 'health.cycle.title',     url: '/health' },
   cycle_log_nudge:        { titleKey: 'health.cycle.title',     url: '/health' },
-  schedule_entry:         { titleKey: 'nav.schedule',           url: '/schedule' },
-  schedule_extra_entry:   { titleKey: 'nav.schedule',           url: '/schedule' },
+  // '/schedule/patterns', nicht bloss '/schedule' (S-10, UX-Audit): Schedule
+  // hat inzwischen einen Tab-Deep-Link (public/utils/schedule-tabs.js), anders
+  // als die obige Budget-Begruendung das fuer Abonnements noch feststellt -
+  // die Planung ist der Tab, auf dem sowohl die eigene Schicht (Heute-Karte)
+  // als auch ihre Ausnahmen/Zusatzschichten stehen.
+  schedule_entry:         { titleKey: 'nav.schedule',           url: '/schedule/patterns' },
+  schedule_extra_entry:   { titleKey: 'nav.schedule',           url: '/schedule/patterns' },
   // url here is only the fallback used when waste_type_id/waste_date_key are
   // unavailable (entity deleted between sync and delivery) - the normal path
   // overrides it in reminderPayload() with the stable ?type=&date= deep link
