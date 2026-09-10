@@ -460,7 +460,7 @@ async function loadScheduleFeed(container) {
   });
   body.querySelector('#schedule-feed-regen')?.addEventListener('click', async () => {
     if (!await confirmModal(t('settings.scheduleFeedRegenerateConfirm'),
-      { danger: true, detail: t('settings.scheduleFeedRegenerateConfirmDetail') })) return;
+      { danger: true, confirmLabel: t('settings.scheduleFeedRegenerate'), detail: t('settings.scheduleFeedRegenerateConfirmDetail') })) return;
     try {
       await api.post('/schedule/feed/regenerate');
       await reload();
@@ -470,7 +470,7 @@ async function loadScheduleFeed(container) {
   });
   body.querySelector('#schedule-feed-disable')?.addEventListener('click', async () => {
     if (!await confirmModal(t('settings.scheduleFeedDisableConfirm'),
-      { danger: true, detail: t('settings.scheduleFeedDisableConfirmDetail') })) return;
+      { danger: true, confirmLabel: t('settings.scheduleFeedDisable'), detail: t('settings.scheduleFeedDisableConfirmDetail') })) return;
     try {
       await api.delete('/schedule/feed');
       await reload();
