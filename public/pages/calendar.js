@@ -2399,11 +2399,78 @@ function scheduleEntryExtraBadge(entry) {
   return entry.source === 'extra' ? `<i data-lucide="layers" class="schedule-entry__extra-badge" aria-label="${esc(t('schedule.extraBadgeLabel'))}"></i>` : '';
 }
 
-function renderScheduleChip(entry, className = 'allday-holiday') {
+// S-17: Eintraege selbst tragen keine einzelne durchgehende Id - welche Spalte
+// zaehlt (pattern_day_id/override_id/extra_id), haengt von `source` ab. Eine
+// eigenstaendige Kopie von schedule.js' gleichnamiger Funktion (dieselbe
+// Begruendung wie scheduleEntryLabel()/scheduleTimeLabel() oben: diese Datei
+// haelt fuer jede Schichtplan-Anzeigeformel eine eigene, unabhaengige Kopie
+// statt schedule.js komplett zu importieren) - reicht, um einen Klick auf
+// einen gerenderten Chip/Block wieder auf genau dieses Objekt zurueckzufuehren.
+function scheduleEntryMatchKey(entry) {
+  const sourceId = entry.source === 'pattern' ? (entry.pattern_day_id ?? `p${entry.pattern_id}`)
+    : entry.source === 'override' ? entry.override_id : entry.extra_id;
+  return [entry.date_key, entry.user_id, entry.source, sourceId].join(':');
+}
+
+// S-16: `showFullRange` zeigt die volle Spanne ("06:00-14:00") statt nur des
+// Starts - nur Woche/Tag haben dafuer Platz (renderWeekView()/renderDayView()
+// setzen es explizit); Monat und Agenda bleiben bei der kurzen Form. S-17:
+// `clickable` haengt die Detail-Modal-Ausloesung an (role=button + Schluessel) -
+// nur Woche/Tag, Monat behaelt sein Navigieren-zum-Tag, Agenda bleibt inert
+// (ausserhalb des Umfangs dieser Aenderung).
+function renderScheduleChip(entry, className = 'allday-holiday', { showFullRange = false, clickable = false } = {}) {
   const type = entry.shift_type;
   const label = scheduleEntryLabel(entry);
-  const start = type.start_time ? '<small class="schedule-entry__start">' + esc(type.start_time) + '</small>' : '';
-  return `<div class="${className} schedule-entry" style="--holi-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span>${esc(label)}</span>${scheduleEntryExtraBadge(entry)}${start}</div>`;
+  const start = type.start_time
+    ? '<small class="schedule-entry__start">' + esc(showFullRange ? scheduleTimeLabel(type) : type.start_time) + '</small>'
+    : '';
+  const detailAttrs = clickable
+    ? ` role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${esc(scheduleEntryMatchKey(entry))}"`
+    : '';
+  return `<div class="${className} schedule-entry" style="--holi-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"${detailAttrs}><span>${esc(label)}</span>${scheduleEntryExtraBadge(entry)}${start}</div>`;
+}
+
+/**
+ * S-17: read-only Detailinhalt fuer EIN Schichtplan-Vorkommen - ein
+ * eigenstaendiger, ABSICHTLICH schmalerer Nachbau von schedule.js'
+ * renderScheduleEntryDetailContent() (dieselbe Begruendung wie
+ * scheduleEntryMatchKey() oben: diese Datei importiert schedule.js nicht).
+ * Zeigt die HerkunftsART (Muster/Ausnahme/Extra), aber KEINEN Musternamen -
+ * diese Seite laedt `/schedule/patterns` nicht (nur `/schedule/entries`), ein
+ * Musternamen-Nachschlag waere ein zusaetzlicher, hier nicht vorhandener
+ * Server-Aufruf nur fuer diese eine Zeile.
+ */
+function scheduleEntryOriginLabel(entry) {
+  if (entry.source === 'pattern') return t('schedule.pattern');
+  if (entry.source === 'override') return t('schedule.override');
+  return t('schedule.extraBadgeLabel');
+}
+
+function renderScheduleEntryDetailContent(entry) {
+  const type = entry.shift_type;
+  const label = esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name);
+  const time = esc(scheduleTimeLabel(type));
+  const owner = scheduleOwnerName(entry);
+  const overlayFields = (type.fields ?? []).filter((field) => entry.field_values?.[field.id]);
+  const fieldRows = overlayFields
+    .map((field) => '<div class="schedule-entry-detail__row"><dt>' + esc(field.name) + '</dt><dd>' + esc(entry.field_values[field.id]) + '</dd></div>')
+    .join('');
+  return '<div class="schedule-entry-detail">'
+    + '<div class="schedule-entry-detail__head"><span class="agenda-holiday__dot" style="--holi-color:' + esc(type.color) + '"></span><span class="u-card-title u-compact">' + label + '</span>' + (time ? '<small>' + time + '</small>' : '') + '</div>'
+    + '<dl class="schedule-entry-detail__rows">'
+    + (owner ? '<div class="schedule-entry-detail__row"><dt>' + esc(t('schedule.owner')) + '</dt><dd>' + esc(owner) + '</dd></div>' : '')
+    + (entry.note ? '<div class="schedule-entry-detail__row"><dt>' + esc(t('schedule.note')) + '</dt><dd>' + esc(entry.note) + '</dd></div>' : '')
+    + fieldRows
+    + '<div class="schedule-entry-detail__row"><dt>' + esc(t('schedule.origin')) + '</dt><dd>' + esc(scheduleEntryOriginLabel(entry)) + '</dd></div>'
+    + '</dl></div>';
+}
+
+function findScheduleEntryByKey(key) {
+  return state.scheduleEntries.find((entry) => scheduleEntryMatchKey(entry) === key);
+}
+
+function openScheduleEntryDetailModal(entry) {
+  openSharedModal({ title: t('schedule.entryDetailTitle'), size: 'sm', content: renderScheduleEntryDetailContent(entry), dirtyGuard: false });
 }
 
 /**
@@ -2500,7 +2567,14 @@ function renderScheduleTimeBlock(entry, className, layout = null) {
   const overlay = scheduleOverlayMeta(entry);
   const time = esc(scheduleTimeLabel(type));
   const timeLine = overlay ? `${time} · ${esc(overlay)}` : time;
-  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);left:${left};width:${width};--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}"><span class="schedule-time-block__title">${esc(scheduleEntryLabel(entry))}${scheduleEntryExtraBadge(entry)}</span><small class="schedule-time-block__time">${timeLine}</small></div>`;
+  // S-17: der Block selbst bleibt `pointer-events:none` (calendar.css) - die
+  // Spalte darunter muss weiter fuer "neuen Termin anlegen" klickbar bleiben.
+  // NUR die sichtbaren Titel-/Uhrzeit-Zeilen bekommen `pointer-events:auto`
+  // zurueck (calendar.css), sodass ein Klick GENAU auf den Text die
+  // Detailansicht oeffnet, waehrend der Rest der Spalte unveraendert bleibt.
+  // role="button"/tabindex traegt trotzdem der AEUSSERE Block: pointer-events
+  // wirkt nur auf Zeiger-Eingabe, Tastaturfokus/Enter/Space bleiben unberuehrt.
+  return `<div class="${className} schedule-time-block" style="top:${hourOffset(start)};height:calc(${hourOffset(duration)} - 4px);left:${left};width:${width};--ev-color:${esc(type.color)}" title="${esc(scheduleEntryTitle(entry))}" role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${esc(scheduleEntryMatchKey(entry))}"><span class="schedule-time-block__title">${esc(scheduleEntryLabel(entry))}${scheduleEntryExtraBadge(entry)}</span><small class="schedule-time-block__time">${timeLine}</small></div>`;
 }
 
 // aria-label der Tageszelle: lokalisiertes Datum + (falls vorhanden) Zahl der
@@ -2572,7 +2646,7 @@ function renderWeekView(container) {
                 <span>${esc(h.name)}</span>
               </div>
             `).join('')}
-            ${scheduleChips[i].map((entry) => renderScheduleChip(entry)).join('')}
+            ${scheduleChips[i].map((entry) => renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true })).join('')}
             ${waste[i].map((occ) => renderWasteChip(occ)).join('')}
             ${alldayEvs[i].map((ev) => `
               <div class="allday-event" data-id="${ev.id}"
@@ -2617,7 +2691,16 @@ function renderWeekView(container) {
   });
 
   container.querySelector('#week-cols').addEventListener('click', (e) => {
-    if (e.target.closest('.schedule-time-block')) return;
+    // S-17: ein Klick GENAU auf den sichtbaren Text eines Schichtblocks
+    // (pointer-events:auto, siehe calendar.css) oeffnet die Detailansicht;
+    // der Rest der Spalte (pointer-events:none auf dem Block selbst) bleibt
+    // unveraendert klickbar fuer "neuen Termin anlegen".
+    const blockEl = e.target.closest('.schedule-time-block');
+    if (blockEl) {
+      const entry = findScheduleEntryByKey(blockEl.dataset.scheduleKey);
+      if (entry) openScheduleEntryDetailModal(entry);
+      return;
+    }
     const evEl = e.target.closest('.week-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
@@ -2642,11 +2725,31 @@ function renderWeekView(container) {
       navigateToWasteOccurrence(wasteEl.dataset.deepLink);
       return;
     }
+    // S-17: ein Schichtplan-Chip in Woche/Tag oeffnet jetzt dieselbe
+    // Detailansicht, statt (wie bisher) nichts zu tun.
+    const scheduleEl = e.target.closest('.schedule-entry');
+    if (scheduleEl) {
+      const entry = findScheduleEntryByKey(scheduleEl.dataset.scheduleKey);
+      if (entry) openScheduleEntryDetailModal(entry);
+      return;
+    }
     const evEl = e.target.closest('.allday-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
       if (ev) openEventDetail(ev, evEl);
     }
+  });
+
+  // S-17: Tastaturaktivierung der als role="button" ausgezeichneten
+  // Schichtplan-Chips/-Bloecke (Enter/Space) - dasselbe Muster wie die
+  // Agenda-Ansicht weiter unten fuer ihre eigenen role="button"-Zeilen.
+  container.querySelector('.week-view').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target.closest('[data-action="view-schedule-entry"]');
+    if (!target) return;
+    e.preventDefault();
+    const entry = findScheduleEntryByKey(target.dataset.scheduleKey);
+    if (entry) openScheduleEntryDetailModal(entry);
   });
 
   // Scrollen zu aktueller Zeit
@@ -2841,7 +2944,7 @@ function renderDayView(container) {
               <span>${esc(h.name)}</span>
             </div>
           `).join('')}
-          ${scheduleChips.map((entry) => renderScheduleChip(entry)).join('')}
+          ${scheduleChips.map((entry) => renderScheduleChip(entry, 'allday-holiday', { showFullRange: true, clickable: true })).join('')}
           ${dayWaste.map((occ) => renderWasteChip(occ)).join('')}
           ${allday.map((ev) => `
             <div class="allday-event" data-id="${ev.id}"
@@ -2887,6 +2990,14 @@ function renderDayView(container) {
       navigateToWasteOccurrence(wasteEl.dataset.deepLink);
       return;
     }
+    // S-17: ein Schichtplan-Chip oeffnet jetzt dieselbe Detailansicht, statt
+    // (wie bisher) nichts zu tun.
+    const scheduleEl = e.target.closest('.schedule-entry');
+    if (scheduleEl) {
+      const entry = findScheduleEntryByKey(scheduleEl.dataset.scheduleKey);
+      if (entry) openScheduleEntryDetailModal(entry);
+      return;
+    }
     const evEl = e.target.closest('.allday-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
@@ -2895,7 +3006,14 @@ function renderDayView(container) {
   });
 
   container.querySelector('#day-col').addEventListener('click', (e) => {
-    if (e.target.closest('.schedule-time-block')) return;
+    // S-17: ein Klick GENAU auf den sichtbaren Text eines Schichtblocks
+    // oeffnet die Detailansicht - siehe der gleiche Kommentar in renderWeekView().
+    const blockEl = e.target.closest('.schedule-time-block');
+    if (blockEl) {
+      const entry = findScheduleEntryByKey(blockEl.dataset.scheduleKey);
+      if (entry) openScheduleEntryDetailModal(entry);
+      return;
+    }
     const evEl = e.target.closest('.day-event');
     if (evEl) {
       const ev = state.events.find((ev) => ev.id === parseInt(evEl.dataset.id, 10));
@@ -2904,6 +3022,17 @@ function renderDayView(container) {
     }
     const time = clickedTime(e, e.currentTarget);
     openEventModal({ mode: 'create', date: state.cursor, time });
+  });
+
+  // S-17: Tastaturaktivierung der als role="button" ausgezeichneten
+  // Schichtplan-Chips/-Bloecke (Enter/Space).
+  container.querySelector('.day-view').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target.closest('[data-action="view-schedule-entry"]');
+    if (!target) return;
+    e.preventDefault();
+    const entry = findScheduleEntryByKey(target.dataset.scheduleKey);
+    if (entry) openScheduleEntryDetailModal(entry);
   });
 
   scrollToHour(container.querySelector('#day-scroll'), container.querySelector('.day-view__body'));
@@ -3176,11 +3305,21 @@ function openCalendarFilters() {
   // hat er als beschrifteter Schalter zum ersten Mal einen Zustand, den man
   // ablesen kann statt ihn aus der Knopfbeschriftung zu erschliessen (der
   // Chip hiess „Volle Bloecke", wenn er sie NICHT zeigte).
-  const scheduleDisplayRow = scheduleEnabled() ? toggleRowHtml({
-    label: t('schedule.fullBlocks'),
-    checked: state.scheduleDisplay === 'blocks',
-    attrs: { 'data-filter-schedule-display': 'true' },
-  }) : '';
+  // S-16: die EN-Beschriftung wurde von "Full blocks" (Insider-Jargon,
+  // erklaerte sich nur ueber den vorherigen Chip-Text) auf eine Beschreibung
+  // der WIRKUNG umbenannt; eine eigene Hinweiszeile darunter nennt zusaetzlich
+  // den AUS-Zustand explizit (das ist der Vorgabewert - S-16 aendert ihn
+  // nicht), damit der Schalter vorhersagbar ist, ohne ihn erst umzulegen.
+  // `.cal-field-hint` statt `.form-hint`: die Regel dafuer lebt in settings.css,
+  // der Router laedt auf /calendar nur calendar.css (siehe die Begruendung an
+  // `.cal-field-hint` selbst weiter oben in dieser Datei).
+  const scheduleDisplayRow = scheduleEnabled()
+    ? toggleRowHtml({
+      label: t('schedule.fullBlocks'),
+      checked: state.scheduleDisplay === 'blocks',
+      attrs: { 'data-filter-schedule-display': 'true' },
+    }) + `<p class="cal-field-hint">${t('schedule.fullBlocksHint')}</p>`
+    : '';
 
   // NUR AM TELEFON, denn nur dort gibt es die zweite Fassung: ab 640px zeigt
   // die Monatszelle ohnehin Titel, und der Schalter waere ein Bedienelement

@@ -2160,6 +2160,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* S-17: der Block selbst bleibt pointer-events:none (siehe oben - die Spalte
+   * muss klickbar bleiben, um dort einen neuen Termin anzulegen), aber ein
+   * Klick GENAU auf den sichtbaren Text soll die Detailansicht oeffnen -
+   * deshalb hier gezielt zurueckgeholt, nur fuer diese beiden Zeilen. */
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .schedule-time-block__time {
@@ -2187,4 +2193,48 @@
   height: 12px;
   flex: 0 0 auto;
   opacity: .82;
+}
+
+/* S-17: Woche/Tag machen den Chip zu einem Detail-Ausloeser (role="button",
+ * siehe renderScheduleChip()) - der Zeiger zeigt das an, der Fokusring kommt
+ * bereits app-weit aus reset.css. Monat/Agenda tragen die Rolle nicht und
+ * bleiben unveraendert. */
+.schedule-entry[role='button'] {
+  cursor: pointer;
+}
+
+/* S-17: read-only Detail-Modal-Inhalt (renderScheduleEntryDetailContent) -
+ * dieselbe Kopfzeile wie ein Termin-Chip (Farbpunkt + Titel + kleine
+ * Uhrzeit), darunter Label/Wert-Zeilen. Eigenstaendige Kopie der Klassen aus
+ * schedule.css (dieselbe Begruendung wie scheduleEntryMatchKey() oben). */
+.schedule-entry-detail__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.schedule-entry-detail__rows {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.schedule-entry-detail__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.schedule-entry-detail__row dt {
+  color: var(--color-text-secondary);
+  flex: 0 0 auto;
+}
+
+.schedule-entry-detail__row dd {
+  margin: 0;
+  min-width: 0;
+  text-align: end;
 }

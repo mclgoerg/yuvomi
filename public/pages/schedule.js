@@ -22,6 +22,13 @@ let scheduleTablist = null;
 let currentUserId = null;
 let canManageOthers = false;
 let activeView = 'patterns';
+// S-07: der Vorgabewert oben gilt nur, bevor jemals entschieden wurde - render()
+// ersetzt ihn beim ALLERERSTEN Laden dieses Moduls (in dieser Sitzung) je nach
+// Datenlage (siehe dort), aber niemals danach: `activeView` ist ausdruecklich
+// Zustand, der einen Tab-Wechsel und einen Seitenbesuch ueberlebt (Kommentar an
+// render() weiter unten), ein spaeterer Besuch soll die eigene Tab-Wahl der
+// Person nicht wieder ueberschreiben.
+let initialViewDecided = false;
 // S-03: welche Musterkarten (per `pattern.id`, als String) gerade eine
 // ungespeicherte Aenderung im Zyklustage-Editor oder im inline Pattern-
 // Formular tragen. renderPage() ersetzt `.schedule-body` komplett bei jedem
@@ -347,6 +354,110 @@ function patternDaysExceedingCycleLength(days, cycleLength) {
     .filter((position) => position >= cycleLength);
   if (!excludedPositions.length) return null;
   return { from: Math.min(...excludedPositions) + 1, to: Math.max(...excludedPositions) + 1 };
+}
+
+// S-04: Tage seit `fromKey` bis `toKey` (kann negativ sein, wenn `toKey` vor
+// `fromKey` liegt) - beide sind reine YYYY-MM-DD-Schluessel, `parseLocalDateKey`
+// baut daraus lokale Mitternachts-Zeitpunkte. Gerundet statt ganzzahlig geteilt:
+// eine Zeitzone mit Sommerzeit-Umstellung zwischen den beiden Tagen liefert
+// sonst 23h/25h-Differenzen, die knapp unter/ueber einem vollen Tag landen -
+// derselbe Rundungs-Kommentar wie overtimeInfo()'s sixDaysMs-Fenster oben.
+function daysBetweenKeys(fromKey, toKey) {
+  return Math.round((parseLocalDateKey(toKey).getTime() - parseLocalDateKey(fromKey).getTime()) / 86400000);
+}
+
+/**
+ * S-04: naechstes Datum (>= todayKeyValue), an dem Zyklusposition `position`
+ * (1-indexiert, wie die Kartenanzeige sie schon beschriftet) eintritt. Das
+ * Muster wiederholt sich alle `cycleLength` Tage in BEIDE Richtungen ab
+ * `anchor` - ein Tag VOR dem Anker ist kein Sonderfall, sondern dieselbe
+ * Rechnung rueckwaerts (S-04: genau das war bisher unerklaert). Reine Funktion
+ * (kein state-Zugriff) mit Vorgabewert fuer `todayKeyValue`, damit ein Test
+ * ein festes "heute" hineingeben kann, ohne die Systemuhr zu faelschen.
+ */
+function cycleDayNextDate(anchor, cycleLength, position, todayKeyValue = todayKey()) {
+  const length = Number(cycleLength);
+  if (!anchor || !Number.isInteger(length) || length < 1) return anchor;
+  const normalize = (value) => ((value % length) + length) % length;
+  const target = normalize(position - 1);
+  const diff = daysBetweenKeys(anchor, todayKeyValue);
+  const delta = normalize(target - normalize(diff));
+  return addLocalDays(anchor, diff + delta);
+}
+
+/**
+ * S-04: die Kopfzeile einer Zyklusposition ("1 · Do 10.09.") - dieselbe
+ * Wochentag-Kurzform wie renderOverview()'s Tageskopf weiter unten
+ * (`calendar.dayShort<Weekday>` + formatDayMonth()), hier fuer einen einzelnen
+ * Zyklustag statt einer ganzen Woche. Faellt die naechste Wiederholung
+ * ausserhalb eines gesetzten Gueltigkeitsfensters (valid_from/valid_until),
+ * zeigt der Kopf stattdessen die ERSTE Wiederholung (anchor + position - 1) -
+ * nie ein Datum, das das Muster laut seinem eigenen Fenster gar nicht zeigen
+ * wuerde.
+ */
+function cycleDayHeaderLabel(anchor, cycleLength, validFrom, validUntil, position, todayKeyValue = todayKey()) {
+  if (!anchor || !cycleLength) return String(position);
+  let date = cycleDayNextDate(anchor, cycleLength, position, todayKeyValue);
+  if ((validFrom && date < validFrom) || (validUntil && date > validUntil)) {
+    date = addLocalDays(anchor, position - 1);
+  }
+  const weekday = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][parseLocalDateKey(date).getDay()];
+  return `${position} · ${t(`calendar.dayShort${weekday}`)} ${formatDayMonth(date)}`;
+}
+
+// S-05: Ueberlappungsfenster zweier Gueltigkeitsfenster (valid_from/valid_until,
+// leer = unbegrenzt) - dieselbe Bedingung, die der Server beim Aufloesen
+// bereits durchsetzt (server/services/schedule.js#resolveEntries:
+// "valid_from <= date_key AND valid_until >= date_key"), hier als reiner
+// Intervall-Vergleich statt Tag-fuer-Tag. String-Vergleich reicht wieder
+// (YYYY-MM-DD sortiert lexikographisch identisch zur Kalenderordnung, siehe
+// rangeDifference() oben).
+function windowsOverlap(aFrom, aUntil, bFrom, bUntil) {
+  const aStart = aFrom || '0000-01-01';
+  const aEnd = aUntil || '9999-12-31';
+  const bStart = bFrom || '0000-01-01';
+  const bEnd = bUntil || '9999-12-31';
+  return aStart <= bEnd && bStart <= aEnd;
+}
+
+// S-05: findet eine ANDERE aktive Musterkarte derselben Person, deren Fenster
+// das neue/gerade bearbeitete ueberschneidet - Grundlage sowohl fuer die
+// Rueckfrage vor dem Anlegen (saveCreatedSchedule()) als auch fuer die
+// Reaktivieren-Rueckfrage (submitForm()' pattern-update-Zweig).
+function findOverlappingActivePattern(patterns, userId, validFrom, validUntil, excludeId = null) {
+  return patterns.find((pattern) => pattern.is_active
+    && Number(pattern.user_id) === Number(userId)
+    && (excludeId == null || Number(pattern.id) !== Number(excludeId))
+    && windowsOverlap(pattern.valid_from, pattern.valid_until, validFrom, validUntil));
+}
+
+// S-05: dieselbe Prioritaet wie der Server (server/services/schedule.js#
+// scheduleData: "ORDER BY user_id, valid_from DESC, id DESC") - SQLite sortiert
+// NULL in DESC zuletzt, ein unbegrenztes valid_from verliert also gegen jedes
+// gesetzte Datum.
+function comparePatternPriority(a, b) {
+  const aFrom = a.valid_from ?? null;
+  const bFrom = b.valid_from ?? null;
+  if (aFrom !== bFrom) {
+    if (aFrom == null) return 1;
+    if (bFrom == null) return -1;
+    return aFrom < bFrom ? 1 : -1;
+  }
+  return Number(b.id) - Number(a.id);
+}
+
+/**
+ * S-05: welches Muster gewinnt HEUTE fuer diese Person - null, solange sich
+ * keine zwei aktiven Muster ueberhaupt ueberschneiden (eine einzelne aktive
+ * Karte braucht kein "gewinnt"-Abzeichen, siehe patternCard()).
+ */
+function resolveWinningPatternId(patterns, userId, dateKey) {
+  const candidates = patterns.filter((pattern) => pattern.is_active
+    && Number(pattern.user_id) === Number(userId)
+    && (!pattern.valid_from || pattern.valid_from <= dateKey)
+    && (!pattern.valid_until || pattern.valid_until >= dateKey));
+  if (candidates.length < 2) return null;
+  return [...candidates].sort(comparePatternPriority)[0].id;
 }
 
 function overtimeInfo(entries, weeklyHours = DEFAULT_WEEKLY_HOURS) {
@@ -804,11 +915,24 @@ function patternCard(pattern) {
     const classes = assigned.get(position) ?? [{ shiftTypeId: null, fieldValues: {} }];
     const rows = classes.map((day) => dayRowHtml(position, day.shiftTypeId, writable, day.fieldValues)).join('');
     const add = writable ? '<button type="button" class="btn btn--secondary" data-action="add-pattern-day-row" data-position="' + position + '">' + esc(t('common.add')) + '</button>' : '';
-    return '<div class="form-field schedule-day-group" data-day-group="' + position + '"><label class="label">' + (position + 1) + '</label><div class="schedule-day-rows">' + rows + '</div>' + add + '</div>';
+    // S-04: die Kopfzeile nennt das naechste tatsaechliche Datum dieser
+    // Position ("1 · Do 10.09."), nicht nur eine nackte Nummer - `data-day-
+    // group-label` ist der Anker, an dem das Live-Neuberechnen (renderShell()'
+    // 'input'/'change'-Delegierte) den Text austauscht, sobald Start-/
+    // Zykluslaenge-Feld sich aendert, ohne die Zeilen selbst neu zu bauen.
+    const label = cycleDayHeaderLabel(pattern.anchor_date, pattern.cycle_length, pattern.valid_from, pattern.valid_until, position + 1);
+    return '<div class="form-field schedule-day-group" data-day-group="' + position + '"><label class="label" data-day-group-label>' + esc(label) + '</label><div class="schedule-day-rows">' + rows + '</div>' + add + '</div>';
   }).join('');
-  return `<details class="card schedule-details" data-pattern="${pattern.id}"><summary><span class="u-card-title u-compact">${esc(pattern.name)}</span> <small>· ${esc(userName(pattern.user_id))}</small></summary>
+  // S-05: nur sichtbar, wenn diese Karte HEUTE tatsaechlich gegen eine andere
+  // aktive Karte derselben Person konkurriert (resolveWinningPatternId()
+  // liefert sonst null) - eine einzelne aktive Karte traegt kein Abzeichen.
+  const winningId = resolveWinningPatternId(state.patterns, pattern.user_id, todayKey());
+  const winsBadge = winningId != null && Number(winningId) === Number(pattern.id)
+    ? '<span class="schedule-wins-badge">' + esc(t('schedule.patternWinsBadge')) + '</span>'
+    : '';
+  return `<details class="card schedule-details" data-pattern="${pattern.id}"><summary><span class="u-card-title u-compact">${esc(pattern.name)}</span> <small>· ${esc(userName(pattern.user_id))}</small>${winsBadge}</summary>
     ${writable ? `<form class="schedule-form" data-form="pattern-update" data-id="${pattern.id}">${patternFields(pattern)}<button class="btn btn--secondary">${esc(t('schedule.save'))}</button></form>` : ''}
-    <h3 class="u-card-title">${esc(t('schedule.cycleDays'))}</h3><div class="schedule-days">${days}</div>
+    <h3 class="u-card-title">${esc(t('schedule.cycleDays'))}</h3><p class="u-meta schedule-cycle-hint">${esc(t('schedule.cycleDaysHint', { count: pattern.cycle_length }))}</p><div class="schedule-days">${days}</div>
     ${writable ? `<div class="schedule-actions"><button type="button" class="btn btn--secondary" data-action="save-days" data-id="${pattern.id}">${esc(t('schedule.save'))}</button><button type="button" class="btn btn--danger" data-action="delete-pattern" data-id="${pattern.id}">${esc(t('schedule.delete'))}</button></div>` : ''}
   </details>`;
 }
@@ -1029,11 +1153,19 @@ function renderStatistics() {
     + '<button type="button" class="btn btn--secondary" data-action="print-statistics"><i data-lucide="printer" aria-hidden="true"></i>' + esc(t('schedule.print')) + '</button></div></form>'
     + results + '</section>';
 }
+// S-07: ohne einen einzigen Schichttyp fuehrt "Schichtplan hinzufuegen" in
+// dasselbe Anlege-Formular, dessen Muster-Modus dann nichts zum Waehlen hat
+// (typeOptions() liefert nur "Freier Tag") - derselbe Hinweistext wie im
+// Anlege-Formular (schedule.noShiftTypesHint, S-02/S-07), hier an die
+// Beschreibung angehaengt statt eines zweiten, aehnlich klingenden Schluessels.
 function emptyPatternState() {
+  const description = state.types.length
+    ? t('schedule.emptyPatternsDescription')
+    : `${t('schedule.emptyPatternsDescription')} ${t('schedule.noShiftTypesHint')}`;
   return emptyStateHTML({
     icon: 'calendar-clock',
     title: t('schedule.emptyPatternsTitle'),
-    description: t('schedule.emptyPatternsDescription'),
+    description,
     action: readOnly() ? null : { label: t('schedule.addPattern'), icon: 'plus', attrs: { 'data-action': 'open-create', 'data-view': 'patterns' } },
   });
 }
@@ -1068,6 +1200,70 @@ function overlayMeta(entry) {
   return [entry.note, ...overlayFields.map((field) => `${field.name}: ${entry.field_values[field.id]}`)].filter(Boolean).join(' · ');
 }
 
+// S-17: Eintraege selbst tragen keine einzelne durchgehende Id - welche Spalte
+// zaehlt (pattern_day_id/override_id/extra_id), haengt von `source` ab (siehe
+// server/services/schedule.js#scheduleData). Diese zusammengesetzte Kennung
+// aus Datum+Person+Herkunft+Herkunfts-Id reicht, um einen Klick auf eine
+// gerenderte Zeile/einen Block (Heute-Karte, Uebersicht-Bloecke) wieder auf
+// genau dieses Objekt zurueckzufuehren, ohne den Eintrag selbst als
+// Data-Attribut zu serialisieren.
+function scheduleEntryMatchKey(entry) {
+  const sourceId = entry.source === 'pattern' ? (entry.pattern_day_id ?? `p${entry.pattern_id}`)
+    : entry.source === 'override' ? entry.override_id : entry.extra_id;
+  return [entry.date_key, entry.user_id, entry.source, sourceId].join(':');
+}
+
+// Sucht in BEIDEN moeglichen Quellen (Heute-Karte und Uebersicht-Tab laden
+// unabhaengig voneinander) - der Schluessel ist global eindeutig (Datum +
+// Person + Herkunft + Herkunfts-Id), welche Liste ihn traegt, ist fuer die
+// Suche selbst gleichgueltig.
+function findScheduleEntry(key) {
+  return [...state.entries, ...overview.entries].find((entry) => scheduleEntryMatchKey(entry) === key);
+}
+
+function scheduleEntryOriginLabel(entry) {
+  if (entry.source === 'pattern') {
+    const pattern = state.patterns.find((item) => Number(item.id) === Number(entry.pattern_id));
+    return pattern ? `${t('schedule.pattern')} · ${pattern.name}` : t('schedule.pattern');
+  }
+  if (entry.source === 'override') return t('schedule.override');
+  return t('schedule.extraBadgeLabel');
+}
+
+/**
+ * S-17: read-only Detailinhalt fuer EIN aufgeloestes Vorkommen - kein neues
+ * Popover-System (DESIGN.md untersagt eine weitere Kontextmenue-/Popover-
+ * Implementierung), dasselbe kleine Modal wie ueberall sonst im Modul.
+ * Feldwerte OHNE die show_in_overlay-Einschraenkung von overlayMeta(): die
+ * Detailansicht ist ein bewusster Klick, keine beilaeufige Kachel, jedes
+ * gepflegte Feld darf hier stehen.
+ */
+function renderScheduleEntryDetailContent(entry) {
+  const type = entry.shift_type;
+  const swatchColor = type ? type.color : 'var(--color-border)';
+  const icon = type?.icon ? '<i data-lucide="' + esc(type.icon) + '" class="schedule-type-icon" aria-hidden="true"></i>' : '';
+  const label = type ? esc(type.short_code ? `${type.short_code} · ${type.name}` : type.name) : esc(t('schedule.freeDay'));
+  const time = type ? esc(clockLabel(type)) : '';
+  const fieldRows = (type?.fields ?? [])
+    .filter((field) => entry.field_values?.[field.id])
+    .map((field) => '<div class="schedule-entry-detail__row"><dt>' + esc(field.name) + '</dt><dd>' + esc(entry.field_values[field.id]) + '</dd></div>')
+    .join('');
+  return '<div class="schedule-entry-detail">'
+    + '<div class="schedule-entry-detail__head"><span class="schedule-swatch" style="--schedule-color:' + esc(swatchColor) + '"></span>' + icon + '<span class="u-card-title u-compact">' + label + '</span>' + (time ? '<small>' + time + '</small>' : '') + '</div>'
+    + '<dl class="schedule-entry-detail__rows">'
+    + '<div class="schedule-entry-detail__row"><dt>' + esc(t('schedule.owner')) + '</dt><dd>' + esc(userName(entry.user_id)) + '</dd></div>'
+    + (entry.note ? '<div class="schedule-entry-detail__row"><dt>' + esc(t('schedule.note')) + '</dt><dd>' + esc(entry.note) + '</dd></div>' : '')
+    + fieldRows
+    + '<div class="schedule-entry-detail__row"><dt>' + esc(t('schedule.origin')) + '</dt><dd>' + esc(scheduleEntryOriginLabel(entry)) + '</dd></div>'
+    + '</dl></div>';
+}
+
+function openScheduleEntryDetailModal(entry) {
+  // dirtyGuard:false - reine Leseansicht ohne Formularfelder, es gibt nichts
+  // zu verwerfen.
+  openModal({ title: t('schedule.entryDetailTitle'), size: 'sm', content: renderScheduleEntryDetailContent(entry), dirtyGuard: false });
+}
+
 function renderToday() {
   if (!state.entries.length) return `<p>${esc(t('schedule.empty'))}</p>`;
   return `<div class="list-rows">${state.entries.map((entry) => {
@@ -1079,7 +1275,12 @@ function renderToday() {
     const meta = overlay ? `${base} · ${esc(overlay)}` : base;
     const icon = type?.icon ? `<i data-lucide="${esc(type.icon)}" class="schedule-type-icon" aria-hidden="true"></i>` : '';
     const badge = entry.source === 'extra' ? extraBadge() : '';
-    return `<div class="list-row schedule-entry-row"><span class="schedule-swatch" style="--schedule-color:${esc(swatchColor)}"></span>${icon}${badge}<div class="list-row__main"><span class="list-row__name">${name}</span><span class="list-row__meta">${meta}</span></div></div>`;
+    // S-17: Zeile ist read-only, aber klickbar/tastaturbedienbar (role=button,
+    // dieselbe Enter/Space-Aktivierung wie calendar.js' Agenda-Zeilen) - jede
+    // Rolle im Haushalt darf sich einen Eintrag ansehen, deshalb steht die
+    // Aktion in READ_SAFE_ACTIONS.
+    const key = esc(scheduleEntryMatchKey(entry));
+    return `<div class="list-row schedule-entry-row" role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${key}" aria-label="${name}, ${meta}"><span class="schedule-swatch" style="--schedule-color:${esc(swatchColor)}"></span>${icon}${badge}<div class="list-row__main"><span class="list-row__name">${name}</span><span class="list-row__meta">${meta}</span></div></div>`;
   }).join('')}</div>`;
 }
 
@@ -1259,8 +1460,13 @@ function overviewEntryBlock(entry, activeHours) {
   const type = entry.shift_type;
   const overlay = overlayMeta(entry);
   const label = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
+  // S-17: read-only Detailansicht bei Klick/Enter/Space - dieselbe Aktion wie
+  // renderToday()'s Zeilen, derselbe zusammengesetzte Schluessel
+  // (scheduleEntryMatchKey()) findet den Eintrag wieder unabhaengig davon, ob
+  // dieser Block eine Fortsetzungszeile (`__continuation`) ist oder nicht.
+  const detailAttrs = ` role="button" tabindex="0" data-action="view-schedule-entry" data-schedule-key="${esc(scheduleEntryMatchKey(entry))}" aria-label="${esc(scheduleOverviewEntryTitle(entry))}"`;
   if (!type?.start_time || !type?.end_time) {
-    return `<div class="schedule-overview__block schedule-overview__block--allday" title="${esc(scheduleOverviewEntryTitle(entry))}"><span>${esc(overlay ? `${label} · ${overlay}` : label)}</span></div>`;
+    return `<div class="schedule-overview__block schedule-overview__block--allday" title="${esc(scheduleOverviewEntryTitle(entry))}"${detailAttrs}><span>${esc(overlay ? `${label} · ${overlay}` : label)}</span></div>`;
   }
   const [startH, startM] = type.start_time.split(':').map(Number);
   const [endH, endM] = type.end_time.split(':').map(Number);
@@ -1274,7 +1480,7 @@ function overviewEntryBlock(entry, activeHours) {
   const top = (startCollapsed / 60) * OVERVIEW_HOUR_PX;
   const height = Math.max(((endCollapsed - startCollapsed) / 60) * OVERVIEW_HOUR_PX, 18);
   const timeLine = overlay ? `${clockLabel(type)} · ${overlay}` : clockLabel(type);
-  return `<div class="schedule-overview__block" style="top:${top}px;height:${height}px;--schedule-color:${esc(type.color)}" title="${esc(scheduleOverviewEntryTitle(entry))}"><span class="schedule-overview__block-title">${esc(label)}</span><small class="schedule-overview__block-time">${esc(timeLine)}</small></div>`;
+  return `<div class="schedule-overview__block" style="top:${top}px;height:${height}px;--schedule-color:${esc(type.color)}" title="${esc(scheduleOverviewEntryTitle(entry))}"${detailAttrs}><span class="schedule-overview__block-title">${esc(label)}</span><small class="schedule-overview__block-time">${esc(timeLine)}</small></div>`;
 }
 
 function scheduleOverviewEntryTitle(entry) {
@@ -1475,9 +1681,11 @@ function renderShell() {
   // Anker-/Gueltigkeitsdatum, Aktiv-Schalter), die manchmal ohne 'input' feuern.
   root.addEventListener('input', (event) => {
     if (activeView === 'patterns') markPatternDirty(event.target);
+    if (activeView === 'patterns') updateCycleDayHeadersFor(event.target);
   });
   root.addEventListener('change', (event) => {
     if (activeView === 'patterns') markPatternDirty(event.target);
+    if (activeView === 'patterns') updateCycleDayHeadersFor(event.target);
     if (event.target.id === 'schedule-reminder-toggle') {
       const offsetSelect = root.querySelector('#schedule-reminder-offset');
       // Sofort sperren/entsperren statt auf renderPage() nach dem Speichern zu
@@ -1510,6 +1718,40 @@ function renderShell() {
       else if (html) row.insertAdjacentHTML('beforeend', html);
       window.lucide?.createIcons({ el: row });
     }
+  });
+  // S-17: Tastaturaktivierung der als role="button" ausgezeichneten
+  // Heute-Zeilen/Uebersicht-Bloecke (Enter/Space) - dasselbe Muster wie
+  // calendar.js' Agenda-Ansicht fuer ihre eigenen role="button"-Zeilen.
+  root.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target.closest('[data-action="view-schedule-entry"]');
+    if (!target) return;
+    event.preventDefault();
+    action({ currentTarget: target });
+  });
+}
+
+/**
+ * S-04: Start-/Zykluslaengen-Feld einer Musterkarte hat sich geaendert - die
+ * Kopfzeilen ihrer bereits gerenderten Zyklustage neu beschriften, rein aus
+ * den LIVE-Formularwerten (noch ungespeichert), ohne die Zeilen selbst
+ * anzufassen. Kein Server-Roundtrip, reine Datumsrechnung (cycleDayHeaderLabel()).
+ */
+function updateCycleDayHeadersFor(target) {
+  const name = target?.name || target?.getAttribute?.('name');
+  if (name !== 'anchor_date' && name !== 'cycle_length') return;
+  const details = target.closest('[data-pattern]');
+  const form = details?.querySelector('[data-form="pattern-update"]');
+  if (!form) return;
+  const anchor = formValue(form, 'anchor_date');
+  const cycleLength = Number(formValue(form, 'cycle_length'));
+  const validFrom = formValue(form, 'valid_from') || null;
+  const validUntil = formValue(form, 'valid_until') || null;
+  if (!anchor || !cycleLength) return;
+  details.querySelectorAll('[data-day-group]').forEach((group) => {
+    const position = Number(group.dataset.dayGroup) + 1;
+    const label = group.querySelector('[data-day-group-label]');
+    if (label) label.textContent = cycleDayHeaderLabel(anchor, cycleLength, validFrom, validUntil, position);
   });
 }
 
@@ -1860,6 +2102,25 @@ async function saveCreatedSchedule(event) {
         data.user_id = Number(data.user_id);
         data.cycle_length = Number(data.cycle_length);
         data.is_active = form.elements.is_active.checked;
+        // S-05: eine neue AKTIVE Karte, die eine bestehende aktive Karte
+        // derselben Person ueberschneidet, flippt jede Ansicht sofort auf sich
+        // selbst (server-seitig gewinnt "valid_from DESC, id DESC" - siehe
+        // resolveWinningPatternId()) - bisher war der Ueberlappungs-Banner das
+        // einzige (nachtraegliche) Signal dafuer. Eine inaktive Karte kann
+        // nichts ueberschreiben, deshalb kein Check in diesem Zweig.
+        if (data.is_active) {
+          const overlap = findOverlappingActivePattern(state.patterns, data.user_id, data.valid_from || null, data.valid_until || null);
+          if (overlap) {
+            // confirmOverModal statt confirmModal: dieses Anlege-Formular ist
+            // noch offen (siehe der gleiche Grund am "replace"-Zweig unten) -
+            // "Abbrechen" soll die getippten Felder nicht loeschen.
+            const confirmed = await confirmOverModal(
+              t('schedule.patternOverlapConfirmTitle', { user: userName(data.user_id) }),
+              { confirmLabel: t('schedule.patternOverlapConfirmAction'), detail: t('schedule.patternOverlapConfirmDetail', { name: overlap.name }) },
+            );
+            if (!confirmed) return;
+          }
+        }
         await api.post('/schedule/patterns', data);
       } else if (data.mode === 'replace') {
         const userId = Number(data.user_id);
@@ -2051,6 +2312,21 @@ async function submitForm(event) {
         reportFieldError(form.querySelector('[name="cycle_length"]'), t('schedule.cycleLengthTooShort', conflict));
         return;
       }
+      // S-05: ein Umschalten von aus -> an kann genau denselben stillen
+      // Ueberlappungs-Sieg ausloesen wie eine neu angelegte aktive Karte -
+      // derselbe Check, dasselbe confirmModal (kein Anlege-Formular offen,
+      // dieses Formular lebt inline in der Karte selbst, kein confirmOverModal
+      // noetig).
+      if (data.is_active && !pattern?.is_active) {
+        const overlap = findOverlappingActivePattern(state.patterns, pattern?.user_id, data.valid_from || null, data.valid_until || null, pattern?.id);
+        if (overlap) {
+          const confirmed = await confirmModal(
+            t('schedule.patternOverlapConfirmTitle', { user: userName(pattern?.user_id) }),
+            { confirmLabel: t('schedule.patternOverlapConfirmAction'), detail: t('schedule.patternOverlapConfirmDetail', { name: overlap.name }) },
+          );
+          if (!confirmed) return;
+        }
+      }
       await api.put(`/schedule/patterns/${form.dataset.id}`, data);
       dirtyPatternIds.delete(String(form.dataset.id)); // S-03: gespeichert, nichts mehr zu verwerfen
     }
@@ -2076,6 +2352,9 @@ async function submitForm(event) {
 const READ_SAFE_ACTIONS = new Set([
   'print-statistics', 'statistics-range', 'overview-week', 'overview-view-mode',
   'retry-statistics', 'retry-overview',
+  // S-17: nur ein Lesevorgang (openScheduleEntryDetailModal ruft nie eine
+  // schreibende API) - auch ein Nur-lesen-Mitglied darf einen Eintrag ansehen.
+  'view-schedule-entry',
 ]);
 
 async function action(event) {
@@ -2084,6 +2363,11 @@ async function action(event) {
   try {
     if (button.dataset.action === 'open-create') {
       openScheduleCreateModal(button.dataset.view || activeView);
+      return;
+    }
+    if (button.dataset.action === 'view-schedule-entry') {
+      const entry = findScheduleEntry(button.dataset.scheduleKey);
+      if (entry) openScheduleEntryDetailModal(entry);
       return;
     }
     // `button.disabled` statt eines `state.types.length`-Torwaechters: der
@@ -2360,6 +2644,16 @@ export async function render(container, { user } = {}) {
   currentUserId = user?.id ?? null;
   canManageOthers = user?.role === 'admin';
   await load();
+  // S-07: die Vorgabe fuer den allerersten Tab dieser Sitzung haengt von der
+  // Datenlage ab - "Planung" (Muster/Ausnahmen/Extras) ist ohne einen einzigen
+  // Schichttyp eine Sackgasse (jedes Formular dahinter dead-endet in einer
+  // leeren Auswahl). Nur beim allerersten Laden entschieden (initialViewDecided),
+  // niemals danach - ein spaeterer Besuch soll die eigene Tab-Wahl der Person
+  // nicht ueberschreiben (siehe Kommentar an `activeView` oben).
+  if (!initialViewDecided) {
+    activeView = state.types.length ? 'patterns' : 'shifts';
+    initialViewDecided = true;
+  }
   // `statistics`/`overview`/`activeView` sind Modul-globaler Zustand, der eine
   // Client-Route ueberlebt (SPA, kein Reload zwischen zwei Seitenbesuchen) -
   // ein blosses Zuruecksetzen von userId/from/to reichte nicht: `entries`/
@@ -2390,4 +2684,4 @@ export async function render(container, { user } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage };
+export const __test = { overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage, cycleDayNextDate, cycleDayHeaderLabel, windowsOverlap, findOverlappingActivePattern, resolveWinningPatternId, scheduleEntryMatchKey };
