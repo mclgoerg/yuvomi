@@ -953,3 +953,83 @@
     border: 1px solid var(--color-border);
   }
 }
+
+/* S-04: Hinweiszeile unter der "Zyklustage"-Ueberschrift - `.u-meta` (typography.css,
+ * global geladen) traegt schon die Sekundaer-Groesse, hier nur Abstand + die
+ * eigentliche Sekundaertinte (u-meta selbst setzt keine Farbe). */
+.schedule-cycle-hint {
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-2);
+}
+
+/* S-05: "gewinnt heute"-Abzeichen auf der Musterkarte, deren Name im
+ * Ueberlappungsfall server-seitig obsiegt (resolveWinningPatternId() spiegelt
+ * "ORDER BY valid_from DESC, id DESC" aus server/services/schedule.js). Eigene,
+ * modul-eigene Abzeichenklasse statt eines generischen Badges (DESIGN.md:
+ * jedes Modul definiert sein eigenes {modul}-{begriff}-badge) - Tinte ueber die
+ * benannten Stufen der Toenungsskala (tokens.css), keine rohe Prozentzahl. */
+.schedule-wins-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-start: var(--space-2);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-fill-well);
+  color: var(--color-text-secondary);
+}
+
+/* Rangmarke nach der Skalen-Regel (test-frontend-audit): Vollton-Punkt neben
+ * neutraler Schrift statt Flaeche UND Tinte derselben Beimischung. */
+.schedule-wins-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--module-accent, var(--color-accent));
+}
+
+/* S-17: Heute-Zeilen/Uebersicht-Bloecke sind jetzt klickbare
+ * Detail-Ausloeser (role="button") - der Zeiger zeigt das an, der
+ * Fokusring kommt bereits app-weit aus reset.css. */
+.schedule-entry-row[role='button'],
+.schedule-overview__block[role='button'] {
+  cursor: pointer;
+}
+
+/* S-17: read-only Detail-Modal-Inhalt (schedule.js#renderScheduleEntryDetailContent) -
+ * dieselbe Kopfzeile wie shiftTypeCard()'s <summary> (Farbpunkt + Icon +
+ * Titel + kleine Uhrzeit), darunter Label/Wert-Zeilen. */
+.schedule-entry-detail__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.schedule-entry-detail__rows {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.schedule-entry-detail__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.schedule-entry-detail__row dt {
+  color: var(--color-text-secondary);
+  flex: 0 0 auto;
+}
+
+.schedule-entry-detail__row dd {
+  margin: 0;
+  min-width: 0;
+  text-align: end;
+}

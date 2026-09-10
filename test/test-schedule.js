@@ -1767,3 +1767,164 @@ test('switching Planning sub-tabs while a pattern editor is dirty asks before di
 
   assert.match(schedulePage, /onChange: \(id\) => \{ guardedActivateView\(id\); \}/, 'the tablist must route through the guard, not call activateView() directly');
 });
+
+// UX audit batch 3 (comprehension): S-04 cycle positions get real dates,
+// S-05 overlapping-pattern guard + "wins" badge, S-07 first-visit sequencing,
+// S-17 entry detail lookup key.
+
+test('cycleDayNextDate() finds the next occurrence of a cycle position on or after today, wrapping backward before the anchor too (S-04)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // Anchor 2026-09-01 (Tue), cycle of 4: position 1 lands on the anchor, then
+  // every 4 days after (09-05, 09-09, 09-13, ...). "Today" 09-10 sits between
+  // 09-09 and 09-13, so the NEXT occurrence on/after today is 09-13.
+  assert.equal(__test.cycleDayNextDate('2026-09-01', 4, 1, '2026-09-10'), '2026-09-13');
+  // Today falls exactly on an occurrence -> that day itself, not the next one.
+  assert.equal(__test.cycleDayNextDate('2026-09-01', 7, 1, '2026-09-01'), '2026-09-01');
+  // Wrap-backward: the anchor is AFTER "today" - position 3 (0-indexed offset
+  // 2) still resolves to a date before the anchor by walking the cycle
+  // backwards, exactly the behaviour S-04's hint line documents.
+  assert.equal(__test.cycleDayNextDate('2026-09-10', 5, 3, '2026-09-01'), '2026-09-02');
+  // A second full cycle later must land on the same weekday/date pattern.
+  assert.equal(__test.cycleDayNextDate('2026-09-01', 4, 1, '2026-09-14'), '2026-09-17');
+});
+
+test('cycleDayHeaderLabel() shows the next occurrence normally, but falls back to the first cycle when that occurrence falls outside the pattern\'s validity window (S-04)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // No bounds: the next occurrence, formatted "<position> · <weekday> <date>"
+  // via the same calendar.dayShort<Weekday> + formatDayMonth() combination
+  // renderOverview() already uses (test-browser-loader.mjs stubs t() as the
+  // key itself and formatDayMonth() as String(d)).
+  assert.equal(
+    __test.cycleDayHeaderLabel('2026-09-01', 4, null, null, 1, '2026-09-10'),
+    '1 · calendar.dayShortSunday 2026-09-13',
+  );
+  // The next occurrence (09-13) falls after a valid_until of 09-05 - the
+  // header must fall back to the FIRST cycle (anchor + position - 1 = the
+  // anchor itself for position 1), never a date the pattern would not show.
+  assert.equal(
+    __test.cycleDayHeaderLabel('2026-09-01', 4, null, '2026-09-05', 1, '2026-09-10'),
+    '1 · calendar.dayShortTuesday 2026-09-01',
+  );
+  // Same fallback, this time excluded by a valid_from that starts later than
+  // the computed next occurrence.
+  assert.equal(
+    __test.cycleDayHeaderLabel('2026-09-01', 4, '2026-09-20', null, 1, '2026-09-10'),
+    '1 · calendar.dayShortTuesday 2026-09-01',
+  );
+});
+
+test('windowsOverlap() treats an empty valid_from/valid_until as unbounded on either side (S-05)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // Two fully unbounded windows always overlap.
+  assert.equal(__test.windowsOverlap(null, null, null, null), true);
+  // Disjoint bounded ranges never overlap.
+  assert.equal(__test.windowsOverlap('2026-01-01', '2026-01-31', '2026-02-01', '2026-02-28'), false);
+  // Overlapping bounded ranges.
+  assert.equal(__test.windowsOverlap('2026-01-01', '2026-03-31', '2026-03-01', '2026-06-30'), true);
+  // An unbounded end on one side still overlaps a bounded window that starts before it ends.
+  assert.equal(__test.windowsOverlap('2026-01-01', null, '2026-06-01', '2026-06-30'), true);
+  assert.equal(__test.windowsOverlap(null, '2026-01-31', '2026-02-01', null), false);
+});
+
+test('findOverlappingActivePattern() only matches another ACTIVE pattern of the SAME owner with an overlapping window (S-05)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const patterns = [
+    { id: 1, user_id: 10, is_active: true, valid_from: null, valid_until: null },
+    { id: 2, user_id: 10, is_active: false, valid_from: null, valid_until: null },
+    { id: 3, user_id: 20, is_active: true, valid_from: null, valid_until: null },
+  ];
+  // Same owner, active, overlapping -> found.
+  assert.equal(__test.findOverlappingActivePattern(patterns, 10, null, null)?.id, 1);
+  // Excluding the match itself (the pattern being re-activated) -> nothing left.
+  assert.equal(__test.findOverlappingActivePattern(patterns, 10, null, null, 1), undefined);
+  // A different owner's active pattern never counts.
+  assert.equal(__test.findOverlappingActivePattern(patterns, 30, null, null), undefined);
+  // An inactive pattern of the same owner never counts either.
+  assert.equal(__test.findOverlappingActivePattern([patterns[1]], 10, null, null), undefined);
+  // Non-overlapping windows -> no match even for the same active owner.
+  const bounded = [{ id: 4, user_id: 10, is_active: true, valid_from: '2026-01-01', valid_until: '2026-01-31' }];
+  assert.equal(__test.findOverlappingActivePattern(bounded, 10, '2026-02-01', '2026-02-28'), undefined);
+});
+
+test('resolveWinningPatternId() mirrors the server\'s "valid_from DESC, id DESC" resolution order, and stays null without a real overlap (S-05)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // A single active pattern never needs a "wins" badge.
+  assert.equal(__test.resolveWinningPatternId([{ id: 1, user_id: 10, is_active: true, valid_from: null, valid_until: null }], 10, '2026-06-01'), null);
+  // A bounded valid_from beats an unbounded one (SQLite sorts NULL last in DESC).
+  const patterns = [
+    { id: 1, user_id: 10, is_active: true, valid_from: null, valid_until: null },
+    { id: 2, user_id: 10, is_active: true, valid_from: '2026-01-01', valid_until: null },
+  ];
+  assert.equal(__test.resolveWinningPatternId(patterns, 10, '2026-06-01'), 2);
+  // Same valid_from -> the higher id (the more recently created pattern) wins.
+  const tie = [
+    { id: 5, user_id: 10, is_active: true, valid_from: '2026-01-01', valid_until: null },
+    { id: 9, user_id: 10, is_active: true, valid_from: '2026-01-01', valid_until: null },
+  ];
+  assert.equal(__test.resolveWinningPatternId(tie, 10, '2026-06-01'), 9);
+  // A pattern whose window does not cover the given date is not a candidate at all.
+  const outOfRange = [
+    { id: 1, user_id: 10, is_active: true, valid_from: null, valid_until: '2026-01-31' },
+    { id: 2, user_id: 10, is_active: true, valid_from: '2026-02-01', valid_until: null },
+  ];
+  assert.equal(__test.resolveWinningPatternId(outOfRange, 10, '2026-01-15'), null);
+});
+
+test('a new ACTIVE pattern creation and re-activating one via the Active toggle both guard against silently outranking an existing active pattern (S-05)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const createBranch = schedulePage.slice(
+    schedulePage.indexOf("if (data.mode === 'pattern') {"),
+    schedulePage.indexOf("} else if (data.mode === 'replace') {"),
+  );
+  assert.match(createBranch, /findOverlappingActivePattern\(state\.patterns, data\.user_id, data\.valid_from \|\| null, data\.valid_until \|\| null\)/);
+  assert.match(createBranch, /confirmOverModal\(/, 'the Add-entry modal is still open, so the guard must park it (confirmOverModal), not destroy it');
+  assert.ok(createBranch.indexOf('if (!confirmed) return;') < createBranch.indexOf("await api.post('/schedule/patterns', data);"));
+
+  const updateBranch = schedulePage.slice(
+    schedulePage.indexOf("if (form.dataset.form === 'pattern-update')"),
+    schedulePage.indexOf('await load();', schedulePage.indexOf("if (form.dataset.form === 'pattern-update')")),
+  );
+  assert.match(updateBranch, /data\.is_active && !pattern\?\.is_active/, 'the guard must only fire on an off -> on transition, not on every save');
+  assert.match(updateBranch, /findOverlappingActivePattern\(state\.patterns, pattern\?\.user_id, data\.valid_from \|\| null, data\.valid_until \|\| null, pattern\?\.id\)/);
+  assert.match(updateBranch, /confirmModal\(/, 'this form is inline (no modal open), so the plain confirmModal is correct here');
+});
+
+test('the initial tab lands on Shift types when the household has no shift types yet, otherwise stays on Planning (S-07)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const renderFn = schedulePage.slice(schedulePage.indexOf('export async function render'), schedulePage.indexOf('// Reines Verhalten statt Text-Muster'));
+  assert.match(renderFn, /if \(!initialViewDecided\) \{\s*\n\s*activeView = state\.types\.length \? 'patterns' : 'shifts';\s*\n\s*initialViewDecided = true;\s*\n\s*\}/);
+  // The decision must happen strictly after load() populated state.types, not before.
+  assert.ok(renderFn.indexOf('await load();') < renderFn.indexOf('if (!initialViewDecided)'));
+});
+
+test('the empty Planning state points to creating shift types first when the household has none, reusing the existing hint key (S-07)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const start = schedulePage.indexOf('function emptyPatternState');
+  const body = schedulePage.slice(start, schedulePage.indexOf('\n}\n', start));
+  assert.match(body, /state\.types\.length/);
+  assert.match(body, /t\('schedule\.noShiftTypesHint'\)/, 'must reuse the existing key, not introduce a new one');
+});
+
+test('scheduleEntryMatchKey() builds a stable, source-aware key so a click can find the exact entry again (S-17)', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  const patternEntry = { date_key: '2026-09-10', user_id: 1, source: 'pattern', pattern_id: 7, pattern_day_id: 42 };
+  const overrideEntry = { date_key: '2026-09-10', user_id: 1, source: 'override', override_id: 5 };
+  const extraEntry = { date_key: '2026-09-10', user_id: 1, source: 'extra', extra_id: 9 };
+  assert.equal(__test.scheduleEntryMatchKey(patternEntry), '2026-09-10:1:pattern:42');
+  assert.equal(__test.scheduleEntryMatchKey(overrideEntry), '2026-09-10:1:override:5');
+  assert.equal(__test.scheduleEntryMatchKey(extraEntry), '2026-09-10:1:extra:9');
+  // A free pattern day (no pattern_day_id, no explicit row) still gets a
+  // unique-enough key via the pattern id itself.
+  const freePatternEntry = { date_key: '2026-09-11', user_id: 1, source: 'pattern', pattern_id: 7, pattern_day_id: null };
+  assert.equal(__test.scheduleEntryMatchKey(freePatternEntry), '2026-09-11:1:pattern:p7');
+  // Two different sources on the same day/user never collide.
+  assert.notEqual(__test.scheduleEntryMatchKey(patternEntry), __test.scheduleEntryMatchKey(overrideEntry));
+});
+
+test('view-schedule-entry is a read action, reachable by a read-only member (S-17)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const setStart = schedulePage.indexOf('const READ_SAFE_ACTIONS = new Set([');
+  const setBody = schedulePage.slice(setStart, schedulePage.indexOf(']);', setStart));
+  assert.match(setBody, /'view-schedule-entry'/);
+  assert.match(schedulePage, /openModal\(\{ title: t\('schedule\.entryDetailTitle'\), size: 'sm', content: renderScheduleEntryDetailContent\(entry\), dirtyGuard: false \}\)/);
+});
