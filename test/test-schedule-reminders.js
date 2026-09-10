@@ -553,12 +553,13 @@ async function call(method, path, { as = alice, body } = {}) {
   return { status: res.status, body: json };
 }
 
-test('GET /schedule/preferences liefert beide Felder als null ohne eigene Einstellung', async () => {
+test('GET /schedule/preferences liefert beide Felder als null ohne eigene Einstellung, Ueberstunden-Verfolgung an', async () => {
   clearAll();
   const r = await call('GET', '/schedule/preferences');
   assert.equal(r.status, 200);
   assert.equal(r.body.data.reminderOffsetMinutes, null);
   assert.equal(r.body.data.weeklyHours, null);
+  assert.equal(r.body.data.overtimeEnabled, true, 'ungesetzt (NULL) muss als "an" gelesen werden - kein stiller Verhaltenswechsel fuer Bestandshaushalte (S-24)');
 });
 
 test('PUT /schedule/preferences setzt den Vorlauf und synchronisiert sofort', async () => {
@@ -628,6 +629,40 @@ test('PUT /schedule/preferences mit weeklyHours: null setzt auf den Rückfallwer
   const r = await call('PUT', '/schedule/preferences', { body: { weeklyHours: null } });
   assert.equal(r.status, 200);
   assert.equal(r.body.data.weeklyHours, null);
+});
+
+test('PUT /schedule/preferences schaltet die Ueberstunden-Verfolgung um, ohne die anderen Felder anzufassen (S-24)', async () => {
+  clearAll();
+  await call('PUT', '/schedule/preferences', { body: { weeklyHours: 30, reminderOffsetMinutes: 10 } });
+
+  const off = await call('PUT', '/schedule/preferences', { body: { overtimeEnabled: false } });
+  assert.equal(off.status, 200);
+  assert.equal(off.body.data.overtimeEnabled, false);
+  assert.equal(off.body.data.weeklyHours, 30, 'ein Feld ohne Erwaehnung im Body bleibt unangetastet');
+  assert.equal(off.body.data.reminderOffsetMinutes, 10);
+
+  const get = await call('GET', '/schedule/preferences');
+  assert.equal(get.body.data.overtimeEnabled, false, 'der Zustand bleibt ueber einen GET-Roundtrip hinweg erhalten');
+
+  const on = await call('PUT', '/schedule/preferences', { body: { overtimeEnabled: true } });
+  assert.equal(on.status, 200);
+  assert.equal(on.body.data.overtimeEnabled, true);
+});
+
+test('PUT /schedule/preferences lehnt einen nicht-booleschen overtimeEnabled-Wert ab', async () => {
+  clearAll();
+  const bad1 = await call('PUT', '/schedule/preferences', { body: { overtimeEnabled: 'yes' } });
+  assert.equal(bad1.status, 400);
+  const bad2 = await call('PUT', '/schedule/preferences', { body: { overtimeEnabled: 1 } });
+  assert.equal(bad2.status, 400);
+  const bad3 = await call('PUT', '/schedule/preferences', { body: { overtimeEnabled: null } });
+  assert.equal(bad3.status, 400, 'anders als reminderOffsetMinutes/weeklyHours gibt es hier keinen "zurueck auf Vorgabe"-Nullwert - ein Schalter ist immer eindeutig an oder aus');
+});
+
+test('PUT /schedule/preferences: weeklyHours: 0 bleibt abgelehnt - kein Sonderwert fuer "aus" (S-24, Entscheidung D-C)', async () => {
+  clearAll();
+  const r = await call('PUT', '/schedule/preferences', { body: { weeklyHours: 0 } });
+  assert.equal(r.status, 400, 'ein eigener Schalter (overtimeEnabled) ist die Antwort auf S-24, nicht eine umgedeutete 0');
 });
 
 test('POST /reminders lehnt ein handgesetztes schedule_entry mit 400 ab', async () => {

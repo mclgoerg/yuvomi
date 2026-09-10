@@ -40,7 +40,7 @@ let initialViewDecided = false;
 // sein, eine Rueckfrage beim Schliessen EINER Karte soll nicht von der
 // Restlichkeit falsch beeinflusst werden.
 let dirtyPatternIds = new Set();
-let state = { users: [], types: [], customFields: [], patterns: [], overrides: [], extras: [], entries: [], warnings: [], reminderOffsetMinutes: null, weeklyHours: null, hiddenTemplates: [] };
+let state = { users: [], types: [], customFields: [], patterns: [], overrides: [], extras: [], entries: [], warnings: [], reminderOffsetMinutes: null, weeklyHours: null, overtimeEnabled: true, hiddenTemplates: [] };
 let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', from: '', to: '', entries: [], bounds: null, loading: false, error: false };
 // Generationszaehler gegen ein Wettrennen zweier ueberlappender Ladevorgaenge
 // (schnelles Tab-Wechseln/Woche-Vor-Zurueck/erneutes Absenden des Filters):
@@ -264,6 +264,7 @@ async function load() {
     warnings: entries.data?.warnings ?? [],
     reminderOffsetMinutes: preferences.data?.reminderOffsetMinutes ?? null,
     weeklyHours: preferences.data?.weeklyHours ?? null,
+    overtimeEnabled: preferences.data?.overtimeEnabled !== false,
     hiddenTemplates: Array.isArray(householdPrefs.data?.schedule_hidden_templates) ? householdPrefs.data.schedule_hidden_templates : [],
     weekStartPref: householdPrefs.data?.week_start ?? null,
   };
@@ -570,9 +571,18 @@ function renderReminderSettings() {
     + toggleRowHtml({ label: t('schedule.reminderToggle'), checked: active, attrs: { id: 'schedule-reminder-toggle' } })
     + '<select class="input" id="schedule-reminder-offset" data-previous-value="' + esc(String(state.reminderOffsetMinutes ?? 15)) + '"' + (active ? '' : ' disabled') + '>' + options + '</select>'
     + '</div><p class="form-hint">' + esc(t('schedule.reminderHint')) + '</p>'
+    // S-24 (UX-Audit, Entscheidung D-C): ein eigener Schalter statt eines
+    // wiederverwendeten Sonderwerts (0 Wochenstunden bleibt eine gueltige,
+    // ablehnbare Falscheingabe - siehe server/routes/schedule-preferences.js).
+    // Aus schaltet die Wochenstunden-Eingabe UND die Ueberstundenkarte in der
+    // Statistik gleichermassen ab (renderStatistics()/overtimeInfo() lesen
+    // state.overtimeEnabled), statt nur eine der beiden Stellen zu vergessen.
+    + '<div class="schedule-reminder-settings__row schedule-reminder-settings__row--overtime-toggle">'
+    + toggleRowHtml({ label: t('schedule.overtimeTrackingToggle'), checked: state.overtimeEnabled, attrs: { id: 'schedule-overtime-toggle' } })
+    + '</div><p class="form-hint">' + esc(t('schedule.overtimeTrackingHint')) + '</p>'
     + '<div class="schedule-reminder-settings__row schedule-reminder-settings__row--hours">'
     + '<label class="label" for="schedule-weekly-hours">' + esc(t('schedule.weeklyHoursLabel')) + '</label>'
-    + '<input class="input" type="number" min="1" max="168" step="1" id="schedule-weekly-hours" value="' + esc(String(weeklyHours)) + '">'
+    + '<input class="input" type="number" min="1" max="168" step="1" id="schedule-weekly-hours" value="' + esc(String(weeklyHours)) + '"' + (state.overtimeEnabled ? '' : ' disabled') + '>'
     + '</div><p class="form-hint">' + esc(t('schedule.weeklyHoursHint')) + '</p></div>';
 }
 
@@ -581,6 +591,7 @@ async function savePreference(patch) {
     const result = await api.put('/schedule/preferences', patch);
     state.reminderOffsetMinutes = result.data?.reminderOffsetMinutes ?? null;
     state.weeklyHours = result.data?.weeklyHours ?? null;
+    state.overtimeEnabled = result.data?.overtimeEnabled !== false;
   } catch (err) {
     window.yuvomi?.showToast(scheduleErrorMessage(err), 'danger');
   }
@@ -1167,7 +1178,11 @@ function renderStatistics() {
   const bounds = statistics.bounds || statisticBounds();
   const summary = statisticsSummary();
   const weeklyHours = state.weeklyHours ?? DEFAULT_WEEKLY_HOURS;
-  const overtime = overtimeInfo(statistics.entries, weeklyHours);
+  // S-24: aus heisst wirklich aus - keine Karte, kein Rechnen, nicht nur ein
+  // verstecktes Ergebnis. `overtime?.over` unten bleibt dieselbe Pruefung wie
+  // zuvor, `null` faellt einfach durch wie ein "kein Ueberschuss"-Ergebnis es
+  // auch schon tat.
+  const overtime = state.overtimeEnabled ? overtimeInfo(statistics.entries, weeklyHours) : null;
   const selectedUser = statistics.userId || currentUserId;
   const range = statistics.range;
   const countItems = [...summary.values];
@@ -1793,6 +1808,13 @@ function renderShell() {
     } else if (event.target.id === 'schedule-weekly-hours') {
       const hours = Math.min(168, Math.max(1, Math.round(Number(event.target.value) || DEFAULT_WEEKLY_HOURS)));
       savePreference({ weeklyHours: hours });
+    } else if (event.target.id === 'schedule-overtime-toggle') {
+      // S-24: sofort sperren/entsperren, gleiches Muster wie der Erinnerungs-
+      // Umschalter (S-25) - sonst wirkt das Wochenstunden-Feld waehrend des
+      // Roundtrips weiter bedienbar, obwohl der Schalter schon aus ist.
+      const hoursInput = root.querySelector('#schedule-weekly-hours');
+      if (hoursInput) hoursInput.disabled = !event.target.checked;
+      savePreference({ overtimeEnabled: event.target.checked });
     } else if (event.target.closest('[data-ms-input="overview-people"]')) {
       // Auswahl ist rein clientseitig - kein Fetch, nur eine Neuzeichnung
       // (siehe Kommentar an overview weiter oben).
