@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Типов смен пока нет",
         "emptyShiftTypesDescription": "Добавьте несколько распространённых типов смен для начала или создайте свои.",
         "quickStartShiftTypes": "Быстрый старт",
+        "quickStartCreated": "Создано типов смен: {{count}}.",
+        "quickStartCreated_one": "Создан один тип смены.",
+        "quickStartNothingNew": "Уже настроено - создавать нечего.",
         "customFields": "Свои поля",
         "createCustomField": "Создать поле",
         "editCustomField": "Изменить поле",
@@ -5048,7 +5051,7 @@
         "editOverride": "Изменить исключение",
         "deleteOverrideRangeTitle": "Удалить этот период?",
         "deleteOverrideRangeDetail": "Будут удалены все записи для {{user}} с {{from}} по {{to}}. Это нельзя отменить.",
-        "fillRange": "Применить к периоду",
+        "fillRange": "Заполнить период",
         "rangeFrom": "С",
         "rangeTo": "По",
         "fillRangeConfirmTitle": "Заполнить этот период?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Часы по типам смен",
         "workedHoursDescription": "Запланированные часы по типам смен.",
         "overtime": "Переработка",
-        "overtimeNote": "Более {{hours}} ч/нед. за этот период",
+        "overtimeNote": "Более {{hours}} ч за 7 дней подряд в этом периоде",
         "reminderToggle": "Напоминать перед началом моей смены",
         "reminderHint": "Push-уведомление перед каждой предстоящей сменой с временем начала. У отпуска, больничного и других записей на весь день нет времени начала, о котором можно напомнить.",
         "reminderAtStart": "Во время начала",
@@ -5099,9 +5102,10 @@
         "templateWork": "Работа",
         "templateSchool": "Школа",
         "templateUniversity": "Университет",
-        "overview": "Обзор",
+        "overview": "Сравнение",
         "overviewPeopleLabel": "Сравнить людей",
+        "overviewClearSelection": "Сбросить выбор",
         "overviewEmptyTitle": "Выберите людей для сравнения",
-        "overviewEmptyDescription": "Выберите выше двух или более членов семьи, чтобы увидеть их недельные расписания рядом друг с другом."
+        "overviewEmptyDescription": "Выберите выше хотя бы одного члена семьи, чтобы увидеть недельные расписания рядом друг с другом."
     }
 }

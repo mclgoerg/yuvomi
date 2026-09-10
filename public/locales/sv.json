@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Inga skifttyper ännu",
         "emptyShiftTypesDescription": "Lägg till några vanliga skifttyper för att komma igång, eller skapa egna.",
         "quickStartShiftTypes": "Snabbstart",
+        "quickStartCreated": "{{count}} skifttyper skapade.",
+        "quickStartCreated_one": "En skifttyp skapad.",
+        "quickStartNothingNew": "Redan klart - inget nytt att skapa.",
         "customFields": "Anpassade fält",
         "createCustomField": "Skapa fält",
         "editCustomField": "Redigera fält",
@@ -5048,7 +5051,7 @@
         "editOverride": "Redigera undantag",
         "deleteOverrideRangeTitle": "Ta bort den här perioden?",
         "deleteOverrideRangeDetail": "Det tar bort varje post för {{user}} från {{from}} till {{to}}. Det går inte att ångra.",
-        "fillRange": "Tillämpa på en period",
+        "fillRange": "Fyll perioden",
         "rangeFrom": "Från",
         "rangeTo": "Till",
         "fillRangeConfirmTitle": "Fylla den här perioden?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Timmar per skifttyp",
         "workedHoursDescription": "Schemalagda timmar per skifttyp.",
         "overtime": "Övertid",
-        "overtimeNote": "Över {{hours}} tim/vecka för denna period",
+        "overtimeNote": "Över {{hours}} tim under 7 dagar i följd i denna period",
         "reminderToggle": "Påminn mig innan mitt skift börjar",
         "reminderHint": "En push-avisering före varje kommande skift med starttid. Semester, sjukdom och andra heldagsposter har ingen starttid att påminna om.",
         "reminderAtStart": "Vid starttid",
@@ -5099,9 +5102,10 @@
         "templateWork": "Arbete",
         "templateSchool": "Skola",
         "templateUniversity": "Universitet",
-        "overview": "Översikt",
+        "overview": "Jämförelse",
         "overviewPeopleLabel": "Jämför personer",
+        "overviewClearSelection": "Rensa urvalet",
         "overviewEmptyTitle": "Välj personer att jämföra",
-        "overviewEmptyDescription": "Välj två eller fler hushållsmedlemmar ovan för att se deras veckoscheman sida vid sida."
+        "overviewEmptyDescription": "Välj minst en hushållsmedlem ovan för att se veckoscheman sida vid sida."
     }
 }

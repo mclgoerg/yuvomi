@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Ancora nessun tipo di turno",
         "emptyShiftTypesDescription": "Aggiungi alcuni tipi di turno comuni per iniziare, oppure crea i tuoi.",
         "quickStartShiftTypes": "Avvio rapido",
+        "quickStartCreated": "Creati {{count}} tipi di turno.",
+        "quickStartCreated_one": "Creato un tipo di turno.",
+        "quickStartNothingNew": "Già impostato: niente di nuovo da creare.",
         "customFields": "Campi personalizzati",
         "createCustomField": "Crea campo",
         "editCustomField": "Modifica campo",
@@ -5048,7 +5051,7 @@
         "editOverride": "Modifica eccezione",
         "deleteOverrideRangeTitle": "Eliminare questo periodo?",
         "deleteOverrideRangeDetail": "Rimuove ogni voce di {{user}} dal {{from}} al {{to}}. L'operazione non può essere annullata.",
-        "fillRange": "Applica a un periodo",
+        "fillRange": "Riempi il periodo",
         "rangeFrom": "Dal",
         "rangeTo": "Al",
         "fillRangeConfirmTitle": "Riempire questo periodo?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Ore per tipo di turno",
         "workedHoursDescription": "Ore pianificate per tipo di turno.",
         "overtime": "Straordinario",
-        "overtimeNote": "Oltre {{hours}} h/settimana per questo intervallo",
+        "overtimeNote": "Oltre {{hours}} h in 7 giorni consecutivi di questo intervallo",
         "reminderToggle": "Avvisami prima dell'inizio del mio turno",
         "reminderHint": "Una notifica push prima di ogni turno imminente con orario di inizio. Ferie, malattia e altre voci per l'intera giornata non hanno un orario di inizio da ricordare.",
         "reminderAtStart": "All'orario di inizio",
@@ -5099,9 +5102,10 @@
         "templateWork": "Lavoro",
         "templateSchool": "Scuola",
         "templateUniversity": "Università",
-        "overview": "Panoramica",
+        "overview": "Confronto",
         "overviewPeopleLabel": "Confronta persone",
+        "overviewClearSelection": "Cancella selezione",
         "overviewEmptyTitle": "Scegli le persone da confrontare",
-        "overviewEmptyDescription": "Seleziona sopra due o più membri della famiglia per vedere i loro orari settimanali affiancati."
+        "overviewEmptyDescription": "Seleziona sopra almeno un membro della famiglia per vedere gli orari settimanali affiancati."
     }
 }

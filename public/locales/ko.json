@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "아직 근무 유형이 없습니다",
         "emptyShiftTypesDescription": "시작하려면 흔히 쓰는 근무 유형 몇 개를 추가하거나 직접 만드세요.",
         "quickStartShiftTypes": "빠른 시작",
+        "quickStartCreated": "근무 유형 {{count}}개를 만들었습니다.",
+        "quickStartCreated_one": "근무 유형 1개를 만들었습니다.",
+        "quickStartNothingNew": "이미 설정되어 있습니다. 새로 만들 항목이 없습니다.",
         "customFields": "사용자 지정 필드",
         "createCustomField": "필드 만들기",
         "editCustomField": "필드 편집",
@@ -5048,7 +5051,7 @@
         "editOverride": "예외 편집",
         "deleteOverrideRangeTitle": "이 기간을 삭제할까요?",
         "deleteOverrideRangeDetail": "{{from}}부터 {{to}}까지 {{user}}의 모든 항목이 삭제됩니다. 되돌릴 수 없습니다.",
-        "fillRange": "기간에 적용",
+        "fillRange": "기간 채우기",
         "rangeFrom": "시작",
         "rangeTo": "종료",
         "fillRangeConfirmTitle": "이 기간을 채울까요?",
@@ -5067,7 +5070,7 @@
         "workedHours": "근무 유형별 시간",
         "workedHoursDescription": "근무 유형별 예정 시간.",
         "overtime": "초과 근무",
-        "overtimeNote": "이 기간에 주 {{hours}}시간 초과",
+        "overtimeNote": "이 기간 중 연속 7일 동안 {{hours}}시간 초과",
         "reminderToggle": "근무 시작 전 알림",
         "reminderHint": "시작 시각이 있는 다가오는 근무마다 푸시 알림을 보냅니다. 휴가, 병가 등 하루 종일 항목에는 알림을 보낼 시작 시각이 없습니다.",
         "reminderAtStart": "시작 시각에",
@@ -5099,9 +5102,10 @@
         "templateWork": "직장",
         "templateSchool": "학교",
         "templateUniversity": "대학교",
-        "overview": "개요",
+        "overview": "비교",
         "overviewPeopleLabel": "사람 비교",
+        "overviewClearSelection": "선택 지우기",
         "overviewEmptyTitle": "비교할 사람을 선택하세요",
-        "overviewEmptyDescription": "위에서 두 명 이상의 가족 구성원을 선택하면 주간 일정을 나란히 볼 수 있습니다."
+        "overviewEmptyDescription": "위에서 한 명 이상의 가족 구성원을 선택하면 주간 일정을 나란히 볼 수 있습니다."
     }
 }

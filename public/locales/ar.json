@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "لا توجد أنواع مناوبات بعد",
         "emptyShiftTypesDescription": "أضف بعض أنواع المناوبات الشائعة للبدء، أو أنشئ أنواعك الخاصة.",
         "quickStartShiftTypes": "بداية سريعة",
+        "quickStartCreated": "تم إنشاء {{count}} من أنواع المناوبات.",
+        "quickStartCreated_one": "تم إنشاء نوع مناوبة واحد.",
+        "quickStartNothingNew": "كل شيء موجود بالفعل - لا جديد لإنشائه.",
         "customFields": "الحقول المخصصة",
         "createCustomField": "إنشاء حقل",
         "editCustomField": "تعديل الحقل",
@@ -5048,7 +5051,7 @@
         "editOverride": "تعديل الاستثناء",
         "deleteOverrideRangeTitle": "حذف هذه الفترة؟",
         "deleteOverrideRangeDetail": "سيؤدي هذا إلى إزالة كل إدخال لـ {{user}} من {{from}} إلى {{to}}. لا يمكن التراجع عن ذلك.",
-        "fillRange": "تطبيق على فترة",
+        "fillRange": "تعبئة الفترة",
         "rangeFrom": "من",
         "rangeTo": "إلى",
         "fillRangeConfirmTitle": "ملء هذه الفترة؟",
@@ -5067,7 +5070,7 @@
         "workedHours": "الساعات حسب نوع المناوبة",
         "workedHoursDescription": "الساعات المخططة حسب نوع المناوبة.",
         "overtime": "العمل الإضافي",
-        "overtimeNote": "أكثر من {{hours}} س/أسبوع لهذه الفترة",
+        "overtimeNote": "أكثر من {{hours}} ساعة خلال 7 أيام متتالية في هذه الفترة",
         "reminderToggle": "ذكّرني قبل بدء مناوبتي",
         "reminderHint": "إشعار قبل كل مناوبة قادمة لها وقت بدء. لا وقت بدء للإجازة أو المرض أو أي إدخال يستغرق اليوم كله ليُذكَّر به.",
         "reminderAtStart": "عند وقت البدء",
@@ -5099,9 +5102,10 @@
         "templateWork": "العمل",
         "templateSchool": "المدرسة",
         "templateUniversity": "الجامعة",
-        "overview": "نظرة عامة",
+        "overview": "مقارنة",
         "overviewPeopleLabel": "مقارنة الأشخاص",
+        "overviewClearSelection": "مسح التحديد",
         "overviewEmptyTitle": "اختر أشخاصًا للمقارنة",
-        "overviewEmptyDescription": "اختر أعلاه عضوين أو أكثر من أفراد الأسرة لرؤية جداولهم الأسبوعية جنبًا إلى جنب."
+        "overviewEmptyDescription": "اختر أعلاه فردًا واحدًا على الأقل من أفراد الأسرة لرؤية الجداول الأسبوعية جنبًا إلى جنب."
     }
 }

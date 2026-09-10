@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Belum ada jenis shift",
         "emptyShiftTypesDescription": "Tambahkan beberapa jenis shift umum untuk memulai, atau buat sendiri.",
         "quickStartShiftTypes": "Mulai cepat",
+        "quickStartCreated": "{{count}} jenis shift dibuat.",
+        "quickStartCreated_one": "Satu jenis shift dibuat.",
+        "quickStartNothingNew": "Sudah disiapkan - tidak ada yang baru untuk dibuat.",
         "customFields": "Bidang khusus",
         "createCustomField": "Buat bidang",
         "editCustomField": "Edit bidang",
@@ -5048,7 +5051,7 @@
         "editOverride": "Edit pengecualian",
         "deleteOverrideRangeTitle": "Hapus rentang ini?",
         "deleteOverrideRangeDetail": "Ini menghapus setiap entri untuk {{user}} dari {{from}} sampai {{to}}. Tidak dapat dibatalkan.",
-        "fillRange": "Terapkan ke rentang",
+        "fillRange": "Isi rentang",
         "rangeFrom": "Dari",
         "rangeTo": "Sampai",
         "fillRangeConfirmTitle": "Isi rentang tanggal ini?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Jam menurut jenis shift",
         "workedHoursDescription": "Jam terjadwal menurut jenis shift.",
         "overtime": "Lembur",
-        "overtimeNote": "Lebih dari {{hours}} jam/minggu untuk rentang ini",
+        "overtimeNote": "Lebih dari {{hours}} jam dalam 7 hari berturut-turut pada rentang ini",
         "reminderToggle": "Ingatkan saya sebelum shift saya mulai",
         "reminderHint": "Notifikasi push sebelum setiap shift mendatang yang punya waktu mulai. Cuti, sakit, dan entri sepanjang hari lainnya tidak punya waktu mulai untuk diingatkan.",
         "reminderAtStart": "Pada waktu mulai",
@@ -5099,9 +5102,10 @@
         "templateWork": "Kerja",
         "templateSchool": "Sekolah",
         "templateUniversity": "Universitas",
-        "overview": "Ikhtisar",
+        "overview": "Perbandingan",
         "overviewPeopleLabel": "Bandingkan orang",
+        "overviewClearSelection": "Hapus pilihan",
         "overviewEmptyTitle": "Pilih orang untuk dibandingkan",
-        "overviewEmptyDescription": "Pilih dua anggota keluarga atau lebih di atas untuk melihat jadwal mingguan mereka berdampingan."
+        "overviewEmptyDescription": "Pilih setidaknya satu anggota keluarga di atas untuk melihat jadwal mingguan berdampingan."
     }
 }

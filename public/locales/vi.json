@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Chưa có loại ca nào",
         "emptyShiftTypesDescription": "Thêm vài loại ca phổ biến để bắt đầu, hoặc tự tạo loại ca của bạn.",
         "quickStartShiftTypes": "Bắt đầu nhanh",
+        "quickStartCreated": "Đã tạo {{count}} loại ca.",
+        "quickStartCreated_one": "Đã tạo một loại ca.",
+        "quickStartNothingNew": "Đã thiết lập sẵn - không có gì mới để tạo.",
         "customFields": "Trường tùy chỉnh",
         "createCustomField": "Tạo trường",
         "editCustomField": "Sửa trường",
@@ -5048,7 +5051,7 @@
         "editOverride": "Sửa ngoại lệ",
         "deleteOverrideRangeTitle": "Xóa khoảng thời gian này?",
         "deleteOverrideRangeDetail": "Thao tác này xóa mọi mục của {{user}} từ {{from}} đến {{to}}. Không thể hoàn tác.",
-        "fillRange": "Áp dụng cho một khoảng thời gian",
+        "fillRange": "Điền khoảng thời gian",
         "rangeFrom": "Từ",
         "rangeTo": "Đến",
         "fillRangeConfirmTitle": "Điền khoảng thời gian này?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Số giờ theo loại ca",
         "workedHoursDescription": "Số giờ đã lên lịch theo loại ca.",
         "overtime": "Làm thêm giờ",
-        "overtimeNote": "Trên {{hours}} giờ/tuần cho khoảng thời gian này",
+        "overtimeNote": "Trên {{hours}} giờ trong 7 ngày liên tiếp của khoảng thời gian này",
         "reminderToggle": "Nhắc tôi trước khi ca của tôi bắt đầu",
         "reminderHint": "Thông báo đẩy trước mỗi ca sắp tới có giờ bắt đầu. Nghỉ phép, nghỉ ốm và các mục cả ngày khác không có giờ bắt đầu để nhắc.",
         "reminderAtStart": "Vào giờ bắt đầu",
@@ -5099,9 +5102,10 @@
         "templateWork": "Công việc",
         "templateSchool": "Trường học",
         "templateUniversity": "Đại học",
-        "overview": "Tổng quan",
+        "overview": "So sánh",
         "overviewPeopleLabel": "So sánh mọi người",
+        "overviewClearSelection": "Xóa lựa chọn",
         "overviewEmptyTitle": "Chọn người để so sánh",
-        "overviewEmptyDescription": "Chọn phía trên hai thành viên gia đình trở lên để xem lịch trình hằng tuần của họ cạnh nhau."
+        "overviewEmptyDescription": "Chọn phía trên ít nhất một thành viên gia đình để xem lịch trình hằng tuần cạnh nhau."
     }
 }

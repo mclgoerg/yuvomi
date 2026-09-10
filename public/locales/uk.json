@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Типів змін поки немає",
         "emptyShiftTypesDescription": "Додайте кілька поширених типів змін для початку або створіть власні.",
         "quickStartShiftTypes": "Швидкий старт",
+        "quickStartCreated": "Створено типів змін: {{count}}.",
+        "quickStartCreated_one": "Створено один тип зміни.",
+        "quickStartNothingNew": "Уже налаштовано - немає чого створювати.",
         "customFields": "Власні поля",
         "createCustomField": "Створити поле",
         "editCustomField": "Редагувати поле",
@@ -5048,7 +5051,7 @@
         "editOverride": "Змінити виняток",
         "deleteOverrideRangeTitle": "Видалити цей період?",
         "deleteOverrideRangeDetail": "Буде видалено всі записи для {{user}} з {{from}} по {{to}}. Це не можна скасувати.",
-        "fillRange": "Застосувати до періоду",
+        "fillRange": "Заповнити період",
         "rangeFrom": "З",
         "rangeTo": "По",
         "fillRangeConfirmTitle": "Заповнити цей період?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Години за типами змін",
         "workedHoursDescription": "Заплановані години за типами змін.",
         "overtime": "Понаднормові",
-        "overtimeNote": "Понад {{hours}} год/тиждень за цей період",
+        "overtimeNote": "Понад {{hours}} год за 7 днів поспіль у цьому періоді",
         "reminderToggle": "Нагадувати перед початком моєї зміни",
         "reminderHint": "Push-сповіщення перед кожною наступною зміною з часом початку. Відпустка, лікарняний та інші цілоденні записи не мають часу початку, про який можна нагадати.",
         "reminderAtStart": "У час початку",
@@ -5099,9 +5102,10 @@
         "templateWork": "Робота",
         "templateSchool": "Школа",
         "templateUniversity": "Університет",
-        "overview": "Огляд",
+        "overview": "Порівняння",
         "overviewPeopleLabel": "Порівняти людей",
+        "overviewClearSelection": "Скинути вибір",
         "overviewEmptyTitle": "Виберіть людей для порівняння",
-        "overviewEmptyDescription": "Виберіть вище двох або більше членів родини, щоб побачити їхні тижневі розклади поруч."
+        "overviewEmptyDescription": "Виберіть вище принаймні одного члена родини, щоб побачити тижневі розклади поруч."
     }
 }

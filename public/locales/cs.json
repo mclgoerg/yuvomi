@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Zatím žádné typy směn",
         "emptyShiftTypesDescription": "Přidejte několik běžných typů směn pro začátek, nebo si vytvořte vlastní.",
         "quickStartShiftTypes": "Rychlý start",
+        "quickStartCreated": "Vytvořeno {{count}} typů směn.",
+        "quickStartCreated_one": "Vytvořen jeden typ směny.",
+        "quickStartNothingNew": "Vše už existuje - není co nového vytvořit.",
         "customFields": "Vlastní pole",
         "createCustomField": "Vytvořit pole",
         "editCustomField": "Upravit pole",
@@ -5048,7 +5051,7 @@
         "editOverride": "Upravit výjimku",
         "deleteOverrideRangeTitle": "Smazat toto období?",
         "deleteOverrideRangeDetail": "Odstraní každý záznam pro {{user}} od {{from}} do {{to}}. Nelze vrátit zpět.",
-        "fillRange": "Použít na období",
+        "fillRange": "Vyplnit období",
         "rangeFrom": "Od",
         "rangeTo": "Do",
         "fillRangeConfirmTitle": "Vyplnit toto období?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Hodiny podle typu směny",
         "workedHoursDescription": "Naplánované hodiny podle typu směny.",
         "overtime": "Přesčas",
-        "overtimeNote": "Nad {{hours}} h/týden pro toto období",
+        "overtimeNote": "Přes {{hours}} h během 7 po sobě jdoucích dnů v tomto období",
         "reminderToggle": "Upozornit před začátkem mé směny",
         "reminderHint": "Push oznámení před každou nadcházející směnou s časem začátku. Dovolená, nemoc a jiné celodenní záznamy nemají čas začátku, na který by šlo upozornit.",
         "reminderAtStart": "V čase začátku",
@@ -5099,9 +5102,10 @@
         "templateWork": "Práce",
         "templateSchool": "Škola",
         "templateUniversity": "Univerzita",
-        "overview": "Přehled",
+        "overview": "Porovnání",
         "overviewPeopleLabel": "Porovnat osoby",
+        "overviewClearSelection": "Zrušit výběr",
         "overviewEmptyTitle": "Vyberte osoby k porovnání",
-        "overviewEmptyDescription": "Vyberte výše dva nebo více členů domácnosti a zobrazte jejich týdenní rozvrhy vedle sebe."
+        "overviewEmptyDescription": "Vyberte výše alespoň jednoho člena domácnosti a zobrazte týdenní rozvrhy vedle sebe."
     }
 }

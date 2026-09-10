@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Aucun type de poste pour l'instant",
         "emptyShiftTypesDescription": "Ajoutez quelques types de poste courants pour commencer, ou créez les vôtres.",
         "quickStartShiftTypes": "Démarrage rapide",
+        "quickStartCreated": "{{count}} types de poste créés.",
+        "quickStartCreated_one": "Un type de poste créé.",
+        "quickStartNothingNew": "Déjà en place - rien de nouveau à créer.",
         "customFields": "Champs personnalisés",
         "createCustomField": "Créer un champ",
         "editCustomField": "Modifier le champ",
@@ -5048,7 +5051,7 @@
         "editOverride": "Modifier l'exception",
         "deleteOverrideRangeTitle": "Supprimer cette période ?",
         "deleteOverrideRangeDetail": "Cela retire chaque entrée de {{user}} du {{from}} au {{to}}. Cette action est irréversible.",
-        "fillRange": "Appliquer à une période",
+        "fillRange": "Remplir la période",
         "rangeFrom": "Du",
         "rangeTo": "Au",
         "fillRangeConfirmTitle": "Remplir cette période ?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Heures par type de poste",
         "workedHoursDescription": "Heures planifiées par type de poste.",
         "overtime": "Heures supplémentaires",
-        "overtimeNote": "Plus de {{hours}} h/semaine pour cette période",
+        "overtimeNote": "Plus de {{hours}} h sur 7 jours consécutifs dans cette période",
         "reminderToggle": "Me rappeler avant le début de mon poste",
         "reminderHint": "Une notification avant chaque poste à venir ayant une heure de début. Les congés, arrêts maladie et autres entrées toute la journée n'ont pas d'heure de début à rappeler.",
         "reminderAtStart": "À l'heure de début",
@@ -5099,9 +5102,10 @@
         "templateWork": "Travail",
         "templateSchool": "École",
         "templateUniversity": "Université",
-        "overview": "Vue d'ensemble",
+        "overview": "Comparaison",
         "overviewPeopleLabel": "Comparer des personnes",
+        "overviewClearSelection": "Effacer la sélection",
         "overviewEmptyTitle": "Choisissez des personnes à comparer",
-        "overviewEmptyDescription": "Sélectionnez ci-dessus deux membres du foyer ou plus pour voir leurs emplois du temps hebdomadaires côte à côte."
+        "overviewEmptyDescription": "Sélectionnez ci-dessus au moins un membre du foyer pour voir les emplois du temps hebdomadaires côte à côte."
     }
 }

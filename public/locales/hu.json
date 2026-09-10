@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Még nincs műszaktípus",
         "emptyShiftTypesDescription": "Kezdésként adjon hozzá néhány gyakori műszaktípust, vagy hozzon létre sajátot.",
         "quickStartShiftTypes": "Gyors indítás",
+        "quickStartCreated": "{{count}} műszaktípus létrehozva.",
+        "quickStartCreated_one": "Egy műszaktípus létrehozva.",
+        "quickStartNothingNew": "Már létezik - nincs mit létrehozni.",
         "customFields": "Egyéni mezők",
         "createCustomField": "Mező létrehozása",
         "editCustomField": "Mező szerkesztése",
@@ -5048,7 +5051,7 @@
         "editOverride": "Kivétel szerkesztése",
         "deleteOverrideRangeTitle": "Törli ezt az időszakot?",
         "deleteOverrideRangeDetail": "Ez {{user}} minden bejegyzését eltávolítja {{from}} és {{to}} között. Nem vonható vissza.",
-        "fillRange": "Alkalmazás egy időszakra",
+        "fillRange": "Időszak kitöltése",
         "rangeFrom": "Ettől",
         "rangeTo": "Eddig",
         "fillRangeConfirmTitle": "Kitölti ezt az időszakot?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Órák műszaktípusonként",
         "workedHoursDescription": "Tervezett órák műszaktípusonként.",
         "overtime": "Túlóra",
-        "overtimeNote": "{{hours}} óra/hét felett erre az időszakra",
+        "overtimeNote": "Több mint {{hours}} óra 7 egymást követő napon ebben az időszakban",
         "reminderToggle": "Emlékeztessen a műszakom kezdete előtt",
         "reminderHint": "Push értesítés minden közelgő, kezdési idővel rendelkező műszak előtt. A szabadságnak, betegszabadságnak és más egész napos bejegyzéseknek nincs kezdési ideje, amire emlékeztetni lehetne.",
         "reminderAtStart": "A kezdés időpontjában",
@@ -5099,9 +5102,10 @@
         "templateWork": "Munka",
         "templateSchool": "Iskola",
         "templateUniversity": "Egyetem",
-        "overview": "Áttekintés",
+        "overview": "Összehasonlítás",
         "overviewPeopleLabel": "Személyek összehasonlítása",
+        "overviewClearSelection": "Kijelölés törlése",
         "overviewEmptyTitle": "Válassz személyeket az összehasonlításhoz",
-        "overviewEmptyDescription": "Válassz fent két vagy több háztartástagot, hogy heti beosztásukat egymás mellett lásd."
+        "overviewEmptyDescription": "Válassz fent legalább egy háztartástagot, hogy a heti beosztásokat egymás mellett lásd."
     }
 }

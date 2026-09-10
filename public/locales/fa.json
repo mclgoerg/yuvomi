@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "هنوز نوع شیفتی وجود ندارد",
         "emptyShiftTypesDescription": "برای شروع چند نوع شیفت رایج اضافه کنید یا نوع دلخواه خود را بسازید.",
         "quickStartShiftTypes": "شروع سریع",
+        "quickStartCreated": "{{count}} نوع شیفت ایجاد شد.",
+        "quickStartCreated_one": "یک نوع شیفت ایجاد شد.",
+        "quickStartNothingNew": "از قبل تنظیم شده است - چیز جدیدی برای ایجاد نیست.",
         "customFields": "فیلدهای سفارشی",
         "createCustomField": "ایجاد فیلد",
         "editCustomField": "ویرایش فیلد",
@@ -5048,7 +5051,7 @@
         "editOverride": "ویرایش استثنا",
         "deleteOverrideRangeTitle": "این بازه حذف شود؟",
         "deleteOverrideRangeDetail": "این کار همه ورودی‌های {{user}} را از {{from}} تا {{to}} حذف می‌کند. قابل بازگشت نیست.",
-        "fillRange": "اعمال روی یک بازه",
+        "fillRange": "پر کردن بازه",
         "rangeFrom": "از",
         "rangeTo": "تا",
         "fillRangeConfirmTitle": "این بازه پر شود؟",
@@ -5067,7 +5070,7 @@
         "workedHours": "ساعت‌ها بر اساس نوع شیفت",
         "workedHoursDescription": "ساعت‌های برنامه‌ریزی‌شده بر اساس نوع شیفت.",
         "overtime": "اضافه‌کاری",
-        "overtimeNote": "بیش از {{hours}} ساعت در هفته برای این بازه",
+        "overtimeNote": "بیش از {{hours}} ساعت در ۷ روز پیاپی از این بازه",
         "reminderToggle": "پیش از شروع شیفتم به من یادآوری کن",
         "reminderHint": "یک اعلان پیش از هر شیفت پیش‌رو که زمان شروع دارد. مرخصی، مرخصی استعلاجی و سایر موارد تمام‌روز زمان شروعی برای یادآوری ندارند.",
         "reminderAtStart": "در زمان شروع",
@@ -5099,9 +5102,10 @@
         "templateWork": "کار",
         "templateSchool": "مدرسه",
         "templateUniversity": "دانشگاه",
-        "overview": "نمای کلی",
+        "overview": "مقایسه",
         "overviewPeopleLabel": "مقایسه افراد",
+        "overviewClearSelection": "پاک کردن انتخاب",
         "overviewEmptyTitle": "افرادی را برای مقایسه انتخاب کن",
-        "overviewEmptyDescription": "بالا دو یا چند عضو خانواده را انتخاب کن تا برنامه هفتگی آن‌ها را کنار هم ببینی."
+        "overviewEmptyDescription": "بالا دست‌کم یک عضو خانواده را انتخاب کن تا برنامه‌های هفتگی را کنار هم ببینی."
     }
 }

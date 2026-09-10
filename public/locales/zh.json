@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "还没有班次类型",
         "emptyShiftTypesDescription": "添加几种常见的班次类型开始使用，或者自行创建。",
         "quickStartShiftTypes": "快速开始",
+        "quickStartCreated": "已创建 {{count}} 个班次类型。",
+        "quickStartCreated_one": "已创建一个班次类型。",
+        "quickStartNothingNew": "均已存在,没有需要新建的类型。",
         "customFields": "自定义字段",
         "createCustomField": "创建字段",
         "editCustomField": "编辑字段",
@@ -5048,7 +5051,7 @@
         "editOverride": "编辑例外",
         "deleteOverrideRangeTitle": "删除此时间段？",
         "deleteOverrideRangeDetail": "这会删除 {{user}} 从 {{from}} 到 {{to}} 的所有记录。此操作无法撤销。",
-        "fillRange": "应用到时间段",
+        "fillRange": "填充时间段",
         "rangeFrom": "从",
         "rangeTo": "到",
         "fillRangeConfirmTitle": "填充此时间段？",
@@ -5067,7 +5070,7 @@
         "workedHours": "按班次类型的小时数",
         "workedHoursDescription": "按班次类型的计划小时数。",
         "overtime": "加班",
-        "overtimeNote": "此时间段每周超过 {{hours}} 小时",
+        "overtimeNote": "此时间段内连续 7 天超过 {{hours}} 小时",
         "reminderToggle": "在我的班次开始前提醒我",
         "reminderHint": "在每个有开始时间的即将到来的班次前推送通知。假期、病假和其他全天条目没有可提醒的开始时间。",
         "reminderAtStart": "在开始时间",
@@ -5099,9 +5102,10 @@
         "templateWork": "工作",
         "templateSchool": "学校",
         "templateUniversity": "大学",
-        "overview": "总览",
+        "overview": "对比",
         "overviewPeopleLabel": "比较成员",
+        "overviewClearSelection": "清除选择",
         "overviewEmptyTitle": "选择要比较的成员",
-        "overviewEmptyDescription": "在上方选择两个或更多家庭成员,即可并排查看他们的每周时间表。"
+        "overviewEmptyDescription": "在上方至少选择一名家庭成员,即可并排查看每周时间表。"
     }
 }

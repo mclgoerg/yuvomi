@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Aún no hay tipos de turno",
         "emptyShiftTypesDescription": "Añade algunos tipos de turno habituales para empezar, o crea los tuyos.",
         "quickStartShiftTypes": "Inicio rápido",
+        "quickStartCreated": "Se crearon {{count}} tipos de turno.",
+        "quickStartCreated_one": "Se creó un tipo de turno.",
+        "quickStartNothingNew": "Ya está configurado: no hay nada nuevo que crear.",
         "customFields": "Campos personalizados",
         "createCustomField": "Crear campo",
         "editCustomField": "Editar campo",
@@ -5048,7 +5051,7 @@
         "editOverride": "Editar excepción",
         "deleteOverrideRangeTitle": "¿Eliminar este periodo?",
         "deleteOverrideRangeDetail": "Esto elimina todas las entradas de {{user}} del {{from}} al {{to}}. No se puede deshacer.",
-        "fillRange": "Aplicar a un periodo",
+        "fillRange": "Rellenar el periodo",
         "rangeFrom": "Desde",
         "rangeTo": "Hasta",
         "fillRangeConfirmTitle": "¿Rellenar este periodo?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Horas por tipo de turno",
         "workedHoursDescription": "Horas planificadas por tipo de turno.",
         "overtime": "Horas extra",
-        "overtimeNote": "Más de {{hours}} h/semana para este periodo",
+        "overtimeNote": "Más de {{hours}} h en 7 días consecutivos de este periodo",
         "reminderToggle": "Avisarme antes de que empiece mi turno",
         "reminderHint": "Un aviso antes de cada turno próximo con hora de inicio. Vacaciones, bajas y otras entradas de día completo no tienen hora de inicio que recordar.",
         "reminderAtStart": "A la hora de inicio",
@@ -5099,9 +5102,10 @@
         "templateWork": "Trabajo",
         "templateSchool": "Colegio",
         "templateUniversity": "Universidad",
-        "overview": "Resumen",
+        "overview": "Comparativa",
         "overviewPeopleLabel": "Comparar personas",
+        "overviewClearSelection": "Borrar la selección",
         "overviewEmptyTitle": "Elige personas para comparar",
-        "overviewEmptyDescription": "Selecciona arriba dos o más miembros del hogar para ver sus horarios semanales uno junto al otro."
+        "overviewEmptyDescription": "Selecciona arriba al menos un miembro del hogar para ver los horarios semanales uno junto al otro."
     }
 }

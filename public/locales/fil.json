@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Wala pang uri ng shift",
         "emptyShiftTypesDescription": "Magdagdag ng ilang karaniwang uri ng shift para makapagsimula, o gumawa ng sarili mo.",
         "quickStartShiftTypes": "Mabilisang pagsisimula",
+        "quickStartCreated": "Nagawa ang {{count}} uri ng shift.",
+        "quickStartCreated_one": "Nagawa ang isang uri ng shift.",
+        "quickStartNothingNew": "Naka-set up na - walang bagong gagawin.",
         "customFields": "Custom na field",
         "createCustomField": "Gumawa ng field",
         "editCustomField": "I-edit ang field",
@@ -5048,7 +5051,7 @@
         "editOverride": "I-edit ang eksepsiyon",
         "deleteOverrideRangeTitle": "Burahin ang saklaw na ito?",
         "deleteOverrideRangeDetail": "Buburahin nito ang bawat entry para kay {{user}} mula {{from}} hanggang {{to}}. Hindi ito maibabalik.",
-        "fillRange": "Ilapat sa isang saklaw",
+        "fillRange": "Punan ang saklaw",
         "rangeFrom": "Mula",
         "rangeTo": "Hanggang",
         "fillRangeConfirmTitle": "Punan ang saklaw na ito?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Mga oras ayon sa uri ng shift",
         "workedHoursDescription": "Mga nakaiskedyul na oras ayon sa uri ng shift.",
         "overtime": "Overtime",
-        "overtimeNote": "Higit sa {{hours}} oras/linggo para sa saklaw na ito",
+        "overtimeNote": "Higit sa {{hours}} oras sa 7 magkakasunod na araw sa saklaw na ito",
         "reminderToggle": "Paalalahanan ako bago magsimula ang aking shift",
         "reminderHint": "Isang push notification bago ang bawat paparating na shift na may oras ng simula. Ang bakasyon, sick day, at iba pang buong-araw na entry ay walang oras ng simula na paaalalahanan.",
         "reminderAtStart": "Sa oras ng simula",
@@ -5099,9 +5102,10 @@
         "templateWork": "Trabaho",
         "templateSchool": "Paaralan",
         "templateUniversity": "Unibersidad",
-        "overview": "Pangkalahatang-ideya",
+        "overview": "Paghahambing",
         "overviewPeopleLabel": "Ikumpara ang mga tao",
+        "overviewClearSelection": "I-clear ang pinili",
         "overviewEmptyTitle": "Pumili ng mga tao na ikukumpara",
-        "overviewEmptyDescription": "Pumili sa itaas ng dalawa o higit pang miyembro ng sambahayan para makita ang kanilang lingguhang iskedyul nang magkatabi."
+        "overviewEmptyDescription": "Pumili sa itaas ng kahit isang miyembro ng sambahayan para makita ang lingguhang iskedyul nang magkatabi."
     }
 }

@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Brak rodzajów zmian",
         "emptyShiftTypesDescription": "Dodaj kilka typowych rodzajów zmian na początek albo utwórz własne.",
         "quickStartShiftTypes": "Szybki start",
+        "quickStartCreated": "Utworzono {{count}} rodzajów zmian.",
+        "quickStartCreated_one": "Utworzono jeden rodzaj zmiany.",
+        "quickStartNothingNew": "Wszystko już istnieje - nie ma nic nowego do utworzenia.",
         "customFields": "Pola niestandardowe",
         "createCustomField": "Utwórz pole",
         "editCustomField": "Edytuj pole",
@@ -5048,7 +5051,7 @@
         "editOverride": "Edytuj wyjątek",
         "deleteOverrideRangeTitle": "Usunąć ten okres?",
         "deleteOverrideRangeDetail": "To usuwa każdy wpis dla {{user}} od {{from}} do {{to}}. Nie można tego cofnąć.",
-        "fillRange": "Zastosuj do okresu",
+        "fillRange": "Wypełnij okres",
         "rangeFrom": "Od",
         "rangeTo": "Do",
         "fillRangeConfirmTitle": "Wypełnić ten okres?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Godziny według rodzaju zmiany",
         "workedHoursDescription": "Zaplanowane godziny według rodzaju zmiany.",
         "overtime": "Nadgodziny",
-        "overtimeNote": "Ponad {{hours}} godz./tydzień dla tego zakresu",
+        "overtimeNote": "Ponad {{hours}} godz. w 7 kolejnych dniach tego zakresu",
         "reminderToggle": "Przypomnij mi przed rozpoczęciem mojej zmiany",
         "reminderHint": "Powiadomienie push przed każdą nadchodzącą zmianą z czasem rozpoczęcia. Urlop, zwolnienie lekarskie i inne całodniowe wpisy nie mają czasu rozpoczęcia, o którym można przypomnieć.",
         "reminderAtStart": "O czasie rozpoczęcia",
@@ -5099,9 +5102,10 @@
         "templateWork": "Praca",
         "templateSchool": "Szkoła",
         "templateUniversity": "Uczelnia",
-        "overview": "Przegląd",
+        "overview": "Porównanie",
         "overviewPeopleLabel": "Porównaj osoby",
+        "overviewClearSelection": "Wyczyść wybór",
         "overviewEmptyTitle": "Wybierz osoby do porównania",
-        "overviewEmptyDescription": "Wybierz powyżej dwóch lub więcej członków gospodarstwa domowego, aby zobaczyć ich tygodniowe plany obok siebie."
+        "overviewEmptyDescription": "Wybierz powyżej co najmniej jednego członka gospodarstwa domowego, aby zobaczyć tygodniowe plany obok siebie."
     }
 }

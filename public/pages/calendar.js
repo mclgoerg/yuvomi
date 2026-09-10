@@ -1603,7 +1603,7 @@ function renderToolbar() {
   // versteckt, und eine Warnung, die man erst oeffnen muss, ist keine.
   const scheduleWarningHtml = (scheduleEnabled() && state.scheduleWarnings.length) ? `
     <span class="cal-toolbar__schedule-warning" role="status"
-          title="${esc(t('schedule.overlapWarning', { date: state.scheduleWarnings[0].date_key, user: scheduleOwnerName(state.scheduleWarnings[0]) }))}">
+          title="${esc(t('schedule.overlapWarning', { date: formatPreferredDate(state.scheduleWarnings[0].date_key), user: scheduleOwnerName(state.scheduleWarnings[0]) }))}">
       <i data-lucide="triangle-alert" class="icon-sm" aria-hidden="true"></i>
       <span>${t('schedule.overlapWarningShort')}</span>
     </span>

@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "Nog geen diensttypes",
         "emptyShiftTypesDescription": "Voeg een paar gangbare diensttypes toe om te beginnen, of maak je eigen.",
         "quickStartShiftTypes": "Snelstart",
+        "quickStartCreated": "{{count}} diensttypen aangemaakt.",
+        "quickStartCreated_one": "Eén diensttype aangemaakt.",
+        "quickStartNothingNew": "Al ingesteld - niets nieuws aan te maken.",
         "customFields": "Aangepaste velden",
         "createCustomField": "Veld aanmaken",
         "editCustomField": "Veld bewerken",
@@ -5048,7 +5051,7 @@
         "editOverride": "Uitzondering bewerken",
         "deleteOverrideRangeTitle": "Deze periode verwijderen?",
         "deleteOverrideRangeDetail": "Dit verwijdert elk item van {{user}} van {{from}} tot {{to}}. Dit kan niet ongedaan worden gemaakt.",
-        "fillRange": "Op een periode toepassen",
+        "fillRange": "Periode invullen",
         "rangeFrom": "Van",
         "rangeTo": "Tot",
         "fillRangeConfirmTitle": "Deze periode vullen?",
@@ -5067,7 +5070,7 @@
         "workedHours": "Uren per diensttype",
         "workedHoursDescription": "Geplande uren per diensttype.",
         "overtime": "Overuren",
-        "overtimeNote": "Meer dan {{hours}} u/week voor deze periode",
+        "overtimeNote": "Meer dan {{hours}} u in 7 opeenvolgende dagen van deze periode",
         "reminderToggle": "Herinner me voordat mijn dienst begint",
         "reminderHint": "Een pushmelding vóór elke aankomende dienst met een starttijd. Vakantie, ziekte en andere hele-dag-items hebben geen starttijd om aan te herinneren.",
         "reminderAtStart": "Op starttijd",
@@ -5099,9 +5102,10 @@
         "templateWork": "Werk",
         "templateSchool": "School",
         "templateUniversity": "Universiteit",
-        "overview": "Overzicht",
+        "overview": "Vergelijking",
         "overviewPeopleLabel": "Personen vergelijken",
+        "overviewClearSelection": "Selectie wissen",
         "overviewEmptyTitle": "Kies personen om te vergelijken",
-        "overviewEmptyDescription": "Selecteer hierboven twee of meer huisgenoten om hun weekroosters naast elkaar te zien."
+        "overviewEmptyDescription": "Selecteer hierboven minstens één huisgenoot om de weekroosters naast elkaar te zien."
     }
 }

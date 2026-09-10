@@ -1218,7 +1218,7 @@ function scheduleOverviewEntryTitle(entry) {
 }
 
 function renderOverview() {
-  const picker = renderUserMultiSelect(overview.people, overview.selectedIds, 'overview-people', 'schedule.overviewPeopleLabel');
+  const picker = renderUserMultiSelect(overview.people, overview.selectedIds, 'overview-people', 'schedule.overviewPeopleLabel', 'schedule.overviewClearSelection');
   const weekDays = overviewVisibleDays();
   const weekLabel = overview.viewMode === 'day'
     ? formatDayMonth(weekDays[0])
@@ -1302,7 +1302,7 @@ function renderOverview() {
 
 function renderScheduleWarnings() {
   if (!state.warnings.length) return '';
-  return '<div class="schedule-warnings" role="status">' + state.warnings.map((warning) => '<p>' + esc(t('schedule.overlapWarning', { date: warning.date_key, user: userName(warning.user_id) })) + '</p>').join('') + '</div>';
+  return '<div class="schedule-warnings" role="status">' + state.warnings.map((warning) => '<p>' + esc(t('schedule.overlapWarning', { date: formatDate(warning.date_key), user: userName(warning.user_id) })) + '</p>').join('') + '</div>';
 }
 
 /**
@@ -1347,7 +1347,12 @@ function renderShell() {
   });
   root.addEventListener('change', (event) => {
     if (event.target.id === 'schedule-reminder-toggle') {
-      const offset = event.target.checked ? Number(root.querySelector('#schedule-reminder-offset')?.value ?? 15) : null;
+      const offsetSelect = root.querySelector('#schedule-reminder-offset');
+      // Sofort sperren/entsperren statt auf renderPage() nach dem Speichern zu
+      // warten (S-25) - sonst wirkt die Auswahl fuer die Dauer des Roundtrips
+      // weiter bedienbar, obwohl der Umschalter schon aus ist.
+      if (offsetSelect) offsetSelect.disabled = !event.target.checked;
+      const offset = event.target.checked ? Number(offsetSelect?.value ?? 15) : null;
       savePreference({ reminderOffsetMinutes: offset });
     } else if (event.target.id === 'schedule-reminder-offset') {
       savePreference({ reminderOffsetMinutes: Number(event.target.value) });
@@ -1448,17 +1453,17 @@ function wireShiftTypeFieldSortables(body) {
 }
 function updateScheduleFab() {
   if (!scheduleFab) return;
+  // Sichtbares Dock-Label = aria-label: beide nennen die AKTION ("Add entry",
+  // "Create shift type"), nicht den aktiven Tab (S-09) - vorher stand hier ein
+  // eigenes `dockLabels`-Kurzwort ("Planning"), das am Docking-Ort aussah, als
+  // liesse sich der Tabname selbst antippen statt die Anlege-Aktion dahinter.
   const labels = {
     shifts: t('schedule.createShiftType'),
     patterns: t('schedule.addEntry'),
   };
-  const dockLabels = {
-    shifts: t('schedule.shiftType'),
-    patterns: t('schedule.planning'),
-  };
   setPageFabAction(scheduleFab, {
     label: labels[activeView],
-    dockLabel: dockLabels[activeView],
+    dockLabel: labels[activeView],
     // Statistics und Overview sind beide reine Leseansichten - kein "Anlegen".
     // Ausgeblendet ist nicht dasselbe wie unerreichbar (siehe readOnly()/
     // action()) - der Handler bleibt trotzdem gesperrt.
@@ -1485,7 +1490,7 @@ function openOverrideEditModal(group) {
     + formField(t('schedule.owner'), '<input class="input" readonly value="' + esc(userName(group.user_id)) + '">')
     + formField(t('schedule.rangeFrom'), '<yuvomi-datepicker required name="from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(group.from) + '"></yuvomi-datepicker>')
     + formField(t('schedule.rangeTo'), '<yuvomi-datepicker required name="to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(group.to) + '"></yuvomi-datepicker>')
-    + formField(t('schedule.shiftTypes'), '<select class="input" name="shift_type_id">' + typeOptions(type?.id ?? null) + '</select>')
+    + formField(t('schedule.shiftType'), '<select class="input" name="shift_type_id">' + typeOptions(type?.id ?? null) + '</select>')
     + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000" value="' + esc(group.note ?? '') + '">')
     + dayRowFieldsHtml(type?.id ?? null, group.field_values)
     + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
@@ -1540,7 +1545,7 @@ function openExtraGroupEditModal(group) {
     + formField(t('schedule.owner'), '<input class="input" readonly value="' + esc(userName(group.user_id)) + '">')
     + formField(t('schedule.rangeFrom'), '<yuvomi-datepicker required name="from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(group.from) + '"></yuvomi-datepicker>')
     + formField(t('schedule.rangeTo'), '<yuvomi-datepicker required name="to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(group.to) + '"></yuvomi-datepicker>')
-    + formField(t('schedule.shiftTypes'), '<select class="input" required name="shift_type_id">' + typeOptions(group.shift_type_id, false) + '</select>')
+    + formField(t('schedule.shiftType'), '<select class="input" required name="shift_type_id">' + typeOptions(group.shift_type_id, false) + '</select>')
     + formField(t('schedule.note'), '<input class="input" name="note" maxlength="5000" value="' + esc(group.note ?? '') + '">')
     + reminderOffsetField(group.reminder_offset_minutes)
     + dayRowFieldsHtml(group.shift_type_id, group.field_values)
@@ -1612,7 +1617,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       // schedule_overrides.shift_type_id ist nullable), ein Extra nicht
       // (schedule_extra_shifts.shift_type_id ist NOT NULL) - deshalb traegt
       // nur die Ersetzen-Variante die Option "Freier Tag".
-      + '<fieldset data-field="mode-replace"' + (mode === 'replace' ? '' : ' hidden disabled') + '>' + formField(t('schedule.shiftTypes'), '<select class="input" name="shift_type_id">' + typeOptions(null) + '</select>') + '</fieldset>'
+      + '<fieldset data-field="mode-replace"' + (mode === 'replace' ? '' : ' hidden disabled') + '>' + formField(t('schedule.shiftType'), '<select class="input" name="shift_type_id">' + typeOptions(null) + '</select>') + '</fieldset>'
       // Anders als "Ersetzen" (dessen freier Tag defaultet, also nie eigene
       // Felder traegt) waehlt ein natives <select> ohne `includeFree` und ohne
       // explizit markierte Auswahl (typeOptions(null, false)) schon selbst den
@@ -1622,7 +1627,7 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       // wireOccurrenceFieldReactivity() ihn bisher nachzog). Dieselbe
       // Reihenfolge wie openExtraGroupEditModal(): Reminder-Feld, dann der
       // Feld-Unterblock.
-      + '<fieldset data-field="mode-add"' + (mode === 'add' ? '' : ' hidden disabled') + '>' + formField(t('schedule.shiftTypes'), '<select class="input" name="shift_type_id">' + typeOptions(null, false) + '</select>') + reminderOffsetField(null) + dayRowFieldsHtml(state.types[0]?.id ?? null) + '</fieldset>'
+      + '<fieldset data-field="mode-add"' + (mode === 'add' ? '' : ' hidden disabled') + '>' + formField(t('schedule.shiftType'), '<select class="input" name="shift_type_id">' + typeOptions(null, false) + '</select>') + reminderOffsetField(null) + dayRowFieldsHtml(state.types[0]?.id ?? null) + '</fieldset>'
       + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
   }
   openModal({
@@ -1922,6 +1927,7 @@ async function action(event) {
       button.disabled = true;
       const template = PRESET_TEMPLATES[button.dataset.template] ?? [];
       const existingCodes = new Set(state.types.map((type) => type.short_code));
+      let createdCount = 0;
       try {
         for (const preset of template) {
           if (existingCodes.has(preset.shortCode)) continue;
@@ -1933,12 +1939,20 @@ async function action(event) {
             color: preset.color,
             icon: preset.icon,
           });
+          createdCount += 1;
         }
       } finally {
         await load();
         renderPage();
       }
-      window.yuvomi?.showToast(t('schedule.saved'), 'success');
+      // Zaehlend statt "Gespeichert." fuer beide Faelle (S-11): ein erneuter
+      // Klick auf dieselbe Vorlage legt nichts mehr an (siehe Kommentar oben,
+      // existingCodes ueberspringt jeden schon vorhandenen Kurzcode) - das war
+      // vorher nicht vom Erfolgsfall zu unterscheiden.
+      window.yuvomi?.showToast(
+        createdCount > 0 ? t('schedule.quickStartCreated', { count: createdCount }) : t('schedule.quickStartNothingNew'),
+        'success'
+      );
       return;
     }
     if (button.dataset.action === 'pick-shift-icon') {

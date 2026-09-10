@@ -4980,6 +4980,9 @@
         "emptyShiftTypesTitle": "シフトの種類はまだありません",
         "emptyShiftTypesDescription": "よくあるシフトの種類をいくつか追加して始めるか、自分で作成してください。",
         "quickStartShiftTypes": "クイックスタート",
+        "quickStartCreated": "シフトの種類を{{count}}件作成しました。",
+        "quickStartCreated_one": "シフトの種類を1件作成しました。",
+        "quickStartNothingNew": "すでに作成済みです。新しく作るものはありません。",
         "customFields": "カスタム項目",
         "createCustomField": "項目を作成",
         "editCustomField": "項目を編集",
@@ -5048,7 +5051,7 @@
         "editOverride": "例外を編集",
         "deleteOverrideRangeTitle": "この期間を削除しますか？",
         "deleteOverrideRangeDetail": "{{user}} の {{from}} から {{to}} までのすべての登録を削除します。元に戻せません。",
-        "fillRange": "期間に適用",
+        "fillRange": "期間を埋める",
         "rangeFrom": "開始",
         "rangeTo": "終了",
         "fillRangeConfirmTitle": "この期間を埋めますか？",
@@ -5067,7 +5070,7 @@
         "workedHours": "種類ごとの時間",
         "workedHoursDescription": "種類ごとの予定時間。",
         "overtime": "残業",
-        "overtimeNote": "この期間で週{{hours}}時間を超過",
+        "overtimeNote": "この期間中、連続7日間で{{hours}}時間を超過",
         "reminderToggle": "シフト開始前に通知する",
         "reminderHint": "開始時刻のある次のシフトの前にプッシュ通知します。休暇、病欠、その他終日の予定には通知する開始時刻がありません。",
         "reminderAtStart": "開始時刻に",
@@ -5099,9 +5102,10 @@
         "templateWork": "仕事",
         "templateSchool": "学校",
         "templateUniversity": "大学",
-        "overview": "一覧",
+        "overview": "比較",
         "overviewPeopleLabel": "メンバーを比較",
+        "overviewClearSelection": "選択をクリア",
         "overviewEmptyTitle": "比較するメンバーを選択",
-        "overviewEmptyDescription": "上で2人以上の家族メンバーを選ぶと、週間予定を並べて表示できます。"
+        "overviewEmptyDescription": "上で1人以上の家族メンバーを選ぶと、週間予定を並べて表示できます。"
     }
 }
