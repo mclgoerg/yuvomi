@@ -310,8 +310,18 @@ export function focusFirstField(panel) {
 // Dirty-Check Helpers
 // --------------------------------------------------------
 
+// `[data-dirty-ignore]` opts a single control OUT of the dirty comparison
+// (S-14): a purely structural/UI-mode field (e.g. a hidden `mode` input that a
+// segmented control rewrites on every click, with no typed content of its
+// own) would otherwise make `isFormDirty()` report a change the user never
+// made - switching segments alone triggered "Discard changes?" with zero
+// typed input. Opt-in per field, not a blanket exclusion of disabled/hidden
+// fieldsets: a real field that starts disabled/hidden (e.g. a conditional
+// fieldset a mode enables) must still count once it holds typed content.
 function serializeForm(container) {
-  const inputs = container.querySelectorAll('input:not([type="file"]), select, textarea');
+  const inputs = container.querySelectorAll(
+    'input:not([type="file"]):not([data-dirty-ignore]), select:not([data-dirty-ignore]), textarea:not([data-dirty-ignore])'
+  );
   return Array.from(inputs).map((el) => `${el.name || el.id}=${el.value}`).join('&');
 }
 

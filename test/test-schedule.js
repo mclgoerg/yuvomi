@@ -1673,3 +1673,97 @@ test('Schedule uses the full desktop module shell and responsive library/statist
   assert.match(scheduleCss, /@container schedule-page \(min-width: 900px\)/);
   assert.match(scheduleCss, /schedule-stat-dates/);
 });
+
+// UX audit batch 2 (safety): S-01 delete confirm, S-02 humanized validation
+// errors, S-03 unsaved cycle-day edits, S-06 statistics range, S-14 dirty
+// false positive.
+
+test('patternDaysExceedingCycleLength() flags exactly the positions a shorter cycle would drop, 1-indexed', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // Kein Tag ausserhalb der neuen Laenge -> kein Konflikt.
+  assert.equal(__test.patternDaysExceedingCycleLength([{ position: 0 }, { position: 3 }], 8), null);
+  // Position 7 (achter Zyklustag) faellt aus einer auf 5 verkuerzten Rotation heraus.
+  assert.deepEqual(__test.patternDaysExceedingCycleLength([{ position: 0 }, { position: 7 }], 5), { from: 8, to: 8 });
+  // Mehrere betroffene Positionen -> von/bis spannt den ganzen betroffenen Bereich auf.
+  assert.deepEqual(__test.patternDaysExceedingCycleLength([{ position: 4 }, { position: 5 }, { position: 6 }], 4), { from: 5, to: 7 });
+  // Leere/ fehlende Tage duerfen nie werfen.
+  assert.equal(__test.patternDaysExceedingCycleLength([], 3), null);
+  assert.equal(__test.patternDaysExceedingCycleLength(undefined, 3), null);
+});
+
+test('the pattern-update submit path prechecks cycle_length against pattern.days before PUTting, field-level not toast', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const branch = schedulePage.slice(
+    schedulePage.indexOf("if (form.dataset.form === 'pattern-update')"),
+    schedulePage.indexOf("await load();", schedulePage.indexOf("if (form.dataset.form === 'pattern-update')")),
+  );
+  assert.match(branch, /patternDaysExceedingCycleLength\(pattern\?\.days, data\.cycle_length\)/);
+  assert.match(branch, /reportFieldError\(form\.querySelector\('\[name="cycle_length"\]'\), t\('schedule\.cycleLengthTooShort', conflict\)\)/);
+  assert.match(branch, /if \(conflict\) \{[\s\S]*return;\s*\}/, 'a detected conflict must bail out before the PUT');
+  assert.doesNotMatch(branch.slice(0, branch.indexOf('return;')), /api\.put\(`\/schedule\/patterns\/\$\{form\.dataset\.id\}`/, 'the PUT must not fire before the precheck has passed');
+});
+
+test('scheduleErrorMessage() maps the three known raw server strings to humanized keys, and passes through anything unknown', async () => {
+  const { __test } = await import('../public/pages/schedule.js');
+  // Der Test-Loader stubt t() als Identitaet (siehe test-browser-loader.mjs)
+  // - hier zaehlt nur, dass ein bekannter Rohtext ueberhaupt auf EINEN
+  // uebersetzten Schluessel abgebildet wird (echte Uebersetzungstexte prueft
+  // bereits test:i18n/-translated), nicht dass er 1:1 durchgereicht wird.
+  assert.equal(__test.scheduleErrorMessage({ data: { error: 'shift_type_id must be a positive number.' } }), 'schedule.shiftTypeRequiredError');
+  assert.equal(__test.scheduleErrorMessage({ data: { error: 'cycle_length cannot exclude existing pattern days.' } }), 'schedule.cycleLengthConflictGeneric');
+  assert.equal(__test.scheduleErrorMessage({ data: { error: 'Shift type is in use.' } }), 'schedule.typeInUse');
+  // Ein unbekannter Rohtext faellt unveraendert durch statt auf den generischen Fehler.
+  assert.equal(__test.scheduleErrorMessage({ data: { error: 'Something else entirely.' } }), 'Something else entirely.');
+  // Weder data.error noch message -> der generische Fallback.
+  assert.equal(__test.scheduleErrorMessage({}), 'common.errorGeneric');
+});
+
+test('delete-shift now confirms before deleting, naming the type, like the other destructive actions', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const branch = schedulePage.slice(
+    schedulePage.indexOf("if (button.dataset.action === 'delete-shift')"),
+    schedulePage.indexOf("if (button.dataset.action === 'open-create-custom-field')"),
+  );
+  assert.match(branch, /confirmModal\(/, 'must gate through the shared confirm dialog like delete-pattern/delete-custom-field');
+  assert.match(branch, /danger:\s*true/);
+  assert.match(branch, /detail:\s*t\('schedule\.deleteShiftTypeDetail'/);
+  assert.match(branch, /if \(!confirmed\) return;/);
+  // Die api.delete() darf erst NACH der Rueckfrage stehen.
+  assert.ok(branch.indexOf('if (!confirmed) return;') < branch.indexOf('await api.delete(`/schedule/shift-types/'));
+});
+
+test('a mode-only switch in the Add-entry modal is excluded from the dirty comparison (S-14)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /name="mode" value="'\s*\+\s*esc\(mode\)\s*\+\s*'" data-dirty-ignore>/,
+    'the mode hidden field must opt out of the dirty comparison, otherwise a bare segment switch reads as unsaved input');
+
+  const modalPage = readFileSync(new URL('../public/components/modal.js', import.meta.url), 'utf8');
+  const serializeFn = modalPage.slice(modalPage.indexOf('function serializeForm'), modalPage.indexOf('function isFormDirty'));
+  assert.match(serializeFn, /:not\(\[data-dirty-ignore\]\)/, 'serializeForm must exclude opted-out fields from the dirty snapshot/comparison');
+});
+
+test('an inverted or incomplete custom statistics range never fetches and never sets the generic error state (S-06)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const fn = schedulePage.slice(schedulePage.indexOf('async function refreshStatistics'), schedulePage.indexOf('async function activateView'));
+  assert.match(fn, /if \(!bounds\) \{[\s\S]*?return;\s*\}/, 'an invalid range must return early, not throw');
+  assert.doesNotMatch(fn.slice(0, fn.indexOf('const userId')), /api\.get/, 'no fetch must happen before the bounds check passes');
+  assert.doesNotMatch(fn, /throw new Error/, 'an invalid range is no longer reported as a thrown error (that surfaced as the generic connection-error tile)');
+
+  assert.match(schedulePage, /formField\(t\('schedule\.rangeFrom'\), '<yuvomi-datepicker required name="from"/, 'the custom-range field must use rangeFrom/rangeTo, not the pattern-vocabulary validFrom/validUntil');
+  assert.match(schedulePage, /formField\(t\('schedule\.rangeTo'\), '<yuvomi-datepicker required name="to"/);
+});
+
+test('switching Planning sub-tabs while a pattern editor is dirty asks before discarding, and clears on save (S-03)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /async function guardedActivateView\(id\)/);
+  const guardFn = schedulePage.slice(schedulePage.indexOf('async function guardedActivateView'), schedulePage.indexOf('function renderShell'));
+  assert.match(guardFn, /dirtyPatternIds\.size/);
+  assert.match(guardFn, /confirmModal\(/);
+  assert.match(guardFn, /scheduleTablist\?\.sync\(activeView\)/, 'cancelling must revert the tab bar without ever calling activateView()');
+
+  // Beide Speicherpfade, die eine Musterkarte betreffen, muessen ihre id wieder freigeben.
+  assert.match(schedulePage, /await api\.put\(`\/schedule\/patterns\/\$\{button\.dataset\.id\}\/days`, \{ days \}\);\s*\n\s*dirtyPatternIds\.delete\(String\(button\.dataset\.id\)\)/);
+  assert.match(schedulePage, /await api\.put\(`\/schedule\/patterns\/\$\{form\.dataset\.id\}`, data\);\s*\n\s*dirtyPatternIds\.delete\(String\(form\.dataset\.id\)\)/);
+
+  assert.match(schedulePage, /onChange: \(id\) => \{ guardedActivateView\(id\); \}/, 'the tablist must route through the guard, not call activateView() directly');
+});

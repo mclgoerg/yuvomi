@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
-import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection, reportFieldError } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
@@ -22,6 +22,16 @@ let scheduleTablist = null;
 let currentUserId = null;
 let canManageOthers = false;
 let activeView = 'patterns';
+// S-03: welche Musterkarten (per `pattern.id`, als String) gerade eine
+// ungespeicherte Aenderung im Zyklustage-Editor oder im inline Pattern-
+// Formular tragen. renderPage() ersetzt `.schedule-body` komplett bei jedem
+// Tab-Wechsel/Neuladen - ohne diese Nachverfolgung verschwand eine getippte,
+// aber nicht gespeicherte Aenderung lautlos, sobald irgendetwas einen
+// Re-Render ausloeste (Audit-Fund S-03). Ein Set statt eines einzelnen
+// Flags: mehrere Musterkarten koennen gleichzeitig geoeffnet und bearbeitet
+// sein, eine Rueckfrage beim Schliessen EINER Karte soll nicht von der
+// Restlichkeit falsch beeinflusst werden.
+let dirtyPatternIds = new Set();
 let state = { users: [], types: [], customFields: [], patterns: [], overrides: [], extras: [], entries: [], warnings: [], reminderOffsetMinutes: null, weeklyHours: null, hiddenTemplates: [] };
 let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', from: '', to: '', entries: [], bounds: null, loading: false, error: false };
 // Generationszaehler gegen ein Wettrennen zweier ueberlappender Ladevorgaenge
@@ -191,6 +201,29 @@ const clockLabel = (shiftType) => {
   return `${shiftType.start_time}–${shiftType.end_time}${crossesDay ? ' +1' : ''}${fullDay ? ' · 24 h' : ''}`;
 };
 
+// S-02: der Server antwortet mit technischen Validierungs-/Konflikttexten
+// ("shift_type_id must be a positive number.", "cycle_length cannot exclude
+// existing pattern days.", "Shift type is in use.") - bisher landeten die
+// unveraendert im Toast. Kein bestehendes Modul im Repo bildet dafuer schon
+// eine Rohtext-zu-Uebersetzung ab (recherchiert: router.js' und documents.js'
+// gleichnamige friendlyError() ordnen nur nach HTTP-Status/Fehlername, nie
+// nach dem WORTLAUT der Meldung) - diese Zuordnung hier ist die erste ihrer
+// Art. Ein unbekannter Text faellt unveraendert durch (der Rohtext bleibt
+// lesbarer als der generische Fehler, falls der Server je einen neuen Text
+// ausgibt, den diese Liste noch nicht kennt). Die API-Vertragstexte selbst
+// (server/routes/schedule.js) bleiben unangetastet - das hier ist rein
+// clientseitige Uebersetzung, kein Vertragswechsel.
+const SCHEDULE_SERVER_ERROR_MESSAGES = {
+  'shift_type_id must be a positive number.': () => t('schedule.shiftTypeRequiredError'),
+  'cycle_length cannot exclude existing pattern days.': () => t('schedule.cycleLengthConflictGeneric'),
+  'Shift type is in use.': () => t('schedule.typeInUse'),
+};
+
+function scheduleErrorMessage(error) {
+  const raw = error?.data?.error ?? error?.message;
+  return (raw && SCHEDULE_SERVER_ERROR_MESSAGES[raw]?.()) ?? raw ?? t('common.errorGeneric');
+}
+
 async function load() {
   const day = todayKey();
   const [users, types, customFields, patternResult, overrides, extras, entries, preferences, householdPrefs, householdMembers] = await Promise.all([
@@ -296,6 +329,26 @@ const DEFAULT_WEEKLY_HOURS = 40;
 // bestimmten Wochentag beginnen. Gemeldet wird nur das SCHLIMMSTE Fenster
 // (nicht die Summe ueber alle ueberlappenden Fenster - die teilen sich
 // dieselben Tage mehrfach, das wuerde denselben Ueberschuss vielfach zaehlen).
+// S-02: derselbe Check, den der Server ohnehin durchsetzt (server/routes/
+// schedule.js: "SELECT 1 FROM schedule_pattern_days WHERE pattern_id=? AND
+// position>=?"), hier VORAB gegen die bereits im Client vorliegenden
+// Zyklustage - eine Verkuerzung, die eine bestehende Zeile ausschliessen
+// wuerde, kam bisher erst als Rohtext ("cycle_length cannot exclude existing
+// pattern days.") vom Server zurueck. Reine Funktion (kein state-Zugriff),
+// damit ein Test echte Tage hineingeben kann - dasselbe Muster wie
+// overtimeInfo()/rangeDifference() in diesem Modul. `days` ist bewusst KEIN
+// state.patterns-Zugriff hier: erwartet wird das bereits geladene
+// `pattern.days`-Array (ein Eintrag je tatsaechlich in der Tabelle
+// vorhandenen Zyklustag), 1-indexierte Position im Rueckgabewert, weil die
+// Kartenansicht Positionen selbst auch 1-indexiert beschriftet (`position + 1`).
+function patternDaysExceedingCycleLength(days, cycleLength) {
+  const excludedPositions = (days ?? [])
+    .map((day) => Number(day.position))
+    .filter((position) => position >= cycleLength);
+  if (!excludedPositions.length) return null;
+  return { from: Math.min(...excludedPositions) + 1, to: Math.max(...excludedPositions) + 1 };
+}
+
 function overtimeInfo(entries, weeklyHours = DEFAULT_WEEKLY_HOURS) {
   const days = entries
     .map((entry) => ({ day: parseLocalDateKey(entry.date_key).getTime(), minutes: entry.shift_type ? (shiftMinutes(entry.shift_type) ?? 0) : 0 }))
@@ -376,7 +429,7 @@ async function savePreference(patch) {
     state.reminderOffsetMinutes = result.data?.reminderOffsetMinutes ?? null;
     state.weeklyHours = result.data?.weeklyHours ?? null;
   } catch (err) {
-    window.yuvomi?.showToast(err.message || t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(scheduleErrorMessage(err), 'danger');
   }
   renderPage();
 }
@@ -432,7 +485,18 @@ function statisticsRows(items, valueFor, magnitudeOf, emptyLabel) {
 async function refreshStatistics() {
   const requestId = statisticsRequestId;
   const bounds = statisticBounds();
-  if (!bounds) throw new Error(t('schedule.invalidRange'));
+  // S-06: ein ungueltiger Zeitraum (leer oder umgekehrt, from > to) ist kein
+  // Verbindungsfehler - kein Fetch, kein Fehler-Toast, nur der bereits
+  // vorhandene "Waehle einen gueltigen Zeitraum"-Zustand (renderStatistics()'
+  // !bounds-Zweig unten). Vorher warf diese Funktion hier, und beide Aufrufer
+  // (activateView()/submitForm()) fingen das im catch als generischen Fehler
+  // auf (statistics.error = true) - der invalidRange-Text existierte zwar
+  // schon lange, war aber ueber keinen der beiden Wege je erreichbar.
+  if (!bounds) {
+    if (requestId !== statisticsRequestId) return; // ueberholt, siehe Kommentar unten
+    statistics = { ...statistics, bounds: null, loading: false };
+    return;
+  }
   const userId = statistics.userId || currentUserId;
   const result = await api.get('/schedule/entries?from=' + encodeURIComponent(bounds.from) + '&to=' + encodeURIComponent(bounds.to) + '&user_id=' + encodeURIComponent(userId));
   if (requestId !== statisticsRequestId) return; // ueberholt - eine juengere Anfrage laeuft/liegt bereits vor
@@ -449,7 +513,7 @@ async function activateView(view) {
     catch (error) {
       if (requestId !== overviewRequestId) return; // eine juengere Anfrage entscheidet, nicht diese veraltete
       overview = { ...overview, loading: false, error: true };
-      window.yuvomi?.showToast(error.data?.error ?? error.message ?? t('common.errorGeneric'), 'danger');
+      window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
     }
     if (requestId === overviewRequestId) renderPage();
     return;
@@ -462,7 +526,7 @@ async function activateView(view) {
   catch (error) {
     if (requestId !== statisticsRequestId) return;
     statistics = { ...statistics, loading: false, error: true };
-    window.yuvomi?.showToast(error.data?.error ?? error.message ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
   }
   if (requestId === statisticsRequestId) renderPage();
 }
@@ -922,8 +986,11 @@ function renderStatistics() {
     ? formField(t('schedule.monthFrom'), '<input class="input" required type="month" name="month_from" value="' + esc(statistics.monthFrom || monthKey()) + '">')
       + formField(t('schedule.monthTo'), '<input class="input" required type="month" name="month_to" value="' + esc(statistics.monthTo || monthKey()) + '">')
     : range === 'custom'
-      ? formField(t('schedule.validFrom'), '<yuvomi-datepicker required name="from" type="date" label="' + esc(t('schedule.validFrom')) + '" value="' + esc(statistics.from || bounds?.from || todayKey()) + '"></yuvomi-datepicker>')
-        + formField(t('schedule.validUntil'), '<yuvomi-datepicker required name="to" type="date" label="' + esc(t('schedule.validUntil')) + '" value="' + esc(statistics.to || bounds?.to || todayKey()) + '"></yuvomi-datepicker>')
+      // S-06: "Valid from/until" ist Muster-Vokabular (patternFields() oben) -
+      // ein Berichtszeitraum ist kein Gueltigkeitsfenster. rangeFrom/rangeTo
+      // sind dieselben Schluessel, die Override-/Extra-Bereiche schon tragen.
+      ? formField(t('schedule.rangeFrom'), '<yuvomi-datepicker required name="from" type="date" label="' + esc(t('schedule.rangeFrom')) + '" value="' + esc(statistics.from || bounds?.from || todayKey()) + '"></yuvomi-datepicker>')
+        + formField(t('schedule.rangeTo'), '<yuvomi-datepicker required name="to" type="date" label="' + esc(t('schedule.rangeTo')) + '" value="' + esc(statistics.to || bounds?.to || todayKey()) + '"></yuvomi-datepicker>')
       : '';
   // Ohne `bounds` gibt es keine Auswertung, sondern einen ungueltigen Zeitraum:
   // `statisticBounds()` antwortet mit null, `refreshStatistics()` wirft, und der
@@ -1305,6 +1372,41 @@ function renderScheduleWarnings() {
   return '<div class="schedule-warnings" role="status">' + state.warnings.map((warning) => '<p>' + esc(t('schedule.overlapWarning', { date: formatDate(warning.date_key), user: userName(warning.user_id) })) + '</p>').join('') + '</div>';
 }
 
+// S-03: markiert die umschliessende Musterkarte (`[data-pattern]`, siehe
+// patternCard()) als dirty - deckt sowohl den Zyklustage-Editor (die
+// `[data-day]`-Selects/Feld-Unterbloecke) als auch das inline
+// `pattern-update`-Formular ab, beide leben im selben `<details
+// data-pattern>`. Kein Effekt ausserhalb einer Musterkarte (z.B. Override-/
+// Extra-Zeilen, "Meine Einstellungen") - deren Aenderungen schreiben ohnehin
+// sofort (savePreference()) oder haben ihr eigenes Modal mit eigenem
+// Dirty-Guard.
+function markPatternDirty(target) {
+  const details = target?.closest?.('[data-pattern]');
+  if (details?.dataset?.pattern) dirtyPatternIds.add(details.dataset.pattern);
+}
+
+// S-03: vor einem Tab-Wechsel gefragt, waehrend mindestens eine Musterkarte
+// dirty ist. `wireTablist()` malt den Klick bereits VOR diesem Aufruf visuell
+// um (setActive() ruft paint() vor onChange()) - bei "Abbrechen" muss der
+// Tab-Balken deshalb aktiv auf den alten activeView zurueckgeholt werden
+// (sync() loest dabei bewusst kein weiteres onChange aus), das eigentliche
+// `.schedule-body` bleibt unveraendert (kein renderPage() gelaufen), die
+// Eingabe steht also unveraendert im DOM.
+async function guardedActivateView(id) {
+  if (activeView === 'patterns' && dirtyPatternIds.size) {
+    const confirmed = await confirmModal(
+      t('modal.unsavedChanges'),
+      { danger: true, confirmLabel: t('modal.discardChanges'), detail: t('schedule.discardCycleDayEditsDetail') },
+    );
+    if (!confirmed) {
+      scheduleTablist?.sync(activeView);
+      return;
+    }
+    dirtyPatternIds.clear();
+  }
+  await activateView(id);
+}
+
 /**
  * Builds the toolbar and tab rail ONCE. `renderPage()` below only touches
  * `.schedule-body` on a tab switch, so a FAB the router docks into
@@ -1338,14 +1440,44 @@ function renderShell() {
   // hier waere seither doppelt verdrahtet.
   scheduleTablist = wireTablist(root.querySelector('.schedule-tabs'), {
     activeId: activeView,
-    onChange: (id) => { activateView(id); },
+    onChange: (id) => { guardedActivateView(id); },
   });
   root.addEventListener('submit', submitForm);
   root.addEventListener('click', (event) => {
+    // S-03: eine Musterkarte einklappen ist ebenfalls ein "Re-Render" ihrer
+    // Sicht (der Zyklustage-Editor darunter verschwindet) - derselbe Verlust
+    // wie ein Tab-Wechsel, nur ueber das native <summary>-Toggle statt
+    // renderPage(). Der 'toggle'-Event von <details> selbst ist nicht
+    // abbrechbar; der Klick auf <summary>, der ihn ausloest, ist es - hier
+    // wird nur das SCHLIESSEN einer dirty Karte abgefangen, das Oeffnen
+    // (nichts geht dabei verloren) bleibt unangetastet.
+    const summary = event.target.closest('summary');
+    const details = summary?.closest('[data-pattern]');
+    if (details?.open && dirtyPatternIds.has(details.dataset.pattern)) {
+      event.preventDefault();
+      confirmModal(
+        t('modal.unsavedChanges'),
+        { danger: true, confirmLabel: t('modal.discardChanges'), detail: t('schedule.discardCycleDayEditsDetail') },
+      ).then((confirmed) => {
+        if (!confirmed) return;
+        dirtyPatternIds.delete(details.dataset.pattern);
+        details.open = false;
+      });
+      return;
+    }
     const actionButton = event.target.closest('[data-action]');
     if (actionButton) action({ currentTarget: actionButton });
   });
+  // S-03: jede Eingabe im Zyklustage-Editor/inline Pattern-Formular markiert
+  // ihre Musterkarte als dirty - 'input' fuer Texteingaben (Name,
+  // Zykluslaenge, Feldwerte, tippt man ohne je zu blur'en), 'change'
+  // zusaetzlich fuer <select>/<input type=date> (Zyklustag-Auswahl,
+  // Anker-/Gueltigkeitsdatum, Aktiv-Schalter), die manchmal ohne 'input' feuern.
+  root.addEventListener('input', (event) => {
+    if (activeView === 'patterns') markPatternDirty(event.target);
+  });
   root.addEventListener('change', (event) => {
+    if (activeView === 'patterns') markPatternDirty(event.target);
     if (event.target.id === 'schedule-reminder-toggle') {
       const offsetSelect = root.querySelector('#schedule-reminder-offset');
       // Sofort sperren/entsperren statt auf renderPage() nach dem Speichern zu
@@ -1592,7 +1724,11 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
     const modes = [['pattern', 'schedule.pattern'], ['replace', 'schedule.override'], ['add', 'schedule.extraBadgeLabel']];
     content = '<form id="schedule-create-form" class="form-stack schedule-modal-form" data-form="pattern-create">'
       + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + userOptions(selectedOwner()) + '</select>')
-      + '<input type="hidden" name="mode" value="' + esc(mode) + '">'
+      // data-dirty-ignore (S-14): merely switching the segmented Pattern/
+      // Override/Extra control rewrites this hidden value - without the
+      // opt-out, modal.js's dirty guard read that as a real change and
+      // prompted "Discard changes?" on Escape even though nothing was typed.
+      + '<input type="hidden" name="mode" value="' + esc(mode) + '" data-dirty-ignore>'
       // Kein zweites sichtbares Label hier - der Modaltitel sagt bereits
       // "Add entry", ein identisches Label direkt darunter war reine
       // Wiederholung. `aria-label` traegt den Kontext weiterhin fuer
@@ -1627,8 +1763,20 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       // wireOccurrenceFieldReactivity() ihn bisher nachzog). Dieselbe
       // Reihenfolge wie openExtraGroupEditModal(): Reminder-Feld, dann der
       // Feld-Unterblock.
-      + '<fieldset data-field="mode-add"' + (mode === 'add' ? '' : ' hidden disabled') + '>' + formField(t('schedule.shiftType'), '<select class="input" name="shift_type_id">' + typeOptions(null, false) + '</select>') + reminderOffsetField(null) + dayRowFieldsHtml(state.types[0]?.id ?? null) + '</fieldset>'
-      + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
+      // S-02/S-07: ohne einen einzigen Schichttyp ist typeOptions(null, false)
+      // ein <select> mit NULL Optionen - ein Klick auf Speichern landete bisher
+      // beim Server, der den rohen Text "shift_type_id must be a positive
+      // number." zurueckgab. `required` laesst den Browser das jetzt selbst
+      // verhindern, der Hinweis ersetzt das leere <select> ganz (ein leerer
+      // Waehler ist kein Formularfeld, das ausfuellbar waere), und der
+      // Speichern-Knopf bleibt fuer diesen Modus zusaetzlich gesperrt
+      // (updateAddModeAvailability() unten) - kein einziger Weg mehr zu einem
+      // Absenden ohne Typ.
+      + '<fieldset data-field="mode-add"' + (mode === 'add' ? '' : ' hidden disabled') + '>' + (state.types.length
+        ? formField(t('schedule.shiftType'), '<select class="input" required name="shift_type_id">' + typeOptions(null, false) + '</select>')
+        : '<p class="form-hint schedule-no-types-hint">' + esc(t('schedule.noShiftTypesHint')) + '</p>')
+      + reminderOffsetField(null) + dayRowFieldsHtml(state.types[0]?.id ?? null) + '</fieldset>'
+      + '<div class="modal-actions"><button type="submit" class="btn btn--primary" data-role="save-entry">' + esc(t('schedule.save')) + '</button></div></form>';
   }
   openModal({
     title,
@@ -1645,6 +1793,16 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       // jeder Klick setzt `hidden` UND `disabled` gemeinsam auf jedem
       // <fieldset> - `disabled` ist der eigentliche Fix, nicht nur Kosmetik,
       // siehe Kommentar oben an der Formularerzeugung.
+      // S-02/S-07: der Speichern-Knopf bleibt gesperrt, solange der Modus
+      // "Extra" aktiv ist UND kein Schichttyp existiert - dieselbe Bedingung,
+      // unter der die Fieldset oben den Hinweis statt eines leeren <select>
+      // zeigt. Jeder andere Modus/Zustand bleibt unberuehrt.
+      const updateAddModeAvailability = () => {
+        const saveButton = form.querySelector('[data-role="save-entry"]');
+        if (!saveButton) return;
+        const currentMode = form.querySelector('[name="mode"]')?.value;
+        saveButton.disabled = currentMode === 'add' && !state.types.length;
+      };
       form?.querySelectorAll('[data-mode]').forEach((button) => {
         button.addEventListener('click', () => {
           const mode = button.dataset.mode;
@@ -1663,8 +1821,10 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
           setGroup('one-time-shared', mode !== 'pattern');
           setGroup('mode-replace', mode === 'replace');
           setGroup('mode-add', mode === 'add');
+          updateAddModeAvailability();
         });
       });
+      updateAddModeAvailability();
       form?.querySelector('[name="reminder_enabled"]')?.addEventListener('change', (event) => {
         form.querySelector('[name="reminder_offset_minutes"]').disabled = !event.currentTarget.checked;
       });
@@ -1793,7 +1953,7 @@ async function saveCreatedSchedule(event) {
     await closeModal({ force: true });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
-    window.yuvomi?.showToast(error.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
   }
 }
 
@@ -1826,7 +1986,7 @@ async function saveCustomField(event, fieldId) {
     await closeModal({ force: true });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
-    window.yuvomi?.showToast(error.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
   }
 }
 
@@ -1879,7 +2039,20 @@ async function submitForm(event) {
     if (form.dataset.form === 'pattern-update') {
       data.cycle_length = Number(data.cycle_length);
       data.is_active = form.elements.is_active.checked;
+      // S-02/S-37: vorab pruefen statt den Rohtext des Servers abzuwarten -
+      // pattern.days liegt bereits geladen im state, dieselbe Bedingung, die
+      // der Server ohnehin durchsetzt (siehe patternDaysExceedingCycleLength()).
+      // Feldbezogen statt Toast: das Feld liegt direkt in diesem (nicht-modalen)
+      // Inline-Formular, reportFieldError() setzt/loescht die Meldung genau wie
+      // in den Modal-Formularen anderer Seiten.
+      const pattern = state.patterns.find((item) => Number(item.id) === Number(form.dataset.id));
+      const conflict = patternDaysExceedingCycleLength(pattern?.days, data.cycle_length);
+      if (conflict) {
+        reportFieldError(form.querySelector('[name="cycle_length"]'), t('schedule.cycleLengthTooShort', conflict));
+        return;
+      }
       await api.put(`/schedule/patterns/${form.dataset.id}`, data);
+      dirtyPatternIds.delete(String(form.dataset.id)); // S-03: gespeichert, nichts mehr zu verwerfen
     }
     await load();
     renderPage();
@@ -1889,7 +2062,7 @@ async function submitForm(event) {
       statistics = { ...statistics, loading: false, error: true };
       renderPage();
     }
-    window.yuvomi?.showToast(error.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
   }
 }
 
@@ -1998,7 +2171,19 @@ async function action(event) {
       if (group) openOverrideEditModal(group);
       return;
     }
-    if (button.dataset.action === 'delete-shift') await api.delete(`/schedule/shift-types/${button.dataset.id}`);
+    // Bisher die einzige Loeschung im Modul ohne Rueckfrage (S-01) - Muster,
+    // Override-Bereich, Extra-Bereich und Eigenes Feld fragen alle schon nach,
+    // ein Schichttyp verschwand mit einem Klick, ohne Undo. Derselbe
+    // confirmModal-Aufbau wie 'delete-pattern' direkt unten.
+    if (button.dataset.action === 'delete-shift') {
+      const type = state.types.find((item) => Number(item.id) === Number(button.dataset.id));
+      const confirmed = await confirmModal(
+        t('schedule.deleteShiftTypeTitle'),
+        { danger: true, confirmLabel: t('schedule.delete'), detail: t('schedule.deleteShiftTypeDetail', { name: type?.name ?? '' }) },
+      );
+      if (!confirmed) return;
+      await api.delete(`/schedule/shift-types/${button.dataset.id}`);
+    }
     if (button.dataset.action === 'open-create-custom-field') {
       openCustomFieldModal();
       return;
@@ -2039,6 +2224,7 @@ async function action(event) {
       );
       if (!confirmed) return;
       await api.delete(`/schedule/patterns/${button.dataset.id}`);
+      dirtyPatternIds.delete(String(button.dataset.id)); // S-03: die Karte selbst ist weg, nichts mehr zu verwerfen
     }
     // Ein Bereich kann viele Tage tragen, darum fragt das Loeschen hier nach,
     // anders als ein Einzeltag frueher (der jetzt selbst eine Gruppe der
@@ -2087,7 +2273,7 @@ async function action(event) {
         // (jetzt falsche) Liste stehen und taeuschte vor, nichts sei passiert.
         await load();
         renderPage();
-        window.yuvomi?.showToast(error.data?.error ?? t('common.errorGeneric'), 'danger');
+        window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
         return;
       }
     }
@@ -2099,9 +2285,11 @@ async function action(event) {
     if (button.dataset.action === 'add-pattern-day-row') {
       button.closest('[data-day-group]')?.querySelector('.schedule-day-rows')?.insertAdjacentHTML('beforeend', dayRowHtml(Number(button.dataset.position), null, true));
       window.lucide?.createIcons({ el: root });
+      markPatternDirty(button); // S-03: eine hinzugefuegte, aber ungespeicherte Zeile
       return;
     }
     if (button.dataset.action === 'remove-pattern-day-row') {
+      markPatternDirty(button); // S-03: siehe add-pattern-day-row
       button.closest('[data-day-row]')?.remove();
       return;
     }
@@ -2157,12 +2345,13 @@ async function action(event) {
         return { position: Number(select.dataset.day), shift_type_id: select.value ? Number(select.value) : null, field_values };
       });
       await api.put(`/schedule/patterns/${button.dataset.id}/days`, { days });
+      dirtyPatternIds.delete(String(button.dataset.id)); // S-03: gespeichert, nichts mehr zu verwerfen
     }
     await load();
     renderPage();
     window.yuvomi?.showToast(button.dataset.action.startsWith('delete') ? t('schedule.deleted') : t('schedule.saved'), 'success');
   } catch (error) {
-    window.yuvomi?.showToast(error.data?.error ?? t('common.errorGeneric'), 'danger');
+    window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
   }
 }
 
@@ -2182,6 +2371,10 @@ export async function render(container, { user } = {}) {
   // bis irgendjemand aktiv auf "Heute" klickte.
   statistics = { ...statistics, userId: currentUserId, monthFrom: monthKey(), monthTo: monthKey(), from: todayKey(), to: todayKey(), entries: [], bounds: null, error: false };
   overview = { ...overview, weekCursor: todayKey(), entries: [], holidays: [], error: false };
+  // S-03: `load()` gerade eben hat frische Musterkarten aus dem Server
+  // geholt - eine Dirty-Markierung vom letzten Seitenbesuch waere jetzt ein
+  // Geisterzustand ohne zugehoerige ungespeicherte DOM-Aenderung.
+  dirtyPatternIds = new Set();
   renderShell();
   scheduleFab = createPageFab({ id: 'schedule-fab' });
   root.querySelector('.schedule-page')?.appendChild(scheduleFab);
@@ -2197,4 +2390,4 @@ export async function render(container, { user } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange };
+export const __test = { overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange, patternDaysExceedingCycleLength, scheduleErrorMessage };
