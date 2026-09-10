@@ -24,6 +24,7 @@ import { setDisplayTimeZone } from '/utils/timezone.js';
 import { isKitchenRoute, getLastKitchenRoute } from '/utils/kitchen-tabs.js';
 import { moduleAccentToken, moduleAccentVar } from '/utils/module-accent.js';
 import { getLastHealthRoute, HEALTH_ROUTES } from '/utils/health-tabs.js';
+import { SCHEDULE_ROUTES } from '/utils/schedule-tabs.js';
 import { activityType } from '/utils/health-activity.js';
 import { buildHelpRows } from '/utils/help.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
@@ -86,7 +87,6 @@ const ROUTES = [
   { path: '/recipes',  page: '/pages/recipes.js',   requiresAuth: true, module: 'recipes',   titleKey: 'nav.recipes' },
   { path: '/pantry',   page: '/pages/pantry.js',    requiresAuth: true, module: 'pantry',    titleKey: 'nav.pantry' },
   { path: '/inventory', page: '/pages/inventory.js', requiresAuth: true, module: 'inventory', titleKey: 'nav.inventory' },
-  { path: '/schedule', page: '/pages/schedule.js', requiresAuth: true, module: 'schedule', titleKey: 'nav.schedule' },
   { path: '/contacts', page: '/pages/contacts.js',  requiresAuth: true, module: 'contacts',  titleKey: 'nav.contacts' },
   { path: '/budget',   page: '/pages/budget.js',    requiresAuth: true, module: 'budget',    titleKey: 'nav.budget' },
   { path: '/documents', page: '/pages/documents.js', requiresAuth: true, module: 'documents', titleKey: 'nav.documents' },
@@ -119,6 +119,16 @@ const HEALTH_PAGE_ROUTES = HEALTH_ROUTES.map((path) => ({
 }));
 
 ROUTES.push(...HEALTH_PAGE_ROUTES);
+
+// Schedule ist - wie Gesundheit - eine Sektion mit einer Wurzel (/schedule) und
+// je einer exakten Route pro Sub-Tab (S-10). Alle Routen laden dasselbe
+// Seitenmodul; die Soft-Navigation zwischen den Tabs laeuft ueber dessen
+// update()-Funktion.
+const SCHEDULE_PAGE_ROUTES = SCHEDULE_ROUTES.map((path) => ({
+  path, page: '/pages/schedule.js', requiresAuth: true, module: 'schedule', titleKey: 'nav.schedule',
+}));
+
+ROUTES.push(...SCHEDULE_PAGE_ROUTES);
 
 // --------------------------------------------------------
 // Standalone-Modus: Dynamische theme-color Anpassung
@@ -462,6 +472,8 @@ function topLevelSection(path) {
   // /health/* Sub-Tabs teilen sich eine Sektion (Soft-Nav zwischen Tabs, keine
   // seitliche Seitentransition) — analog zu den Settings-Blättern.
   if (typeof path === 'string' && path.startsWith('/health')) return '/health';
+  // /schedule/* Sub-Tabs ebenso (S-10) — derselbe Grund wie bei /health.
+  if (typeof path === 'string' && path.startsWith('/schedule')) return '/schedule';
   return path ?? '/';
 }
 

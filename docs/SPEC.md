@@ -3992,12 +3992,29 @@ One page module with six deep-link routes (pattern like Settings, not like the K
 
 ### Schedule (`/schedule`)
 
-Off by default. Four tabs (shift types, patterns, overrides, statistics) plus a "today" card.
+Off by default. Four tabs — Shift types, Planning (patterns, overrides and extra shifts together),
+Statistics, and Compare (the side-by-side weekly view, formerly labelled "Overview") — plus a
+"today" card. Each tab is its own route (`/schedule/shifts`, `/schedule/patterns`,
+`/schedule/statistics`, `/schedule/overview`; the routes themselves keep the `overview` path segment
+even though the tab label reads "Compare") registered like Health's sub-tabs (one exact route per
+tab, `public/utils/schedule-tabs.js`, soft-navigated via the page module's `update()` export) — a
+reload or a shared/deep link lands on the right tab, and the browser Back button walks between tabs
+instead of leaving the page. A household with no shift types yet opens on the Shift types tab
+instead of Planning, which would otherwise dead-end every form behind it. Clicking a schedule entry
+anywhere it renders (the "today" card, the Compare grid, a week/day calendar block) opens a small
+read-only detail view (shift type, times, owner, note, custom field values, and its origin
+pattern/override/extra) — month-view calendar chips keep navigating to that day instead.
 
 - **Scoping:** every household member may *read* the whole overlay — the family mostly needs to know
   that one person is unavailable on Tuesday evening. A member writes only their own schedule; an
   admin writes for anyone. Shift types are the exception, because they are shared: anyone may add
-  one, only the creator or an admin may change or remove it.
+  one, only the creator or an admin may change or remove it. The Statistics tab's owner picker is
+  narrower than this read scope on purpose: a non-admin sees only themselves there, an admin sees
+  everyone. This is a client-side convenience restriction, not a data boundary — `GET
+  /schedule/entries` itself stays queryable by any `user_id` for any member with module read access,
+  because the "today" card, Compare, the calendar overlay and the dashboard widget all depend on
+  that being household-wide by design; Statistics just stops making it as convenient to pull up
+  someone else's hour totals as it is to look at their shifts directly.
 - **Calendar overlay:** a separate, explicitly toggleable, **read-only** layer — never ordinary
   editable events. It defaults to a compact strip rather than a full block, and the choice persists
   per browser. Its colour comes from `--module-schedule` in `tokens.css`, not from the markup: the

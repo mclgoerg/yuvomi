@@ -1891,10 +1891,60 @@ test('a new ACTIVE pattern creation and re-activating one via the Active toggle 
 
 test('the initial tab lands on Shift types when the household has no shift types yet, otherwise stays on Planning (S-07)', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
-  const renderFn = schedulePage.slice(schedulePage.indexOf('export async function render'), schedulePage.indexOf('// Reines Verhalten statt Text-Muster'));
-  assert.match(renderFn, /if \(!initialViewDecided\) \{\s*\n\s*activeView = state\.types\.length \? 'patterns' : 'shifts';\s*\n\s*initialViewDecided = true;\s*\n\s*\}/);
+  const renderFn = schedulePage.slice(schedulePage.indexOf('export async function render'), schedulePage.indexOf('export async function update'));
+  const branchStart = renderFn.indexOf('} else if (!initialViewDecided) {');
+  assert.ok(branchStart !== -1, 'the fallback branch must exist for a bare-root visit with no explicit deep link');
+  const fallbackBranch = renderFn.slice(branchStart, branchStart + 700);
+  assert.match(fallbackBranch, /activeView = state\.types\.length \? 'patterns' : 'shifts';/);
+  assert.match(fallbackBranch, /initialViewDecided = true;/);
   // The decision must happen strictly after load() populated state.types, not before.
-  assert.ok(renderFn.indexOf('await load();') < renderFn.indexOf('if (!initialViewDecided)'));
+  assert.ok(renderFn.indexOf('await load();') < branchStart);
+});
+
+test('an explicit tab deep link (URL path) always wins over the remembered tab, but the bare root still falls back to it (S-10)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const renderFn = schedulePage.slice(schedulePage.indexOf('export async function render'), schedulePage.indexOf('export async function update'));
+  assert.match(renderFn, /const requestedView = scheduleViewFromPath\(window\.location\.pathname\);\s*\n\s*if \(requestedView\) \{\s*\n\s*activeView = requestedView;\s*\n\s*initialViewDecided = true;\s*\n\s*\} else if \(!initialViewDecided\)/);
+  // The address bar is normalized to the resolved tab's own route afterwards,
+  // so a bare '/schedule' visit becomes a reloadable, back-button-able link.
+  assert.match(renderFn, /history\.replaceState\(\{ path: resolvedRoute \}, '', resolvedRoute\)/);
+});
+
+test('switching tabs navigates through the router (URL + history entry), and the router registers one exact route per tab (S-10)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const guardedFn = schedulePage.slice(schedulePage.indexOf('async function guardedActivateView'), schedulePage.indexOf('/**\n * Builds the toolbar'));
+  assert.match(guardedFn, /window\.yuvomi\?\.navigate\(scheduleRouteForView\(id\)\)/, 'a tab click must go through navigate(), not a bare activateView() call, or the URL never updates');
+
+  const routerJs = readFileSync(new URL('../public/router.js', import.meta.url), 'utf8');
+  assert.match(routerJs, /import \{ SCHEDULE_ROUTES \} from '\/utils\/schedule-tabs\.js';/);
+  assert.match(routerJs, /const SCHEDULE_PAGE_ROUTES = SCHEDULE_ROUTES\.map\(\(path\) => \(\{\s*\n\s*path, page: '\/pages\/schedule\.js', requiresAuth: true, module: 'schedule', titleKey: 'nav\.schedule',\s*\n\s*\}\)\);/);
+  assert.match(routerJs, /ROUTES\.push\(\.\.\.SCHEDULE_PAGE_ROUTES\);/);
+  // The single literal '/schedule' entry must be gone from the base ROUTES array -
+  // it would shadow SCHEDULE_PAGE_ROUTES's own '/schedule' entry and, worse, register
+  // the module without its four sub-tab routes.
+  assert.ok(!/\{ path: '\/schedule', page: '\/pages\/schedule\.js'/.test(routerJs));
+});
+
+test('the schedule-tabs helper resolves a path to exactly one of the four known tab ids, and back again (S-10)', async () => {
+  const { scheduleViewFromPath, scheduleRouteForView, SCHEDULE_ROUTES } = await import('../public/utils/schedule-tabs.js');
+  assert.strictEqual(scheduleViewFromPath('/schedule'), null, 'the bare root has no specific tab - the caller decides the default');
+  assert.strictEqual(scheduleViewFromPath('/schedule/shifts'), 'shifts');
+  assert.strictEqual(scheduleViewFromPath('/schedule/patterns'), 'patterns');
+  assert.strictEqual(scheduleViewFromPath('/schedule/statistics'), 'statistics');
+  assert.strictEqual(scheduleViewFromPath('/schedule/overview'), 'overview');
+  assert.strictEqual(scheduleViewFromPath('/schedule/nonsense'), null, 'an unknown sub-path is not a known tab');
+  assert.strictEqual(scheduleViewFromPath('/other'), null);
+  assert.strictEqual(scheduleViewFromPath(null), null);
+  assert.strictEqual(scheduleRouteForView('statistics'), '/schedule/statistics');
+  for (const route of SCHEDULE_ROUTES.filter((r) => r !== '/schedule')) {
+    assert.strictEqual(scheduleRouteForView(scheduleViewFromPath(route)), route, `${route} must round-trip through scheduleViewFromPath/scheduleRouteForView`);
+  }
+});
+
+test('a shift reminder deep-links into the Planning tab, not the bare module root (S-10)', () => {
+  const notifications = readFileSync(new URL('../server/services/notifications.js', import.meta.url), 'utf8');
+  assert.match(notifications, /schedule_entry:\s*\{ titleKey: 'nav\.schedule',\s*url: '\/schedule\/patterns' \}/);
+  assert.match(notifications, /schedule_extra_entry:\s*\{ titleKey: 'nav\.schedule',\s*url: '\/schedule\/patterns' \}/);
 });
 
 test('the empty Planning state points to creating shift types first when the household has none, reusing the existing hint key (S-07)', () => {
@@ -1927,4 +1977,60 @@ test('view-schedule-entry is a read action, reachable by a read-only member (S-1
   const setBody = schedulePage.slice(setStart, schedulePage.indexOf(']);', setStart));
   assert.match(setBody, /'view-schedule-entry'/);
   assert.match(schedulePage, /openModal\(\{ title: t\('schedule\.entryDetailTitle'\), size: 'sm', content: renderScheduleEntryDetailContent\(entry\), dirtyGuard: false \}\)/);
+});
+
+test('a read-only Schedule member can still save their own reminder offset and weekly hours (S-12)', () => {
+  // Client side: "My settings" must no longer disable the toggle/select/input
+  // based on readOnly() - this is a personal preference (own reminder lead
+  // time / own overtime target), not a write to shared schedule data.
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const fnStart = schedulePage.indexOf('function renderReminderSettings() {');
+  const fnBody = schedulePage.slice(fnStart, schedulePage.indexOf('\n}\n', fnStart));
+  assert.ok(!fnBody.includes('readOnly()'), 'renderReminderSettings() must not call the module read-only check anymore');
+  assert.ok(!fnBody.includes('const locked'), 'the old client-side lock variable must be fully removed, not just unused');
+  assert.match(fnBody, /toggleRowHtml\(\{ label: t\('schedule\.reminderToggle'\), checked: active, attrs: \{ id: 'schedule-reminder-toggle' \} \}\)/, 'the toggle must no longer pass a disabled flag');
+
+  // Server side: the blanket module read-only/denied gate must exempt exactly
+  // this path, computing a null module key so moduleAccessVerdict() falls
+  // through to its own "unlisted path -> allow" rule - the API-token scope
+  // check above it (still keyed on moduleForPath(), unchanged) is untouched.
+  const serverIndex = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
+  assert.match(serverIndex, /const scopedModuleKey = req\.path\.startsWith\('\/schedule\/preferences'\) \? null : moduleForPath\(req\.path\);/);
+  assert.match(serverIndex, /moduleAccessVerdict\(\s*\n\s*req\.sessionModuleAccess,\s*\n\s*scopedModuleKey,/);
+});
+
+test('the Statistics owner select is self-only for non-admins, full list for admins (S-13)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /formField\(t\('schedule\.owner'\), '<select class="input" required name="user_id">' \+ userOptions\(canManageOthers \? selectedUser : currentUserId\) \+ '<\/select>'\)/);
+  // Must NOT be the raw, unfiltered state.users list anymore (the original finding).
+  assert.ok(!schedulePage.includes("formField(t('schedule.owner'), '<select class=\"input\" required name=\"user_id\">' + state.users.map"));
+});
+
+test('the shift-type preset picker groups presets by template, respecting the household template toggles (S-22)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /function shiftPresetOptgroups\(\)/);
+  const fnBody = schedulePage.slice(schedulePage.indexOf('function shiftPresetOptgroups()'), schedulePage.indexOf('function shiftPresetOptions()'));
+  assert.match(fnBody, /visibleQuickstartTemplates\(\)/, 'must respect the same household toggle as the quick-start buttons');
+  assert.match(fnBody, /shared\.add\('exam'\)/, 'exam is identical across School/University and belongs in one shared group, not two');
+  const optionsFn = schedulePage.slice(schedulePage.indexOf('function shiftPresetOptions()'), schedulePage.indexOf('function setShiftIconButtonIcon'));
+  assert.match(optionsFn, /<optgroup label="/, 'the select must actually render optgroups, not a flat list');
+});
+
+test('the reminder-offset select accepts a custom value beyond the fixed presets, matching the server\'s 0-1440 range (S-23)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /async function pickCustomReminderOffset\(select, onResolved\)/);
+  const fnBody = schedulePage.slice(schedulePage.indexOf('async function pickCustomReminderOffset'), schedulePage.indexOf('async function pickCustomReminderOffset') + 1200);
+  assert.match(fnBody, /minutes < 0 \|\| minutes > 1440/, 'must mirror the server\'s own MAX_OFFSET_MINUTES range, not invent a narrower one');
+  assert.match(fnBody, /select\.value = previous;/, 'cancelling or an invalid value must revert the select, not leave "custom" selected');
+  // The options builder must offer the escape hatch and must render an already-
+  // stored out-of-preset value as a real selected option, not silently as nothing selected.
+  const optionsFn = schedulePage.slice(schedulePage.indexOf('function reminderOffsetOptions('), schedulePage.indexOf('/**\n * S-23: "Custom...'));
+  assert.match(optionsFn, /!REMINDER_OFFSET_PRESETS\.includes\(effective\)/);
+  assert.match(optionsFn, /<option value="custom">/);
+});
+
+test('an overnight shift\'s continuation fragment in Overview names its end time, not the full origin-day range (S-30)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const fnBody = schedulePage.slice(schedulePage.indexOf('function overviewEntryBlock('), schedulePage.indexOf('function scheduleOverviewEntryTitle('));
+  assert.match(fnBody, /entry\.__continuation\s*\n\s*\? t\('schedule\.continuesUntil', \{ time: type\.end_time \}\)/, 'a continuation block must use a distinct label naming only the end time, not clockLabel()\'s full origin-day range');
 });

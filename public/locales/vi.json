@@ -5036,6 +5036,7 @@
         "addPattern": "Thêm chu kỳ ca",
         "preset": "Mẫu",
         "presetCustom": "Tùy chỉnh",
+        "presetShared": "Chung",
         "emptyPatternsTitle": "Chưa có chu kỳ ca nào",
         "emptyPatternsDescription": "Tạo chu kỳ ca lặp lại cho một thành viên trong gia đình.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Thông báo đẩy trước mỗi ca sắp tới có giờ bắt đầu. Nghỉ phép, nghỉ ốm và các mục cả ngày khác không có giờ bắt đầu để nhắc.",
         "reminderAtStart": "Vào giờ bắt đầu",
         "reminderMinutesBefore": "{{minutes}} phút trước",
+        "reminderCustomOffset": "Tùy chỉnh…",
+        "customReminderOffsetPrompt": "Thời gian tùy chỉnh (phút)",
         "mySettings": "Cài đặt của tôi",
         "weeklyHoursLabel": "Số giờ mỗi tuần (cho cờ báo làm thêm giờ)",
         "weeklyHoursHint": "Mục tiêu toàn thời gian của riêng bạn. Tab Thống kê đánh dấu làm thêm giờ khi tổng của bất kỳ 7 ngày liên tiếp nào trong khoảng đã chọn vượt quá giá trị này.",
@@ -5122,6 +5125,7 @@
         "overview": "So sánh",
         "overviewPeopleLabel": "So sánh mọi người",
         "overviewClearSelection": "Xóa lựa chọn",
+        "continuesUntil": "…tiếp tục đến {{time}}",
         "overviewEmptyTitle": "Chọn người để so sánh",
         "overviewEmptyDescription": "Chọn phía trên ít nhất một thành viên gia đình để xem lịch trình hằng tuần cạnh nhau."
     }

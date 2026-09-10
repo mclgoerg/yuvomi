@@ -5036,6 +5036,7 @@
         "addPattern": "إضافة دورة مناوبات",
         "preset": "قالب",
         "presetCustom": "مخصص",
+        "presetShared": "عام",
         "emptyPatternsTitle": "لا توجد دورة مناوبات بعد",
         "emptyPatternsDescription": "أنشئ دورة مناوبات متكررة لأحد أفراد الأسرة.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "إشعار قبل كل مناوبة قادمة لها وقت بدء. لا وقت بدء للإجازة أو المرض أو أي إدخال يستغرق اليوم كله ليُذكَّر به.",
         "reminderAtStart": "عند وقت البدء",
         "reminderMinutesBefore": "قبل {{minutes}} دقيقة",
+        "reminderCustomOffset": "مخصص…",
+        "customReminderOffsetPrompt": "وقت مخصص بالدقائق",
         "mySettings": "إعداداتي",
         "weeklyHoursLabel": "ساعات أسبوعية (لعلامة العمل الإضافي)",
         "weeklyHoursHint": "هدفك الخاص لدوام كامل. يُعلّم تبويب الإحصاءات العمل الإضافي عندما يتجاوز مجموع أي 7 أيام متتالية ضمن الفترة المختارة هذه القيمة.",
@@ -5122,6 +5125,7 @@
         "overview": "مقارنة",
         "overviewPeopleLabel": "مقارنة الأشخاص",
         "overviewClearSelection": "مسح التحديد",
+        "continuesUntil": "…يستمر حتى {{time}}",
         "overviewEmptyTitle": "اختر أشخاصًا للمقارنة",
         "overviewEmptyDescription": "اختر أعلاه فردًا واحدًا على الأقل من أفراد الأسرة لرؤية الجداول الأسبوعية جنبًا إلى جنب."
     }

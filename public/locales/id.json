@@ -5036,6 +5036,7 @@
         "addPattern": "Tambah pola shift",
         "preset": "Templat",
         "presetCustom": "Kustom",
+        "presetShared": "Umum",
         "emptyPatternsTitle": "Belum ada pola shift",
         "emptyPatternsDescription": "Buat siklus shift berulang untuk anggota rumah tangga.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Notifikasi push sebelum setiap shift mendatang yang punya waktu mulai. Cuti, sakit, dan entri sepanjang hari lainnya tidak punya waktu mulai untuk diingatkan.",
         "reminderAtStart": "Pada waktu mulai",
         "reminderMinutesBefore": "{{minutes}} menit sebelumnya",
+        "reminderCustomOffset": "Kustom…",
+        "customReminderOffsetPrompt": "Waktu kustom (menit)",
         "mySettings": "Pengaturan saya",
         "weeklyHoursLabel": "Jam mingguan (untuk penanda lembur)",
         "weeklyHoursHint": "Target penuh waktu Anda sendiri. Tab Statistik menandai lembur ketika total 7 hari berturut-turut mana pun dalam rentang yang dipilih melebihi nilai ini.",
@@ -5122,6 +5125,7 @@
         "overview": "Perbandingan",
         "overviewPeopleLabel": "Bandingkan orang",
         "overviewClearSelection": "Hapus pilihan",
+        "continuesUntil": "…berlanjut hingga {{time}}",
         "overviewEmptyTitle": "Pilih orang untuk dibandingkan",
         "overviewEmptyDescription": "Pilih setidaknya satu anggota keluarga di atas untuk melihat jadwal mingguan berdampingan."
     }

@@ -2,7 +2,7 @@ import { api } from '/api.js';
 import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
-import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection, reportFieldError } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection, reportFieldError, promptModal } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
@@ -11,6 +11,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect } from '/components/user-multi-select.js';
 import { isNavModuleReadOnly } from '/permissions.js';
+import { scheduleViewFromPath, scheduleRouteForView } from '/utils/schedule-tabs.js';
 
 // ZWEISPALTIG: Schedule is a full-width responsive library and statistics view;
 // constraining its row lists to the narrow reading measure would recreate the
@@ -495,9 +496,48 @@ const REMINDER_OFFSET_PRESETS = [0, 5, 10, 15, 30, 60, 120];
 // deshalb hier, nicht erst dort, der tatsaechliche Vorgabewert.
 function reminderOffsetOptions(selectedMinutes) {
   const effective = selectedMinutes ?? 15;
-  return REMINDER_OFFSET_PRESETS.map((minutes) =>
+  const presetsHtml = REMINDER_OFFSET_PRESETS.map((minutes) =>
     `<option value="${minutes}"${Number(effective) === minutes ? ' selected' : ''}>${esc(t(minutes === 0 ? 'schedule.reminderAtStart' : 'schedule.reminderMinutesBefore', { minutes }))}</option>`
   ).join('');
+  // S-23 (UX-Audit): der Server erlaubt 0-1440 Minuten (MAX_OFFSET_MINUTES/
+  // MAX_REMINDER_OFFSET_MINUTES), diese Liste deckelte die UI zuvor auf 120 -
+  // ein bereits gespeicherter Wert ausserhalb der Presets (z.B. per API
+  // gesetzt) braucht eine echte, ausgewaehlte Option, sonst zeigt das <select>
+  // stillschweigend die falsche Zeile als aktiv an.
+  const customValueHtml = Number.isInteger(effective) && !REMINDER_OFFSET_PRESETS.includes(effective)
+    ? `<option value="${effective}" selected data-custom-value="1">${esc(effective === 0 ? t('schedule.reminderAtStart') : t('schedule.reminderMinutesBefore', { minutes: effective }))}</option>`
+    : '';
+  return presetsHtml + customValueHtml + `<option value="custom">${esc(t('schedule.reminderCustomOffset'))}</option>`;
+}
+
+/**
+ * S-23: "Custom..." selbst ist keine speicherbare Auswahl, sondern der
+ * Einstiegspunkt zu promptModal() fuer eine freie Minutenzahl (0-1440, wie
+ * der Server sie zulaesst). Erfolgreich bestaetigt, haengt sie sich als
+ * echte, ausgewaehlte Option an (dieselbe Form wie ein bereits gespeicherter
+ * Fremdwert oben) und meldet die Minuten an `onResolved` zurueck; abgebrochen
+ * oder ungueltig, springt das <select> auf seinen letzten echten Wert zurueck -
+ * "Custom..." bleibt selbst nie die aktive Auswahl.
+ */
+async function pickCustomReminderOffset(select, onResolved) {
+  const previous = select.dataset.previousValue ?? '15';
+  const input = await promptModal(t('schedule.customReminderOffsetPrompt'), '');
+  const minutes = input == null ? NaN : Math.round(Number(input));
+  if (!Number.isFinite(minutes) || minutes < 0 || minutes > 1440) {
+    select.value = previous;
+    return;
+  }
+  let customOption = select.querySelector('option[data-custom-value]');
+  if (!customOption) {
+    customOption = document.createElement('option');
+    customOption.dataset.customValue = '1';
+    select.querySelector('option[value="custom"]')?.insertAdjacentElement('beforebegin', customOption);
+  }
+  customOption.value = String(minutes);
+  customOption.textContent = minutes === 0 ? t('schedule.reminderAtStart') : t('schedule.reminderMinutesBefore', { minutes });
+  select.value = String(minutes);
+  select.dataset.previousValue = String(minutes);
+  onResolved(minutes);
 }
 
 // Ein eigener Vorlauf je Extra, unabhaengig vom haushaltweiten Feld unten -
@@ -516,21 +556,23 @@ function renderReminderSettings() {
   const active = state.reminderOffsetMinutes != null;
   const options = reminderOffsetOptions(state.reminderOffsetMinutes);
   const weeklyHours = state.weeklyHours ?? DEFAULT_WEEKLY_HOURS;
-  // PUT /schedule/preferences ist trotz "nur die eigenen Werte" ueber das
-  // schedule-Modul mitgesperrt (server/scopes.js ordnet jeden /schedule/*-Pfad
-  // dem Modul zu, moduleAccessVerdict() liefert bei 'read' MODULE_ACCESS_READ_ONLY
-  // fuer JEDEN Schreibzugriff) - ein Nur-lesen-Mitglied bekaeme hier ein
-  // wirkungsloses 403 statt einer gespeicherten Einstellung.
-  const locked = readOnly();
+  // S-12 (UX-Audit): NICHT laenger an den Nur-lesen-Zustand des Moduls
+  // gekoppelt. "My settings" ist die eigene Erinnerungsvorlaufzeit/
+  // Wochenstunden - haengt an der eigenen users-Zeile, unabhaengig davon, ob
+  // diese Person fremde Schichtplan-Daten schreiben darf. Vorher war das Feld
+  // hier UND server-seitig gesperrt (ein Nur-lesen-Mitglied bekam ein
+  // wirkungsloses 403 statt einer gespeicherten Einstellung); server/index.js
+  // nimmt `/schedule/preferences` inzwischen aus der Modul-Sperre heraus,
+  // dieses Formular darf ihr also folgen.
   return '<div class="card card--padded schedule-reminder-settings">'
     + '<h2 class="u-section-title">' + esc(t('schedule.mySettings')) + '</h2>'
     + '<div class="schedule-reminder-settings__row">'
-    + toggleRowHtml({ label: t('schedule.reminderToggle'), checked: active, disabled: locked, attrs: { id: 'schedule-reminder-toggle' } })
-    + '<select class="input" id="schedule-reminder-offset"' + (active && !locked ? '' : ' disabled') + '>' + options + '</select>'
+    + toggleRowHtml({ label: t('schedule.reminderToggle'), checked: active, attrs: { id: 'schedule-reminder-toggle' } })
+    + '<select class="input" id="schedule-reminder-offset" data-previous-value="' + esc(String(state.reminderOffsetMinutes ?? 15)) + '"' + (active ? '' : ' disabled') + '>' + options + '</select>'
     + '</div><p class="form-hint">' + esc(t('schedule.reminderHint')) + '</p>'
     + '<div class="schedule-reminder-settings__row schedule-reminder-settings__row--hours">'
     + '<label class="label" for="schedule-weekly-hours">' + esc(t('schedule.weeklyHoursLabel')) + '</label>'
-    + '<input class="input" type="number" min="1" max="168" step="1" id="schedule-weekly-hours" value="' + esc(String(weeklyHours)) + '"' + (locked ? ' disabled' : '') + '>'
+    + '<input class="input" type="number" min="1" max="168" step="1" id="schedule-weekly-hours" value="' + esc(String(weeklyHours)) + '">'
     + '</div><p class="form-hint">' + esc(t('schedule.weeklyHoursHint')) + '</p></div>';
 }
 
@@ -713,9 +755,34 @@ function shiftPresetLabel(key) {
   return labels[key] ?? '';
 }
 
+// S-22 (UX-Audit): 15 Presets in einer einzigen flachen Liste liessen sich
+// nur am Namen erkennen, aus welcher Vorlage sie stammen ("Periode 2" neben
+// "Vorlesung" neben "Fruehschicht"). Optgroups je Vorlage - dieselben drei,
+// die auch die Schnellstart-Knoepfe zeigen, plus eine gemeinsame Gruppe fuer
+// die vorlagenuebergreifenden Presets (Urlaub/Krank/Klausur, ueberall
+// identisch). Respektiert dieselbe Haushalts-Einstellung wie die Knoepfe
+// (visibleQuickstartTemplates()) - ein Haushalt, der nur "Arbeit" braucht,
+// sieht hier ebenso wenig Schule/Uni-Eintraege.
+function shiftPresetOptgroups() {
+  const shared = new Set(SHARED_PRESETS.map((preset) => preset.key));
+  shared.add('exam'); // identisch in Schule/Uni, eine gemeinsame Gruppe statt zwei Dopplungen.
+  const visible = new Set(visibleQuickstartTemplates().map(([key]) => key));
+  const groups = [];
+  for (const [templateKey, labelKey] of QUICKSTART_TEMPLATES) {
+    if (!visible.has(templateKey)) continue;
+    const presets = PRESET_TEMPLATES[templateKey].filter((preset) => !shared.has(preset.key));
+    if (presets.length) groups.push({ label: t(labelKey), presets });
+  }
+  const sharedPresets = ALL_PRESETS.filter((preset) => shared.has(preset.key));
+  if (sharedPresets.length) groups.push({ label: t('schedule.presetShared'), presets: sharedPresets });
+  return groups;
+}
+
 function shiftPresetOptions() {
-  return option('', t('schedule.presetCustom'), true)
-    + ALL_PRESETS.map((preset) => option(preset.key, shiftPresetLabel(preset.key))).join('');
+  const groupsHtml = shiftPresetOptgroups().map((group) => '<optgroup label="' + esc(group.label) + '">'
+    + group.presets.map((preset) => option(preset.key, shiftPresetLabel(preset.key))).join('')
+    + '</optgroup>').join('');
+  return option('', t('schedule.presetCustom'), true) + groupsHtml;
 }
 
 function setShiftIconButtonIcon(button, iconName) {
@@ -792,7 +859,7 @@ function patternFields(pattern = {}) {
 function shiftTypeCard(type) {
   const editable = canEditType(type);
   const body = editable
-    ? `<form class="schedule-form" data-form="shift-update" data-id="${type.id}">${shiftFields(type)}<div class="schedule-actions"><button class="btn btn--secondary">${esc(t('schedule.save'))}</button><button type="button" class="btn btn--danger" data-action="delete-shift" data-id="${type.id}">${esc(t('schedule.delete'))}</button></div></form>`
+    ? `<form class="schedule-form" data-form="shift-update" data-id="${type.id}">${shiftFields(type)}<div class="schedule-actions"><button class="btn btn--secondary">${esc(t('schedule.save'))}</button><button type="button" class="btn btn--danger-outline" data-action="delete-shift" data-id="${type.id}">${esc(t('schedule.delete'))}</button></div></form>`
     : `<p class="schedule-readonly">${esc(type?.created_by == null
         ? t('schedule.typeOrphaned')
         : t('schedule.typeOwnedBy', { user: userName(type.created_by) }))}</p>`;
@@ -848,7 +915,7 @@ function customFieldRow(field) {
   const editable = canEditType(field);
   const actions = editable
     ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-custom-field" data-id="' + field.id + '">' + esc(t('common.edit')) + '</button>'
-      + '<button type="button" class="btn btn--danger" data-action="delete-custom-field" data-id="' + field.id + '">' + esc(t('schedule.delete')) + '</button></span>'
+      + '<button type="button" class="btn btn--danger-outline" data-action="delete-custom-field" data-id="' + field.id + '">' + esc(t('schedule.delete')) + '</button></span>'
     : '';
   return '<div class="list-row schedule-custom-field-row"><div class="list-row__main"><span class="list-row__name">' + esc(field.name) + '</span></div>' + actions + '</div>';
 }
@@ -933,7 +1000,7 @@ function patternCard(pattern) {
   return `<details class="card schedule-details" data-pattern="${pattern.id}"><summary><span class="u-card-title u-compact">${esc(pattern.name)}</span> <small>· ${esc(userName(pattern.user_id))}</small>${winsBadge}</summary>
     ${writable ? `<form class="schedule-form" data-form="pattern-update" data-id="${pattern.id}">${patternFields(pattern)}<button class="btn btn--secondary">${esc(t('schedule.save'))}</button></form>` : ''}
     <h3 class="u-card-title">${esc(t('schedule.cycleDays'))}</h3><p class="u-meta schedule-cycle-hint">${esc(t('schedule.cycleDaysHint', { count: pattern.cycle_length }))}</p><div class="schedule-days">${days}</div>
-    ${writable ? `<div class="schedule-actions"><button type="button" class="btn btn--secondary" data-action="save-days" data-id="${pattern.id}">${esc(t('schedule.save'))}</button><button type="button" class="btn btn--danger" data-action="delete-pattern" data-id="${pattern.id}">${esc(t('schedule.delete'))}</button></div>` : ''}
+    ${writable ? `<div class="schedule-actions"><button type="button" class="btn btn--secondary" data-action="save-days" data-id="${pattern.id}">${esc(t('schedule.save'))}</button><button type="button" class="btn btn--danger-outline" data-action="delete-pattern" data-id="${pattern.id}">${esc(t('schedule.delete'))}</button></div>` : ''}
   </details>`;
 }
 
@@ -1020,7 +1087,7 @@ function overrideRows() {
     const meta = [userName(group.user_id), typeLabel, group.note].filter(Boolean).join(' · ');
     const label = group.from === group.to ? formatDate(group.from) : `${formatDate(group.from)} – ${formatDate(group.to)}`;
     const actions = canWrite(group.user_id)
-      ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-override" data-from="' + esc(group.from) + '" data-user-id="' + group.user_id + '">' + esc(t('common.edit')) + '</button><button type="button" class="btn btn--danger" data-action="delete-override-range" data-from="' + esc(group.from) + '" data-to="' + esc(group.to) + '" data-user-id="' + group.user_id + '">' + esc(t('schedule.delete')) + '</button></span>'
+      ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-override" data-from="' + esc(group.from) + '" data-user-id="' + group.user_id + '">' + esc(t('common.edit')) + '</button><button type="button" class="btn btn--danger-outline" data-action="delete-override-range" data-from="' + esc(group.from) + '" data-to="' + esc(group.to) + '" data-user-id="' + group.user_id + '">' + esc(t('schedule.delete')) + '</button></span>'
       : '';
     const icon = type?.icon ? '<i data-lucide="' + esc(type.icon) + '" class="schedule-type-icon" aria-hidden="true"></i>' : '';
     return '<div class="list-row schedule-override"><span class="schedule-swatch" style="--schedule-color:' + esc(swatchColor) + '"></span>' + icon + '<div class="list-row__main"><span class="list-row__name">' + esc(label) + '</span><span class="list-row__meta">' + esc(meta) + '</span></div>' + actions + '</div>';
@@ -1090,7 +1157,7 @@ function extraRows() {
     const icon = type?.icon ? '<i data-lucide="' + esc(type.icon) + '" class="schedule-type-icon" aria-hidden="true"></i>' : '';
     const ids = esc(group.ids.join(','));
     const actions = canWrite(group.user_id)
-      ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-extra-range" data-ids="' + ids + '">' + esc(t('common.edit')) + '</button><button type="button" class="btn btn--danger" data-action="delete-extra-range" data-ids="' + ids + '" data-user-id="' + group.user_id + '" data-from="' + esc(group.from) + '" data-to="' + esc(group.to) + '">' + esc(t('schedule.delete')) + '</button></span>'
+      ? '<span class="schedule-override-actions"><button type="button" class="btn btn--secondary" data-action="edit-extra-range" data-ids="' + ids + '">' + esc(t('common.edit')) + '</button><button type="button" class="btn btn--danger-outline" data-action="delete-extra-range" data-ids="' + ids + '" data-user-id="' + group.user_id + '" data-from="' + esc(group.from) + '" data-to="' + esc(group.to) + '">' + esc(t('schedule.delete')) + '</button></span>'
       : '';
     return '<div class="list-row schedule-override"><span class="schedule-swatch" style="--schedule-color:' + esc(swatchColor) + '"></span>' + icon + extraBadge() + '<div class="list-row__main"><span class="list-row__name">' + esc(label) + '</span><span class="list-row__meta">' + esc(meta) + '</span></div>' + actions + '</div>';
   }).join('') + '</div>';
@@ -1145,7 +1212,15 @@ function renderStatistics() {
   return '<section class="schedule-statistics">'
     + renderReminderSettings()
     + '<form class="card card--padded schedule-stat-filters" data-form="statistics">'
-    + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + state.users.map((user) => option(user.id, user.display_name || user.username, Number(selectedUser) === Number(user.id))).join('') + '</select>')
+    // S-13 (UX-Audit, Entscheidung D-B): userOptions() statt der vollen
+    // state.users-Liste - ein Nicht-Admin sieht hier nur sich selbst, ein
+    // Admin weiterhin alle. Das ist eine reine Client-Einschraenkung der
+    // AGGREGAT-Ansicht: GET /schedule/entries selbst bleibt fuer jeden mit
+    // Schichtplan-Lesezugriff fuer JEDEN user_id abrufbar (Today-Karte/
+    // Uebersicht/Kalender/Dashboard-Kachel brauchen genau das, absichtlich
+    // haushaltweit) - diese Auswahl versteckt nur die bequeme Auswertungs-
+    // Zusammenfassung fuer fremde Konten, sie sperrt keine Rohdaten.
+    + formField(t('schedule.owner'), '<select class="input" required name="user_id">' + userOptions(canManageOthers ? selectedUser : currentUserId) + '</select>')
     + '<div class="form-field schedule-stat-range"><span class="label">' + esc(t('schedule.statisticsRange')) + '</span><div class="segmented schedule-stat-range__choices" role="group" aria-label="' + esc(t('schedule.statisticsRange')) + '">'
     + [['current', 'schedule.currentMonth'], ['months', 'schedule.selectedMonths'], ['custom', 'schedule.customRange']].map(([value, label]) => '<button type="button" class="segmented__item' + (range === value ? ' is-active' : '') + '" data-action="statistics-range" data-range="' + value + '" aria-pressed="' + (range === value ? 'true' : 'false') + '">' + esc(t(label)) + '</button>').join('')
     + '</div></div>' + (controls ? '<div class="schedule-stat-dates">' + controls + '</div>' : '')
@@ -1479,7 +1554,13 @@ function overviewEntryBlock(entry, activeHours) {
   const endCollapsed = collapsedMinutes(endMin, activeHours) ?? startCollapsed;
   const top = (startCollapsed / 60) * OVERVIEW_HOUR_PX;
   const height = Math.max(((endCollapsed - startCollapsed) / 60) * OVERVIEW_HOUR_PX, 18);
-  const timeLine = overlay ? `${clockLabel(type)} · ${overlay}` : clockLabel(type);
+  // S-30 (UX-Audit): eine Fortsetzungszeile sitzt auf dem FOLGETAG bei 00:00 -
+  // die volle Spanne ("22:00-06:00 +1") daneben liest sich, als begaenne die
+  // Schicht heute erneut um 22 Uhr. Ein eigener, kuerzerer Text nennt nur das
+  // Ende und benennt die Fortsetzung, statt die Herkunftszeile zu wiederholen.
+  const timeLine = entry.__continuation
+    ? t('schedule.continuesUntil', { time: type.end_time })
+    : overlay ? `${clockLabel(type)} · ${overlay}` : clockLabel(type);
   return `<div class="schedule-overview__block" style="top:${top}px;height:${height}px;--schedule-color:${esc(type.color)}" title="${esc(scheduleOverviewEntryTitle(entry))}"${detailAttrs}><span class="schedule-overview__block-title">${esc(label)}</span><small class="schedule-overview__block-time">${esc(timeLine)}</small></div>`;
 }
 
@@ -1610,7 +1691,12 @@ async function guardedActivateView(id) {
     }
     dirtyPatternIds.clear();
   }
-  await activateView(id);
+  // S-10: navigate() statt eines blossen activateView() - haengt Adresse UND
+  // Verlaufseintrag an. Da /schedule/<tab> bereits als eigene Route
+  // registriert ist (router.js) und dieses Modul schon gerendert ist, nimmt
+  // der Router den Soft-Nav-Pfad (update() unten fuehrt dieselbe
+  // activateView() dann aus) statt eines vollen Neu-Renderns.
+  window.yuvomi?.navigate(scheduleRouteForView(id));
 }
 
 /**
@@ -1683,7 +1769,7 @@ function renderShell() {
     if (activeView === 'patterns') markPatternDirty(event.target);
     if (activeView === 'patterns') updateCycleDayHeadersFor(event.target);
   });
-  root.addEventListener('change', (event) => {
+  root.addEventListener('change', async (event) => {
     if (activeView === 'patterns') markPatternDirty(event.target);
     if (activeView === 'patterns') updateCycleDayHeadersFor(event.target);
     if (event.target.id === 'schedule-reminder-toggle') {
@@ -1695,7 +1781,15 @@ function renderShell() {
       const offset = event.target.checked ? Number(offsetSelect?.value ?? 15) : null;
       savePreference({ reminderOffsetMinutes: offset });
     } else if (event.target.id === 'schedule-reminder-offset') {
-      savePreference({ reminderOffsetMinutes: Number(event.target.value) });
+      // S-23: "Custom..." selbst speichert nichts - erst promptModal() liefert
+      // eine echte Minutenzahl (oder das <select> springt zurueck), siehe
+      // pickCustomReminderOffset().
+      if (event.target.value === 'custom') {
+        await pickCustomReminderOffset(event.target, (minutes) => savePreference({ reminderOffsetMinutes: minutes }));
+      } else {
+        event.target.dataset.previousValue = event.target.value;
+        savePreference({ reminderOffsetMinutes: Number(event.target.value) });
+      }
     } else if (event.target.id === 'schedule-weekly-hours') {
       const hours = Math.min(168, Math.max(1, Math.round(Number(event.target.value) || DEFAULT_WEEKLY_HOURS)));
       savePreference({ weeklyHours: hours });
@@ -2644,13 +2738,23 @@ export async function render(container, { user } = {}) {
   currentUserId = user?.id ?? null;
   canManageOthers = user?.role === 'admin';
   await load();
-  // S-07: die Vorgabe fuer den allerersten Tab dieser Sitzung haengt von der
-  // Datenlage ab - "Planung" (Muster/Ausnahmen/Extras) ist ohne einen einzigen
-  // Schichttyp eine Sackgasse (jedes Formular dahinter dead-endet in einer
-  // leeren Auswahl). Nur beim allerersten Laden entschieden (initialViewDecided),
-  // niemals danach - ein spaeterer Besuch soll die eigene Tab-Wahl der Person
-  // nicht ueberschreiben (siehe Kommentar an `activeView` oben).
-  if (!initialViewDecided) {
+  // S-10: ein ausdruecklicher Tab-Deep-Link (Dashboard-Kachel, Erinnerung,
+  // ein gemerkter Browser-Verlaufseintrag) gewinnt IMMER - er ist eine
+  // explizite Anfrage, keine geerbte Sitzungsvorgabe. Nur die nackte Wurzel
+  // '/schedule' faellt auf die S-07-Datenlage-Vorgabe zurueck (oder, nach dem
+  // allerersten Laden, auf die eigene Tab-Wahl der Person - siehe naechster
+  // Kommentar).
+  const requestedView = scheduleViewFromPath(window.location.pathname);
+  if (requestedView) {
+    activeView = requestedView;
+    initialViewDecided = true;
+  } else if (!initialViewDecided) {
+    // S-07: die Vorgabe fuer den allerersten Tab dieser Sitzung haengt von der
+    // Datenlage ab - "Planung" (Muster/Ausnahmen/Extras) ist ohne einen einzigen
+    // Schichttyp eine Sackgasse (jedes Formular dahinter dead-endet in einer
+    // leeren Auswahl). Nur beim allerersten Laden entschieden (initialViewDecided),
+    // niemals danach - ein spaeterer Besuch soll die eigene Tab-Wahl der Person
+    // nicht ueberschreiben (siehe Kommentar an `activeView` oben).
     activeView = state.types.length ? 'patterns' : 'shifts';
     initialViewDecided = true;
   }
@@ -2677,7 +2781,43 @@ export async function render(container, { user } = {}) {
   // (genau das, was ein Tab-Wechsel ohnehin tut); fuer 'shifts'/'patterns'
   // entspricht sie unveraendert einem einzelnen renderPage().
   await activateView(activeView);
+  // S-10: die Adresse auf die konkrete Tab-Route normalisieren - ein Besuch
+  // ueber die nackte Wurzel (Seitenleiste, alter Bookmark) zeigt danach genau
+  // den Tab, auf dem die Person tatsaechlich steht (Neuladen/Zurueck landen
+  // dann direkt dort, statt wieder auf der Wurzel zu entscheiden).
+  const resolvedRoute = scheduleRouteForView(activeView);
+  if (window.location.pathname !== resolvedRoute) {
+    history.replaceState({ path: resolvedRoute }, '', resolvedRoute);
+  }
   window.lucide?.createIcons({ el: root });
+}
+
+/**
+ * S-10: Soft-Navigation zwischen Schedule-Tabs (vom Router aufgerufen, wenn
+ * dieses Modul bereits gerendert ist - siehe router.js' SCHEDULE_PAGE_ROUTES).
+ * Tauscht nur `.schedule-body` aus (ueber activateView(), dieselbe Funktion
+ * wie ein Tab-Klick), kein Full-Reload. Rueckgabe false erzwingt volles
+ * Rendern (hier nur, wenn der Container bereits verschwunden ist).
+ */
+export async function update({ path } = {}) {
+  if (!root?.isConnected) return false;
+  const requestedView = scheduleViewFromPath(path || window.location.pathname);
+  const nextView = requestedView ?? activeView;
+  const resolvedRoute = scheduleRouteForView(nextView);
+  if (window.location.pathname !== resolvedRoute) {
+    history.replaceState({ path: resolvedRoute }, '', resolvedRoute);
+  }
+  if (nextView !== activeView) {
+    // S-03 Restluecke (bewusst offen, siehe PLAN.md): ein Browser-Zurueck ruft
+    // diese Funktion ueber popstate direkt auf und umgeht damit
+    // guardedActivateView()s Rueckfrage - dieselbe Einschraenkung wie die
+    // anderen "load()+renderPage()"-Pfade, die eine offene Zyklustage-
+    // Bearbeitung stillschweigend verwerfen wuerden. Volle Abdeckung braeuchte
+    // eine Kopplung an handleBackNavigation() (#871) und ist hier bewusst
+    // nicht gebaut.
+    await activateView(nextView);
+  }
+  return true;
 }
 
 // Reines Verhalten statt Text-Muster (PR #930 review): beide Funktionen sind

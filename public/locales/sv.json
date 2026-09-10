@@ -5036,6 +5036,7 @@
         "addPattern": "Lägg till skiftcykel",
         "preset": "Mall",
         "presetCustom": "Egen",
+        "presetShared": "Allmänt",
         "emptyPatternsTitle": "Ingen skiftcykel ännu",
         "emptyPatternsDescription": "Skapa en återkommande skiftcykel för en hushållsmedlem.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "En push-avisering före varje kommande skift med starttid. Semester, sjukdom och andra heldagsposter har ingen starttid att påminna om.",
         "reminderAtStart": "Vid starttid",
         "reminderMinutesBefore": "{{minutes}} min innan",
+        "reminderCustomOffset": "Anpassad…",
+        "customReminderOffsetPrompt": "Anpassad förvarning (minuter)",
         "mySettings": "Mina inställningar",
         "weeklyHoursLabel": "Veckotimmar (för övertidsflaggan)",
         "weeklyHoursHint": "Ditt eget heltidsmål. Fliken Statistik flaggar övertid så snart summan av 7 på varandra följande dagar i den valda perioden överstiger detta värde.",
@@ -5122,6 +5125,7 @@
         "overview": "Jämförelse",
         "overviewPeopleLabel": "Jämför personer",
         "overviewClearSelection": "Rensa urvalet",
+        "continuesUntil": "…fortsätter till {{time}}",
         "overviewEmptyTitle": "Välj personer att jämföra",
         "overviewEmptyDescription": "Välj minst en hushållsmedlem ovan för att se veckoscheman sida vid sida."
     }

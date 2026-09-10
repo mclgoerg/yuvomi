@@ -5036,6 +5036,7 @@
         "addPattern": "Dodaj cykl zmian",
         "preset": "Szablon",
         "presetCustom": "Własny",
+        "presetShared": "Ogólne",
         "emptyPatternsTitle": "Brak cyklu zmian",
         "emptyPatternsDescription": "Utwórz powtarzający się cykl zmian dla domownika.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Powiadomienie push przed każdą nadchodzącą zmianą z czasem rozpoczęcia. Urlop, zwolnienie lekarskie i inne całodniowe wpisy nie mają czasu rozpoczęcia, o którym można przypomnieć.",
         "reminderAtStart": "O czasie rozpoczęcia",
         "reminderMinutesBefore": "{{minutes}} min wcześniej",
+        "reminderCustomOffset": "Niestandardowy…",
+        "customReminderOffsetPrompt": "Własny czas wyprzedzenia (minuty)",
         "mySettings": "Moje ustawienia",
         "weeklyHoursLabel": "Godziny tygodniowo (do oznaczenia nadgodzin)",
         "weeklyHoursHint": "Twój własny cel pełnego etatu. Zakładka Statystyki oznacza nadgodziny, gdy suma dowolnych 7 kolejnych dni w wybranym zakresie przekroczy tę wartość.",
@@ -5122,6 +5125,7 @@
         "overview": "Porównanie",
         "overviewPeopleLabel": "Porównaj osoby",
         "overviewClearSelection": "Wyczyść wybór",
+        "continuesUntil": "…trwa do {{time}}",
         "overviewEmptyTitle": "Wybierz osoby do porównania",
         "overviewEmptyDescription": "Wybierz powyżej co najmniej jednego członka gospodarstwa domowego, aby zobaczyć tygodniowe plany obok siebie."
     }

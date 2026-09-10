@@ -5036,6 +5036,7 @@
         "addPattern": "शिफ़्ट चक्र जोड़ें",
         "preset": "टेम्पलेट",
         "presetCustom": "कस्टम",
+        "presetShared": "सामान्य",
         "emptyPatternsTitle": "अभी कोई शिफ़्ट चक्र नहीं",
         "emptyPatternsDescription": "घर के किसी सदस्य के लिए दोहराया जाने वाला शिफ़्ट चक्र बनाएँ।",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "शुरुआत समय वाली हर आगामी शिफ़्ट से पहले एक पुश सूचना। छुट्टी, बीमारी और अन्य पूरे दिन की प्रविष्टियों का कोई शुरुआत समय नहीं होता जिसकी याद दिलाई जाए।",
         "reminderAtStart": "शुरुआत के समय",
         "reminderMinutesBefore": "{{minutes}} मिनट पहले",
+        "reminderCustomOffset": "कस्टम…",
+        "customReminderOffsetPrompt": "कस्टम समय (मिनट)",
         "mySettings": "मेरी सेटिंग्स",
         "weeklyHoursLabel": "साप्ताहिक घंटे (ओवरटाइम चिह्न के लिए)",
         "weeklyHoursHint": "आपका अपना पूर्णकालिक लक्ष्य। आँकड़े टैब ओवरटाइम को तब चिह्नित करता है जब चुनी गई अवधि में किन्हीं भी लगातार 7 दिनों का योग इस मान से अधिक हो जाता है।",
@@ -5122,6 +5125,7 @@
         "overview": "तुलना",
         "overviewPeopleLabel": "लोगों की तुलना करें",
         "overviewClearSelection": "चयन साफ़ करें",
+        "continuesUntil": "…{{time}} तक जारी है",
         "overviewEmptyTitle": "तुलना के लिए लोग चुनें",
         "overviewEmptyDescription": "साप्ताहिक समय-सारिणी साथ-साथ देखने के लिए ऊपर कम से कम एक सदस्य चुनें।"
     }

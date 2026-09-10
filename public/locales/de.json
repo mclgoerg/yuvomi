@@ -5036,6 +5036,7 @@
         "addPattern": "Schichtplan hinzufügen",
         "preset": "Vorlage",
         "presetCustom": "Eigene Eingabe",
+        "presetShared": "Allgemein",
         "emptyPatternsTitle": "Noch kein Schichtplan",
         "emptyPatternsDescription": "Erstelle einen wiederkehrenden Schichtzyklus für ein Haushaltsmitglied.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Eine Push-Benachrichtigung vor jeder anstehenden Schicht mit Startzeit. Urlaub, Krankheit und andere ganztägige Einträge haben keine Startzeit, an die erinnert werden könnte.",
         "reminderAtStart": "Zum Schichtbeginn",
         "reminderMinutesBefore": "{{minutes}} Min. vorher",
+        "reminderCustomOffset": "Eigene Eingabe…",
+        "customReminderOffsetPrompt": "Eigener Vorlauf (Minuten)",
         "mySettings": "Meine Einstellungen",
         "weeklyHoursLabel": "Wochenstunden (für die Überstunden-Markierung)",
         "weeklyHoursHint": "Dein eigener Vollzeit-Richtwert. Die Statistik markiert Überstunden, sobald 7 beliebige aufeinanderfolgende Tage im gewählten Zeitraum diesen Wert überschreiten.",
@@ -5122,6 +5125,7 @@
         "overview": "Vergleich",
         "overviewPeopleLabel": "Personen vergleichen",
         "overviewClearSelection": "Auswahl leeren",
+        "continuesUntil": "…geht bis {{time}}",
         "overviewEmptyTitle": "Personen zum Vergleichen auswählen",
         "overviewEmptyDescription": "Wähle oben mindestens ein Haushaltsmitglied aus, um die Wochenpläne nebeneinander zu sehen."
     }

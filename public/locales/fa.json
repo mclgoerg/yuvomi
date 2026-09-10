@@ -5036,6 +5036,7 @@
         "addPattern": "افزودن چرخه شیفت",
         "preset": "الگوی آماده",
         "presetCustom": "سفارشی",
+        "presetShared": "عمومی",
         "emptyPatternsTitle": "هنوز چرخه شیفتی وجود ندارد",
         "emptyPatternsDescription": "برای یکی از اعضای خانواده یک چرخه شیفت تکرارشونده بسازید.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "یک اعلان پیش از هر شیفت پیش‌رو که زمان شروع دارد. مرخصی، مرخصی استعلاجی و سایر موارد تمام‌روز زمان شروعی برای یادآوری ندارند.",
         "reminderAtStart": "در زمان شروع",
         "reminderMinutesBefore": "{{minutes}} دقیقه قبل",
+        "reminderCustomOffset": "سفارشی…",
+        "customReminderOffsetPrompt": "زمان سفارشی (دقیقه)",
         "mySettings": "تنظیمات من",
         "weeklyHoursLabel": "ساعات هفتگی (برای نشانگر اضافه‌کاری)",
         "weeklyHoursHint": "هدف تمام‌وقت خودتان. تب آمار به محض اینکه مجموع هر ۷ روز متوالی در بازه انتخابی از این مقدار فراتر رود، آن را اضافه‌کاری علامت می‌زند.",
@@ -5122,6 +5125,7 @@
         "overview": "مقایسه",
         "overviewPeopleLabel": "مقایسه افراد",
         "overviewClearSelection": "پاک کردن انتخاب",
+        "continuesUntil": "…تا {{time}} ادامه دارد",
         "overviewEmptyTitle": "افرادی را برای مقایسه انتخاب کن",
         "overviewEmptyDescription": "بالا دست‌کم یک عضو خانواده را انتخاب کن تا برنامه‌های هفتگی را کنار هم ببینی."
     }

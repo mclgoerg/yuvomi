@@ -5036,6 +5036,7 @@
         "addPattern": "Přidat cyklus směn",
         "preset": "Šablona",
         "presetCustom": "Vlastní",
+        "presetShared": "Obecné",
         "emptyPatternsTitle": "Zatím žádný cyklus směn",
         "emptyPatternsDescription": "Vytvořte opakující se cyklus směn pro člena domácnosti.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Push oznámení před každou nadcházející směnou s časem začátku. Dovolená, nemoc a jiné celodenní záznamy nemají čas začátku, na který by šlo upozornit.",
         "reminderAtStart": "V čase začátku",
         "reminderMinutesBefore": "{{minutes}} min předem",
+        "reminderCustomOffset": "Vlastní…",
+        "customReminderOffsetPrompt": "Vlastní předstih (minuty)",
         "mySettings": "Moje nastavení",
         "weeklyHoursLabel": "Týdenní hodiny (pro označení přesčasu)",
         "weeklyHoursHint": "Váš vlastní cíl pro plný úvazek. Karta Statistiky označí přesčas, jakmile součet libovolných 7 po sobě jdoucích dnů ve vybraném období překročí tuto hodnotu.",
@@ -5122,6 +5125,7 @@
         "overview": "Porovnání",
         "overviewPeopleLabel": "Porovnat osoby",
         "overviewClearSelection": "Zrušit výběr",
+        "continuesUntil": "…pokračuje do {{time}}",
         "overviewEmptyTitle": "Vyberte osoby k porovnání",
         "overviewEmptyDescription": "Vyberte výše alespoň jednoho člena domácnosti a zobrazte týdenní rozvrhy vedle sebe."
     }

@@ -654,6 +654,16 @@
   .schedule-library--shifts .schedule-details {
     margin-block-end: 0;
   }
+
+  /* S-26 (UX-Audit): an open card in a 2-column CSS grid pushes only its own
+   * row taller - the sibling sharing that row (and everything below) jumps
+   * sideways/down as columns re-balance, reading as a layout glitch rather
+   * than an intentional expand. Spanning both columns while open keeps every
+   * OTHER card's column position stable; only rows shift, which is the
+   * expected, unsurprising effect of something above growing taller. */
+  .schedule-library--shifts .schedule-details[open] {
+    grid-column: 1 / -1;
+  }
 }
 
 @container schedule-page (min-width: 900px) {

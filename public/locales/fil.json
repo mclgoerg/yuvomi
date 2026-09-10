@@ -5036,6 +5036,7 @@
         "addPattern": "Magdagdag ng pattern ng shift",
         "preset": "Template",
         "presetCustom": "Sariling gawa",
+        "presetShared": "Pangkalahatan",
         "emptyPatternsTitle": "Wala pang pattern ng shift",
         "emptyPatternsDescription": "Gumawa ng paulit-ulit na cycle ng shift para sa isang miyembro ng sambahayan.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Isang push notification bago ang bawat paparating na shift na may oras ng simula. Ang bakasyon, sick day, at iba pang buong-araw na entry ay walang oras ng simula na paaalalahanan.",
         "reminderAtStart": "Sa oras ng simula",
         "reminderMinutesBefore": "{{minutes}} minuto bago",
+        "reminderCustomOffset": "Custom…",
+        "customReminderOffsetPrompt": "Custom na paunang oras (minuto)",
         "mySettings": "Aking mga setting",
         "weeklyHoursLabel": "Lingguhang oras (para sa overtime flag)",
         "weeklyHoursHint": "Ang sarili mong full-time na target. Minamarkahan ng tab ng Estadistika ang overtime kapag ang kabuuan ng anumang 7 magkakasunod na araw sa loob ng napiling saklaw ay lumagpas sa halagang ito.",
@@ -5122,6 +5125,7 @@
         "overview": "Paghahambing",
         "overviewPeopleLabel": "Ikumpara ang mga tao",
         "overviewClearSelection": "I-clear ang pinili",
+        "continuesUntil": "…magpapatuloy hanggang {{time}}",
         "overviewEmptyTitle": "Pumili ng mga tao na ikukumpara",
         "overviewEmptyDescription": "Pumili sa itaas ng kahit isang miyembro ng sambahayan para makita ang lingguhang iskedyul nang magkatabi."
     }

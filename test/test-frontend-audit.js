@@ -13700,6 +13700,17 @@ test('jedes Push-Ziel zeigt auf eine Route, die es gibt', () => {
   // entwertet die Benachrichtigung und lehrt, sie zu ignorieren.
   const routerSrc = read('../public/router.js');
   const known = new Set([...routerSrc.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1]));
+  // Sub-Tab-Sektionen (Gesundheit, Schedule S-10) registrieren ihre Routen
+  // ueber ein `.map(path => ({ path, ... }))` aus einem importierten Array,
+  // nicht als literales `path: '...'` in router.js selbst - das obige Regex
+  // sieht sie deshalb nicht. Reiner Text-Read statt eines echten Imports:
+  // beide Util-Dateien importieren selbst wieder `/i18n.js` (ein
+  // Browser-Pfadalias), das unter Node nicht aufloest.
+  for (const file of ['../public/utils/health-tabs.js', '../public/utils/schedule-tabs.js']) {
+    const src = read(file);
+    const arrayBody = src.slice(src.indexOf('Object.freeze(['), src.indexOf('])', src.indexOf('Object.freeze([')));
+    for (const match of arrayBody.matchAll(/'([^']+)'/g)) known.add(match[1]);
+  }
   // Die Settings-Blätter kommen aus der Registry, nicht aus einem `path:`.
   const settingsLeaf = /^\/settings(\/|$)/;
   assert.ok(known.size >= 15, `nur ${known.size} Routen aus router.js gelesen - Regex tot?`);

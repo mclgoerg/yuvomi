@@ -5036,6 +5036,7 @@
         "addPattern": "シフトパターンを追加",
         "preset": "プリセット",
         "presetCustom": "カスタム",
+        "presetShared": "共通",
         "emptyPatternsTitle": "シフトパターンはまだありません",
         "emptyPatternsDescription": "家族のメンバー用に繰り返しのシフト周期を作成します。",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "開始時刻のある次のシフトの前にプッシュ通知します。休暇、病欠、その他終日の予定には通知する開始時刻がありません。",
         "reminderAtStart": "開始時刻に",
         "reminderMinutesBefore": "{{minutes}}分前",
+        "reminderCustomOffset": "カスタム…",
+        "customReminderOffsetPrompt": "カスタムのリード時間(分)",
         "mySettings": "自分の設定",
         "weeklyHoursLabel": "週あたりの時間（残業フラグ用）",
         "weeklyHoursHint": "自分自身のフルタイム目標です。選択した期間内の連続する7日間の合計がこの値を超えると、統計タブが残業としてフラグを立てます。",
@@ -5122,6 +5125,7 @@
         "overview": "比較",
         "overviewPeopleLabel": "メンバーを比較",
         "overviewClearSelection": "選択をクリア",
+        "continuesUntil": "…{{time}}まで継続",
         "overviewEmptyTitle": "比較するメンバーを選択",
         "overviewEmptyDescription": "上で1人以上の家族メンバーを選ぶと、週間予定を並べて表示できます。"
     }

@@ -5036,6 +5036,7 @@
         "addPattern": "Roosterpatroon toevoegen",
         "preset": "Sjabloon",
         "presetCustom": "Eigen invoer",
+        "presetShared": "Algemeen",
         "emptyPatternsTitle": "Nog geen roosterpatroon",
         "emptyPatternsDescription": "Maak een terugkerende dienstcyclus voor een gezinslid.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Een pushmelding vóór elke aankomende dienst met een starttijd. Vakantie, ziekte en andere hele-dag-items hebben geen starttijd om aan te herinneren.",
         "reminderAtStart": "Op starttijd",
         "reminderMinutesBefore": "{{minutes}} min. van tevoren",
+        "reminderCustomOffset": "Aangepast…",
+        "customReminderOffsetPrompt": "Aangepaste tijd (minuten)",
         "mySettings": "Mijn instellingen",
         "weeklyHoursLabel": "Wekelijkse uren (voor de overurenmarkering)",
         "weeklyHoursHint": "Je eigen fulltime-doel. Het tabblad Statistieken markeert overuren zodra een reeks van 7 opeenvolgende dagen in de gekozen periode deze waarde overschrijdt.",
@@ -5122,6 +5125,7 @@
         "overview": "Vergelijking",
         "overviewPeopleLabel": "Personen vergelijken",
         "overviewClearSelection": "Selectie wissen",
+        "continuesUntil": "…loopt door tot {{time}}",
         "overviewEmptyTitle": "Kies personen om te vergelijken",
         "overviewEmptyDescription": "Selecteer hierboven minstens één huisgenoot om de weekroosters naast elkaar te zien."
     }

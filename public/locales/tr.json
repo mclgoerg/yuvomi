@@ -5036,6 +5036,7 @@
         "addPattern": "Vardiya düzeni ekle",
         "preset": "Şablon",
         "presetCustom": "Özel",
+        "presetShared": "Genel",
         "emptyPatternsTitle": "Henüz vardiya düzeni yok",
         "emptyPatternsDescription": "Bir hane üyesi için tekrarlayan bir vardiya döngüsü oluşturun.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Başlangıç saati olan yaklaşan her vardiyadan önce anlık bildirim. İzin, hastalık ve diğer tüm gün süren girişlerin hatırlatılacak bir başlangıç saati yoktur.",
         "reminderAtStart": "Başlangıç saatinde",
         "reminderMinutesBefore": "{{minutes}} dakika önce",
+        "reminderCustomOffset": "Özel…",
+        "customReminderOffsetPrompt": "Özel süre (dakika)",
         "mySettings": "Ayarlarım",
         "weeklyHoursLabel": "Haftalık saat (fazla mesai işareti için)",
         "weeklyHoursHint": "Kendi tam zamanlı hedefiniz. İstatistikler sekmesi, seçilen aralıktaki herhangi 7 ardışık günün toplamı bu değeri aştığında fazla mesaiyi işaretler.",
@@ -5122,6 +5125,7 @@
         "overview": "Karşılaştırma",
         "overviewPeopleLabel": "Kişileri karşılaştır",
         "overviewClearSelection": "Seçimi temizle",
+        "continuesUntil": "…{{time}} saatine kadar sürüyor",
         "overviewEmptyTitle": "Karşılaştırılacak kişileri seç",
         "overviewEmptyDescription": "Haftalık programları yan yana görmek için yukarıdan en az bir hane üyesi seç."
     }

@@ -5036,6 +5036,7 @@
         "addPattern": "Aggiungi rotazione",
         "preset": "Modello",
         "presetCustom": "Personalizzato",
+        "presetShared": "Generale",
         "emptyPatternsTitle": "Ancora nessuna rotazione",
         "emptyPatternsDescription": "Crea un ciclo di turni ricorrente per un membro della famiglia.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Una notifica push prima di ogni turno imminente con orario di inizio. Ferie, malattia e altre voci per l'intera giornata non hanno un orario di inizio da ricordare.",
         "reminderAtStart": "All'orario di inizio",
         "reminderMinutesBefore": "{{minutes}} min prima",
+        "reminderCustomOffset": "Personalizzato…",
+        "customReminderOffsetPrompt": "Anticipo personalizzato (minuti)",
         "mySettings": "Le mie impostazioni",
         "weeklyHoursLabel": "Ore settimanali (per il segnale di straordinario)",
         "weeklyHoursHint": "Il tuo obiettivo a tempo pieno. La scheda Statistiche segnala lo straordinario quando 7 giorni consecutivi qualsiasi nell'intervallo selezionato superano questo valore.",
@@ -5122,6 +5125,7 @@
         "overview": "Confronto",
         "overviewPeopleLabel": "Confronta persone",
         "overviewClearSelection": "Cancella selezione",
+        "continuesUntil": "…continua fino alle {{time}}",
         "overviewEmptyTitle": "Scegli le persone da confrontare",
         "overviewEmptyDescription": "Seleziona sopra almeno un membro della famiglia per vedere gli orari settimanali affiancati."
     }

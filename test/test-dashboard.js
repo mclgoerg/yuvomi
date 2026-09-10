@@ -599,6 +599,31 @@ test('Cockpit-Coda nennt die morgen fällige Aufgabe statt falscher Entwarnung',
   }
 });
 
+test('"Heute frei"/"Fuer heute alles erledigt" entfaellt neben einer sichtbaren Schichtplan-Kachel (S-18)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const prevWindow = global.window;
+  global.window = { yuvomi: null };
+  try {
+    // Ohne Schedule-Kachel (Vorgabe): der leere Tag darf "Heute frei" sagen.
+    const withoutWidget = __test.renderTodayCockpit({}, []);
+    nodeAssert.match(withoutWidget, /todayFree/, 'ohne sichtbare Schichtplan-Kachel bleibt die alte Zustandszeile');
+    // Mit sichtbarer Schedule-Kachel: dieselbe leere Aufgaben/Termin-Lage darf
+    // NICHT mehr "Heute frei" behaupten - die Kachel daneben koennte etwas
+    // ganz anderes zeigen (der urspruengliche Befund: eine echte Schicht).
+    const withWidget = __test.renderTodayCockpit({}, [{ id: 'schedule', visible: true }]);
+    nodeAssert.ok(!/todayFree/.test(withWidget), 'eine sichtbare Schichtplan-Kachel darf nicht neben "Heute frei" widersprochen werden');
+    // Dieselbe Regel fuer die "alles erledigt"-Variante (erledigte Aufgaben,
+    // sonst nichts): auch sie ist neben der Kachel eine unvollstaendige Story.
+    const allDoneWithWidget = __test.renderTodayCockpit(
+      { urgentTasks: [{ id: 1, title: 'x', due_date: toLocalDateKey(new Date()), status: 'done' }] },
+      [{ id: 'schedule', visible: true }],
+    );
+    nodeAssert.ok(!/todayAllDone/.test(allDoneWithWidget), '"alles erledigt" entfaellt ebenso neben einer sichtbaren Schichtplan-Kachel');
+  } finally {
+    global.window = prevWindow;
+  }
+});
+
 test('Notiz-Widget: nur der Auszug landet im DOM, nie der Volltext (Paket 3)', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   // line-clamp kürzt rein visuell - Screenreader lasen die komplette Notiz vor.
@@ -2711,6 +2736,23 @@ test('Wetter: ohne Tageswerte bleibt die Hoch/Tief-Zeile weg statt leer zu stehe
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------
+test('das Familienmitglieder-Widget kennt die eigene Schicht statt "Heute frei" zu behaupten (S-18)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const users = [{ id: 1, display_name: 'Anna', avatar_color: '#6C3AED' }];
+  // Ohne data.schedule (Schedule-Kachel nicht sichtbar): unveraendertes Verhalten.
+  const withoutSchedule = __test.renderFamilyWidget(users, {});
+  nodeAssert.match(withoutSchedule, /todayFree/, 'ohne geladene Schichtplan-Daten bleibt die alte "Heute frei"-Zeile');
+  // Mit einer echten Schicht heute: die Zeile nennt die Schicht, nicht "frei".
+  const withShift = __test.renderFamilyWidget(users, {
+    schedule: { entries: [{ user_id: 1, shift_type: { short_code: 'E', name: 'Early shift' } }] },
+  });
+  nodeAssert.match(withShift, /E · Early shift/, 'die eigene Schicht ersetzt die "frei"-Behauptung');
+  nodeAssert.ok(!/todayFree/.test(withShift), 'kein Widerspruch zur Schedule-Kachel mehr');
+  // Ein freier Tag (Schedule geladen, aber kein Eintrag fuer diese Person) sagt weiterhin "frei".
+  const stillFree = __test.renderFamilyWidget(users, { schedule: { entries: [] } });
+  nodeAssert.match(stillFree, /todayFree/, 'ein wirklich freier Tag darf weiterhin "Heute frei" sagen');
+});
+
 await Promise.all(pendingTests);
 
 console.log(`\n[Dashboard-Test] Ergebnis: ${passed} bestanden, ${failed} fehlgeschlagen\n`);

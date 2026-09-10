@@ -5036,6 +5036,7 @@
         "addPattern": "Añadir rotación",
         "preset": "Plantilla",
         "presetCustom": "Personalizado",
+        "presetShared": "General",
         "emptyPatternsTitle": "Aún no hay rotaciones",
         "emptyPatternsDescription": "Crea un ciclo de turnos recurrente para un miembro del hogar.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Un aviso antes de cada turno próximo con hora de inicio. Vacaciones, bajas y otras entradas de día completo no tienen hora de inicio que recordar.",
         "reminderAtStart": "A la hora de inicio",
         "reminderMinutesBefore": "{{minutes}} min antes",
+        "reminderCustomOffset": "Personalizado…",
+        "customReminderOffsetPrompt": "Antelación personalizada (minutos)",
         "mySettings": "Mis ajustes",
         "weeklyHoursLabel": "Horas semanales (para la marca de horas extra)",
         "weeklyHoursHint": "Tu propio objetivo de jornada completa. La pestaña Estadísticas marca horas extra cuando cualquier periodo de 7 días consecutivos dentro del rango seleccionado supera este valor.",
@@ -5122,6 +5125,7 @@
         "overview": "Comparativa",
         "overviewPeopleLabel": "Comparar personas",
         "overviewClearSelection": "Borrar la selección",
+        "continuesUntil": "…continúa hasta las {{time}}",
         "overviewEmptyTitle": "Elige personas para comparar",
         "overviewEmptyDescription": "Selecciona arriba al menos un miembro del hogar para ver los horarios semanales uno junto al otro."
     }

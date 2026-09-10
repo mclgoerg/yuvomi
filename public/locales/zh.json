@@ -5036,6 +5036,7 @@
         "addPattern": "添加排班周期",
         "preset": "模板",
         "presetCustom": "自定义",
+        "presetShared": "通用",
         "emptyPatternsTitle": "还没有排班周期",
         "emptyPatternsDescription": "为家庭成员创建重复的班次周期。",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "在每个有开始时间的即将到来的班次前推送通知。假期、病假和其他全天条目没有可提醒的开始时间。",
         "reminderAtStart": "在开始时间",
         "reminderMinutesBefore": "提前 {{minutes}} 分钟",
+        "reminderCustomOffset": "自定义…",
+        "customReminderOffsetPrompt": "自定义提前时间(分钟)",
         "mySettings": "我的设置",
         "weeklyHoursLabel": "每周小时数（用于加班标记）",
         "weeklyHoursHint": "你自己的全职目标。当所选时间段内任意连续7天的总时长超过此值时，统计选项卡会将其标记为加班。",
@@ -5122,6 +5125,7 @@
         "overview": "对比",
         "overviewPeopleLabel": "比较成员",
         "overviewClearSelection": "清除选择",
+        "continuesUntil": "…持续到 {{time}}",
         "overviewEmptyTitle": "选择要比较的成员",
         "overviewEmptyDescription": "在上方至少选择一名家庭成员,即可并排查看每周时间表。"
     }

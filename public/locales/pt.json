@@ -5036,6 +5036,7 @@
         "addPattern": "Adicionar escala",
         "preset": "Modelo",
         "presetCustom": "Personalizado",
+        "presetShared": "Geral",
         "emptyPatternsTitle": "Ainda não há escalas",
         "emptyPatternsDescription": "Crie um ciclo de turnos recorrente para um membro do agregado.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Uma notificação antes de cada turno próximo com hora de início. Férias, baixa médica e outras entradas de dia inteiro não têm hora de início para lembrar.",
         "reminderAtStart": "À hora de início",
         "reminderMinutesBefore": "{{minutes}} min antes",
+        "reminderCustomOffset": "Personalizado…",
+        "customReminderOffsetPrompt": "Antecedência personalizada (minutos)",
         "mySettings": "As minhas definições",
         "weeklyHoursLabel": "Horas semanais (para o sinalizador de horas extra)",
         "weeklyHoursHint": "O seu próprio objetivo de tempo inteiro. O separador Estatísticas assinala horas extra quando quaisquer 7 dias consecutivos dentro do período selecionado ultrapassam este valor.",
@@ -5122,6 +5125,7 @@
         "overview": "Comparação",
         "overviewPeopleLabel": "Comparar pessoas",
         "overviewClearSelection": "Limpar seleção",
+        "continuesUntil": "…continua até às {{time}}",
         "overviewEmptyTitle": "Escolhe pessoas para comparar",
         "overviewEmptyDescription": "Seleciona acima pelo menos um membro do agregado para ver os horários semanais lado a lado."
     }

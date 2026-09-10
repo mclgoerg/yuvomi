@@ -537,9 +537,21 @@ app.use('/api/v1', (req, res, next) => {
 app.use('/api/v1', (req, res, next) => {
   // Die Regel selbst steht in permissions.js — dieselbe Funktion prüft den
   // MCP-Endpoint (#823), damit beide Oberflächen nicht auseinanderlaufen.
+  //
+  // AUSNAHME /schedule/preferences (S-12, UX-Audit): der Vorlauf/die
+  // Wochenstunden hängen an der EIGENEN users-Zeile (siehe
+  // routes/schedule-preferences.js' eigener Kommentar, "keine Admin-Gate") -
+  // ein Mitglied mit `schedule: read` darf nur FREMDE Schichtplan-Daten nicht
+  // schreiben, seine eigene Erinnerungsvorlaufzeit ist keine davon. `null`
+  // statt des sonstigen Modulschlüssels zwingt moduleAccessVerdict() auf
+  // "erlaubt" (dieselbe Deny-Listen-Regel, unter der jeder NICHT gelistete
+  // Pfad ohnehin durchgeht) - ausdrücklich nur für diesen Session-Pfad, die
+  // API-Token-Scope-Prüfung oben bleibt unveraendert an `schedule:write`
+  // gebunden.
+  const scopedModuleKey = req.path.startsWith('/schedule/preferences') ? null : moduleForPath(req.path);
   const verdict = moduleAccessVerdict(
     req.sessionModuleAccess,
-    moduleForPath(req.path),
+    scopedModuleKey,
     requiredAccess(req.method),
   );
   if (verdict === MODULE_ACCESS_DENIED) {

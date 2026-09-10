@@ -5036,6 +5036,7 @@
         "addPattern": "Műszakciklus hozzáadása",
         "preset": "Sablon",
         "presetCustom": "Egyéni",
+        "presetShared": "Általános",
         "emptyPatternsTitle": "Még nincs műszakciklus",
         "emptyPatternsDescription": "Hozzon létre ismétlődő műszakciklust egy háztartástag számára.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "Push értesítés minden közelgő, kezdési idővel rendelkező műszak előtt. A szabadságnak, betegszabadságnak és más egész napos bejegyzéseknek nincs kezdési ideje, amire emlékeztetni lehetne.",
         "reminderAtStart": "A kezdés időpontjában",
         "reminderMinutesBefore": "{{minutes}} perccel előtte",
+        "reminderCustomOffset": "Egyéni…",
+        "customReminderOffsetPrompt": "Egyéni előrejelzés (perc)",
         "mySettings": "Saját beállítások",
         "weeklyHoursLabel": "Heti órák (a túlóra-jelzéshez)",
         "weeklyHoursHint": "A saját teljes munkaidős célja. A Statisztika fül túlórát jelez, amint a kiválasztott időszakon belül bármely egymást követő 7 nap összege meghaladja ezt az értéket.",
@@ -5122,6 +5125,7 @@
         "overview": "Összehasonlítás",
         "overviewPeopleLabel": "Személyek összehasonlítása",
         "overviewClearSelection": "Kijelölés törlése",
+        "continuesUntil": "…eddig tart: {{time}}",
         "overviewEmptyTitle": "Válassz személyeket az összehasonlításhoz",
         "overviewEmptyDescription": "Válassz fent legalább egy háztartástagot, hogy a heti beosztásokat egymás mellett lásd."
     }

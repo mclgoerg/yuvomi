@@ -5036,6 +5036,7 @@
         "addPattern": "근무 패턴 추가",
         "preset": "템플릿",
         "presetCustom": "직접 입력",
+        "presetShared": "공통",
         "emptyPatternsTitle": "아직 근무 패턴이 없습니다",
         "emptyPatternsDescription": "가족 구성원을 위한 반복 근무 주기를 만드세요.",
         "presets": {
@@ -5088,6 +5089,8 @@
         "reminderHint": "시작 시각이 있는 다가오는 근무마다 푸시 알림을 보냅니다. 휴가, 병가 등 하루 종일 항목에는 알림을 보낼 시작 시각이 없습니다.",
         "reminderAtStart": "시작 시각에",
         "reminderMinutesBefore": "{{minutes}}분 전",
+        "reminderCustomOffset": "사용자 지정…",
+        "customReminderOffsetPrompt": "사용자 지정 시간(분)",
         "mySettings": "내 설정",
         "weeklyHoursLabel": "주간 시간(초과 근무 표시용)",
         "weeklyHoursHint": "본인의 전일제 목표입니다. 선택한 기간 내 연속된 7일의 합계가 이 값을 초과하면 통계 탭이 초과 근무로 표시합니다.",
@@ -5122,6 +5125,7 @@
         "overview": "비교",
         "overviewPeopleLabel": "사람 비교",
         "overviewClearSelection": "선택 지우기",
+        "continuesUntil": "…{{time}}까지 계속",
         "overviewEmptyTitle": "비교할 사람을 선택하세요",
         "overviewEmptyDescription": "위에서 한 명 이상의 가족 구성원을 선택하면 주간 일정을 나란히 볼 수 있습니다."
     }
