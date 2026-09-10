@@ -1,14 +1,16 @@
 import { api } from '/api.js';
-import { t, formatDate, formatDayMonth } from '/i18n.js';
+import { t, formatDate, formatDayMonth, getNumberFormat } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { todayKey, addLocalDays, parseLocalDateKey, weekStartIndex, startOfLocalWeekKey } from '/utils/date.js';
-import { openModal, closeModal, confirmModal, advancedSection } from '/components/modal.js';
+import { openModal, closeModal, confirmModal, confirmOverModal, advancedSection } from '/components/modal.js';
 import { makeSortable } from '/utils/sortable.js';
 import { createPageFab, setPageFabAction } from '/utils/fab.js';
 import { emptyStateHTML } from '/utils/empty-state.js';
 import { wireScrollFade } from '/utils/ux.js';
+import { wireTablist } from '/utils/tablist.js';
 import { toggleRowHtml } from '/settings/components.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect } from '/components/user-multi-select.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 
 // ZWEISPALTIG: Schedule is a full-width responsive library and statistics view;
 // constraining its row lists to the narrow reading measure would recreate the
@@ -16,11 +18,23 @@ import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect } from '
 
 let root;
 let scheduleFab = null;
+let scheduleTablist = null;
 let currentUserId = null;
 let canManageOthers = false;
 let activeView = 'patterns';
 let state = { users: [], types: [], customFields: [], patterns: [], overrides: [], extras: [], entries: [], warnings: [], reminderOffsetMinutes: null, weeklyHours: null, hiddenTemplates: [] };
-let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', from: '', to: '', entries: [], bounds: null, loading: false };
+let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', from: '', to: '', entries: [], bounds: null, loading: false, error: false };
+// Generationszaehler gegen ein Wettrennen zweier ueberlappender Ladevorgaenge
+// (schnelles Tab-Wechseln/Woche-Vor-Zurueck/erneutes Absenden des Filters):
+// jeder Aufruf reserviert sich vor dem eigentlichen Fetch die naechste Nummer,
+// und nur wer beim Zurueckkommen noch die AKTUELLE Nummer traegt, darf sein
+// Ergebnis uebernehmen - eine spaeter gestartete, aber frueher zurueckkommende
+// Anfrage gewinnt sonst gegen eine juengere, die correcter waere. Dasselbe
+// Prinzip wie calendar.js' createCalendarLoadCoordinator(), hier als schlichter
+// lokaler Zaehler statt einer geteilten Abstraktion (kein weiteres Modul
+// braucht das gleiche Muster).
+let statisticsRequestId = 0;
+let overviewRequestId = 0;
 // "Uebersicht"-Tab: mehrere Haushaltsmitglieder nebeneinander vergleichen
 // (#1018 - Stundenplaene mehrerer Kinder). people kommt vorgefiltert vom
 // Server (GET /schedule/household-members, isHouseholdMember()); selectedIds
@@ -28,7 +42,7 @@ let statistics = { userId: null, range: 'current', monthFrom: '', monthTo: '', f
 // tut das (siehe refreshOverview()).
 const OVERVIEW_SELECTION_KEY = 'yuvomi:schedule:overview:people';
 const OVERVIEW_VIEW_KEY = 'yuvomi:schedule:overview:mode';
-let overview = { people: [], selectedIds: [], weekCursor: todayKey(), viewMode: loadSavedOverviewViewMode(), entries: [], holidays: [], loading: false };
+let overview = { people: [], selectedIds: [], weekCursor: todayKey(), viewMode: loadSavedOverviewViewMode(), entries: [], holidays: [], loading: false, error: false };
 
 function loadSavedOverviewViewMode() {
   try { return localStorage.getItem(OVERVIEW_VIEW_KEY) === 'day' ? 'day' : 'week'; } catch { return 'week'; }
@@ -142,15 +156,34 @@ const userName = (id) => state.users.find((user) => Number(user.id) === Number(i
   || state.users.find((user) => Number(user.id) === Number(id))?.username
   || String(id);
 const selectedOwner = () => currentUserId ?? state.users[0]?.id ?? '';
-const canWrite = (userId) => canManageOthers || Number(userId) === Number(currentUserId);
+
+/**
+ * Nur-lesen-Mitglied fuer das Schedule-Modul (Modulrecht 'read'): der Server
+ * blockt jedes POST/PUT/DELETE unter /schedule ohnehin mit 403 (zentrales Gate,
+ * server/index.js + moduleAccessVerdict()) - diese Abfrage ist die ehrliche
+ * UI-Entsprechung dazu, nicht die eigentliche Sperre. Als Funktion statt einer
+ * Konstante, weil ein Rechtewechsel ohne Reload ankommt und jedes Re-Render neu
+ * fragen soll. Selbes Muster wie readOnly() in public/pages/waste.js.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('schedule');
+}
+
+// canWrite/canEditType tragen jetzt BEIDE Achsen: die Eigentuemer-Pruefung
+// (wem gehoert die Zeile) UND das Modul-Nur-lesen-Recht (darf diese Person
+// ueberhaupt etwas im Modul schreiben, egal wessen Zeile). Eine zentrale
+// Stelle statt eines Extra-`&& !readOnly()` an jeder Aufrufstelle - patternCard(),
+// shiftTypeCard(), customFieldRow(), overrideRows() und extraRows() lesen
+// beide Funktionen ohnehin schon fuer ihre "gehoert es mir"-Frage.
+const canWrite = (userId) => !readOnly() && (canManageOthers || Number(userId) === Number(currentUserId));
 
 // Ein Schichttyp gehoert dem Haushalt und nicht einer Person: jeder darf einen
 // anlegen, aendern und loeschen nur der Ersteller oder ein Admin. Ein Typ, dessen
 // Ersteller nicht mehr da ist, traegt `created_by = null` und liegt bei den Admins.
 // Ohne diese Pruefung stuenden Formular und Loeschknopf bei jedem - und endeten
 // verlaesslich in 403.
-const canEditType = (type) => canManageOthers
-  || (type?.created_by != null && Number(type.created_by) === Number(currentUserId));
+const canEditType = (type) => !readOnly() && (canManageOthers
+  || (type?.created_by != null && Number(type.created_by) === Number(currentUserId)));
 const clockLabel = (shiftType) => {
   if (!shiftType?.start_time || !shiftType?.end_time) return t('schedule.allDay');
   const crossesDay = shiftType.end_time <= shiftType.start_time;
@@ -237,7 +270,12 @@ function shiftMinutes(shiftType) {
 
 function formatHours(minutes) {
   const hours = minutes / 60;
-  const value = Number.isInteger(hours) ? String(hours) : hours.toFixed(1).replace(/\.0$/, '');
+  // Locale-abhaengiges Dezimaltrennzeichen (Komma im Deutschen) statt eines
+  // festen toFixed(1) - der geteilte Zahlenformatierer (i18n.js) traegt
+  // dieselbe Rundung auf eine Nachkommastelle, faellt aber bei einer ganzen
+  // Zahl von selbst auf keine Nachkommastelle zurueck (minimumFractionDigits
+  // bleibt bei 0), genau das vorherige "9" statt "9.0".
+  const value = getNumberFormat({ maximumFractionDigits: 1 }).format(hours);
   return t('schedule.hoursValue', { value });
 }
 
@@ -283,9 +321,18 @@ function overtimeInfo(entries, weeklyHours = DEFAULT_WEEKLY_HOURS) {
 // Werte ist schneller getroffen als eine Minutenzahl zu tippen.
 const REMINDER_OFFSET_PRESETS = [0, 5, 10, 15, 30, 60, 120];
 
+// `selectedMinutes == null` heisst "noch nicht konfiguriert" (Umschalter aus /
+// frisches Formular), nicht "0 Minuten Vorlauf" - `Number(null) === 0` waere
+// sonst true und liesse den 0-Minuten-Eintrag ("zu Schichtbeginn") als
+// vermeintliche Auswahl erscheinen, obwohl niemand ihn gewaehlt hat. Der
+// Aendern-Handler liest beim Einschalten genau diesen (dann falschen) Wert aus
+// dem <select> zurueck, sein eigener `?? 15`-Rueckfall greift also nie (er
+// sieht nie `null`/`undefined`, sondern die Zeichenkette "0"). 15 Minuten ist
+// deshalb hier, nicht erst dort, der tatsaechliche Vorgabewert.
 function reminderOffsetOptions(selectedMinutes) {
+  const effective = selectedMinutes ?? 15;
   return REMINDER_OFFSET_PRESETS.map((minutes) =>
-    `<option value="${minutes}"${Number(selectedMinutes) === minutes ? ' selected' : ''}>${esc(t(minutes === 0 ? 'schedule.reminderAtStart' : 'schedule.reminderMinutesBefore', { minutes }))}</option>`
+    `<option value="${minutes}"${Number(effective) === minutes ? ' selected' : ''}>${esc(t(minutes === 0 ? 'schedule.reminderAtStart' : 'schedule.reminderMinutesBefore', { minutes }))}</option>`
   ).join('');
 }
 
@@ -305,15 +352,21 @@ function renderReminderSettings() {
   const active = state.reminderOffsetMinutes != null;
   const options = reminderOffsetOptions(state.reminderOffsetMinutes);
   const weeklyHours = state.weeklyHours ?? DEFAULT_WEEKLY_HOURS;
+  // PUT /schedule/preferences ist trotz "nur die eigenen Werte" ueber das
+  // schedule-Modul mitgesperrt (server/scopes.js ordnet jeden /schedule/*-Pfad
+  // dem Modul zu, moduleAccessVerdict() liefert bei 'read' MODULE_ACCESS_READ_ONLY
+  // fuer JEDEN Schreibzugriff) - ein Nur-lesen-Mitglied bekaeme hier ein
+  // wirkungsloses 403 statt einer gespeicherten Einstellung.
+  const locked = readOnly();
   return '<div class="card card--padded schedule-reminder-settings">'
     + '<h2 class="u-section-title">' + esc(t('schedule.mySettings')) + '</h2>'
     + '<div class="schedule-reminder-settings__row">'
-    + toggleRowHtml({ label: t('schedule.reminderToggle'), checked: active, attrs: { id: 'schedule-reminder-toggle' } })
-    + '<select class="input" id="schedule-reminder-offset"' + (active ? '' : ' disabled') + '>' + options + '</select>'
+    + toggleRowHtml({ label: t('schedule.reminderToggle'), checked: active, disabled: locked, attrs: { id: 'schedule-reminder-toggle' } })
+    + '<select class="input" id="schedule-reminder-offset"' + (active && !locked ? '' : ' disabled') + '>' + options + '</select>'
     + '</div><p class="form-hint">' + esc(t('schedule.reminderHint')) + '</p>'
     + '<div class="schedule-reminder-settings__row schedule-reminder-settings__row--hours">'
     + '<label class="label" for="schedule-weekly-hours">' + esc(t('schedule.weeklyHoursLabel')) + '</label>'
-    + '<input class="input" type="number" min="1" max="168" step="1" id="schedule-weekly-hours" value="' + esc(String(weeklyHours)) + '">'
+    + '<input class="input" type="number" min="1" max="168" step="1" id="schedule-weekly-hours" value="' + esc(String(weeklyHours)) + '"' + (locked ? ' disabled' : '') + '>'
     + '</div><p class="form-hint">' + esc(t('schedule.weeklyHoursHint')) + '</p></div>';
 }
 
@@ -368,36 +421,50 @@ function statisticsRows(items, valueFor, magnitudeOf, emptyLabel) {
   }).join('') + '</div>';
 }
 
+// Liest `statisticsRequestId` bewusst OHNE Parameter: der Aufrufer (activateView()/
+// submitForm()) erhoeht den geteilten Zaehler synchron, BEVOR er diese Funktion
+// ruft (kein await dazwischen), sodass die hier gelesene Nummer garantiert die
+// ist, die der Aufrufer gerade reserviert hat. Kommt die Antwort zurueck,
+// nachdem ein juengerer Aufruf den Zaehler weitergedreht hat, ist dieses
+// Ergebnis veraltet und darf `statistics` nicht mehr ueberschreiben - sonst
+// gewinnt ein schnelles Doppel-Klicken auf "Anwenden" oder ein rascher
+// Tab-Wechsel manchmal die AELTERE Antwort gegen die juengere.
 async function refreshStatistics() {
+  const requestId = statisticsRequestId;
   const bounds = statisticBounds();
   if (!bounds) throw new Error(t('schedule.invalidRange'));
   const userId = statistics.userId || currentUserId;
   const result = await api.get('/schedule/entries?from=' + encodeURIComponent(bounds.from) + '&to=' + encodeURIComponent(bounds.to) + '&user_id=' + encodeURIComponent(userId));
+  if (requestId !== statisticsRequestId) return; // ueberholt - eine juengere Anfrage laeuft/liegt bereits vor
   statistics = { ...statistics, userId: Number(userId), entries: result.data?.entries ?? [], bounds, loading: false };
 }
 
 async function activateView(view) {
   activeView = view;
   if (view === 'overview') {
-    overview = { ...overview, entries: [], holidays: [], loading: true };
+    const requestId = ++overviewRequestId;
+    overview = { ...overview, entries: [], holidays: [], loading: true, error: false };
     renderPage();
     try { await refreshOverview(); }
     catch (error) {
-      overview = { ...overview, loading: false };
+      if (requestId !== overviewRequestId) return; // eine juengere Anfrage entscheidet, nicht diese veraltete
+      overview = { ...overview, loading: false, error: true };
       window.yuvomi?.showToast(error.data?.error ?? error.message ?? t('common.errorGeneric'), 'danger');
     }
-    renderPage();
+    if (requestId === overviewRequestId) renderPage();
     return;
   }
   if (view !== 'statistics') { renderPage(); return; }
-  statistics = { ...statistics, entries: [], bounds: null, loading: true };
+  const requestId = ++statisticsRequestId;
+  statistics = { ...statistics, entries: [], bounds: null, loading: true, error: false };
   renderPage();
   try { await refreshStatistics(); }
   catch (error) {
-    statistics = { ...statistics, loading: false };
+    if (requestId !== statisticsRequestId) return;
+    statistics = { ...statistics, loading: false, error: true };
     window.yuvomi?.showToast(error.data?.error ?? error.message ?? t('common.errorGeneric'), 'danger');
   }
-  renderPage();
+  if (requestId === statisticsRequestId) renderPage();
 }
 
 /**
@@ -420,13 +487,23 @@ function overviewFetchRange(weekCursor, weekStartPref) {
  * Personen (overview.selectedIds) loest NIE einen Fetch aus, nur eine
  * Neuzeichnung; nur der Wochenwechsel tut das (siehe activateView()/
  * navigateOverviewWeek()).
+ *
+ * Liest `overviewRequestId` bewusst OHNE Parameter, aus demselben Grund wie
+ * refreshStatistics() oben: der Aufrufer erhoeht den Zaehler synchron direkt
+ * vor diesem Aufruf, ohne await dazwischen - was hier gelesen wird, ist also
+ * garantiert die gerade reservierte Nummer. Kommt die Antwort zurueck,
+ * nachdem ein juengerer Wochen-/Tab-Wechsel den Zaehler weitergedreht hat, ist
+ * sie veraltet und darf `overview` nicht mehr ueberschreiben (schnelles
+ * Vor-/Zurueck-Klicken liess sonst manchmal die AELTERE Woche gewinnen).
  */
 async function refreshOverview() {
+  const requestId = overviewRequestId;
   const { entriesFrom, from, to } = overviewFetchRange(overview.weekCursor, state.weekStartPref);
   const [entriesRes, holidaysRes] = await Promise.all([
     api.get(`/schedule/entries?from=${entriesFrom}&to=${to}`),
     api.get(`/calendar/holidays?from=${from}&to=${to}`).catch(() => ({ data: [] })),
   ]);
+  if (requestId !== overviewRequestId) return; // ueberholt - siehe refreshStatistics()
   overview = {
     ...overview,
     entries: entriesRes.data?.entries ?? [],
@@ -606,13 +683,13 @@ function emptyCustomFieldsState() {
     icon: 'list-plus',
     title: t('schedule.emptyCustomFieldsTitle'),
     description: t('schedule.emptyCustomFieldsDescription'),
-    actions: [{ label: t('schedule.createCustomField'), icon: 'plus', attrs: { 'data-action': 'open-create-custom-field' } }],
+    actions: readOnly() ? [] : [{ label: t('schedule.createCustomField'), icon: 'plus', attrs: { 'data-action': 'open-create-custom-field' } }],
   });
 }
 
 function customFieldsSection() {
   return '<section class="schedule-library schedule-library--custom-fields"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.customFields')) + '</h2>'
-    + (state.customFields.length ? '<button type="button" class="btn btn--secondary" data-action="open-create-custom-field"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.createCustomField')) + '</button>' : '') + '</div>'
+    + (state.customFields.length && !readOnly() ? '<button type="button" class="btn btn--secondary" data-action="open-create-custom-field"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.createCustomField')) + '</button>' : '') + '</div>'
     + (state.customFields.length ? '<div class="list-rows">' + state.customFields.map(customFieldRow).join('') + '</div>' : emptyCustomFieldsState())
     + '</section>';
 }
@@ -628,19 +705,26 @@ function customFieldsSection() {
 // Nachziehen nach einem Schichttyp-Wechsel (siehe der 'change'-Zweig in
 // renderShell() weiter unten), damit beide Wege garantiert dasselbe Markup
 // erzeugen.
-function dayRowFieldsHtml(shiftTypeId, fieldValues = {}) {
+// `writable=false` disabled JEDES Eingabefeld eines Zyklustags mit, nicht nur
+// den Entfernen-Knopf: ein fremdes Muster (patternCard()'s `writable`) rendert
+// diese Zeile rein lesend, und ein aktives <select>/<input> ohne Speicherpfad
+// (save-days schreibt ohnehin nur nach einem Klick auf den - hier fehlenden -
+// Speichern-Knopf) waere eine Eingabe, die niemals ankommt.
+function dayRowFieldsHtml(shiftTypeId, fieldValues = {}, writable = true) {
   const type = state.types.find((t) => Number(t.id) === Number(shiftTypeId));
   if (!type?.fields.length) return '';
+  const disabledAttr = writable ? '' : ' disabled';
   return '<div class="schedule-day-row-fields" data-day-row-fields>' + type.fields.map((field) =>
-    formField(field.name, '<input class="input" data-field-value="' + field.id + '" maxlength="500" value="' + esc(fieldValues[field.id] ?? '') + '">')
+    formField(field.name, '<input class="input" data-field-value="' + field.id + '" maxlength="500" value="' + esc(fieldValues[field.id] ?? '') + '"' + disabledAttr + '>')
   ).join('') + '</div>';
 }
 
 function dayRowHtml(position, shiftTypeId, writable, fieldValues = {}) {
   const remove = writable ? '<button type="button" class="btn btn--secondary btn--icon" data-action="remove-pattern-day-row" aria-label="' + esc(t('common.delete')) + '"><i data-lucide="x" aria-hidden="true"></i></button>' : '';
+  const disabledAttr = writable ? '' : ' disabled';
   return '<div class="schedule-day-row" data-day-row>'
-    + '<div class="schedule-day-row__main"><select class="input" data-day="' + position + '">' + typeOptions(shiftTypeId) + '</select>' + remove + '</div>'
-    + dayRowFieldsHtml(shiftTypeId, fieldValues)
+    + '<div class="schedule-day-row__main"><select class="input" data-day="' + position + '"' + disabledAttr + '>' + typeOptions(shiftTypeId) + '</select>' + remove + '</div>'
+    + dayRowFieldsHtml(shiftTypeId, fieldValues, writable)
     + '</div>';
 }
 
@@ -734,7 +818,7 @@ function emptyOverrideState() {
     icon: 'calendar-clock',
     title: t('schedule.emptyOverridesTitle'),
     description: t('schedule.emptyOverridesDescription'),
-    action: { label: t('schedule.createOverride'), icon: 'plus', attrs: { 'data-action': 'open-create-override' } },
+    action: readOnly() ? null : { label: t('schedule.createOverride'), icon: 'plus', attrs: { 'data-action': 'open-create-override' } },
   });
 }
 
@@ -769,7 +853,7 @@ function emptyExtraShiftsState() {
     icon: 'calendar-clock',
     title: t('schedule.emptyExtraShiftsTitle'),
     description: t('schedule.emptyExtraShiftsDescription'),
-    action: { label: t('schedule.addExtraShift'), icon: 'plus', attrs: { 'data-action': 'open-create-extra' } },
+    action: readOnly() ? null : { label: t('schedule.addExtraShift'), icon: 'plus', attrs: { 'data-action': 'open-create-extra' } },
   });
 }
 
@@ -781,8 +865,10 @@ function emptyExtraShiftsState() {
  * das bleiben zwei Gruppen mit identischem Datum statt einer falsch
  * zusammengefassten.
  */
-function extraGroups() {
-  const sorted = [...state.extras].sort((a, b) =>
+// Parameter mit state-Default wie overrideGroups(): so laesst sich das
+// Verschmelzen behavioral testen, ohne state von aussen zu beschreiben.
+function extraGroups(extras = state.extras) {
+  const sorted = [...extras].sort((a, b) =>
     Number(a.user_id) - Number(b.user_id) || a.date_key.localeCompare(b.date_key));
   const groups = [];
   for (const row of sorted) {
@@ -844,9 +930,16 @@ function renderStatistics() {
   // catch-Zweig rendert genau hierher zurueck. Vorher stand da `bounds.from` -
   // ein TypeError, noch bevor der Fehler-Toast lief. Die Seite blieb auf dem
   // vorigen Ergebnis stehen und sagte nichts.
+  // Ein fehlgeschlagener Ladevorgang darf NIE als "0 Schichten - 0 h" landen -
+  // das ist von einem echten leeren Monat nicht zu unterscheiden und ohne den
+  // (laengst verschwundenen) Fehler-Toast bliebe der Nutzer bei einer stillen
+  // Falschaussage. Eigener Zweig, denselben Fehlerzustand wie andere Module
+  // (mountLoadError/emptyStateHTML variant:'error') statt erfundener Zahlen.
   const results = statistics.loading
     ? '<div class="card card--padded schedule-stat-loading" role="status" aria-live="polite">' + esc(t('common.loading')) + '</div>'
-    : !bounds
+    : statistics.error
+      ? emptyStateHTML({ variant: 'error', title: t('common.errorGeneric'), description: t('common.loadErrorDescription'), action: { label: t('common.retry'), icon: 'refresh-cw', attrs: { 'data-action': 'retry-statistics' } } })
+      : !bounds
       ? '<p class="card card--padded schedule-stat-empty" role="status">' + esc(t('schedule.invalidRange')) + '</p>'
       : '<p class="schedule-stat-period u-meta">' + esc(t('schedule.statisticsFor', { user: userName(selectedUser), from: formatDate(bounds.from), to: formatDate(bounds.to) })) + '</p>'
       + '<div class="metric-grid schedule-stat-metrics' + (overtime?.over ? ' schedule-stat-metrics--with-overtime' : '') + '">'
@@ -874,7 +967,7 @@ function emptyPatternState() {
     icon: 'calendar-clock',
     title: t('schedule.emptyPatternsTitle'),
     description: t('schedule.emptyPatternsDescription'),
-    action: { label: t('schedule.addPattern'), icon: 'plus', attrs: { 'data-action': 'open-create', 'data-view': 'patterns' } },
+    action: readOnly() ? null : { label: t('schedule.addPattern'), icon: 'plus', attrs: { 'data-action': 'open-create', 'data-view': 'patterns' } },
   });
 }
 
@@ -890,7 +983,7 @@ function emptyShiftTypesState() {
     icon: 'calendar-clock',
     title: t('schedule.emptyShiftTypesTitle'),
     description: t('schedule.emptyShiftTypesDescription'),
-    actions: [
+    actions: readOnly() ? [] : [
       ...visibleQuickstartTemplates().map(([key, labelKey]) => ({ label: t(labelKey), icon: 'sparkles', attrs: { 'data-action': 'quick-start-shifts', 'data-template': key } })),
       { label: t('schedule.createShiftType'), icon: 'plus', attrs: { 'data-action': 'open-create', 'data-view': 'shifts' } },
     ],
@@ -1145,6 +1238,17 @@ function renderOverview() {
     </div>
   </div>`;
 
+  // Ladezustand und Fehlerzustand VOR dem Auswahl-Leerzustand: `loading` wird
+  // in activateView() gesetzt, bevor `overview.entries` je gefuellt sind, und
+  // `error` bleibt sonst stumm (nur ein voruebergehender Toast) - ein leerer
+  // Zeitraum sah bisher genauso aus wie einer, der nie geladen werden konnte.
+  if (overview.loading) {
+    return `<section class="schedule-overview">${header}<div class="card card--padded schedule-stat-loading" role="status" aria-live="polite">${esc(t('common.loading'))}</div></section>`;
+  }
+  if (overview.error) {
+    return `<section class="schedule-overview">${header}${emptyStateHTML({ variant: 'error', title: t('common.errorGeneric'), description: t('common.loadErrorDescription'), action: { label: t('common.retry'), icon: 'refresh-cw', attrs: { 'data-action': 'retry-overview' } } })}</section>`;
+  }
+
   if (!overview.selectedIds.length) {
     return `<section class="schedule-overview">${header}${emptyStateHTML({ title: t('schedule.overviewEmptyTitle'), description: t('schedule.overviewEmptyDescription') })}</section>`;
   }
@@ -1220,17 +1324,24 @@ function renderShell() {
       <h1 class="page-toolbar__title">${esc(t('schedule.title'))}</h1>
       <div class="page-toolbar__actions"></div>
       <div class="sub-tabs-bar schedule-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('schedule.title'))}">
-        ${tabs.map(([id, label]) => `<button class="sub-tab" type="button" role="tab" data-tab="${id}">${esc(label)}</button>`).join('')}
+        ${tabs.map(([id, label]) => `<button class="sub-tab${id === activeView ? ' sub-tab--active' : ''}" type="button" role="tab" data-tab-id="${id}" aria-selected="${id === activeView ? 'true' : 'false'}" tabindex="${id === activeView ? '0' : '-1'}">${esc(label)}</button>`).join('')}
       </div>
     </header>
     <div class="schedule-body"></div>
   </div>`);
-  // Scroll-Affordanz der Bar-Zeile (geteilter Peek-Fade, .page-toolbar__bar).
-  wireScrollFade(root.querySelector('.schedule-tabs'));
+  // Geteilte Tablist-Verhaltensschicht (Klick + Pfeiltasten/Home/End + Roving-
+  // Tabindex + ARIA, utils/tablist.js) statt einer Handnachbildung ohne
+  // Tastatursteuerung - dieselbe Grammatik wie Budget/Kalender/Rewards/
+  // Haushaltshilfe fuer ihre jeweilige Haupt-Tab-Leiste. wireTablist() malt den
+  // aktiven Tab selbst (Klasse/aria-selected/tabindex) und bringt die
+  // Scroll-Fade-Affordanz gleich mit - eine zusaetzliche wireScrollFade()-Zeile
+  // hier waere seither doppelt verdrahtet.
+  scheduleTablist = wireTablist(root.querySelector('.schedule-tabs'), {
+    activeId: activeView,
+    onChange: (id) => { activateView(id); },
+  });
   root.addEventListener('submit', submitForm);
   root.addEventListener('click', (event) => {
-    const tabButton = event.target.closest('[data-tab]');
-    if (tabButton) { activateView(tabButton.dataset.tab); return; }
     const actionButton = event.target.closest('[data-action]');
     if (actionButton) action({ currentTarget: actionButton });
   });
@@ -1276,25 +1387,27 @@ function renderPage() {
   // every tab uniformly rather than special-casing statistics.
   const scrollPort = document.getElementById('main-content');
   const scrollTop = scrollPort?.scrollTop ?? 0;
-  root.querySelectorAll('[data-tab]').forEach((button) => {
-    const isActive = button.dataset.tab === activeView;
-    button.classList.toggle('sub-tab--active', isActive);
-    button.setAttribute('aria-selected', String(isActive));
-  });
+  // Repaint statt Neubau: wireTablist() haelt Klasse/aria-selected/tabindex der
+  // schon bestehenden Knoepfe selbst nach (sync() loest dabei bewusst KEIN
+  // erneutes onChange aus - activeView aendert sich hier ueber Wege, die die
+  // Leiste selbst nie angeklickt haben, z. B. den FAB oder "Heute" im
+  // Uebersicht-Tab).
+  scheduleTablist?.sync(activeView);
+  const locked = readOnly();
   const panel = activeView === 'shifts'
     // Der Quickstart bleibt erreichbar, auch nachdem der erste Typ existiert -
     // ein Haushalt kann durchaus "Arbeit" fuer ein Mitglied und spaeter
     // "Schule" fuer ein anderes brauchen, nicht nur beim allerersten Typ.
     ? '<section class="schedule-library schedule-library--shifts"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.shiftTypes')) + '</h2>'
-      + (state.types.length && visibleQuickstartTemplates().length ? '<div class="segmented" role="group" aria-label="' + esc(t('schedule.quickStartShiftTypes')) + '">'
+      + (locked ? '' : (state.types.length && visibleQuickstartTemplates().length ? '<div class="segmented" role="group" aria-label="' + esc(t('schedule.quickStartShiftTypes')) + '">'
         + visibleQuickstartTemplates().map(([template, key]) => '<button type="button" class="segmented__item" data-action="quick-start-shifts" data-template="' + template + '">' + esc(t(key)) + '</button>').join('')
-        + '</div>' : '') + '</div>'
+        + '</div>' : '')) + '</div>'
       + (state.types.length ? state.types.map(shiftTypeCard).join('') : emptyShiftTypesState()) + '</section>'
       + customFieldsSection()
     : activeView === 'patterns'
       ? '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? state.patterns.map(patternCard).join('') : emptyPatternState()) + '</section>'
-        + '<section class="schedule-library schedule-library--overrides"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.overrides')) + '</h2><button type="button" class="btn btn--secondary" data-action="open-create-override"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.createOverride')) + '</button></div>' + overrideRows() + '</section>'
-        + '<section class="schedule-library schedule-library--extras"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.extraShifts')) + '</h2><button type="button" class="btn btn--secondary" data-action="open-create-extra"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.addExtraShift')) + '</button></div>' + extraRows() + '</section>'
+        + '<section class="schedule-library schedule-library--overrides"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.overrides')) + '</h2>' + (locked ? '' : '<button type="button" class="btn btn--secondary" data-action="open-create-override"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.createOverride')) + '</button>') + '</div>' + overrideRows() + '</section>'
+        + '<section class="schedule-library schedule-library--extras"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.extraShifts')) + '</h2>' + (locked ? '' : '<button type="button" class="btn btn--secondary" data-action="open-create-extra"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.addExtraShift')) + '</button>') + '</div>' + extraRows() + '</section>'
       : activeView === 'overview'
         ? renderOverview()
         : renderStatistics();
@@ -1347,7 +1460,9 @@ function updateScheduleFab() {
     label: labels[activeView],
     dockLabel: dockLabels[activeView],
     // Statistics und Overview sind beide reine Leseansichten - kein "Anlegen".
-    hidden: activeView === 'statistics' || activeView === 'overview',
+    // Ausgeblendet ist nicht dasselbe wie unerreichbar (siehe readOnly()/
+    // action()) - der Handler bleibt trotzdem gesperrt.
+    hidden: readOnly() || activeView === 'statistics' || activeView === 'overview',
     onClick: () => openScheduleCreateModal(activeView),
   });
 }
@@ -1498,7 +1613,16 @@ function openScheduleCreateModal(view, { mode = 'pattern' } = {}) {
       // (schedule_extra_shifts.shift_type_id ist NOT NULL) - deshalb traegt
       // nur die Ersetzen-Variante die Option "Freier Tag".
       + '<fieldset data-field="mode-replace"' + (mode === 'replace' ? '' : ' hidden disabled') + '>' + formField(t('schedule.shiftTypes'), '<select class="input" name="shift_type_id">' + typeOptions(null) + '</select>') + '</fieldset>'
-      + '<fieldset data-field="mode-add"' + (mode === 'add' ? '' : ' hidden disabled') + '>' + formField(t('schedule.shiftTypes'), '<select class="input" name="shift_type_id">' + typeOptions(null, false) + '</select>') + reminderOffsetField(null) + '</fieldset>'
+      // Anders als "Ersetzen" (dessen freier Tag defaultet, also nie eigene
+      // Felder traegt) waehlt ein natives <select> ohne `includeFree` und ohne
+      // explizit markierte Auswahl (typeOptions(null, false)) schon selbst den
+      // ERSTEN echten Schichttyp - der Feld-Unterblock muss also von Anfang an
+      // zu GENAU diesem (impliziten) Typ passen, nicht erst nach dem ersten
+      // manuellen Wechsel (der einzige Moment, in dem
+      // wireOccurrenceFieldReactivity() ihn bisher nachzog). Dieselbe
+      // Reihenfolge wie openExtraGroupEditModal(): Reminder-Feld, dann der
+      // Feld-Unterblock.
+      + '<fieldset data-field="mode-add"' + (mode === 'add' ? '' : ' hidden disabled') + '>' + formField(t('schedule.shiftTypes'), '<select class="input" name="shift_type_id">' + typeOptions(null, false) + '</select>') + reminderOffsetField(null) + dayRowFieldsHtml(state.types[0]?.id ?? null) + '</fieldset>'
       + '<div class="modal-actions"><button type="submit" class="btn btn--primary">' + esc(t('schedule.save')) + '</button></div></form>';
   }
   openModal({
@@ -1585,7 +1709,14 @@ async function saveCreatedSchedule(event) {
         } else {
           const type = state.types.find((item) => Number(item.id) === shiftTypeId);
           const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
-          const confirmed = await confirmModal(
+          // confirmOverModal statt confirmModal: dieser Aufruf laeuft WAEHREND
+          // das Anlege-Formular noch offen ist. confirmModal haengt an
+          // openModal, und das schliesst ein bereits offenes Modal mit
+          // `force: true` weg (kein Stacking) - "Abbrechen" hier, der einzige
+          // Grund ueberhaupt nachzufragen, vernichtete damit lautlos jedes
+          // getippte Feld. confirmOverModal parkt das Formular stattdessen und
+          // gibt es bei "Abbrechen" unveraendert zurueck (H-3).
+          const confirmed = await confirmOverModal(
             t('schedule.fillRangeConfirmTitle'),
             { confirmLabel: t('schedule.fillRange'), detail: t('schedule.fillRangeConfirmDetail', { from: formatDate(data.range_from), to: formatDate(data.range_to), type: typeLabel }) },
           );
@@ -1613,7 +1744,10 @@ async function saveCreatedSchedule(event) {
       const type = state.types.find((item) => Number(item.id) === shiftTypeId);
       const typeLabel = type ? (type.short_code ? `${type.short_code} · ${type.name}` : type.name) : t('schedule.freeDay');
       const fieldValues = collectFieldValues(form);
-      const confirmed = await confirmModal(
+      // Gleicher Grund wie im "replace"-Zweig oben: das Editier-Formular ist
+      // beim Speichern noch offen, confirmOverModal parkt es statt es beim
+      // Nachfragen zu vernichten (H-3).
+      const confirmed = await confirmOverModal(
         t('schedule.fillRangeConfirmTitle'),
         { confirmLabel: t('schedule.save'), detail: t('schedule.fillRangeConfirmDetail', { from: formatDate(data.from), to: formatDate(data.to), type: typeLabel }) },
       );
@@ -1703,8 +1837,14 @@ async function submitForm(event) {
   event.preventDefault();
   const form = event.target;
   const data = formData(form);
+  // Reserviert die Generation dieses Statistik-Ladevorgangs (siehe
+  // refreshStatistics()/activateView()) - nur fuer den 'statistics'-Zweig
+  // gesetzt, aber ausserhalb von try/catch deklariert, damit der catch-Zweig
+  // unten denselben Wert lesen kann.
+  let statisticsRequest = null;
   try {
     if (form.dataset.form === 'statistics') {
+      statisticsRequest = ++statisticsRequestId;
       statistics = {
         ...statistics,
         userId: Number(formValue(form, 'user_id', data.user_id)),
@@ -1715,10 +1855,14 @@ async function submitForm(event) {
         entries: [],
         bounds: null,
         loading: true,
+        error: false,
       };
       renderPage();
       await refreshStatistics();
-      renderPage();
+      // Ueberholt? Eine juengere Anfrage (Tab-Wechsel, erneutes Absenden) hat
+      // den Zaehler inzwischen weitergedreht - ihr Ergebnis zaehlt, nicht
+      // dieses.
+      if (statisticsRequest === statisticsRequestId) renderPage();
       return;
     }
     // Keine Zweige fuer 'shift-create'/'pattern-create'/'override-create' hier:
@@ -1736,16 +1880,29 @@ async function submitForm(event) {
     renderPage();
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
-    if (form.dataset.form === 'statistics') {
-      statistics = { ...statistics, loading: false };
+    if (form.dataset.form === 'statistics' && statisticsRequest === statisticsRequestId) {
+      statistics = { ...statistics, loading: false, error: true };
       renderPage();
     }
     window.yuvomi?.showToast(error.data?.error ?? t('common.errorGeneric'), 'danger');
   }
 }
 
+// Jede `data-action` dieser Seite, die NICHT schreibt (reine Navigation/
+// Ansicht). Eine Positivliste, damit eine spaeter ergaenzte Schreib-Aktion
+// standardmaessig gesperrt ist statt standardmaessig offen - die
+// Markup-Unterdrueckung (readOnly()-Abfragen in den render*-Funktionen) ist die
+// erste Verteidigungslinie, dieser Wachposten in action() die zweite (ein
+// veralteter oder per Devtools wiederbelebter Knopf findet denselben Riegel).
+// Selbes Muster wie READ_SAFE_ACTIONS in public/pages/waste.js.
+const READ_SAFE_ACTIONS = new Set([
+  'print-statistics', 'statistics-range', 'overview-week', 'overview-view-mode',
+  'retry-statistics', 'retry-overview',
+]);
+
 async function action(event) {
   const button = event.currentTarget;
+  if (readOnly() && !READ_SAFE_ACTIONS.has(button.dataset.action)) return;
   try {
     if (button.dataset.action === 'open-create') {
       openScheduleCreateModal(button.dataset.view || activeView);
@@ -1795,6 +1952,18 @@ async function action(event) {
     if (button.dataset.action === 'statistics-range') {
       statistics = { ...statistics, range: button.dataset.range, entries: [], bounds: null, loading: false };
       renderPage();
+      return;
+    }
+    // Wiederholen-CTA des Fehlerzustands (renderStatistics()/renderOverview()) -
+    // laeuft ueber activateView(), denselben Weg wie ein Tab-Wechsel, damit
+    // Ladezustand, Generationszaehler und Fehler-Rueckstellung an genau einer
+    // Stelle bleiben statt hier verdoppelt zu werden.
+    if (button.dataset.action === 'retry-statistics') {
+      await activateView('statistics');
+      return;
+    }
+    if (button.dataset.action === 'retry-overview') {
+      await activateView('overview');
       return;
     }
     if (button.dataset.action === 'overview-week') {
@@ -1893,8 +2062,19 @@ async function action(event) {
         { danger: true, confirmLabel: t('schedule.delete'), detail: t('schedule.deleteOverrideRangeDetail', { from: formatDate(from), to: formatDate(to), user: userName(userId) }) },
       );
       if (!confirmed) return;
-      for (const id of button.dataset.ids.split(',')) {
-        await api.delete(`/schedule/extras/${id}`);
+      try {
+        for (const id of button.dataset.ids.split(',')) {
+          await api.delete(`/schedule/extras/${id}`);
+        }
+      } catch (error) {
+        // Extras haben kein Range-Delete-Endpoint - die Schleife loescht Zeile
+        // fuer Zeile, und ein Fehlschlag in der Mitte hat bereits einige davon
+        // entfernt, bevor der Fehler auftrat. Ohne Neuladen bliebe die alte
+        // (jetzt falsche) Liste stehen und taeuschte vor, nichts sei passiert.
+        await load();
+        renderPage();
+        window.yuvomi?.showToast(error.data?.error ?? t('common.errorGeneric'), 'danger');
+        return;
       }
     }
     // Rein lokale Aenderungen am Tageseditor, kein API-Aufruf - erst der
@@ -1977,11 +2157,25 @@ export async function render(container, { user } = {}) {
   currentUserId = user?.id ?? null;
   canManageOthers = user?.role === 'admin';
   await load();
-  statistics = { ...statistics, userId: currentUserId, monthFrom: monthKey(), monthTo: monthKey(), from: todayKey(), to: todayKey() };
+  // `statistics`/`overview`/`activeView` sind Modul-globaler Zustand, der eine
+  // Client-Route ueberlebt (SPA, kein Reload zwischen zwei Seitenbesuchen) -
+  // ein blosses Zuruecksetzen von userId/from/to reichte nicht: `entries`/
+  // `bounds`/`holidays` blieben sonst vom LETZTEN Besuch stehen und erschienen
+  // unter den frisch zurueckgesetzten Filterwerten, so als gehoerten sie dazu
+  // (M-5, z.B. ein anderer Nutzer in der Statistik-Auswahl). `weekCursor`
+  // stammte bisher aus `todayKey()` beim MODUL-LADEN (einmalig) statt bei
+  // jedem Seitenbesuch - nach Mitternacht zeigte "Heute" so noch den Vortag,
+  // bis irgendjemand aktiv auf "Heute" klickte.
+  statistics = { ...statistics, userId: currentUserId, monthFrom: monthKey(), monthTo: monthKey(), from: todayKey(), to: todayKey(), entries: [], bounds: null, error: false };
+  overview = { ...overview, weekCursor: todayKey(), entries: [], holidays: [], error: false };
   renderShell();
   scheduleFab = createPageFab({ id: 'schedule-fab' });
   root.querySelector('.schedule-page')?.appendChild(scheduleFab);
-  renderPage();
+  // activateView() statt eines blossen renderPage(): fuer 'statistics'/
+  // 'overview' raeumt sie den obigen Reset ins Bild UND laedt frisch nach
+  // (genau das, was ein Tab-Wechsel ohnehin tut); fuer 'shifts'/'patterns'
+  // entspricht sie unveraendert einem einzelnen renderPage().
+  await activateView(activeView);
   window.lucide?.createIcons({ el: root });
 }
 
@@ -1989,4 +2183,4 @@ export async function render(container, { user } = {}) {
 // bereits pur bzw. nehmen ihre Eingabe jetzt als Parameter statt sie fest aus
 // `state` zu lesen - ein Test kann so echte Tage hineingeben und das Ergebnis
 // pruefen, statt nur zu belegen, dass der Funktionsname im Quelltext steht.
-export const __test = { overrideGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange };
+export const __test = { overrideGroups, extraGroups, rangeDifference, setShiftIconButtonIcon, overtimeInfo, sameFieldValues, overlayMeta, buildOverviewLanes, normalizeOverviewSelection, computeActiveHours, collapsedMinutes, isOvernightEntry, touchesVisibleDay, overviewFetchRange };

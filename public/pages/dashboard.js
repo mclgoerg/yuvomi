@@ -2042,8 +2042,10 @@ function renderCycleWidget(cycle) {
 
 /**
  * schedule: { entries, hasTypes } (haushaltsweit, kein Owner-Filter noetig -
- * das Modul liest schon fuer den ganzen Haushalt) | null (Ladefehler) |
- * undefined (Kachel versteckt, kein Request gelaufen).
+ * das Modul liest schon fuer den ganzen Haushalt) | null (Ladefehler,
+ * rendert die geteilte Fehlerkachel ueber den bestehenden try/catch in
+ * renderDashboardLayout, siehe renderWasteWidget) | undefined (Kachel
+ * versteckt, kein Request gelaufen).
  *
  * `entries`, nicht `users`: `resolveEntries()` (services/schedule.js) liefert
  * fuer ein Mitglied ohne jedes Muster und ohne Ausnahme heute gar keinen
@@ -2052,6 +2054,14 @@ function renderCycleWidget(cycle) {
  * aufzulisten wuerde hier etwas zeigen, das die Seite selbst nicht zeigt.
  */
 function renderScheduleWidget(schedule, users, size) {
+  // M-6b: ein Ladefehler ist kein leerer Tag - ohne diesen Wurf faellt `null`
+  // (Fehler) auf denselben Zweig wie `hasTypes === false` (echtes Onboarding)
+  // und zeigt die "Schicht-Typ anlegen"-CTA statt der Fehlerkachel, und bleibt
+  // wegen der `data.schedule !== undefined`-Merkung in ensureScheduleSlice
+  // auch nie neu versucht. Wie renderWasteWidget: der Wurf laesst
+  // renderDashboardLayout die geteilte Fehlerkachel (renderWidgetError) mit
+  // ihrem Retry rendern.
+  if (schedule === null) throw new Error('schedule widget slice failed to load');
   const entries = schedule?.entries ?? [];
   const hasTypes = Boolean(schedule?.hasTypes);
 
@@ -4856,11 +4866,23 @@ export async function render(container, { user, signal: routeSignal = null } = {
       if (Array.isArray(fresh?.upcomingEvents)) {
         fresh.upcomingEvents = fresh.upcomingEvents.map(localizeBirthdayEvent);
       }
-      // Der owner-only Zyklus-Slice reist mit: /dashboard liefert ihn nie,
-      // ein Refresh darf ihn nicht auf „nie geladen" zurückwerfen. Der
-      // Schedule-Slice reist aus demselben Grund mit, nur ohne die
-      // Owner-Beschraenkung - /dashboard liefert auch ihn nie.
+      // Der owner-only Zyklus-Slice reist unveraendert mit: /dashboard
+      // liefert ihn nie, ein Refresh darf ihn nicht auf „nie geladen"
+      // zurückwerfen.
       fresh.cycle = data.cycle;
+      // Schedule hat anders als Cycle keinen Privatsphaere-Grund, den alten
+      // Stand einfach mitzuschleppen (M-6a): "wer heute Dienst hat" blieb
+      // sonst bis zu 15 Minuten stehen und ueberlebte sogar einen
+      // Mitternachts-Wechsel auf dem Wandtablet. Vor der Uebernahme
+      // zuruecksetzen und mit frisch berechnetem Tag neu laden - derselbe
+      // Weg, den ein frisch eingeblendetes Widget in persistWidgetConfig()
+      // schon nimmt. Das heilt nebenbei auch einen zuvor gescheiterten Slice
+      // (M-6b) beim naechsten stillen Takt, statt auf den Retry-Knopf zu warten.
+      if (widgetConfig.some((w) => w.id === 'schedule' && w.visible)) {
+        data.schedule = undefined;
+        await ensureScheduleSlice();
+        if (signal.aborted) return;
+      }
       fresh.schedule = data.schedule;
       fresh.waste = data.waste;
       data = fresh;

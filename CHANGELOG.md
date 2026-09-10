@@ -168,6 +168,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A full audit of the Schedule module, fixed in one sweep.** The override editor no longer
+  destroys typed input when its "fill the whole range?" confirmation is cancelled — the confirm now
+  parks and resumes the open form instead of force-closing it. A member with read-only access to the
+  module sees an honest page: the banner was always there, but every create/edit/delete control
+  rendered anyway and failed only on save; they are now gone, matching what the API has always
+  enforced. Statistics and Overview refetch when the page is revisited (previously they re-labelled
+  another user's cached numbers as your own after a tab switch), show real loading and error states
+  instead of zeros that looked like data, and rapid week-flipping can no longer let a slow older
+  response overwrite a newer one. The dashboard "who's working today" widget refreshes with the
+  15-minute cycle instead of showing the morning state all day, and a failed load renders the error
+  tile with a retry button instead of the "create a shift type" onboarding. Shift-start reminders
+  fire at the DST-correct minute around clock changes, enabling them defaults to a 15-minute lead
+  instead of "at shift start", and a reminder can no longer keep firing for a shift type deleted in
+  the sync's blind window. On the server, a pattern save is capped at 500 cycle-day rows (each
+  stored row is re-emitted on every resolved read — an uncapped save was stored read amplification
+  any member could create), deleting a pattern or a user no longer leaks its custom-field values,
+  duplicate field ids in one payload are rejected instead of half-committing and answering 500, and
+  omitting `field_values` from an override save now preserves stored values, as the extras route
+  always did. The statistics hint text in all 24 languages finally describes the rolling
+  7-day-window rule the overtime flag actually applies, the printed statistics sheet no longer leads
+  with the personal reminder settings card, and a member with no schedule access no longer gets a
+  dead "Schedule" calendar layer plus a guaranteed-403 request on every calendar load.
+
 - **The person filter in the task history is no longer a row of blank buttons on a phone** (#1068).
   Below 640px the label-loss rule removes every `.group-toggle__label`; it is built on the
   assumption that an icon stays behind, which is true for the view switcher next to it. These chips

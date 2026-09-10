@@ -2266,15 +2266,22 @@ function scheduleEntriesOnDay(date) {
 }
 
 /**
- * Ist der Schichtplan im Haushalt ueberhaupt eingeschaltet?
+ * Ist der Schichtplan im Haushalt ueberhaupt eingeschaltet UND lesbar?
  *
  * `disabled_modules` heisst "dieses Modul gibt es hier nicht". Der Routen-Guard
  * schuetzt `/schedule` - der Kalender ist aber eine MISCHSTELLE: sein Pfad nennt
  * ein Modul, sein Inhalt kommt aus mehreren. Ohne diese Frage laedt und zeigt er
  * die Schichten eines abgeschalteten Moduls weiter, samt Ebenen-Knopf. Dasselbe
  * Muster wie in dashboard.js und recipes.js.
+ *
+ * Zusaetzlich `moduleAccess`, wie wasteEnabled() gleich daneben: ein Mitglied
+ * mit Schedule-Recht 'none' sah trotzdem die Ebenen-Zeile im Filter-Blatt UND
+ * loeste bei jedem Kalender-Laden ein garantiertes 403 auf
+ * GET /schedule/entries aus (Konsolenrauschen, live verifiziert).
  */
-function scheduleEnabled() { return !window.yuvomi?.isModuleDisabled?.('schedule'); }
+function scheduleEnabled() {
+  return !window.yuvomi?.isModuleDisabled?.('schedule') && moduleAccess('schedule') !== 'none';
+}
 
 /**
  * Ist Waste ueberhaupt eingeschaltet UND lesbar? Anders als scheduleEnabled()

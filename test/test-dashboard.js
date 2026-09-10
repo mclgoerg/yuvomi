@@ -2257,15 +2257,46 @@ test('Kennzahlreihe wiederholt nicht, was ein sichtbares Widget schon sagt', asy
 // Owner-Beschraenkung braucht) und denselben Zweiteiler.
 // --------------------------------------------------------
 
-test('das Schedule-Widget ist an beiden Refresh-Stellen verdrahtet, an denen cycle es auch ist', () => {
+// M-6a/M-6b: a plain `fresh.schedule = data.schedule;` carry-over is still
+// present TWICE in the file (once per refresh site) - a bare count-of-two
+// guard stays green even if refreshDashboardData() regressed back to pure
+// carry-over, since the literal line still exists there too, just preceded by
+// nothing. This guard instead pins WHICH mechanism each site uses:
+// reloadIfQueryChanged() (fires only on a filter change) still carries the
+// slice over unchanged like cycle, but refreshDashboardData() (the 15-minute
+// silent/background tick) must reset-and-reload it first - "who's on duty
+// today" is a moving target across both a 15-minute tick and a midnight
+// rollover on a wall-mounted tablet, unlike the owner-only, privacy-gated
+// cycle slice.
+test('das Schedule-Widget wird an der periodischen Refresh-Stelle zurueckgesetzt und neu geladen, nicht nur uebernommen wie an der query-getriebenen Stelle', () => {
   const src = readFileSync(new URL('../public/pages/dashboard.js', import.meta.url), 'utf8');
   assert(/schedule:\s*'schedule'/.test(src), 'MODULE_FOR_WIDGET kennt das Modul hinter dem Widget nicht');
   assert(/schedule:\s*\(size\)\s*=>\s*renderScheduleWidget/.test(src), 'widgetById hat keinen Eintrag fuer schedule, oder er reicht die Groesse nicht durch (PR #930 review)');
-  const carryOvers = [...src.matchAll(/fresh\.schedule\s*=\s*data\.schedule;/g)];
-  assert(carryOvers.length === 2,
-    'fresh.schedule = data.schedule; muss an beiden Refresh-Stellen stehen (reloadIfQueryChanged UND '
-    + `refreshDashboardData), sonst faellt die Kachel bei einem stillen Refresh auf ihren Leerzustand `
-    + `zurueck - gefunden: ${carryOvers.length}`);
+
+  // reloadIfQueryChanged(): only fires on a filter change, no staleness
+  // concern - the slice still just rides along, exactly like cycle.
+  const reloadFn = src.slice(src.indexOf('async function reloadIfQueryChanged'), src.indexOf('async function persistWidgetConfig'));
+  nodeAssert.match(reloadFn, /fresh\.cycle = data\.cycle;/);
+  nodeAssert.match(reloadFn, /fresh\.schedule = data\.schedule;/, 'reloadIfQueryChanged must still carry the old slice over unchanged - it has no reason to refetch on every filter change');
+
+  // refreshDashboardData(): the 15-minute silent/background refresh. Must
+  // reset the memoized slice to undefined (so ensureScheduleSlice()'s own
+  // `if (data.schedule !== undefined) return;` early-out does not skip the
+  // refetch) and re-await it with a freshly computed "today" BEFORE folding
+  // it into `fresh` - in that order, or a stale/failed slice survives another
+  // 15 minutes.
+  const refreshFn = src.slice(src.indexOf('async function refreshDashboardData'), src.indexOf('const refreshTimerId'));
+  nodeAssert.match(refreshFn, /data\.schedule = undefined;/, 'must reset the memoized slice, or ensureScheduleSlice() short-circuits on its own "already loaded" memo and nothing is refetched');
+  nodeAssert.match(refreshFn, /await ensureScheduleSlice\(\);/, 'must re-await the slice, not just remember the previous result');
+  const resetIndex = refreshFn.indexOf('data.schedule = undefined;');
+  const reEnsureIndex = refreshFn.indexOf('await ensureScheduleSlice();');
+  const carryOverIndex = refreshFn.indexOf('fresh.schedule = data.schedule;');
+  assert(
+    resetIndex > -1 && reEnsureIndex > resetIndex && carryOverIndex > reEnsureIndex,
+    'the reset must precede the re-fetch, which must precede folding the (now newly loaded) slice into `fresh` - '
+    + 'a regression back to a bare carry-over would still satisfy a loose "the line appears twice in the file" '
+    + 'grep but fails this ordering check',
+  );
 });
 
 test('das Schedule-Widget ist in der Anpassen-Standardliste als Opt-in eingetragen', async () => {

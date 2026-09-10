@@ -3116,7 +3116,9 @@ Shortening a pattern is refused while days sit beyond the new length, rather tha
 them. As of migration 188, a position is **not** unique — a cycle day may carry several rows (a
 timetable's multiple classes at different times on the same weekday), each its own `shift_type_id`.
 `PUT /patterns/:id/days` always replaces every row of a pattern in one transaction (delete-all,
-re-insert-all), so every save assigns fresh ids to every row, even unchanged ones.
+re-insert-all), so every save assigns fresh ids to every row, even unchanged ones. A save is capped
+at 500 rows total (`MAX_PATTERN_DAY_ROWS`): every stored row is re-emitted as its own entry on every
+resolved read, so an uncapped save would be stored read amplification, not scheduling.
 
 #### Schedule Overrides
 
@@ -3250,8 +3252,12 @@ and `POST /overrides/fill` (and their extra-shift equivalents) follow the same s
 `note` already established: a fill applies one set of values to every day in the range, not a value
 per day. Every read endpoint (`GET /patterns/{id}/days`, `GET /overrides`, `GET /extras`) embeds
 `field_values` per row; every delete path (`DELETE /overrides/{dateKey}`, `DELETE /overrides`,
-`DELETE /extras/{id}`) explicitly deletes the matching `schedule_custom_field_values` rows first,
-since `entry_id` carries no real foreign key for a cascade to ride on.
+`DELETE /extras/{id}`, `DELETE /patterns/{id}` — whose pattern days only cascade at the FK level —
+and the user-deletion transaction, which cascades away all three entry kinds at once) explicitly
+deletes the matching `schedule_custom_field_values` rows first, since `entry_id` carries no real
+foreign key for a cascade to ride on. Omitting `field_values` from a `PUT` leaves stored values
+untouched on both the override and the extra route; only an explicitly sent object (including `{}`)
+replaces them.
 
 **Frontend (capture):** the cycle-day editor, the override create/edit modals, and the extra-shift
 create/edit modals all render a field-input block right after their shift-type selector, sourced from
