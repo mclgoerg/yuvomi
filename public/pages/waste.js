@@ -1574,6 +1574,7 @@ async function skipOccurrence(occurrenceKey) {
   try {
     await api.put(`/waste/schedules/${found.scheduleId}/overrides/${found.originalDate}`, { replacement_date: null });
     await reloadAndRender();
+    refocusAfterRender();
     window.yuvomi?.showToast(t('waste.scheduleSavedToast'), 'success');
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
@@ -1733,6 +1734,7 @@ function bindEvents() {
         try {
           await api.delete(`/waste/schedules/${schedule.id}`);
           await reloadAndRender();
+          refocusAfterRender();
           window.yuvomi?.showToast(t('waste.scheduleDeletedToast'), 'success');
         } catch (err) {
           window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
@@ -1788,6 +1790,7 @@ async function deletePickup(id) {
   try {
     await api.delete(`/waste/pickups/${id}`);
     await reloadAndRender();
+    refocusAfterRender();
     window.yuvomi?.showToast(t('waste.pickupDeletedToast'), 'success');
   } catch (err) {
     window.yuvomi?.showToast(err.data?.error ?? t('common.unknownError'), 'danger');
