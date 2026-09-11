@@ -20,6 +20,7 @@ process.env.SESSION_SECRET = 'waste-routes-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: wasteRouter } = await import('../server/routes/waste/index.js');
+const helpers = await import('../server/routes/waste/helpers.js');
 
 const moduleDatabase = get();
 const db = buildMigratedDatabase(MIGRATIONS);
@@ -695,4 +696,52 @@ test('mapping-profile import/commit: 404 for an unknown source', async () => {
     body: { profile: { version: 1, mappings: [] }, profile_digest: 'x' },
   });
   assert.equal(r.status, 404);
+});
+
+// -------------------------------------------------------------------------
+// hasWasteWriteAccess / redactSourceForReader (pure, given a fabricated req) -
+// an API token inherits its OWNER's actual module rights on top of whatever
+// the token itself scopes down to; checking only the token's own scope let
+// an unscoped (or waste:write-scoped) token issued for a read-only member
+// still read that member's source url/last_error unredacted, even though the
+// identical write 403s at the mount point (server/index.js) for that same
+// token, because the mount point applies both gates in sequence.
+// -------------------------------------------------------------------------
+
+test('hasWasteWriteAccess/redactSourceForReader: a session with write module access sees url/last_error unredacted', () => {
+  const req = { authMethod: 'session', sessionModuleAccess: null };
+  assert.equal(helpers.hasWasteWriteAccess(req), true);
+  const source = { id: 1, kind: 'url', url: 'https://example.com/cal.ics', last_error: 'boom' };
+  assert.deepEqual(helpers.redactSourceForReader(source, req), source);
+});
+
+test('hasWasteWriteAccess/redactSourceForReader: a read-only session never sees url/last_error, regardless of an unscoped or write-scoped token', () => {
+  const source = { id: 1, kind: 'url', url: 'https://example.com/cal.ics', last_error: 'boom' };
+  const readOnlySession = { authMethod: 'session', sessionModuleAccess: { waste: 'read' } };
+  assert.equal(helpers.hasWasteWriteAccess(readOnlySession), false);
+  assert.deepEqual(helpers.redactSourceForReader(source, readOnlySession), { id: 1, kind: 'url' });
+
+  // The bug this test guards: an unscoped token (authScopes null, meaning
+  // "no scope restriction beyond the token owner's own role") was previously
+  // enough on its own to grant write access here, ignoring that the token's
+  // OWNER is a read-only member. Same for a token explicitly scoped
+  // waste:write - scope only ever narrows what a token's owner can already
+  // do, it cannot widen it.
+  const unscopedTokenForReadOnlyMember = { authMethod: 'api_token', authScopes: null, sessionModuleAccess: { waste: 'read' } };
+  assert.equal(helpers.hasWasteWriteAccess(unscopedTokenForReadOnlyMember), false);
+  assert.deepEqual(helpers.redactSourceForReader(source, unscopedTokenForReadOnlyMember), { id: 1, kind: 'url' });
+
+  const writeScopedTokenForReadOnlyMember = { authMethod: 'api_token', authScopes: ['waste:write'], sessionModuleAccess: { waste: 'read' } };
+  assert.equal(helpers.hasWasteWriteAccess(writeScopedTokenForReadOnlyMember), false);
+  assert.deepEqual(helpers.redactSourceForReader(source, writeScopedTokenForReadOnlyMember), { id: 1, kind: 'url' });
+});
+
+test('hasWasteWriteAccess: a write-scoped token for a member with actual write rights is allowed', () => {
+  const req = { authMethod: 'api_token', authScopes: ['waste:write'], sessionModuleAccess: null };
+  assert.equal(helpers.hasWasteWriteAccess(req), true);
+});
+
+test('hasWasteWriteAccess: a read-only-scoped token is denied even for an admin session, since the token itself narrows access', () => {
+  const req = { authMethod: 'api_token', authScopes: ['waste:read'], sessionModuleAccess: null };
+  assert.equal(helpers.hasWasteWriteAccess(req), false);
 });

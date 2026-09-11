@@ -55,7 +55,10 @@ function isoNow(now) {
   return now.toISOString();
 }
 
-function wasteDisabled(database) {
+/** Is the Waste module switched off for the whole household? Shared with
+ * waste-source-scheduler.js, so a disabled module also pauses URL-source
+ * background refreshes, not just reminder sync. */
+export function wasteDisabled(database) {
   const row = database.prepare("SELECT value FROM sync_config WHERE key = 'disabled_modules'").get();
   if (!row?.value) return false;
   try {
@@ -96,8 +99,9 @@ export const __test = { pickupReminderAt };
  * pickup, an archived type, anything that touched getOccurrences() mid-run -
  * left some anchors/reminders deleted and others not yet recreated: an
  * inconsistent state that silently persisted until the next periodic tick
- * papered over it (PLAN.md #8, "never truncate silently" applies to a
- * half-applied sync too, not just a half-computed occurrence list).
+ * papered over it - the same "never leave a silently half-applied result"
+ * discipline this app applies to a half-computed occurrence list applies just
+ * as much to a half-applied reminder sync.
  */
 export function syncWasteRemindersForUser(database, userId, now = new Date()) {
   database.transaction(() => syncWasteRemindersForUserUnsafe(database, userId, now))();

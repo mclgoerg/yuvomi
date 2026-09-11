@@ -549,7 +549,8 @@ export function listDueUrlSources(d) {
 
 /**
  * Edits one mapping's decision after commit, without requiring a full
- * re-import - "mapping management" (PLAN.md solid-v1 addition). Only the
+ * re-import - a household correcting a label's mapping shouldn't have to
+ * re-upload and re-review the whole file. Only the
  * mapping row changes; already-committed waste_imported_pickups for labels
  * whose type changes are NOT retroactively reassigned here (that would
  * silently rewrite import history outside the atomic-commit path) - the next
@@ -626,7 +627,10 @@ export function previewImport(d, { sourceId = null, icsText } = {}) {
  * @param {Array<{normalized_label:string, type_id?:number, new_type?:object, ignored?:boolean}>} opts.mappingDecisions one decision per distinct label
  * @param {string[]} [opts.skipEventKeys] blocking-diagnostic event keys the caller explicitly acknowledges and excludes
  * @param {number|null} [opts.expectedVersion] the source's version as last seen in a preview (re-import concurrency guard)
- * @param {string|null} [opts.previewDigest] the digest the preview returned for this same file (protects against committing stale content)
+ * @param {string|null} [opts.previewDigest] the digest the preview returned for this same file - a
+ *   digest of what the preview SHOWED (candidates/labels/diagnostics), not of the raw bytes, so a
+ *   URL source re-fetched between preview and commit still matches as long as the parsed result
+ *   didn't actually change (see waste-import.js#computeReviewDigest)
  * @param {number|null} opts.userId
  */
 export function commitImport(d, {
@@ -639,10 +643,12 @@ export function commitImport(d, {
     throw new WasteConflictError('This source changed since you last previewed it; preview again before committing.');
   }
 
+  // content_hash storage only - NOT the commit concurrency guard below (see
+  // waste-import.js#computeReviewDigest for why: a URL source's preview and
+  // this commit each fetch the URL independently, and raw bytes can differ
+  // between the two fetches - e.g. a request-time DTSTAMP - even when the
+  // parsed result is identical).
   const digest = computeDigest(icsText);
-  if (previewDigest && previewDigest !== digest) {
-    throw new WasteConflictError('The file content changed since you last previewed it; preview again before committing.');
-  }
 
   const today = todayKey(d);
   // The pickup DAY is a household-local fact, not a UTC one (see
@@ -658,6 +664,16 @@ export function commitImport(d, {
   } catch (err) {
     if (err instanceof WasteImportError) throw new WasteValidationError([err.message]);
     throw err;
+  }
+
+  // Compares against what the preview actually SHOWED (candidates/labels/
+  // diagnostics), not the raw bytes behind it - a URL source's preview and
+  // this commit each fetch the URL independently, and two fetches of the
+  // same underlying feed routinely differ in bytes that don't change the
+  // parsed result (a request-time DTSTAMP, incidental whitespace, ...).
+  // Comparing raw bytes made every such source refuse every commit forever.
+  if (previewDigest && previewDigest !== preview.digest) {
+    throw new WasteConflictError('The file content changed since you last previewed it; preview again before committing.');
   }
 
   const skipSet = new Set(skipEventKeys);
@@ -854,7 +870,7 @@ export function upsertReminderSetting(d, userId, typeId, { enabled, offsetDays, 
 // {version, mappings: [{pattern, type_name}]}. Deliberately decoupled from
 // local ids (source_id, type_id) so it can be exported from one source or
 // household and applied to another where the ids differ but the type NAMES
-// still match. No municipal/provider catalog ships with the app (PLAN.md) -
+// still match. No municipal/provider catalog ships with the app, by design -
 // this only ever round-trips a household's OWN previously-made decisions.
 //
 // Reuses waste_source_mappings as-is (already exactly "one source's label ->

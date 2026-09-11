@@ -41,9 +41,35 @@ export class WasteImportError extends Error {
   }
 }
 
-/** sha256 of the raw ICS text - the source's content_hash and the concurrency guard on commit. */
+/** sha256 of the raw ICS text - stored as the source's content_hash. NOT used for the commit
+ * concurrency guard (see computeReviewDigest) - a URL source's preview and commit each fetch the
+ * text independently, and a feed whose bytes change on every request (e.g. a DTSTAMP carrying the
+ * request time) would never match itself byte-for-byte between the two fetches. */
 export function computeDigest(icsText) {
   return crypto.createHash('sha256').update(icsText, 'utf8').digest('hex');
+}
+
+/**
+ * sha256 of what a preview actually SHOWS a reviewer (candidates/labels/diagnostics), not of the
+ * raw bytes behind it. Used as the commit concurrency guard: two fetches of the same underlying
+ * feed that differ only in volatile bytes irrelevant to the parsed result (a request-time DTSTAMP,
+ * incidental whitespace, ...) still produce the same review digest, so a URL source doesn't get
+ * stuck refusing every commit with "content changed since you last previewed it" purely because it
+ * was fetched twice. A genuine content change - a different candidate, label, or diagnostic - does
+ * change the digest, so the guard still does its real job.
+ */
+export function computeReviewDigest({ candidates, labels, diagnostics }) {
+  const candidateLines = candidates
+    .map((c) => `${c.identity_key}|${c.normalized_label}|${c.date_key}`)
+    .sort();
+  const labelLines = labels
+    .map((l) => `${l.normalized_label}|${l.original_label}|${l.count}`)
+    .sort();
+  const diagnosticLines = diagnostics
+    .map((d) => `${d.severity}|${d.code}|${d.event_key ?? ''}|${d.count ?? ''}|${d.message ?? ''}`)
+    .sort();
+  const canonical = JSON.stringify({ candidates: candidateLines, labels: labelLines, diagnostics: diagnosticLines });
+  return crypto.createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
 function baseNormalizeLabel(label) {
@@ -188,7 +214,6 @@ export function buildImportPreview(icsText, {
     throw new WasteImportError(`The file exceeds the ${Math.round(MAX_ICS_BYTES / (1024 * 1024))} MB upload limit.`, 'file_too_large');
   }
 
-  const digest = computeDigest(icsText);
   const skipped = [];
   const rawEvents = parseICS(icsText, { allowMissingUid: true, onSkip: (info) => skipped.push(info) });
 
@@ -325,7 +350,7 @@ export function buildImportPreview(icsText, {
   const coverage = dateKeys.length ? { start: dateKeys[0], end: dateKeys[dateKeys.length - 1] } : { start: null, end: null };
 
   return {
-    digest,
+    digest: computeReviewDigest({ candidates, labels, diagnostics }),
     coverage,
     counts: { events: rawEvents.length, candidates: candidates.length, distinct_labels: labels.length },
     diagnostics,

@@ -20,8 +20,8 @@ export const MONTHLY_INTERVAL_MAX = 24;
 // (#1063 Phase 9).
 export const ORDINAL_WEEKDAY_VALUES = Object.freeze([-1, 1, 2, 3, 4]);
 
-// Matches Schedule's own established ceiling (invariant #7 in PLAN.md) - a
-// range read is never allowed to scan an arbitrary multi-year window.
+// Matches Schedule's own established ceiling - a range read is never allowed
+// to scan an arbitrary multi-year window.
 export const OCCURRENCE_RANGE_MAX_DAYS = 731;
 
 // A safety fuse, not a normal limit. Since the walk catches up to the
@@ -33,9 +33,9 @@ export const OCCURRENCE_RANGE_MAX_DAYS = 731;
 // accumulated so far, which for a weekly schedule anchored in 2010 was NOTHING
 // at all: the pickup vanished from the list, the dashboard, the calendar, the
 // feed and the reminder scan at once, and the API answered 200 (#1063). A
-// wrong-but-plausible empty answer is worse than a loud failure, and PLAN.md
-// invariant #8 says as much - every limit is measured and none truncates
-// silently.
+// wrong-but-plausible empty answer is worse than a loud failure - this
+// module's own discipline throughout is that every limit is measured and
+// none truncates silently.
 const MAX_EXPANSION_ITERATIONS = 5000;
 
 /**

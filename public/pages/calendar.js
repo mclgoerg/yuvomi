@@ -599,10 +599,9 @@ let state = {
   layerBirthdays: true,    // toggle for the birthday layer (#778)
   layerSchedule: true,     // computed schedule overlay
   // Anders als holidays/school/schedule/birthdays (Vorgabe AN, Filter nimmt weg):
-  // PLAN.md Phase 0 legt ausdruecklich fest, dass die Waste-Ebene AUS startet,
-  // wie das Dashboard-Widget selbst (DEFAULT_HIDDEN_WIDGETS) - ein bestehender
-  // Haushalt bekommt beim Rebase auf diese Phase keinen ungefragt vollen
-  // Kalender voller Muelltermine.
+  // die Waste-Ebene startet bewusst AUS, wie das Dashboard-Widget selbst
+  // (DEFAULT_HIDDEN_WIDGETS) - ein bestehender Haushalt bekommt beim Update
+  // auf dieses Feature keinen ungefragt vollen Kalender voller Muelltermine.
   layerWaste:    false,    // computed Waste occurrence overlay (#1063 Phase 5) - opt-in
   wasteVisibleTypeIds: new Set(), // per-type visibility nested under the waste layer (#1063 Phase 10); empty = all
   wasteOccurrences: [],
@@ -640,9 +639,9 @@ let state = {
 let _container = null;
 const calendarLoads = createCalendarLoadCoordinator();
 // Eigener Koordinator statt calendarLoads: ein Waste-Fetchfehler darf den
-// Ladezustand von Terminen/Aufgaben/Feiertagen/Schichtplan nicht anfassen
-// (PLAN.md Phase 5, "ohne gewoehnlichen Kalenderinhalt zu brechen") - beide
-// teilen sich dieselbe Generation-Logik, aber jede Generation zaehlt fuer sich.
+// Ladezustand von Terminen/Aufgaben/Feiertagen/Schichtplan nicht anfassen,
+// und umgekehrt - beide teilen sich dieselbe Generation-Logik, aber jede
+// Generation zaehlt fuer sich.
 const wasteLoads = createCalendarLoadCoordinator();
 
 // Termin-Suche (#471): datumsunabhängiges Finden über den FTS-Index. Der
@@ -1259,8 +1258,8 @@ function fetchWindow(from, to) {
  * Liste uebersetzen und ihn damit von "keine Eintraege" ununterscheidbar
  * machen. Zweitens: ein abgeschaltetes oder ungelesenes Waste-Modul loest
  * ueberhaupt keinen Request aus (wasteEnabled()), waehrend der Schichtplan-Weg
- * nur die Modul-Abschaltung, nicht die Leserechte prueft (PLAN.md Phase 5
- * verlangt ausdruecklich "enabled and readable").
+ * nur die Modul-Abschaltung, nicht die Leserechte prueft - Waste verlangt
+ * ausdruecklich beides, "eingeschaltet UND lesbar".
  */
 async function loadWasteRange(from, to) {
   if (!wasteEnabled()) {
@@ -2278,11 +2277,10 @@ function scheduleEnabled() { return !window.yuvomi?.isModuleDisabled?.('schedule
 
 /**
  * Ist Waste ueberhaupt eingeschaltet UND lesbar? Anders als scheduleEnabled()
- * prueft dies zusaetzlich die Modulrechte (moduleAccess), weil PLAN.md Phase 5
- * ausdruecklich "enabled and readable" verlangt - eine Rolle mit read:none auf
- * Waste soll nicht einmal den Fetch ausloesen. Die verbindliche Durchsetzung
- * bleibt serverseitig (moduleAccessVerdict); dies ist reine UX, wie ueberall in
- * permissions.js dokumentiert.
+ * prueft dies zusaetzlich die Modulrechte (moduleAccess) - eine Rolle mit
+ * read:none auf Waste soll nicht einmal den Fetch ausloesen. Die verbindliche
+ * Durchsetzung bleibt serverseitig (moduleAccessVerdict); dies ist reine UX,
+ * wie ueberall in permissions.js dokumentiert.
  */
 function wasteEnabled() {
   return !window.yuvomi?.isModuleDisabled?.('waste') && moduleAccess('waste') !== 'none';
@@ -2403,7 +2401,7 @@ function renderScheduleChip(entry, className = 'allday-holiday') {
  * Ein Waste-Vorkommen als flache Ebenen-Bar - dieselbe Form wie Feiertag/
  * Schichtplan (--holi-color/--holi-ink, siehe calendar.css), aber ANDERS ALS
  * DIESE eigenstaendig klickbar: ein Klick fuehrt direkt in die Waste-Seite,
- * nie in den gewoehnlichen Termin-Editor (PLAN.md Phase 5). Icon + Typname
+ * nie in den gewoehnlichen Termin-Editor. Icon + Typname
  * stehen immer zusammen im Text - Farbe ist Dekoration, nie der einzige
  * Traeger der Identitaet (Skalen-Regel). moved/coalesced spiegeln exakt die
  * Dashboard-Kachel (renderWasteWidget, pages/dashboard.js), damit dieselbe
@@ -2436,7 +2434,7 @@ function renderWasteChip(occurrence, { className = 'allday-holiday', icon = true
 }
 
 /** Ein Klick/Enter auf eine Waste-Bar fuehrt direkt in die Waste-Seite, nie in
- *  den Termin-Editor (PLAN.md Phase 5) - derselbe Mechanismus wie ein
+ *  den Termin-Editor - derselbe Mechanismus wie ein
  *  Haushaltshilfe-Besuch aus openEventDetail() heraus. */
 function navigateToWasteOccurrence(deepLink) {
   window.yuvomi.navigate(`/waste${deepLink}`);

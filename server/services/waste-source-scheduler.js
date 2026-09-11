@@ -10,6 +10,7 @@ import { createLogger } from '../logger.js';
 import * as db from '../db.js';
 import { listDueUrlSources, WasteConflictError } from './waste-store.js';
 import { refreshUrlSource } from './waste-url-source.js';
+import { wasteDisabled } from './waste-reminders.js';
 
 const log = createLogger('Waste');
 
@@ -33,6 +34,10 @@ export async function runDueWasteSourceRefreshes() {
   }
   scanRunning = true;
   try {
+    // A household that has switched Waste off entirely shouldn't have its URL
+    // sources quietly fetched and committed in the background - the reminder
+    // sync (waste-reminders.js) already respects this same switch.
+    if (wasteDisabled(db.get())) return;
     const due = listDueUrlSources(db.get());
     // Parallel, not sequential (M-2 der Auditrunde): ein Haushalt hat
     // hoechstens eine Handvoll Quellen (invariant #8), und jede ist bereits

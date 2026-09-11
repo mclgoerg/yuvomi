@@ -476,14 +476,34 @@ function nextOccurrenceAfter(baseDateStr, rrule, notBeforeStr, { seriesStart = n
  */
 function lastOccurrenceOf(seriesStart, parsed) {
   const { freq, interval, byday, count, bymonthday, bydayOrdinal } = parsed;
-  // Dieselbe Zurueckhaltung wie bei BYDAY: das n-te Vorkommen einer ordinalen
-  // Regel ab dem Serienstart zu zaehlen ist keine feste Intervall-Multiplikation
-  // (ein "zweiter Montag" verschiebt sich pro Monat um einen anderen Betrag) -
-  // lieber unbegrenzt als falsch begrenzt.
-  if (!count || byday.length || bydayOrdinal) return null;
+  // Dieselbe Zurueckhaltung wie bei plain BYDAY (mehrere Wochentage): dort
+  // haengt an einem Intervall mehr als ein Vorkommen, und das laesst sich
+  // nicht als feste Multiplikation zaehlen - lieber unbegrenzt als falsch
+  // begrenzt. `bydayOrdinal` ist ANDERS: eine ordinale Regel ("2MO", "-1FR")
+  // hat laut ORDINAL_BYDAY_VALUES' eigener Begruendung GENAU EIN Vorkommen je
+  // Intervall (jeder Monat hat mindestens vier von jedem Wochentag und genau
+  // einen letzten), also unten wie BYMONTHDAY=-1 direkt ausgerechnet statt
+  // ebenfalls unbegrenzt gelassen.
+  if (!count || byday.length) return null;
 
   const start = new Date(`${String(seriesStart).slice(0, 10)}T00:00:00Z`);
   if (isNaN(start.getTime())) return null;
+
+  if (bydayOrdinal) {
+    const { weekday, ordinal } = bydayOrdinal;
+    // Wie bei BYMONTHDAY=-1 gilt: DTSTART ist nur dann Vorkommen 1, wenn sein
+    // eigener Tag auf oder vor dem Zieltag desselben Monats liegt. Anders als
+    // dort kann das hier tatsaechlich fehlschlagen (ein Monatsletzter ist
+    // immer >= jedem Tag desselben Monats, ein "zweiter Montag" nicht) - liegt
+    // DTSTART spaeter im Monat als der Zieltag, faellt Vorkommen 1 in den
+    // Folgemonat, exakt wie nextOccurrence()'s eigene "kann im selben Monat
+    // liegen"-Pruefung oben, nur umgekehrt geprueft.
+    const targetInStartMonth = nthWeekdayOfMonth(start.getUTCFullYear(), start.getUTCMonth(), weekday, ordinal);
+    const firstMonth = start.getUTCDate() <= targetInStartMonth ? start.getUTCMonth() : start.getUTCMonth() + 1;
+    const zielMonat = firstMonth + (count - 1) * interval;
+    const zielTag = nthWeekdayOfMonth(start.getUTCFullYear(), zielMonat, weekday, ordinal);
+    return new Date(Date.UTC(start.getUTCFullYear(), zielMonat, zielTag)).toISOString().slice(0, 10);
+  }
 
   /* EINE -1-SERIE LAEUFT NICHT AUF DEM RASTER IHRES STARTDATUMS, ABER AUF EINEM.
    * `FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=3` ab dem 15. Januar bedeutet Jan 15

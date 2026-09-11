@@ -1,8 +1,8 @@
 /**
  * Module: Waste collection routes - manual one-off pickups
  * Purpose: HTTP layer over server/services/waste-store.js's one-off functions.
- *          API path is /pickups (PLAN.md's stable contract); the underlying
- *          table is waste_one_off_pickups.
+ *          API path is /pickups (the short, stable public name); the
+ *          underlying table is waste_one_off_pickups.
  */
 
 import express from 'express';

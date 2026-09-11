@@ -8,16 +8,15 @@
  *          buildImportPreview (via waste-store.js#previewImport) remains the
  *          one place preview/commit logic lives, for both source kinds.
  * Dependencies: server/utils/ssrf.js (central SSRF guard), server/utils/http.js
- *               (safe HTTP client) - the same primitives
- *               server/services/ics-subscription.js already uses; this file
+ *               (safe HTTP client), and ics-subscription.js#checkSSRF itself
+ *               (parameterized by opt-in rather than copied) - this file
  *               does not reimplement or duplicate that protection.
  */
 
-import { isIP } from 'node:net';
-import dns from 'node:dns/promises';
 import { createLogger } from '../logger.js';
-import { isBlockedAddress, readPrivateNetworkOptIn, createGuardedLookup } from '../utils/ssrf.js';
+import { readPrivateNetworkOptIn, createGuardedLookup } from '../utils/ssrf.js';
 import { safeRequest } from '../utils/http.js';
+import { checkSSRF as checkSSRFWithOptIn } from './ics-subscription.js';
 import { url as validateUrl, num } from '../middleware/validate.js';
 import { MAX_ICS_BYTES } from './waste-import.js';
 import * as store from './waste-store.js';
@@ -68,25 +67,15 @@ export function validateRefreshIntervalMinutes(raw) {
 }
 
 /**
- * SSRF pre-check against DNS-resolved addresses, mirroring
- * ics-subscription.js#checkSSRF exactly (the vetted, already-tested
- * precedent) - literal IPs are checked directly since resolve4/6 do not
- * resolve them. The real request additionally validates at connect time via
- * createGuardedLookup below, which also defeats DNS-rebinding between this
- * check and the request.
+ * SSRF pre-check against DNS-resolved addresses - the actual check lives once
+ * in ics-subscription.js#checkSSRF; this only supplies WASTE's own opt-in
+ * instead of keeping a second copy of the whole function. Literal IPs are
+ * checked directly since resolve4/6 do not resolve them. The real request
+ * additionally validates at connect time via createGuardedLookup below,
+ * which also defeats DNS-rebinding between this check and the request.
  */
-async function checkSSRF(urlStr) {
-  if (isPrivateNetworkAllowed()) return;
-  const hostname = new URL(urlStr).hostname.replace(/^\[|\]$/g, '');
-  if (isIP(hostname)) {
-    if (isBlockedAddress(hostname)) throw new Error(`URL resolves to a private IP address: ${hostname}`);
-    return;
-  }
-  const v4 = await dns.resolve4(hostname).catch(() => []);
-  const v6 = await dns.resolve6(hostname).catch(() => []);
-  for (const addr of [...v4, ...v6]) {
-    if (isBlockedAddress(addr)) throw new Error(`URL resolves to a private IP address: ${addr}`);
-  }
+function checkSSRF(urlStr) {
+  return checkSSRFWithOptIn(urlStr, isPrivateNetworkAllowed);
 }
 
 /**
@@ -120,16 +109,21 @@ export async function fetchIcsText(rawUrl, { etag = null, lastModified = null } 
   const cl = parseInt(res.headers.get('content-length') || '0', 10);
   if (cl > MAX_ICS_BYTES) throw new Error(`ICS file exceeds the ${Math.round(MAX_ICS_BYTES / (1024 * 1024))} MB limit.`);
 
-  let text = '', received = 0;
+  // Buffer chunks and decode ONCE at the end, not per chunk: a multi-byte
+  // UTF-8 character split across a chunk boundary would otherwise decode as
+  // two U+FFFD replacement characters mid-string, silently corrupting a
+  // label like "Grünschnitt" and breaking its remembered-mapping match.
+  const chunks = [];
+  let received = 0;
   for await (const chunk of res.body) {
     received += chunk.length;
     if (received > MAX_ICS_BYTES) throw new Error(`ICS file exceeds the ${Math.round(MAX_ICS_BYTES / (1024 * 1024))} MB limit.`);
-    text += chunk.toString();
+    chunks.push(chunk);
   }
 
   return {
     notModified: false,
-    text,
+    text: Buffer.concat(chunks).toString('utf8'),
     etag: res.headers.get('etag') || null,
     lastModified: res.headers.get('last-modified') || null,
   };
@@ -164,7 +158,9 @@ function backoffMinutes(consecutiveFailures) {
  * steht die Quelle danach auf `needs_mapping = 1, next_attempt_at = NULL` und
  * faellt damit dauerhaft aus `listDueUrlSources` heraus, obwohl der andere
  * Lauf gerade erfolgreich uebernommen hat. Eine Quelle, die sich nie wieder
- * von selbst meldet, ist genau die Art stiller Fehler, die PLAN.md #8 verbietet.
+ * von selbst meldet, ist genau die Art stiller Fehler, die diese App durchgaengig
+ * vermeidet: jede Grenze/jeder Fehlerfall bekommt eine ehrliche Meldung statt
+ * eines plausibel aussehenden, aber falschen stillen Zustands.
  *
  * WARUM IN-PROCESS UND NICHT IN DER DATENBANK: Diese App laeuft als EIN
  * Node-Prozess (`npm start` startet genau einen, kein cluster/pm2-fork), und

@@ -7,7 +7,7 @@
 
   <p>
     Aufgaben, Kalender, Budget, Einkauf, Mahlzeiten, Gesundheit und mehr - für eine Familie,
-    ein Paar oder nur dich. Neunzehn Module für einen Haushalt von bis zu sechs Personen, auf
+    ein Paar oder nur dich. Zwanzig Module für einen Haushalt von bis zu sechs Personen, auf
     einem Server, der dir gehört, und das Einzige, was ihn verlässt, ist eine Versionsprüfung.
   </p>
 

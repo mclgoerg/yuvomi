@@ -13,6 +13,7 @@ import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
+import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'waste-url-source-test-secret';
@@ -22,6 +23,8 @@ const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const store = await import('../server/services/waste-store.js');
 const urlSource = await import('../server/services/waste-url-source.js');
 const { fetchIcsText, refreshUrlSource, createUrlSource, validateSourceUrl, validateRefreshIntervalMinutes, __test } = urlSource;
+const { default: wasteRouter } = await import('../server/routes/waste/index.js');
+const { runDueWasteSourceRefreshes } = await import('../server/services/waste-source-scheduler.js');
 
 const moduleDatabase = get();
 const suiteDatabase = buildMigratedDatabase(MIGRATIONS);
@@ -30,7 +33,35 @@ moduleDatabase.close();
 
 const ALICE = seedUser('alice', 'admin');
 
-test.after(() => suiteDatabase.close());
+// A real Express app with the actual waste router mounted, exactly like
+// test-waste-routes.js - needed for the reimport/preview + reimport/commit
+// route-level test below, which reproduces a bug the store-level tests above
+// cannot: the ROUTE (not refreshUrlSource) fetches the URL independently for
+// preview and for commit, so it is the one place two real, separate fetches
+// of the same source happen back to back.
+const app = express();
+app.use(express.json());
+app.use((req, _res, next) => {
+  req.authUserId = ALICE;
+  req.session = { userId: ALICE, role: 'admin' };
+  next();
+});
+app.use('/api/v1/waste', wasteRouter);
+const apiServer = http.createServer(app);
+await new Promise((r) => apiServer.listen(0, '127.0.0.1', r));
+const apiOrigin = `http://127.0.0.1:${apiServer.address().port}/api/v1`;
+
+async function apiCall(method, path, { body } = {}) {
+  const res = await fetch(`${apiOrigin}${path}`, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text();
+  return { status: res.status, body: text ? JSON.parse(text) : null };
+}
+
+test.after(() => { suiteDatabase.close(); apiServer.close(); });
 
 function applyMigration(db, migration) {
   if (typeof migration.up === 'function') migration.up(db);
@@ -181,6 +212,30 @@ test('fetchIcsText: a non-2xx status throws', async () => {
   }
 });
 
+test('fetchIcsText: a multi-byte UTF-8 character split across a chunk boundary decodes correctly, not as two replacement characters', async () => {
+  const { server, url } = await startServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/calendar' });
+    // "ü" (U+00FC) is the two bytes 0xC3 0xBC in UTF-8 - split them across two
+    // separate writes/chunks on purpose, with a flush and a short delay
+    // between them so they arrive as genuinely separate reads on the client
+    // side, not coalesced into one by the transport.
+    const prefix = Buffer.from('BEGIN:VCALENDAR\r\nSUMMARY:Gr', 'utf8');
+    const split = Buffer.from([0xC3]); // first byte of "ü"
+    const rest = Buffer.concat([Buffer.from([0xBC]), Buffer.from('nschnitt\r\nEND:VCALENDAR\r\n', 'utf8')]);
+    res.write(prefix);
+    res.write(split);
+    res.flushHeaders?.();
+    setTimeout(() => res.end(rest), 20);
+  });
+  try {
+    const result = await fetchIcsText(url('/cal.ics'));
+    assert.match(result.text, /SUMMARY:Grünschnitt/,
+      `expected the split "ü" to decode correctly, got: ${JSON.stringify(result.text)}`);
+  } finally {
+    server.close();
+  }
+});
+
 test('fetchIcsText: a response over the size cap throws mid-stream', async () => {
   const { server, url } = await startServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/calendar' });
@@ -319,6 +374,88 @@ test('refreshUrlSource: an already-mapped label (remembered from a prior commit)
 });
 
 // -------------------------------------------------------------------------
+// Route-level reimport/preview + reimport/commit: the actual bug the
+// store-level "two-attempt" test above cannot see, because it commits
+// through store.commitImport with the FIRST fetch's own text directly. The
+// real HTTP route re-fetches the URL independently for preview and again for
+// commit - two genuinely separate network round-trips of the same feed.
+// -------------------------------------------------------------------------
+
+test('reimport/preview then reimport/commit against a URL source: a feed that returns byte-different-but-semantically-identical content on each fetch (e.g. a per-request DTSTAMP) still commits, not stuck in a 409 loop', async () => {
+  const type = seedType({ name: 'Papier' });
+  let call = 0;
+  const { server, url } = await startServer((req, res) => {
+    call += 1;
+    res.writeHead(200);
+    // Same event/label/date every time; only a request-time DTSTAMP differs,
+    // exactly the shape the review flagged (a live feed's bytes are rarely
+    // byte-identical across two fetches even when nothing meaningful changed).
+    res.end(`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nDTSTAMP:${new Date(Date.now() + call).toISOString().replace(/[-:]/g, '').split('.')[0]}Z\r\nBEGIN:VEVENT\r\nUID:evt-papier\r\nDTSTART;VALUE=DATE:20260410\r\nSUMMARY:Papier\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`);
+  });
+  try {
+    const created = await createUrlSource(get(), {
+      name: 'Volatile-bytes source', url: url('/cal.ics'), refreshIntervalMinutes: 1440, userId: ALICE,
+    });
+    assert.equal(created.outcome, 'needs_mapping', 'no remembered mapping yet - needs a first reviewed decision');
+
+    const preview = await apiCall('POST', `/waste/sources/${created.source.id}/reimport/preview`, { body: {} });
+    assert.equal(preview.status, 200);
+
+    const commit = await apiCall('POST', `/waste/sources/${created.source.id}/reimport/commit`, {
+      body: {
+        mappings: [{ normalized_label: 'papier', type_id: type.id }],
+        preview_digest: preview.body.data.digest,
+        expected_version: preview.body.data.expected_version,
+      },
+    });
+    assert.equal(commit.status, 200, `expected the commit to succeed despite the byte-different refetch, got ${JSON.stringify(commit.body)}`);
+    assert.equal(commit.body.data.diff.added, 1);
+
+    const sourceAfter = await apiCall('GET', `/waste/sources/${created.source.id}`);
+    assert.equal(sourceAfter.body.data.needs_mapping, 0);
+    assert.equal(sourceAfter.body.data.version, 1);
+  } finally {
+    server.close();
+  }
+});
+
+test('reimport/preview then reimport/commit against a URL source: content that genuinely changed between the two fetches (a different pickup date) is still refused with 409', async () => {
+  const type = seedType({ name: 'Glas' });
+  let call = 0;
+  const { server, url } = await startServer((req, res) => {
+    call += 1;
+    res.writeHead(200);
+    // Every fetch returns a genuinely different pickup date (not just an
+    // incidental byte) - the guard must still catch this regardless of how
+    // many prior fetches happened (createUrlSource's own initial fetch is
+    // call 1, so the preview/commit calls below must still differ from
+    // EACH OTHER, not just from call 1).
+    const date = `202604${String(10 + call).padStart(2, '0')}`;
+    res.end(`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:evt-glas\r\nDTSTART;VALUE=DATE:${date}\r\nSUMMARY:Glas\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`);
+  });
+  try {
+    const created = await createUrlSource(get(), {
+      name: 'Genuinely-changing source', url: url('/cal.ics'), refreshIntervalMinutes: 1440, userId: ALICE,
+    });
+    assert.equal(created.outcome, 'needs_mapping');
+
+    const preview = await apiCall('POST', `/waste/sources/${created.source.id}/reimport/preview`, { body: {} });
+    assert.equal(preview.status, 200);
+
+    const commit = await apiCall('POST', `/waste/sources/${created.source.id}/reimport/commit`, {
+      body: {
+        mappings: [{ normalized_label: 'glas', type_id: type.id }],
+        preview_digest: preview.body.data.digest,
+        expected_version: preview.body.data.expected_version,
+      },
+    });
+    assert.equal(commit.status, 409, 'a real content change between preview and commit must still be refused');
+  } finally {
+    server.close();
+  }
+});
+
+// -------------------------------------------------------------------------
 // Store helpers
 // -------------------------------------------------------------------------
 
@@ -333,4 +470,51 @@ test('listDueUrlSources: only kind=url, needs_mapping=0, and due (next_attempt_a
   assert.ok(ids.includes(due.id));
   assert.ok(!ids.includes(future.id));
   assert.ok(!ids.includes(mapping.id));
+});
+
+// -------------------------------------------------------------------------
+// runDueWasteSourceRefreshes: the scheduler must respect the same household
+// module switch waste-reminders.js already does - a disabled module still
+// having its URL sources quietly fetched/committed in the background would
+// be the one exception to "Waste never acts when switched off".
+// -------------------------------------------------------------------------
+
+test('runDueWasteSourceRefreshes: a due source is skipped entirely while the Waste module is disabled for the household', async () => {
+  // The scheduler fetches EVERY due source in the database, and this suite
+  // shares one long-lived DB across tests (see listDueUrlSources above, which
+  // leaves its own https://example.com/* placeholder sources behind). Isolate
+  // this test from that leftover state - otherwise the scheduler would make a
+  // real network call to example.com here, unrelated to what this test checks.
+  get().prepare("DELETE FROM waste_sources WHERE kind = 'url'").run();
+
+  let fetched = false;
+  const { server, url } = await startServer((req, res) => {
+    fetched = true;
+    res.writeHead(200);
+    res.end(ICS_ONE_EVENT('Bio', '2026-06-01'));
+  });
+  try {
+    const due = store.createUrlSourcePlaceholder(get(), {
+      name: 'Disabled-household source', url: url('/cal.ics'), refreshIntervalMinutes: 60, userId: ALICE,
+    });
+    get().prepare(`
+      INSERT INTO sync_config (key, value) VALUES ('disabled_modules', '["waste"]')
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run();
+    try {
+      await runDueWasteSourceRefreshes();
+      assert.equal(fetched, false, 'a disabled Waste module must not trigger a background fetch');
+      const after = store.getSource(get(), due.id);
+      assert.equal(after.version, 0, 'nothing was committed');
+      assert.equal(after.last_error, null, 'not even an error was recorded - the scan never touched this source');
+    } finally {
+      get().prepare("DELETE FROM sync_config WHERE key = 'disabled_modules'").run();
+    }
+
+    // Re-enabled: the very next scan picks the same source back up.
+    await runDueWasteSourceRefreshes();
+    assert.equal(fetched, true, 'once Waste is enabled again, the same due source is refreshed normally');
+  } finally {
+    server.close();
+  }
 });

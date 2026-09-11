@@ -183,7 +183,7 @@ test('wasteEnabled(): false, wenn das Modul zwar an, aber ohne Leserechte ist (m
     permissions.setPermissions({ admin: false, modules: { waste: 'none' }, widgets: {} });
     withWasteViewState({}, {}, () => {
       assert(calendarHelpers.wasteEnabled() === false,
-        'PLAN.md Phase 5 verlangt "enabled AND readable" - staerker als scheduleEnabled(), das nur die Abschaltung prueft');
+        'wasteEnabled() verlangt "eingeschaltet UND lesbar" - staerker als scheduleEnabled(), das nur die Abschaltung prueft');
     });
   } finally {
     permissions.setPermissions(saved);
@@ -240,7 +240,7 @@ test('availableLayers(): enthaelt die waste-Zeile nur, wenn wasteEnabled() true 
 // wie test-waste-dashboard.js's Quelltext-Verdrahtungspruefungen.
 // -------------------------------------------------------------------------
 
-test('PLAN.md Phase 0: die Waste-Ebene startet AUS (Erststand UND localStorage-Wiederherstellung), anders als holidays/school/schedule/birthdays', () => {
+test('die Waste-Ebene startet AUS (Erststand UND localStorage-Wiederherstellung), anders als holidays/school/schedule/birthdays', () => {
   const text = src();
   const stateLiteralStart = text.indexOf('layerWaste:');
   assert(/layerWaste:\s*false,/.test(text.slice(stateLiteralStart, stateLiteralStart + 30)),
@@ -265,7 +265,7 @@ test('openCalendarFilters(): der Reset-Knopf setzt layerWaste auf SEINE EIGENE V
   const start = text.indexOf("#cal-filters-reset')?.addEventListener('click'");
   const block = text.slice(start, start + 900);
   assert(/state\.layerWaste = false;/.test(block),
-    'Reset heisst "auf die Vorgabe zurueck" - PLAN.md Phase 0 legt die Waste-Ebenen-Vorgabe ausdruecklich auf AUS fest, anders als holidays/school/schedule/birthdays');
+    'Reset heisst "auf die Vorgabe zurueck" - die Waste-Ebenen-Vorgabe ist ausdruecklich AUS, anders als holidays/school/schedule/birthdays');
   assert(/localStorage\.setItem\(LAYER_WASTE_KEY, 'false'\);/.test(block), 'Reset muss den Waste-Schluessel im localStorage auf false zuruecksetzen');
 });
 

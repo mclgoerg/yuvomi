@@ -1314,7 +1314,7 @@ export const schemas = {
           type: 'object',
           required: ['digest', 'coverage', 'counts', 'diagnostics', 'labels'],
           properties: {
-            digest: { type: 'string', description: 'sha256 of the previewed ICS text; pass it back as preview_digest on commit.' },
+            digest: { type: 'string', description: 'sha256 of what this preview shows (candidates/labels/diagnostics), not of the raw ICS bytes; pass it back as preview_digest on commit. A URL source may be re-fetched between preview and commit - this digest still matches as long as the parsed result is unchanged.' },
             source_id: { type: ['integer', 'null'], description: 'null for a fresh import preview.' },
             expected_version: { type: ['integer', 'null'], description: 'The source\'s current version, for a re-import preview; pass it back as expected_version on commit.' },
             coverage: {
@@ -1355,7 +1355,7 @@ export const schemas = {
             name: { type: 'string', maxLength: 150, description: 'Required for a fresh import (POST /import/commit); defaults to the existing name on a re-import.' },
             mappings: { type: 'array', items: { $ref: '#/components/schemas/WasteImportMappingDecision' } },
             skip_event_keys: { type: 'array', items: { type: 'string' }, description: 'Blocking-diagnostic event_key values explicitly acknowledged and excluded.' },
-            preview_digest: { type: 'string', description: 'The digest returned by the preview for this same ICS text; a mismatch is refused with 409.' },
+            preview_digest: { type: 'string', description: 'The digest returned by the matching preview; a mismatch (the parsed content actually changed since that preview) is refused with 409.' },
             expected_version: { type: 'integer', description: 'Required on a re-import commit; the source\'s version as last seen in a preview (409 on mismatch).' },
           },
         },

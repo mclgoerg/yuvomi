@@ -130,12 +130,51 @@ test('nextOccurrenceAfter: catches up to a future lower bound and still lands on
   assert.equal(result, '2026-01-12');
 });
 
-test('nextOccurrenceAfter: COUNT is never enforced on an ordinal rule (fastForward/lastOccurrenceOf both bail out), same caution as plain BYDAY', () => {
-  // A tight COUNT must not silently cut the series short - "one occurrence
-  // too many" is the accepted tradeoff for a shape this module cannot count
-  // via fixed interval multiplication.
+test('nextOccurrenceAfter: COUNT IS enforced on an ordinal rule - a single ordinal token has exactly one occurrence per interval, unlike plain BYDAY', () => {
+  // 2026-01-12 is the 2nd Monday of January 2026 (DTSTART already on the
+  // rule), so COUNT=1 means the series has exactly one occurrence ever.
   const result = nextOccurrenceAfter('2026-01-12', 'FREQ=MONTHLY;BYDAY=2MO;COUNT=1', '2026-02-01', { seriesStart: '2026-01-12' });
-  assert.equal(result, '2026-02-09', 'must still produce a 2nd occurrence despite COUNT=1');
+  assert.equal(result, null, 'COUNT=1 must end the series at its one occurrence, not silently produce a 2nd');
+});
+
+test('nextOccurrenceAfter: COUNT=3 on an ordinal rule allows exactly three occurrences, INTERVAL respected', () => {
+  const seriesStart = '2026-01-12'; // 2nd Monday of January 2026
+  const rrule = 'FREQ=MONTHLY;BYDAY=2MO;COUNT=3';
+  // 2nd Monday of Feb 2026 (occurrence 2) is still within bounds.
+  assert.equal(
+    nextOccurrenceAfter(seriesStart, rrule, '2026-02-01', { seriesStart }),
+    '2026-02-09',
+  );
+  // 2nd Monday of March 2026 (occurrence 3, the last) is still within bounds.
+  assert.equal(
+    nextOccurrenceAfter(seriesStart, rrule, '2026-03-01', { seriesStart }),
+    '2026-03-09',
+  );
+  // 2nd Monday of April 2026 would be occurrence 4 - COUNT=3 has run out.
+  assert.equal(
+    nextOccurrenceAfter(seriesStart, rrule, '2026-04-01', { seriesStart }),
+    null,
+    'the series must end after its 3rd occurrence, not silently produce a 4th',
+  );
+});
+
+test('nextOccurrenceAfter: an unsynchronized DTSTART (not itself on the ordinal rule) still counts from the correct first occurrence', () => {
+  // 2026-01-25 is a Sunday, not the 2nd Monday of January (2026-01-12,
+  // already past) - the first real occurrence is the 2nd Monday of
+  // FEBRUARY, not January. COUNT=2 must therefore end after March's 2nd
+  // Monday (occurrence 2), not February's.
+  const seriesStart = '2026-01-25';
+  const rrule = 'FREQ=MONTHLY;BYDAY=2MO;COUNT=2';
+  assert.equal(
+    nextOccurrenceAfter(seriesStart, rrule, '2026-03-01', { seriesStart }),
+    '2026-03-09',
+    'occurrence 2 (2nd Monday of March) is still within bounds',
+  );
+  assert.equal(
+    nextOccurrenceAfter(seriesStart, rrule, '2026-04-01', { seriesStart }),
+    null,
+    'occurrence 3 would be April - COUNT=2 has already run out',
+  );
 });
 
 test('nextOccurrenceAfter: UNTIL still ends the series', () => {

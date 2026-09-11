@@ -2840,9 +2840,8 @@ async function openWidgetOptions(id, current = {}) {
           } else if (id === 'waste') {
             const picked = [...panel.querySelectorAll('input[name="waste-type"]:checked')].map((el) => Number(el.value));
             // Dieselbe Regel wie bei den Aufgaben-Kategorien: keine Auswahl
-            // heisst „alle" (PLAN.md: eine seltene Abholung darf nie
-            // stillschweigend verschwinden, nur weil niemand den Dialog
-            // geoeffnet hat).
+            // heisst „alle" - eine seltene Abholung darf nie stillschweigend
+            // verschwinden, nur weil niemand den Dialog geoeffnet hat.
             if (picked.length) next.types = picked;
           } else {
             const picked = [...panel.querySelectorAll('input[name="task-category"]:checked')].map((el) => el.value);

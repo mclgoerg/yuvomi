@@ -10,8 +10,9 @@
  *        "key" + JSON.stringify(params), so assertions check against that
  *        predictable shape rather than real translated text. Full modal
  *        open/save/dirty-close flows are covered by manual browser testing
- *        (see PLAN.md Phase 2 checkpoint), since modal.js's dirty-close
- *        machinery is generic, shared, and already covered by its own tests.
+ *        instead of here, since modal.js's dirty-close machinery is generic,
+ *        shared, and already covered by its own tests - this repo has no
+ *        jsdom dependency, and open/save/dirty-close flows need a real DOM.
  * Ausführen: node --loader ./test/test-browser-loader.mjs --test test/test-waste-ui.js
  */
 import { test } from 'node:test';

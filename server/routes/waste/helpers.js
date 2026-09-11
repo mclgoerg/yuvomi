@@ -39,9 +39,18 @@ export function currentUserId(req) {
  * source's subscription URL is a credential (Phase 7): every list/detail
  * response must redact it for a read-only caller, mirroring the mount-point
  * middleware's own read/write primitives rather than reimplementing them.
+ *
+ * The mount point (server/index.js) applies BOTH gates to an API token, in
+ * order: the token's own scope, then the calling member's actual module
+ * rights via sessionModuleAccess (a token is always issued for a member, and
+ * inherits that member's rights on top of whatever the token itself scopes
+ * down to - a token cannot grant MORE than its owner has). Checking only
+ * scope here let an unscoped token, or one scoped waste:write, still read a
+ * read-only member's own source URL/last_error unredacted, even though the
+ * exact same write would 403 at the mount point.
  */
 export function hasWasteWriteAccess(req) {
-  if (req.authMethod === 'api_token') return tokenAllows(req.authScopes ?? null, 'waste', 'write');
+  if (req.authMethod === 'api_token' && !tokenAllows(req.authScopes ?? null, 'waste', 'write')) return false;
   return moduleAccessVerdict(req.sessionModuleAccess, 'waste', 'write') === MODULE_ACCESS_ALLOW;
 }
 

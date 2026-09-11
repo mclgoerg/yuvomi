@@ -2,8 +2,9 @@
  * Module: Waste collection routes - schedules and their per-occurrence overrides
  * Purpose: HTTP layer over server/services/waste-store.js's schedule/override
  *          functions. Overrides live nested under a schedule
- *          (PUT/DELETE /:id/overrides/:originalDate) per the stable API
- *          contract in PLAN.md - there is no separate top-level router for them.
+ *          (PUT/DELETE /:id/overrides/:originalDate) because an override only
+ *          ever makes sense in the context of the schedule it moves/skips one
+ *          occurrence of - there is no separate top-level router for them.
  */
 
 import express from 'express';
