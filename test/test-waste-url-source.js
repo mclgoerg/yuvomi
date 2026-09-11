@@ -390,7 +390,15 @@ test('reimport/preview then reimport/commit against a URL source: a feed that re
     // Same event/label/date every time; only a request-time DTSTAMP differs,
     // exactly the shape the review flagged (a live feed's bytes are rarely
     // byte-identical across two fetches even when nothing meaningful changed).
-    res.end(`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nDTSTAMP:${new Date(Date.now() + call).toISOString().replace(/[-:]/g, '').split('.')[0]}Z\r\nBEGIN:VEVENT\r\nUID:evt-papier\r\nDTSTART;VALUE=DATE:20260410\r\nSUMMARY:Papier\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`);
+    // Full SECONDS apart (not milliseconds): the DTSTAMP format truncates
+    // sub-second precision (`.split('.')[0]`), so two fetches inside the same
+    // wall-clock second produced byte-IDENTICAL text despite the `+call` ms
+    // offset - which meant this test stayed green even with the old raw-byte
+    // digest reinstated (round 2 of the review caught this exact gap: 20/20
+    // either way). `call * 1000` guarantees a real second-level difference
+    // between the preview fetch and the commit's own re-fetch, regardless of
+    // how fast the two run.
+    res.end(`BEGIN:VCALENDAR\r\nVERSION:2.0\r\nDTSTAMP:${new Date(Date.now() + call * 1000).toISOString().replace(/[-:]/g, '').split('.')[0]}Z\r\nBEGIN:VEVENT\r\nUID:evt-papier\r\nDTSTART;VALUE=DATE:20260410\r\nSUMMARY:Papier\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`);
   });
   try {
     const created = await createUrlSource(get(), {
