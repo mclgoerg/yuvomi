@@ -1159,3 +1159,192 @@ test('nach einem Fehlschlag derselben Liste wird die gecachte Antwort angenommen
     'ist der Bestand verworfen, ist die gecachte Antwort das Beste, was es gibt');
   delete globalThis.__apiStub;
 });
+
+// --------------------------------------------------------------------------
+// Autocomplete-Vorschlag uebernehmen (#1103)
+//
+// GET /shopping/suggestions liefert seit #1103 { name, category, quantity }
+// je Vorschlag, nicht mehr nur einen Namen (Companion-Fix zu #1103: "Kategorie
+// reist mit"). Ein Nutzer meldete "[object Object]" im Namensfeld - genau das
+// Ergebnis von `esc(einemObjekt)` -, weil dieser Uebernahme-Pfad nie eine
+// eigene Pruefung hatte: nur die Server-Seite der Route war getestet, die
+// Client-Seite (wireAutocomplete) rief weiterhin `esc(s)`/`.dataset.value`
+// auf einem Objekt auf.
+// --------------------------------------------------------------------------
+
+/** Minimaler Eingabefeld-Doppelgaenger: nur die eine Eigenschaft, die
+ *  applyAutocompleteSuggestion() anfasst. */
+function fakeInput(initial = '') {
+  return { value: initial };
+}
+
+/** Minimaler <select>-Doppelgaenger mit einer festen Options-Liste. */
+function fakeSelect(optionValues, initial = optionValues[0] ?? '') {
+  return { value: initial, options: optionValues.map((v) => ({ value: v })) };
+}
+
+function fakeFormContainer({ name, qty, cat }) {
+  const els = {
+    '#item-name-input': name,
+    '#item-qty-input': qty,
+    '#item-cat-select': cat,
+  };
+  return { querySelector: (sel) => els[sel] ?? null };
+}
+
+test('applyAutocompleteSuggestion: übernimmt Name, Kategorie und Menge aus dem Vorschlagsobjekt', () => {
+  const name = fakeInput('');
+  const qty  = fakeInput('');
+  const cat  = fakeSelect(['Obst & Gemüse', 'Backwaren', 'Sonstiges'], 'Sonstiges');
+  const container = fakeFormContainer({ name, qty, cat });
+
+  const el = { dataset: { name: 'Bananen', category: 'Obst & Gemüse', quantity: '1 Bund' } };
+  __test.applyAutocompleteSuggestion(container, el);
+
+  assert.equal(name.value, 'Bananen', 'der Name darf nie das Objekt selbst als String zeigen ("[object Object]")');
+  assert.equal(cat.value, 'Obst & Gemüse');
+  assert.equal(qty.value, '1 Bund');
+});
+
+test('applyAutocompleteSuggestion: eine nicht mehr vorhandene Kategorie überschreibt das Feld nicht', () => {
+  const name = fakeInput('');
+  const qty  = fakeInput('');
+  const cat  = fakeSelect(['Obst & Gemüse', 'Backwaren'], 'Backwaren');
+  const container = fakeFormContainer({ name, qty, cat });
+
+  // "Getränke" existiert in dieser Auswahl nicht (umbenannt/gelöscht seit dem
+  // letzten Einkauf) - das Feld muss auf seinem bisherigen Wert bleiben.
+  const el = { dataset: { name: 'Wasser', category: 'Getränke', quantity: '' } };
+  __test.applyAutocompleteSuggestion(container, el);
+
+  assert.equal(name.value, 'Wasser');
+  assert.equal(cat.value, 'Backwaren', 'eine unbekannte Kategorie darf das Feld nicht auf einen ungültigen Wert setzen');
+  assert.equal(qty.value, '', 'eine leere Menge überschreibt das Feld nicht mit einem leeren String');
+});
+
+test('shopping.js: der Vorschlags-Renderer zeigt s.name, nicht das ganze Vorschlagsobjekt', () => {
+  // Ergaenzende Textprobe (Verhaltenstest oben deckt die eigentliche Logik ab):
+  // haelt fest, dass der Renderer nie wieder auf ein bares `s` zurueckfaellt.
+  const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  assert.match(source, /data-name="\$\{esc\(s\.name\)\}"/,
+    'Der Vorschlags-Eintrag muss s.name rendern, nicht das ganze Vorschlagsobjekt.');
+  assert.doesNotMatch(source, /esc\(s\)/,
+    'Ein Vorschlagsobjekt darf nie als Ganzes in esc() laufen - das ergibt "[object Object]".');
+});
+
+// --------------------------------------------------------------------------
+// "Alle Häkchen zurücksetzen" räumt eine noch offene Absicht mit (#1103)
+//
+// Gemeldet 2026-09-11: ein von Hand abgehaktes Element blieb nach "Alle
+// Häkchen zurücksetzen" trotzdem abgehakt. Ursache: checkedOf() liest eine
+// noch offene Absicht (intents, siehe toggleShoppingItem) VOR state.items -
+// uncheckAllItems() aenderte is_checked, liess die Absicht aber stehen, und
+// checkedOf() zeigte weiterhin "abgehakt".
+// --------------------------------------------------------------------------
+
+/** Toleriert jeden Aufruf, tut nichts - fuer Funktionen, die nur state/intents
+ *  pruefen sollen, nicht das tatsaechliche Rendern (updateItemsList, renderTabs
+ *  finden dann einfach kein Element und kehren um, wie im echten Browser bei
+ *  einer bereits verlassenen Seite). */
+function fakeDomContainer() {
+  return { querySelector: () => null, querySelectorAll: () => [] };
+}
+
+test('uncheckAllItems: räumt eine noch offene Absicht mit, sonst bleibt checkedOf() bei "abgehakt" hängen', async () => {
+  resetShoppingState();
+  const item = { id: 42, list_id: 1, is_checked: 1, price_cents: null };
+  __test.state.items = [item];
+  __test.state.lists = [{ id: 1, name: 'A', item_total: 1, item_checked: 1 }];
+
+  // Simuliert genau die Vorgeschichte aus der Meldung: von Hand abgehakt
+  // (toggleShoppingItem legt eine Absicht an, bevor die Server-Antwort da ist).
+  __test.intents.set(item.id, { value: 1, seq: 1, listId: 1, delta: 1 });
+  assert.equal(__test.checkedOf(item), 1, 'Vorbedingung: die Absicht überlagert is_checked');
+
+  global.window.yuvomi.showToast = () => {};
+  globalThis.__apiStub = { patch: async () => ({ reset: 1 }) };
+  await __test.uncheckAllItems(fakeDomContainer());
+  delete globalThis.__apiStub;
+  delete global.window.yuvomi.showToast;
+
+  assert.equal(__test.intents.has(item.id), false,
+    'die Absicht muss nach dem Zurücksetzen weg sein, sonst überlagert sie den neuen Stand weiter');
+  const current = __test.state.items.find((i) => i.id === item.id);
+  assert.equal(__test.checkedOf(current), 0, 'checkedOf() muss nach dem Zurücksetzen "nicht abgehakt" zeigen');
+});
+
+test('uncheckAllItems: reset 0 (nichts abgehakt) räumt nichts an, wirft nicht', async () => {
+  resetShoppingState();
+  __test.state.items = [{ id: 1, list_id: 1, is_checked: 0, price_cents: null }];
+  __test.state.lists = [{ id: 1, name: 'A', item_total: 1, item_checked: 0 }];
+
+  global.window.yuvomi.showToast = () => {};
+  globalThis.__apiStub = { patch: async () => ({ reset: 0 }) };
+  await __test.uncheckAllItems(fakeDomContainer());
+  delete globalThis.__apiStub;
+  delete global.window.yuvomi.showToast;
+
+  assert.equal(__test.state.items[0].is_checked, 0);
+});
+
+// --------------------------------------------------------------------------
+// Quick-Add: die Kategorie faellt nach dem Anlegen auf den Standard zurueck
+//
+// Gemeldet 2026-09-11: nach dem Waehlen eines Autocomplete-Vorschlags
+// ("Milch", Kategorie Milchprodukte) blieb die Kategorie-Auswahl auf
+// "Milchprodukte" stehen - ein danach eingetippter, unverwandter Artikel
+// ("Toast") landete dort statt in Sonstiges (#548). Name/Menge wurden nach
+// dem Anlegen schon zurueckgesetzt, die Kategorie nicht.
+// --------------------------------------------------------------------------
+test('wireQuickAdd: setzt die Kategorie nach dem Anlegen auf den Standard zurueck, nicht nur Name/Menge', () => {
+  const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
+  const submitBlock = source.slice(
+    source.indexOf("form.addEventListener('submit'"),
+    source.indexOf("form.addEventListener('submit'") + 2500,
+  );
+  assert.match(submitBlock, /nameInput\.value = '';/);
+  assert.match(submitBlock, /catSelect\.value = DEFAULT_CATEGORY_NAME/,
+    'die Kategorie-Auswahl muss nach dem Anlegen auf DEFAULT_CATEGORY_NAME zurueckfallen, ' +
+    'sonst bleibt eine per Vorschlag oder von Hand gewaehlte Kategorie fuer den naechsten Artikel stehen.');
+});
+
+// --------------------------------------------------------------------------
+// checkAllItems: das Gegenstueck zu uncheckAllItems (#1103) - dieselbe
+// Absichten-Falle gilt hier spiegelverkehrt.
+// --------------------------------------------------------------------------
+test('checkAllItems: räumt eine noch offene Absicht mit, sonst bleibt checkedOf() bei "offen" hängen', async () => {
+  resetShoppingState();
+  const item = { id: 43, list_id: 1, is_checked: 0, price_cents: null };
+  __test.state.items = [item];
+  __test.state.lists = [{ id: 1, name: 'A', item_total: 1, item_checked: 0 }];
+
+  // Eine noch offene "wird gerade abgehakt"-Absicht mit dem GEGENTEILIGEN
+  // Wert - simuliert ein Antippen, das der Server noch nicht bestaetigt hat.
+  __test.intents.set(item.id, { value: 0, seq: 1, listId: 1, delta: -1 });
+  assert.equal(__test.checkedOf(item), 0, 'Vorbedingung: die Absicht überlagert is_checked');
+
+  global.window.yuvomi.showToast = () => {};
+  globalThis.__apiStub = { patch: async () => ({ checked: 1 }) };
+  await __test.checkAllItems(fakeDomContainer());
+  delete globalThis.__apiStub;
+  delete global.window.yuvomi.showToast;
+
+  assert.equal(__test.intents.has(item.id), false,
+    'die Absicht muss nach dem Abhaken weg sein, sonst überlagert sie den neuen Stand weiter');
+  const current = __test.state.items.find((i) => i.id === item.id);
+  assert.equal(__test.checkedOf(current), 1, 'checkedOf() muss nach checkAllItems "abgehakt" zeigen');
+});
+
+test('checkAllItems: checked 0 (schon alles abgehakt) räumt nichts an, wirft nicht', async () => {
+  resetShoppingState();
+  __test.state.items = [{ id: 1, list_id: 1, is_checked: 1, price_cents: null }];
+  __test.state.lists = [{ id: 1, name: 'A', item_total: 1, item_checked: 1 }];
+
+  global.window.yuvomi.showToast = () => {};
+  globalThis.__apiStub = { patch: async () => ({ checked: 0 }) };
+  await __test.checkAllItems(fakeDomContainer());
+  delete globalThis.__apiStub;
+  delete global.window.yuvomi.showToast;
+
+  assert.equal(__test.state.items[0].is_checked, 1);
+});

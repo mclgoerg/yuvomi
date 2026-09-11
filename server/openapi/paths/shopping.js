@@ -36,16 +36,57 @@ export function shoppingPaths() {
       }),
     },
     '/api/v1/shopping/items/{itemId}': {
-      patch: op({ summary: 'Update shopping item', tag: 'Shopping', params: [idParam('itemId', 'Item ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      patch: op({
+        summary: 'Update shopping item',
+        description: 'Body may include an optional `list_id` to move the item onto another list (#998). Moving '
+          + 're-ranks the item to the end of its category on the NEW list, since its old rank has no meaning '
+          + 'there. If the item was mirrored to a CalDAV collection, moving it deletes the old remote VTODO and '
+          + 'resets it to a local item - it uploads as a brand-new object if the destination list is itself a '
+          + 'sync target, rather than silently repointing the existing remote object.',
+        tag: 'Shopping',
+        params: [idParam('itemId', 'Item ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
       delete: op({ summary: 'Delete shopping item', tag: 'Shopping', params: [idParam('itemId', 'Item ID')], stateChanging: true }),
     },
     '/api/v1/shopping/{listId}': {
-      put: op({ summary: 'Rename shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      put: op({
+        summary: 'Rename a shopping list and/or set its template flag',
+        description: 'Body: { name, is_template? }. A template is the same row as any other list, just with '
+          + 'one flag set - it stays fully editable and is never a separate object kind. Omitting `is_template` '
+          + 'leaves the current value unchanged.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
       delete: op({ summary: 'Delete shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true }),
+    },
+    '/api/v1/shopping/{listId}/duplicate': {
+      post: op({
+        summary: 'Duplicate a shopping list',
+        description: 'Body: { name, resetChecked?, keepQuantities?, keepNotes? } - the three flags default to true. '
+          + 'Category assignment and manual per-category order are always carried over, since preserving them is '
+          + 'the point of duplicating. CalDAV sync fields, the meal-plan origin and the recorded price are never '
+          + 'copied: each is a fact about the ORIGINAL item (a synced remote object, a specific meal, a price '
+          + 'actually paid) that is not true of a fresh copy.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
     },
     '/api/v1/shopping/{listId}/items': {
       get: op({ summary: 'List items in shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')] }),
-      post: op({ summary: 'Add item to shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      post: op({
+        summary: 'Add item to shopping list',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+        description: 'Adding a name that already exists unchecked on the list returns the existing row (200) instead of a second row. If a quantity is given that differs from the existing one, it overwrites it; otherwise (no quantity given, or the same quantity resubmitted - e.g. via the autocomplete suggestion prefill) the existing quantity is bumped: a bare integer is incremented by 1, no quantity at all is treated as an implicit "one" and becomes "2", and anything else (e.g. "500g") is left untouched.',
+      }),
     },
     '/api/v1/shopping/{listId}/import-pantry': {
       post: op({
@@ -84,6 +125,24 @@ export function shoppingPaths() {
     },
     '/api/v1/shopping/{listId}/items/checked': {
       delete: op({ summary: 'Delete checked shopping items', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true }),
+      patch: op({
+        summary: 'Reset all checked shopping items back to unchecked',
+        description: 'Sibling to the delete on the same path: that removes checked items, this keeps them and '
+          + 'restarts them unchecked - for reusing one list on the next shopping trip instead of duplicating it.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+      }),
+    },
+    '/api/v1/shopping/{listId}/items/unchecked': {
+      patch: op({
+        summary: 'Check every currently open shopping item on a list',
+        description: 'Sibling to PATCH .../items/checked in the opposite direction: that resets checked items '
+          + 'back to open, this checks off everything still open - for closing out a shopping trip in one step.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+      }),
     },
     '/api/v1/shopping/{listId}/items/reorder': {
       patch: op({ summary: 'Reorder the items of one category', tag: 'Shopping', stateChanging: true, params: [idParam('listId', 'Shopping list ID')], requestBody: jsonBody(null), description: 'Per category rather than across the whole list: the category order is already its own handle and models the route through the shop; a second, list-wide rank beside it would make two statements about the same order. The request must name EVERY item of the category - a subset would let the ranks of the omitted ones collide with the newly assigned ones, and creation time would decide again.' }),

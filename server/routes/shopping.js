@@ -66,6 +66,11 @@ function pushToCalDAV(what) {
   flushOutbound().catch((err) => log.warn(`${what} vorgemerkt, Sofortversuch fehlgeschlagen:`, err.message));
 }
 
+/** Zeitstempel im Format der übrigen Spalten (UTC, sekundengenau) - wie tasks.js. */
+function nowStamp() {
+  return new Date().toISOString().slice(0, 19) + 'Z';
+}
+
 /** Alle Kategorien aus DB laden (nach sort_order sortiert). */
 function loadCategories() {
   return db.get().prepare('SELECT * FROM shopping_categories ORDER BY sort_order ASC').all();
@@ -306,21 +311,46 @@ router.get('/send-recipients', (req, res) => {
 // --------------------------------------------------------
 // GET /api/v1/shopping/suggestions?q=…
 // Autocomplete-Vorschläge aus bisherigen Artikelnamen.
-// Response: { data: string[] }
+// Response: { data: { name, category, quantity }[] }
+//
+// KATEGORIE UND MENGE REISEN MIT (#1103). Ein Name allein macht aus der Liste
+// bisheriger Einkaeufe keinen Vorschlag, der etwas spart - ohne die Kategorie
+// landet jeder abgetippte Vorschlag wieder in "Sonstiges" und die
+// Gang-Reihenfolge, derentwegen jemand ueberhaupt Kategorien pflegt, ist beim
+// naechsten Einkauf neu zu sortieren. Die juengste Zeile mit diesem Namen
+// entscheidet, welche Kategorie/Menge vorgeschlagen wird - sie ist die
+// aktuellste Aussage darueber, wie der Haushalt den Artikel heute einordnet.
+//
+// REIHENFOLGE NACH ZULETZT VERWENDET, NICHT ALPHABETISCH (#1103). Ein
+// Haushalt kauft dieselbe Handvoll Artikel immer wieder - die zuletzt
+// eingekauften stehen oben, statt hinter allem, was zufaellig frueher im
+// Alphabet liegt.
 // --------------------------------------------------------
 router.get('/suggestions', (req, res) => {
   try {
     const q = (req.query.q ?? '').trim();
     if (q.length < 1) return res.json({ data: [] });
 
-    const rows = db.get().prepare(`
-      SELECT DISTINCT name FROM shopping_items
+    const names = db.get().prepare(`
+      SELECT name, MAX(created_at) AS latest, MAX(id) AS latest_id FROM shopping_items
       WHERE name LIKE ? COLLATE NOCASE
-      ORDER BY name ASC
+      GROUP BY name
+      ORDER BY latest DESC, latest_id DESC
       LIMIT 8
     `).all(`${q}%`);
 
-    res.json({ data: rows.map((r) => r.name) });
+    const mostRecent = db.get().prepare(`
+      SELECT category, quantity FROM shopping_items
+      WHERE name = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `);
+    const data = names.map((r) => {
+      const recent = mostRecent.get(r.name);
+      return { name: r.name, category: recent?.category ?? null, quantity: recent?.quantity ?? null };
+    });
+
+    res.json({ data });
   } catch (err) {
     log.error('suggestions error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -497,24 +527,53 @@ router.patch('/items/:itemId', (req, res) => {
     const fieldErrors = collectErrors([vNotes, vUrl]);
     if (fieldErrors.length) return res.status(400).json({ error: fieldErrors.join(' '), code: 400 });
 
+    // ARTIKEL AUF EINE ANDERE LISTE VERSCHIEBEN (#998, Diskussion). Optional -
+    // fehlt list_id, bleibt der Artikel auf seiner Liste, wie bisher.
+    let targetListId = item.list_id;
+    if (req.body.list_id !== undefined && req.body.list_id !== null) {
+      const n = Number(req.body.list_id);
+      if (!Number.isInteger(n) || n <= 0) {
+        return res.status(400).json({ error: 'list_id muss eine Listen-ID sein.', code: 400 });
+      }
+      if (!db.get().prepare('SELECT 1 FROM shopping_lists WHERE id = ?').get(n)) {
+        return res.status(400).json({ error: 'Unbekannte Liste.', code: 400 });
+      }
+      targetListId = n;
+    }
+    const movingList = targetListId !== item.list_id;
+
+    // War der Artikel gespiegelt UND wandert er auf eine andere Liste: das
+    // VTODO der ALTEN Sammlung vormerken, BEVOR die Zeile unten lokal wird -
+    // danach kennt mirroredItems() ihn nicht mehr als gespiegelt. Anders als
+    // ein Umbenennen/Abhaken ist ein Listenwechsel kein Update DESSELBEN
+    // Fernobjekts: die Zeile verlaesst dessen Sammlung, sie zieht nicht um.
+    const queued = movingList
+      ? queueTodoDeletions('shopping', mirroredItems('id = ?', item.id))
+      : false;
+
     db.get().prepare(`
       UPDATE shopping_items
       SET is_checked = ?, name = ?, quantity = ?, category = ?, notes = ?, url = ?,
-          price_cents = ?, store_id = ?
+          price_cents = ?, store_id = ?, list_id = ?
+          ${movingList ? `, external_source = 'local', external_uid = NULL,
+              external_account_id = NULL, external_object_url = NULL,
+              outbound_dirty = 0, outbound_attempts = 0` : ''}
       WHERE id = ?
     `).run(is_checked ? 1 : 0, name.trim(), quantity ?? null, category, vNotes.value, vUrl.value,
-      priceCents ?? null, storeId ?? null, req.params.itemId);
+      priceCents ?? null, storeId ?? null, targetListId, req.params.itemId);
 
-    // Kategoriewechsel heißt Positionswechsel: die Handsortierung zählt je
-    // Kategorie (#678), der alte Rang gilt in der neuen Nachbarschaft nicht.
-    // Ans Ende - dort landet in dieser Liste auch alles neu Hinzugefügte.
-    if (category !== item.category) {
+    // Kategorie- ODER Listenwechsel heisst Positionswechsel: die
+    // Handsortierung zaehlt je (Liste, Kategorie) (#678), der alte Rang gilt
+    // in der neuen Nachbarschaft nicht - unabhaengig davon, ob sich nur die
+    // Kategorie oder auch die Liste geaendert hat (#998). Ans Ende - dort
+    // landet in dieser (Liste, Kategorie) auch alles neu Hinzugefuegte.
+    if (category !== item.category || movingList) {
       db.get().prepare(`
         UPDATE shopping_items SET sort_order = COALESCE((
           SELECT MAX(sort_order) FROM shopping_items
            WHERE list_id = ? AND category = ? AND id != ?
         ), 0) + 1 WHERE id = ?
-      `).run(item.list_id, category, item.id, item.id);
+      `).run(targetListId, category, item.id, item.id);
     }
 
     const updated = db.get()
@@ -522,12 +581,16 @@ router.patch('/items/:itemId', (req, res) => {
       .get(req.params.itemId);
 
     // Abhaken oder Umbenennen eines gespiegelten Artikels zieht auf dem
-    // CalDAV-Server nach (#617).
-    const pending = markTodoOutbound('shopping', item, updated);
+    // CalDAV-Server nach (#617). Ein Listenwechsel macht die Zeile lokal -
+    // markTodoOutbound haette an ihr nichts mehr zu markieren; `queued` deckt
+    // die ALTE Seite ab, ein kuenftiger Synclauf die neue (falls die
+    // Zielliste selbst eine gespiegelte Liste ist).
+    const pending = movingList ? false : markTodoOutbound('shopping', item, updated);
 
     res.json({ data: updated });
 
     if (pending) pushToCalDAV('Änderung');
+    if (queued) pushToCalDAV('Liste gewechselt');
   } catch (err) {
     log.error('PATCH items/:id error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -620,10 +683,15 @@ router.delete('/items/:itemId', (req, res) => {
 // --------------------------------------------------------
 // GET /api/v1/shopping
 // Alle Einkaufslisten mit Artikel-Zähler.
+// Query: ?archived=only zeigt NUR archivierte Listen (fuer den
+// Wiederherstellen-Dialog, dieselbe Wortwahl wie bei Aufgaben, #688); ohne
+// den Parameter bleiben archivierte aus der taeglichen Tab-Leiste verborgen,
+// ohne dass ihre Artikel verloren gehen (#1103).
 // Response: { data: ShoppingList[] }
 // --------------------------------------------------------
 router.get('/', (req, res) => {
   try {
+    const archivedOnly = req.query.archived === 'only';
     const lists = db.get().prepare(`
       SELECT
         sl.*,
@@ -631,6 +699,7 @@ router.get('/', (req, res) => {
         SUM(CASE WHEN si.is_checked = 1 THEN 1 ELSE 0 END)   AS item_checked
       FROM shopping_lists sl
       LEFT JOIN shopping_items si ON si.list_id = sl.id
+      WHERE sl.archived_at IS ${archivedOnly ? 'NOT' : ''} NULL
       GROUP BY sl.id
       ORDER BY sl.created_at ASC
     `).all();
@@ -668,27 +737,130 @@ router.post('/', (req, res) => {
 
 // --------------------------------------------------------
 // PUT /api/v1/shopping/:listId
-// Einkaufsliste umbenennen.
-// Body: { name }
+// Einkaufsliste umbenennen, als Vorlage kennzeichnen und/oder archivieren.
+// Body: { name, is_template?, archived? }
 // Response: { data: ShoppingList }
+//
+// is_template UND archived SIND FLAGS AUF DER LISTE, KEIN EIGENES OBJEKT
+// (#1103): eine Vorlage oder eine archivierte Liste bleibt dieselbe Zeile,
+// mit derselben Bearbeitung, demselben Duplizieren - nur ihre Rolle im
+// Tab-Riegel aendert sich auf dem Client. Fehlt ein Flag im Body, bleibt der
+// bisherige Wert stehen (reines Umbenennen aendert weder das eine noch das
+// andere).
 // --------------------------------------------------------
 router.put('/:listId', (req, res) => {
   try {
-    const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
-    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
-
-    const result = db.get()
-      .prepare('UPDATE shopping_lists SET name = ? WHERE id = ?')
-      .run(vName.value, req.params.listId);
-    if (result.changes === 0)
-      return res.status(404).json({ error: 'List not found.', code: 404 });
-
     const list = db.get()
       .prepare('SELECT * FROM shopping_lists WHERE id = ?')
       .get(req.params.listId);
-    res.json({ data: list });
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+
+    const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
+    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+
+    const isTemplate = req.body.is_template !== undefined
+      ? (req.body.is_template ? 1 : 0)
+      : list.is_template;
+
+    let archivedAt = list.archived_at;
+    if (req.body.archived !== undefined) {
+      archivedAt = req.body.archived
+        ? (list.archived_at ?? nowStamp())
+        : null;
+    }
+
+    db.get()
+      .prepare('UPDATE shopping_lists SET name = ?, is_template = ?, archived_at = ? WHERE id = ?')
+      .run(vName.value, isTemplate, archivedAt, req.params.listId);
+
+    const updated = db.get()
+      .prepare('SELECT * FROM shopping_lists WHERE id = ?')
+      .get(req.params.listId);
+    res.json({ data: updated });
   } catch (err) {
     log.error('PUT /:listId error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// POST /api/v1/shopping/:listId/duplicate
+// Liste als neue Liste kopieren (#1103) - der eigentliche Weg, aus einer
+// Vorlage einen Einkauf zu machen, aber genauso auf jeder gewoehnlichen Liste
+// nutzbar ("der Einkauf letzte Woche war gut, das meiste davon wieder").
+// Body: { name, resetChecked?, keepQuantities?, keepNotes? }  (die drei Flags
+//        sind alle standardmaessig an)
+// Response: { data: ShoppingList }
+//
+// KATEGORIE UND HANDSORTIERUNG WERDEN IMMER UEBERNOMMEN - das ist der Punkt
+// des Duplizierens, kein Schalter. Was NIE mitkopiert wird, unabhaengig von
+// den Flags:
+//
+//   - Die CalDAV-Sync-Spalten (external_uid/external_source/...). Sie sind
+//     eine Aussage ueber EIN Sync-Objekt auf einem fremden Server - eine
+//     unveraenderte Kopie wuerde jede Aenderung der Kopie auf dasselbe
+//     entfernte VTODO schreiben und jedes Loeschen der Kopie dessen Loeschung
+//     dort anstossen (siehe auch die Diskussion in #998). Eine Kopie ist ein
+//     neuer, lokaler Artikel, der beim naechsten Sync-Lauf ganz normal neu
+//     angelegt wird, falls die Zielliste selbst gespiegelt ist.
+//   - added_from_meal: eine Kopie stammt aus dieser Aktion, nicht aus der
+//     Mahlzeit, aus der der ORIGINAL-Artikel kam.
+//   - price_cents UND store_id: beide sind eine Tatsache ueber einen EINKAUF -
+//     "einmal bezahlt, in diesem Laden" (#1003) - eine Kopie wurde noch nicht
+//     bezahlt, ihr fehlen beide Tatsachen, die Preis und Laden festhalten
+//     (Ruecksprache mit dem Maintainer auf #1103: derselbe Grund fuer beide,
+//     nicht nur fuer den Preis).
+// --------------------------------------------------------
+router.post('/:listId/duplicate', (req, res) => {
+  try {
+    const list = db.get()
+      .prepare('SELECT * FROM shopping_lists WHERE id = ?')
+      .get(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+
+    const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
+    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+
+    const resetChecked   = req.body.resetChecked !== false;
+    const keepQuantities = req.body.keepQuantities !== false;
+    const keepNotes      = req.body.keepNotes !== false;
+
+    const items = db.get()
+      .prepare('SELECT * FROM shopping_items WHERE list_id = ?')
+      .all(req.params.listId);
+
+    const newList = db.get().transaction(() => {
+      const info = db.get()
+        .prepare('INSERT INTO shopping_lists (name, created_by) VALUES (?, ?)')
+        .run(vName.value, req.authUserId || req.session.userId);
+      const newListId = info.lastInsertRowid;
+
+      const insertItem = db.get().prepare(`
+        INSERT INTO shopping_items
+          (list_id, name, quantity, category, is_checked, notes, url, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const item of items) {
+        insertItem.run(
+          newListId,
+          item.name,
+          keepQuantities ? item.quantity : null,
+          item.category,
+          resetChecked ? 0 : item.is_checked,
+          keepNotes ? item.notes : null,
+          keepNotes ? item.url : null,
+          // Rang explizit uebernehmen statt dem Einfuege-Trigger zu ueberlassen
+          // (der neue Zeilen mit sort_order=0 ans Ende ihrer Kategorie stellt) -
+          // die Handsortierung IST das, was diese Route verspricht zu erhalten.
+          item.sort_order,
+        );
+      }
+      return db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(newListId);
+    })();
+
+    res.status(201).json({ data: newList });
+  } catch (err) {
+    log.error('POST /:listId/duplicate error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });
@@ -817,8 +989,14 @@ router.post('/:listId/items', (req, res) => {
       .get(req.params.listId);
     if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
 
+    // Ohne Kategorie faellt der Artikel auf die LETZTE (#548, "Sonstiges"),
+    // nicht die erste ("Obst & Gemuese" nach Gang-Reihenfolge) - genau das war
+    // der gemeldete Fehler: unzusammenhaengende Artikel landeten automatisch
+    // in der ersten Kategorie, statt in der neutralen Sammelkategorie. Der
+    // Quick-Add-Client schickt die Kategorie ohnehin immer explizit mit;
+    // dieser Rueckfall greift nur, wenn sie fehlt (z.B. direkter API-Aufruf).
     const validNames = validCategoryNames();
-    const defaultCat = validNames[0] ?? 'Sonstiges';
+    const defaultCat = validNames[validNames.length - 1] ?? 'Sonstiges';
     const requestedCat = req.body.category || defaultCat;
 
     const vName  = str(req.body.name, 'Name', { max: MAX_TITLE });
@@ -828,6 +1006,48 @@ router.post('/:listId/items', (req, res) => {
     const vUrl   = url(req.body.url, 'URL');
     const errors = collectErrors([vName, vQty, vCat, vNotes, vUrl]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
+
+    // Zweimal derselbe, noch OFFENE Zeile ist kein Fehler des Nutzers, sondern
+    // schon da - dieselbe Haltung wie bei Laeden (POST /stores): die
+    // vorhandene Zeile zurueckgeben (200) statt eine zweite anzulegen. Nur
+    // bei bereits abgehakten Artikeln wird trotzdem neu angelegt - ein
+    // erneuter Bedarf nach dem letzten Einkauf ist kein Duplikat, sondern ein
+    // neuer Einkauf desselben Artikels. Eine neu eingetippte Menge zaehlt als
+    // Aktualisierung der bestehenden Zeile, nicht als eigener Datensatz -
+    // "Milch" nochmal mit "2L" heisst "jetzt 2L", nicht zwei Zeilen "Milch".
+    const existing = db.get().prepare(`
+      SELECT * FROM shopping_items
+      WHERE list_id = ? AND is_checked = 0 AND name = ? COLLATE NOCASE
+      LIMIT 1
+    `).get(req.params.listId, vName.value);
+    if (existing) {
+      // Eine mitgeschickte Menge, die von der bestehenden abweicht, ist eine
+      // bewusste Aenderung. Stimmt sie dagegen mit der bestehenden ueberein,
+      // ist das kein bewusstes "setze wieder auf denselben Wert" - das ist der
+      // Vorschlags-Autofill (#1103, "traegt Kategorie + Menge mit"), der das
+      // Mengenfeld schon mit der zuletzt genutzten Menge vorbelegt, bevor der
+      // Klick auf "Hinzufuegen" ueberhaupt passiert. Ohne diese Gleichstellung
+      // wuerde das Erhoehen fuer genau den Weg nie greifen, ueber den die
+      // meisten erneuten Artikel tatsaechlich eingegeben werden.
+      if (vQty.value && vQty.value !== existing.quantity) {
+        db.get().prepare('UPDATE shopping_items SET quantity = ? WHERE id = ?').run(vQty.value, existing.id);
+        existing.quantity = vQty.value;
+      } else if (!existing.quantity) {
+        // Keine Menge ist stillschweigend "einmal" - ein zweites Mal derselbe
+        // Name heisst dann "zweimal", nicht "immer noch keine Angabe".
+        db.get().prepare('UPDATE shopping_items SET quantity = ? WHERE id = ?').run('2', existing.id);
+        existing.quantity = '2';
+      } else if (/^\d+$/.test(existing.quantity)) {
+        // Menge ist Freitext ("500g", "eine Tuete"), kein garantierter
+        // Zahlenwert - "um 1 erhoehen" ergibt nur bei einer nackten Ganzzahl
+        // Sinn. Ohne Einheiten-Unterstuetzung bleibt alles andere unveraendert,
+        // statt aus "500g" ein sinnloses "501g" zu machen.
+        const incremented = String(Number(existing.quantity) + 1);
+        db.get().prepare('UPDATE shopping_items SET quantity = ? WHERE id = ?').run(incremented, existing.id);
+        existing.quantity = incremented;
+      }
+      return res.status(200).json({ data: existing });
+    }
 
     const result = db.get().prepare(`
       INSERT INTO shopping_items (list_id, name, quantity, category, notes, url)
@@ -1111,6 +1331,87 @@ router.delete('/:listId/items/checked', (req, res) => {
     if (queued) pushToCalDAV('Löschung');
   } catch (err) {
     log.error('DELETE /:listId/items/checked error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// PATCH /api/v1/shopping/:listId/items/checked
+// Alle abgehakten Artikel einer Liste zuruecksetzen (#1103) - der
+// Neben-einander zu DELETE .../items/checked: dort werden sie entfernt, hier
+// bleiben sie erhalten und starten unabgehakt neu. Fuer einen Haushalt, der
+// dieselbe Liste fuer den naechsten Einkauf wiederverwenden will, statt sie
+// zu duplizieren.
+// Response: { reset: number }
+// --------------------------------------------------------
+router.patch('/:listId/items/checked', (req, res) => {
+  try {
+    const list = db.get()
+      .prepare('SELECT id FROM shopping_lists WHERE id = ?')
+      .get(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+
+    const before = db.get()
+      .prepare('SELECT * FROM shopping_items WHERE list_id = ? AND is_checked = 1')
+      .all(req.params.listId);
+
+    db.get().prepare(`
+      UPDATE shopping_items SET is_checked = 0 WHERE list_id = ? AND is_checked = 1
+    `).run(req.params.listId);
+
+    // Jede zurueckgesetzte Zeile einzeln pruefen: markTodoOutbound vergleicht
+    // vorher/nachher und markiert nur gespiegelte Artikel, deren Haekchen sich
+    // wirklich geaendert hat - dieselbe Funktion, die eine einzelne PATCH
+    // schon nutzt, nur hier in einer Schleife statt einmal.
+    let anyQueued = false;
+    for (const item of before) {
+      const after = { ...item, is_checked: 0 };
+      if (markTodoOutbound('shopping', item, after)) anyQueued = true;
+    }
+
+    res.json({ reset: before.length });
+
+    if (anyQueued) pushToCalDAV('Häkchen zurückgesetzt');
+  } catch (err) {
+    log.error('PATCH /:listId/items/checked error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
+// PATCH /api/v1/shopping/:listId/items/unchecked
+// Alle noch offenen Artikel einer Liste abhaken (#1103) - das Gegenstueck zu
+// PATCH .../items/checked: dort wird abgehaktes zurueckgesetzt, hier wird
+// offenes abgehakt. Fuer den Abschluss eines Einkaufs in einem Zug, statt
+// jede Zeile einzeln anzutippen.
+// Response: { checked: number }
+// --------------------------------------------------------
+router.patch('/:listId/items/unchecked', (req, res) => {
+  try {
+    const list = db.get()
+      .prepare('SELECT id FROM shopping_lists WHERE id = ?')
+      .get(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+
+    const before = db.get()
+      .prepare('SELECT * FROM shopping_items WHERE list_id = ? AND is_checked = 0')
+      .all(req.params.listId);
+
+    db.get().prepare(`
+      UPDATE shopping_items SET is_checked = 1 WHERE list_id = ? AND is_checked = 0
+    `).run(req.params.listId);
+
+    let anyQueued = false;
+    for (const item of before) {
+      const after = { ...item, is_checked: 1 };
+      if (markTodoOutbound('shopping', item, after)) anyQueued = true;
+    }
+
+    res.json({ checked: before.length });
+
+    if (anyQueued) pushToCalDAV('Alle abgehakt');
+  } catch (err) {
+    log.error('PATCH /:listId/items/unchecked error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

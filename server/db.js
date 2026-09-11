@@ -7601,6 +7601,33 @@ const MIGRATIONS = [
       CREATE INDEX idx_shopping_items_store ON shopping_items(store_id);
     `,
   },
+  {
+    version: 194,
+    description: 'shopping list duplication and template flag (#1103)',
+    up: `
+      -- EINE VORLAGE IST EINE LISTE MIT EINEM FLAG, KEIN ZWEITES OBJEKT (#1103).
+      --
+      -- Eine Liste, die staendig neu aufgebaut wird ("REWE", jede Woche dieselben
+      -- Artikel in Gang-Reihenfolge), bleibt bearbeitbar wie jede andere - nur ihre
+      -- Rolle ist eine andere: sie liefert Kopien, statt selbst abgehakt zu werden.
+      -- Ein eigener Tabellentyp neben shopping_lists haette DECISIONS.md's "ein
+      -- Modell, nicht zwei" verletzt, ohne dass die Vorlage irgendetwas koennen
+      -- muesste, das eine Liste nicht schon kann.
+      ALTER TABLE shopping_lists ADD COLUMN is_template INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
+  {
+    version: 195,
+    description: 'shopping list archiving (#1103)',
+    up: `
+      -- ABLAGE ALS EIGENE ACHSE (#1103), wie schon bei Aufgaben (Migration v132,
+      -- #688): NULL = im Lauf. Eine archivierte Liste bleibt vollstaendig
+      -- erhalten (Artikel, Kategorien, CalDAV-Zuordnung) und verschwindet nur
+      -- aus der taeglichen Tab-Leiste - im Unterschied zu DELETE, das die
+      -- Artikel per CASCADE unwiderruflich mitnimmt.
+      ALTER TABLE shopping_lists ADD COLUMN archived_at TEXT;
+    `,
+  },
 ];
 
 /**

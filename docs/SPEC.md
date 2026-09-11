@@ -372,6 +372,8 @@ Points-and-rewards system. A member earns a task's `points` when the task is mar
 | Column | Type | Constraint |
 |--------|------|-----------|
 | name | TEXT | NOT NULL (e.g. "Supermarket", "Hardware store") |
+| is_template | INTEGER | NOT NULL DEFAULT 0 (migration v194, #1103) — see "Duplicating a list" below |
+| archived_at | TEXT | nullable, migration v195 (#1103) — same axis as `tasks.archived_at` (#688): NULL = active. Excluded from `GET /shopping` by default; `?archived=only` returns archived lists only. Archiving never touches the list's items - unlike `DELETE`, which cascades and is permanent. |
 
 ### Shopping Items
 | Column | Type | Constraint |
@@ -439,6 +441,109 @@ rejects a grouped "1.000" instead of silently reading it as one.
 
 `store_id` is `ON DELETE SET NULL`, not `RESTRICT`: deleting a shop keeps every price and only
 clears the assignment. What was once paid stays true.
+
+### Duplicating a list, and templates (migration v194, #1103)
+`POST /shopping/{listId}/duplicate` copies a list's items into a brand-new list in one transaction.
+Body: `{ name, resetChecked?, keepQuantities?, keepNotes? }`, all three flags default to `true`.
+
+Category assignment and the manual per-category `sort_order` are **always** carried over verbatim —
+that is the entire point of duplicating a list, not something to make optional. `sort_order` is
+copied explicitly rather than left to the `AFTER INSERT` trigger (which would append every copied row
+to the end of its category and destroy the order being preserved).
+
+What a copy never carries over, independent of the flags:
+- The CalDAV sync columns (`external_uid`, `external_source`, `external_account_id`,
+  `external_object_url`, `outbound_dirty`, `outbound_attempts`) reset to their local defaults. Each
+  names a fact about a *specific* mirrored remote object; copying them verbatim would make an edit to
+  the copy write onto the same remote VTODO the original mirrors, and deleting the copy would queue
+  deletion of that shared remote object (the same class of hazard raised on #998, "Move an item
+  between shopping lists"). If the destination list is itself a CalDAV sync target, a copied item
+  uploads as a brand-new VTODO on the next sync pass, same as any newly-added item.
+- `added_from_meal` resets to `NULL` — a copy was created by this action, not by the meal that added
+  the original item.
+- `price_cents` resets to `NULL` — a price is a fact about a purchase actually made (#1003); a copy
+  has not been bought yet.
+
+`is_template` (on Shopping Lists, above) marks a list as a reusable source for `duplicate` rather than
+a list meant to be shopped from directly — a plain boolean on the same row, not a second list type. A
+template stays fully editable (add/remove/re-categorize its items normally); the flag only changes how
+the frontend presents the list (a badge in the tab bar, and "Duplicate to start shopping" as the tab's
+primary action in place of the ordinary add-item row) and is set/cleared through the same
+`PUT /shopping/{listId}` used for renaming (`{ name, is_template? }` — omitting `is_template` leaves it
+unchanged).
+
+`GET /shopping/suggestions?q=` additionally returns each suggested name's most recently used
+`category` and `quantity`, not the name alone, so picking a suggestion in quick-add restores its usual
+aisle placement instead of defaulting to the fallback category (the gap #1103 opened with). Results
+are ordered by most recently used first (`MAX(created_at)`, tie-broken by row id) rather than
+alphabetically.
+
+Adding an item whose name (case-insensitive) already matches an **open** item on the same list no
+longer inserts a second row: `POST /shopping/{listId}/items` returns the existing row (200, not 201)
+and, if a quantity was given that differs from the existing one, updates it on the existing row —
+the same "already there, return the existing row" treatment `POST /shopping/stores` already gives a
+duplicate shop name. If no quantity was given, **or the given quantity is identical to the existing
+one** (picking the autocomplete suggestion prefills the quantity field with the item's last-used
+value before "add" is even clicked, so the form almost always submits *some* quantity), the existing
+quantity is bumped: a bare integer is incremented by 1, and **no quantity at all is treated as an
+implicit "one"**, so a second add jumps it straight to "2" (`quantity` is freeform text, not a
+guaranteed number — "2" becomes "3", empty becomes "2", but "500g" or "a bag" are left untouched
+rather than guessed at, since units aren't modeled and there is no sound way to add to them). A **checked**
+item with the same name does not block a new row: a repeat purchase after the last shopping trip is
+a new need, not a duplicate. The item POST route's own default category (when none is given) is now
+the *last* category, matching `import-pantry`'s existing fallback and the original intent of issue
+#548 ("default manually added items to the misc category") — the route had drifted to defaulting to
+the *first* category instead.
+
+### Archiving a list (migration v195, #1103)
+`archived_at` is a second, independent axis on `shopping_lists`, the same shape as `tasks.archived_at`
+(#688): `GET /shopping` excludes archived lists by default, `GET /shopping?archived=only` returns
+archived lists only. Archiving/restoring goes through the same `PUT /shopping/{listId}` endpoint the
+template flag uses (`{ name, is_template?, archived? }`); archiving twice keeps the original
+timestamp rather than bumping it. `DELETE /shopping/{listId}` remains a real, permanent delete
+(cascades to items) regardless of archived state — archiving is the alternative to reach for when a
+list should stop cluttering the tab bar without losing anything, not a replacement for delete.
+
+### Uncheck all / check all items on a list (#1103)
+`PATCH /shopping/{listId}/items/checked` (a sibling to the existing `DELETE` on the same path) resets
+every checked item on a list back to unchecked, keeping the rows — for reusing one list on the next
+shopping trip instead of duplicating it. Response: `{ reset: number }`. `PATCH
+/shopping/{listId}/items/unchecked` is the mirror in the other direction: checks off every still-open
+item, response `{ checked: number }` — for closing out a trip in one step. Both run each affected item
+through the same `markTodoOutbound()` a single-item PATCH uses, so a mirrored item's new state still
+reaches its CalDAV collection. On the client, both also clear any pending optimistic "intent" for the
+items they touch (`toggleShoppingItem`'s in-memory overlay that lets a tap show its result before the
+server confirms) — without that, an item toggled by hand moments before either bulk action would keep
+showing its old, now-stale intent value instead of the bulk action's fresh result.
+
+### Moving an item to another list (#998)
+`PATCH /shopping/items/{itemId}` accepts an optional `list_id`. Moving re-ranks the item to the end of
+its category on the **destination** list — its `sort_order` on the old list has no meaning there, the
+same "category change repositions to the end" rule already applied to a same-list category change,
+just scoped to the target list instead. If the item was mirrored to a CalDAV collection
+(`external_source = 'caldav'`), the move queues deletion of the old remote VTODO
+(`queueTodoDeletions`, the same helper the delete routes already use) and resets the item's `external_*`
+columns to local defaults in the same statement — the row becomes a plain local item. If the
+destination list is itself a CalDAV sync target, the item uploads as a **new** VTODO on the next sync
+pass (`pendingShoppingCreations`), rather than silently repointing the shared remote object a naive
+`list_id` update would have left behind. A moved item is not a duplicate: `added_from_meal` and
+`price_cents` are left untouched.
+
+### Dragging an item into a different category (#1103)
+Per-category drag-and-drop reorder (`public/utils/sortable.js`, #678) now links every category group
+of the open list into one shared `group`, so an item can be dropped into a different category, not
+only reordered within its own. A cross-group drop first PATCHes the item's `category` (server-side
+re-rank to the end of the new category, as above), then runs the same reorder-persistence path an
+ordinary same-category drag already uses for the destination category, so the exact drop position is
+adopted rather than left at "the end." Previously deliberately unsupported — category changes were
+edit-dialog-only.
+
+### Checked-items price total (#1103)
+The item list shows a small summary line — the sum of `price_cents` over currently **checked** items,
+formatted in the household currency — whenever at least one checked item has a recorded price. Purely
+client-side (no new endpoint): a price is only ever set through the existing item dialog (#1003), and
+the summary reads from the same items already loaded for the active list. Stays hidden for a household
+that has never used the price field, rather than showing a "0.00" line.
 
 ### Meals
 | Column | Type | Constraint |
@@ -3484,6 +3589,12 @@ The surface carries four things, in this order: **the time**, large (this is whe
 - **Quick-add is a disclosure on touch (v1.59.0):** the two-line quick-add form is collapsed on pointer-less devices and opened by the FAB, which until then was the only FAB in the kitchen that merely focused an already-visible field instead of opening a form. Esc closes it and returns focus to the FAB. On pointer devices the field stays open — it is faster than any button — and the redundant empty-state CTA is dropped there instead, because the input it points at is visible right above it.
 - **Item editor (v1.59.0):** the detail dialog is titled "Edit item" (shared key with the pantry) instead of carrying the data value as its title, offers name, quantity and category besides link and note, and has a Cancel button. Before this it had two fields, no Cancel, and neither name nor quantity could be changed — a typo meant deleting the row and re-creating it. Deleting stays in the row (× on pointer devices, swipe on touch), both with undo.
 - **"Apply" is disabled at zero hits (v1.59.0)** in the meal-plan import dialog, matching its sibling action "Randomize plan"; the preview enables it as soon as the range contains ingredients.
+- **Duplicate a list, or mark it as a template (#1103):** "Duplicate" sits in the list menu next to rename/delete and opens a dialog for the new list's name plus three on-by-default flags (reset checked state, keep quantities, keep notes & links) — see "Duplicating a list, and templates" under Data Model above for what always carries over and what never does. Any list can additionally be flagged as a template (same menu, toggling "Mark as template"/"Remove template flag"): its tab carries a small bookmark badge, and its content leads with a "Duplicate to start shopping" banner in place of the ordinary quick-add row — a template stays exactly as editable as any other list, only its role in the tab bar and its primary action change. Picking an autocomplete suggestion while adding an item now restores that item's most recently used category and quantity too, not just its name, and suggestions are ordered by most recently used rather than alphabetically. Adding an item whose name matches one already open on the list bumps its quantity instead of creating a duplicate: a bare integer increases by 1, and no quantity at all counts as "one", so re-adding jumps straight to "2".
+- **Archive a list, and browse archived lists (#1103):** "Archive list" sits in the list menu; an archived list leaves the tab bar immediately (no confirmation, no undo window - nothing is lost) but stays fully intact. "Archived lists" (same menu) opens a dialog listing every archived list with a "Restore" action and a real, permanent "Delete forever" (with the same confirmation as the ordinary delete-list action).
+- **"Check all" / "Uncheck all" (#1103):** two list menu entries next to "Duplicate list". "Check all" checks off every still-open item in one step (closing out a trip); "Uncheck all" resets every checked item back to open without removing them (reusing the same list on a later trip).
+- **Move an item to another list (#998):** the item edit dialog gained a list picker next to the category picker; choosing a different list moves the item there (removed from the currently open list's view, appended to the end of its category on the destination), with a confirming toast naming the destination.
+- **Drag an item into a different category (#1103):** category groups now share one drag group, so an item dropped into another category's group changes its category and lands at the exact drop position - previously a drag was confined to reordering within its own category, and changing category required opening the edit dialog (which remains available).
+- **Checked-items price total (#1103):** a small summary line above the item list totals the recorded price of currently checked items, in the household currency - appears only once at least one checked item actually has a price on it.
 
 ### Meal Plan (`/meals`)
 

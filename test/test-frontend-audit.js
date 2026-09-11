@@ -4669,12 +4669,18 @@ test('der Einkaufs-Kopf trägt mobil keine unbeschrifteten Aktionen', () => {
   assert.doesNotMatch(page, /list-header__(more|inline-actions)/,
     'die responsive Doppelfassung der Listen-Aktionen ist entfallen - eine Darstellung auf allen Breiten');
 
-  // Der Trigger klebt am Rand, während die Chips durchscrollen: ohne opaken
-  // Grund liefe ein Chip sichtbar durch das Icon.
+  // Der Trigger klebt am Rand, während die Chips durchscrollen. Eine hart
+  // beginnende Deckfarbe (frühere Fassung: `background-color`) kappte einen
+  // darunter wegscrollenden Chip mitten im Wort, ohne Übergang - gemeldet
+  // 2026-09-11. Ein Farbverlauf von durchsichtig auf `var(--space-3)` löst
+  // dasselbe Grundproblem (der Knopf selbst darf nie durchscheinen), lässt
+  // den Chip aber weich ausklingen statt ihn hart zu kappen - der Knopf sitzt
+  // hinter dem vollständig opaken Teil des Verlaufs und bleibt so scharf wie
+  // zuvor.
   assert.match(cssNoComments, /\.list-tabs-bar__actions\s*\{[^}]*position:\s*sticky/,
     'die Aktionszone muss am Rand der scrollenden Chip-Leiste stehenbleiben');
-  assert.match(cssNoComments, /\.list-tabs-bar__actions\s*\{[^}]*background-color:/,
-    'die sticky Aktionszone braucht einen opaken Grund, sonst scrollen Chips sichtbar darunter durch');
+  assert.match(cssNoComments, /\.list-tabs-bar__actions\s*\{[^}]*background:\s*linear-gradient\([^)]*var\(--color-surface\)/,
+    'die sticky Aktionszone braucht einen Verlauf auf einen opaken Grund, sonst kappt sie einen wegscrollenden Chip hart statt ihn weich ausklingen zu lassen');
 
   // Das Icon-only-Import-Label darf nicht zurückkommen: es war der Grund, warum
   // drei unbeschriftete Glyphen nebeneinander standen.
@@ -10776,13 +10782,19 @@ test('Die Handsortierung der Einkaufsliste sichert über einen gemeinsamen Pfad'
   // die Tastatur über eine eigene Schreibweise, driftete sie beim nächsten Fix
   // still am Drag-Pfad vorbei - der Fehlerfall (Rollback-Render) ist der Teil,
   // der dabei zuerst verloren geht.
+  //
+  // Seit #1103 hat das Drag-Ende einen dritten Weg: ein Zug in eine ANDERE
+  // Kategorie geht über persistItemCategoryMove(), das die Kategorie
+  // serverseitig ändert und dann SEINERSEITS persistItemOrder für die neue
+  // Gruppe aufruft - derselbe gemeinsame Pfad, nur einmal mehr durchlaufen.
   const source = read('../public/pages/shopping.js');
   const persistCalls = source.match(/persistItemOrder\s*\(/g) ?? [];
 
-  assert.ok(persistCalls.length >= 3,
-    `Erwartet: Definition + Drag-Ende + Tastaturpfad rufen persistItemOrder. Gefunden: ${persistCalls.length}`);
-  assert.match(source, /onEnd:\s*\([^)]*\)\s*=>\s*persistItemOrder\(/,
-    'Das Drag-Ende muss über persistItemOrder sichern.');
+  assert.ok(persistCalls.length >= 4,
+    'Erwartet: Definition + Drag-Ende (gleiche Kategorie) + Kategoriewechsel-Pfad + Tastaturpfad '
+    + `rufen persistItemOrder. Gefunden: ${persistCalls.length}`);
+  assert.match(source, /onEnd:\s*\(evt\)\s*=>\s*\{[\s\S]{0,400}persistItemCategoryMove\([\s\S]{0,400}persistItemOrder\(/,
+    'Das Drag-Ende muss in beiden Zweigen (gleiche/andere Kategorie) über persistItemOrder sichern.');
   assert.match(source, /moveItemRow\([^)]*\)/,
     'Der Tastaturpfad braucht moveItemRow, das seinerseits persistItemOrder aufruft.');
   assert.match(source, /catch[\s\S]{0,400}updateItemsList\(container\)/,

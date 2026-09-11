@@ -65,10 +65,132 @@ test('GET /suggestions: leere Query → leere Liste', async () => {
 test('GET /suggestions: Präfix liefert distinct Namen', async () => {
   const list = await newList('Sugg');
   await call('POST', `/${list}/items`, { name: 'Bananen' });
-  await call('POST', `/${list}/items`, { name: 'Bananen' }); // Duplikat → DISTINCT
+  // Zweiter POST mit demselben Namen aktualisiert die erste, offene Zeile
+  // (Duplikat-Schutz, #1103) statt eine zweite anzulegen - hier reicht das,
+  // um zu zeigen, dass die Vorschlagsliste je Name nur einmal steht.
+  await call('POST', `/${list}/items`, { name: 'Bananen' });
   const r = await call('GET', '/suggestions?q=Ban');
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body.data, ['Bananen']);
+  assert.equal(r.body.data.length, 1);
+  assert.equal(r.body.data[0].name, 'Bananen');
+});
+
+test('GET /suggestions: sortiert nach zuletzt verwendet, nicht alphabetisch (#1103)', async () => {
+  const list = await newList('SuggOrder');
+  // "Zwiebeln" zuerst angelegt (alphabetisch nach "Zucchini"), aber "Zucchini"
+  // danach - die Antwort muss trotzdem mit dem zuletzt verwendeten beginnen.
+  await call('POST', `/${list}/items`, { name: 'Zwiebeln' });
+  await call('POST', `/${list}/items`, { name: 'Zucchini' });
+  const r = await call('GET', '/suggestions?q=Z');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.data.map((s) => s.name), ['Zucchini', 'Zwiebeln']);
+});
+
+// --------------------------------------------------------------------------
+// Duplikat-Schutz auf POST /:listId/items (#1103)
+// --------------------------------------------------------------------------
+test('POST /:listId/items: derselbe offene Name aktualisiert die Menge statt eine zweite Zeile anzulegen', async () => {
+  const list = await newList('Dedup');
+  const first = await call('POST', `/${list}/items`, { name: 'Milch', quantity: '1L' });
+  assert.equal(first.status, 201);
+
+  const second = await call('POST', `/${list}/items`, { name: 'milch', quantity: '2L' }); // andere Schreibweise
+  assert.equal(second.status, 200);
+  assert.equal(second.body.data.id, first.body.data.id);
+  assert.equal(second.body.data.quantity, '2L');
+
+  const items = await call('GET', `/${list}/items`);
+  assert.equal(items.body.data.length, 1);
+  assert.equal(items.body.data[0].quantity, '2L');
+});
+
+test('POST /:listId/items: ohne mitgeschickte Menge bleibt die vorhandene Menge stehen', async () => {
+  const list = await newList('Dedup2');
+  const first = await call('POST', `/${list}/items`, { name: 'Brot', quantity: '1 Stück' });
+  const second = await call('POST', `/${list}/items`, { name: 'Brot' });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.data.id, first.body.data.id);
+  assert.equal(second.body.data.quantity, '1 Stück');
+});
+
+test('POST /:listId/items: erneutes Anlegen ohne Menge erhöht eine nackte Ganzzahl um 1', async () => {
+  const list = await newList('Dedup4');
+  const first = await call('POST', `/${list}/items`, { name: 'Bananen', quantity: '2' });
+  const second = await call('POST', `/${list}/items`, { name: 'Bananen' });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.data.id, first.body.data.id);
+  assert.equal(second.body.data.quantity, '3');
+});
+
+test('POST /:listId/items: erneutes Anlegen ohne Menge lässt Mengen mit Einheit unangetastet', async () => {
+  const list = await newList('Dedup5');
+  const first = await call('POST', `/${list}/items`, { name: 'Mehl', quantity: '500g' });
+  const second = await call('POST', `/${list}/items`, { name: 'Mehl' });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.data.id, first.body.data.id);
+  assert.equal(second.body.data.quantity, '500g');
+});
+
+test('POST /:listId/items: eine mitgeschickte Menge überschreibt weiterhin, statt zu addieren', async () => {
+  const list = await newList('Dedup6');
+  const first = await call('POST', `/${list}/items`, { name: 'Äpfel', quantity: '2' });
+  const second = await call('POST', `/${list}/items`, { name: 'Äpfel', quantity: '5' });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.data.id, first.body.data.id);
+  assert.equal(second.body.data.quantity, '5');
+});
+
+test('POST /:listId/items: ganz ohne Menge angelegt, dann nochmal → springt auf 2 (keine Angabe heißt "einmal")', async () => {
+  const list = await newList('Dedup8');
+  const first = await call('POST', `/${list}/items`, { name: 'Brot' });
+  assert.equal(first.body.data.quantity, null);
+  const second = await call('POST', `/${list}/items`, { name: 'Brot' });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.data.id, first.body.data.id);
+  assert.equal(second.body.data.quantity, '2');
+});
+
+test('POST /:listId/items: dieselbe Menge wie schon vorhanden zählt als "nichts Neues" und erhöht trotzdem', async () => {
+  // Regression: die Vorschläge (#1103) belegen das Mengenfeld schon mit der
+  // zuletzt genutzten Menge vor, bevor "Hinzufügen" gedrückt wird - das
+  // Formular schickt also fast immer eine Menge mit, auch wenn niemand sie
+  // bewusst getippt hat. Ohne diesen Fall würde "Apfel" nochmal mit
+  // vorbelegter Menge "2" für immer bei "2" hängen bleiben.
+  const list = await newList('Dedup7');
+  const first = await call('POST', `/${list}/items`, { name: 'Apfel', quantity: '2' });
+  const second = await call('POST', `/${list}/items`, { name: 'Apfel', quantity: '2' });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.data.id, first.body.data.id);
+  assert.equal(second.body.data.quantity, '3');
+});
+
+test('POST /:listId/items: ein bereits abgehakter gleichnamiger Artikel blockiert eine neue Zeile nicht', async () => {
+  const list = await newList('Dedup3');
+  const first = await call('POST', `/${list}/items`, { name: 'Eier' });
+  await call('PATCH', `/items/${first.body.data.id}`, { is_checked: true });
+
+  const second = await call('POST', `/${list}/items`, { name: 'Eier' });
+  assert.equal(second.status, 201);
+  assert.notEqual(second.body.data.id, first.body.data.id);
+
+  const items = await call('GET', `/${list}/items`);
+  assert.equal(items.body.data.length, 2);
+});
+
+test('GET /suggestions: trägt Kategorie + Menge der zuletzt verwendeten Zeile mit (#1103)', async () => {
+  const cats = await call('GET', '/categories');
+  const [firstCat, secondCat] = cats.body.data;
+  const list = await newList('Sugg2');
+  const first = await call('POST', `/${list}/items`, { name: 'Käse', category: firstCat.name, quantity: '200g' });
+  // Abgehakt, bevor der zweite Artikel angelegt wird: der Duplikat-Schutz auf
+  // POST /:listId/items (#1103) fasst einen zweiten "Käse" sonst als
+  // Aktualisierung der ERSTEN, noch offenen Zeile auf, statt eine zweite Zeile
+  // anzulegen - hier soll aber genau eine zweite, echte Zeile entstehen.
+  await call('PATCH', `/items/${first.body.data.id}`, { is_checked: true });
+  await call('POST', `/${list}/items`, { name: 'Käse', category: secondCat.name, quantity: '1 Stück' });
+  const r = await call('GET', '/suggestions?q=Käse');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.data, [{ name: 'Käse', category: secondCat.name, quantity: '1 Stück' }]);
 });
 
 // --------------------------------------------------------------------------
@@ -116,6 +238,157 @@ test('PUT /:listId: benennt um', async () => {
   assert.equal(r.body.data.name, 'Neu');
 });
 
+test('PUT /:listId: setzt is_template, unbenanntes Feld bleibt sonst stehen (#1103)', async () => {
+  const list = await newList('Vorlage');
+  const on = await call('PUT', `/${list}`, { name: 'Vorlage', is_template: true });
+  assert.equal(on.status, 200);
+  assert.equal(on.body.data.is_template, 1);
+
+  // Reines Umbenennen ohne is_template im Body darf das Flag nicht zurücksetzen.
+  const renamed = await call('PUT', `/${list}`, { name: 'Vorlage 2' });
+  assert.equal(renamed.body.data.is_template, 1);
+  assert.equal(renamed.body.data.name, 'Vorlage 2');
+
+  const off = await call('PUT', `/${list}`, { name: 'Vorlage 2', is_template: false });
+  assert.equal(off.body.data.is_template, 0);
+});
+
+test('PUT /:listId: neue Liste hat is_template = 0', async () => {
+  const list = await newList('Frisch');
+  const r = await call('GET', '/');
+  const found = r.body.data.find((l) => l.id === list);
+  assert.equal(found.is_template, 0);
+});
+
+// --------------------------------------------------------------------------
+// Archivieren (#1103)
+// --------------------------------------------------------------------------
+test('PUT /:listId: archiviert und stellt wieder her, GET / filtert entsprechend', async () => {
+  const list = await newList('Archiv');
+
+  const archived = await call('PUT', `/${list}`, { name: 'Archiv', archived: true });
+  assert.equal(archived.status, 200);
+  assert.ok(archived.body.data.archived_at);
+
+  const activeOnly = await call('GET', '/');
+  assert.ok(!activeOnly.body.data.some((l) => l.id === list));
+
+  const archivedOnly = await call('GET', '/?archived=only');
+  assert.ok(archivedOnly.body.data.some((l) => l.id === list));
+
+  const restored = await call('PUT', `/${list}`, { name: 'Archiv', archived: false });
+  assert.equal(restored.body.data.archived_at, null);
+  const activeAgain = await call('GET', '/');
+  assert.ok(activeAgain.body.data.some((l) => l.id === list));
+});
+
+test('PUT /:listId: archived nicht mitgeschickt laesst den Wert stehen', async () => {
+  const list = await newList('Archiv2');
+  await call('PUT', `/${list}`, { name: 'Archiv2', archived: true });
+  const renamed = await call('PUT', `/${list}`, { name: 'Archiv2 neu' });
+  assert.ok(renamed.body.data.archived_at);
+  assert.equal(renamed.body.data.name, 'Archiv2 neu');
+});
+
+test('PUT /:listId: erneutes Archivieren behaelt den urspruenglichen Zeitstempel', async () => {
+  const list = await newList('Archiv3');
+  const first = await call('PUT', `/${list}`, { name: 'Archiv3', archived: true });
+  const second = await call('PUT', `/${list}`, { name: 'Archiv3', archived: true });
+  assert.equal(second.body.data.archived_at, first.body.data.archived_at);
+});
+
+test('DELETE /:listId: eine archivierte Liste laesst sich weiterhin endgueltig loeschen', async () => {
+  const list = await newList('Archiv4');
+  await call('PUT', `/${list}`, { name: 'Archiv4', archived: true });
+  const r = await call('DELETE', `/${list}`);
+  assert.equal(r.status, 200);
+});
+
+// --------------------------------------------------------------------------
+// Liste duplizieren (#1103)
+// --------------------------------------------------------------------------
+test('POST /:listId/duplicate: unbekannte Liste → 404', async () => {
+  const r = await call('POST', '/999999/duplicate', { name: 'Kopie' });
+  assert.equal(r.status, 404);
+});
+
+test('POST /:listId/duplicate: leerer Name → 400', async () => {
+  const list = await newList('Original');
+  const r = await call('POST', `/${list}/duplicate`, { name: '' });
+  assert.equal(r.status, 400);
+});
+
+test('POST /:listId/duplicate: kopiert Kategorie + Handsortierung immer, unabhängig von den Flags', async () => {
+  const cats = await call('GET', '/categories');
+  const catName = cats.body.data[0].name;
+  const list = await newList('Original');
+  const a = await call('POST', `/${list}/items`, { name: 'A', category: catName });
+  const b = await call('POST', `/${list}/items`, { name: 'B', category: catName });
+  await call('PATCH', `/${list}/items/reorder`, { category: catName, order: [b.body.data.id, a.body.data.id] });
+
+  const dup = await call('POST', `/${list}/duplicate`, { name: 'Kopie' });
+  assert.equal(dup.status, 201);
+  assert.notEqual(dup.body.data.id, list);
+  assert.equal(dup.body.data.name, 'Kopie');
+
+  const items = await call('GET', `/${dup.body.data.id}/items`);
+  assert.equal(items.body.data.length, 2);
+  assert.deepEqual(items.body.data.map((i) => i.name), ['B', 'A']); // Rang übernommen
+  for (const i of items.body.data) assert.equal(i.category, catName);
+});
+
+test('POST /:listId/duplicate: resetChecked/keepQuantities/keepNotes steuern, was mitkommt', async () => {
+  const list = await newList('Original2');
+  const item = await call('POST', `/${list}/items`, {
+    name: 'Milch', quantity: '2 Liter', notes: 'Bio', url: 'https://example.com',
+  });
+  await call('PATCH', `/items/${item.body.data.id}`, { is_checked: true });
+
+  const dup = await call('POST', `/${list}/duplicate`, {
+    name: 'Kopie2', resetChecked: false, keepQuantities: false, keepNotes: false,
+  });
+  const items = await call('GET', `/${dup.body.data.id}/items`);
+  const copy = items.body.data[0];
+  assert.equal(copy.is_checked, 1); // resetChecked:false → Häkchen bleibt
+  assert.equal(copy.quantity, null);
+  assert.equal(copy.notes, null);
+  assert.equal(copy.url, null);
+});
+
+test('POST /:listId/duplicate: Häkchen wird standardmäßig zurückgesetzt', async () => {
+  const list = await newList('Original3');
+  const item = await call('POST', `/${list}/items`, { name: 'Brot' });
+  await call('PATCH', `/items/${item.body.data.id}`, { is_checked: true });
+
+  const dup = await call('POST', `/${list}/duplicate`, { name: 'Kopie3' });
+  const items = await call('GET', `/${dup.body.data.id}/items`);
+  assert.equal(items.body.data[0].is_checked, 0);
+});
+
+test('POST /:listId/duplicate: übernimmt weder CalDAV-Sync-Spalten noch added_from_meal/price_cents/store_id', async () => {
+  const store = await call('POST', '/stores', { name: 'Netto' });
+  const list = await newList('Original4');
+  const item = await call('POST', `/${list}/items`, { name: 'Käse' });
+  db.prepare(`
+    UPDATE shopping_items
+    SET external_uid = 'uid-1', external_source = 'caldav', external_object_url = 'https://caldav.example/x',
+        added_from_meal = NULL, price_cents = 250, store_id = ?
+    WHERE id = ?
+  `).run(store.body.data.id, item.body.data.id);
+
+  const dup = await call('POST', `/${list}/duplicate`, { name: 'Kopie4' });
+  const copyId = (await call('GET', `/${dup.body.data.id}/items`)).body.data[0].id;
+  const row = db.prepare('SELECT * FROM shopping_items WHERE id = ?').get(copyId);
+  assert.equal(row.external_uid, null);
+  assert.equal(row.external_source, 'local');
+  assert.equal(row.external_object_url, null);
+  assert.equal(row.added_from_meal, null);
+  assert.equal(row.price_cents, null);
+  // Ein Laden ist genauso eine Tatsache ueber einen EINKAUF wie der Preis
+  // (Maintainer-Ruecksprache auf #1103) - eine Kopie hat beides noch nicht.
+  assert.equal(row.store_id, null);
+});
+
 test('DELETE /:listId: unbekannt → 404', async () => {
   const r = await call('DELETE', '/999999');
   assert.equal(r.status, 404);
@@ -150,12 +423,12 @@ test('POST /:listId/items: Nicht-http(s)-URL → 400', async () => {
   assert.equal(r.status, 400);
 });
 
-test('POST /:listId/items: legt Artikel an, Default-Kategorie = erste', async () => {
+test('POST /:listId/items: legt Artikel an, Default-Kategorie = letzte (#548)', async () => {
   const list = await newList();
   const r = await call('POST', `/${list}/items`, { name: 'Milch', quantity: '1 l', url: 'https://example.com' });
   assert.equal(r.status, 201);
   assert.equal(r.body.data.name, 'Milch');
-  assert.equal(r.body.data.category, 'Obst & Gemüse'); // sort_order 0
+  assert.equal(r.body.data.category, 'Sonstiges'); // letzte Kategorie, nicht die erste (#548)
   assert.equal(r.body.data.url, 'https://example.com');
 });
 
@@ -204,6 +477,86 @@ test('PATCH /items/:itemId: aktualisiert Felder + is_checked', async () => {
   assert.equal(r.body.data.name, 'Y');
   assert.equal(r.body.data.category, 'Backwaren');
   assert.equal(r.body.data.is_checked, 1);
+});
+
+// --------------------------------------------------------------------------
+// Artikel auf eine andere Liste verschieben (#998)
+// --------------------------------------------------------------------------
+test('PATCH /items/:itemId: list_id verschiebt den Artikel auf eine andere Liste', async () => {
+  const listA = await newList('MoveA');
+  const listB = await newList('MoveB');
+  const item = (await call('POST', `/${listA}/items`, { name: 'Milch' })).body.data;
+
+  const r = await call('PATCH', `/items/${item.id}`, { list_id: listB });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.list_id, listB);
+
+  const fromA = await call('GET', `/${listA}/items`);
+  assert.equal(fromA.body.data.length, 0);
+  const fromB = await call('GET', `/${listB}/items`);
+  assert.equal(fromB.body.data.length, 1);
+  assert.equal(fromB.body.data[0].name, 'Milch');
+});
+
+test('PATCH /items/:itemId: list_id landet am Ende der Kategorie auf der Zielliste', async () => {
+  const listA = await newList('MoveOrderA');
+  const listB = await newList('MoveOrderB');
+  const cats = await call('GET', '/categories');
+  const cat = cats.body.data[0].name;
+
+  const existing = await call('POST', `/${listB}/items`, { name: 'Schon da', category: cat });
+  const moved = (await call('POST', `/${listA}/items`, { name: 'Kommt dazu', category: cat })).body.data;
+
+  await call('PATCH', `/items/${moved.id}`, { list_id: listB });
+
+  const items = await call('GET', `/${listB}/items`);
+  const ranks = items.body.data.map((i) => i.name);
+  assert.deepEqual(ranks, ['Schon da', 'Kommt dazu']); // die verschobene Zeile landet dahinter
+  assert.ok(items.body.data[1].sort_order > existing.body.data.sort_order);
+});
+
+test('PATCH /items/:itemId: unbekannte list_id → 400', async () => {
+  const list = await newList('MoveUnknown');
+  const item = (await call('POST', `/${list}/items`, { name: 'X' })).body.data;
+  const r = await call('PATCH', `/items/${item.id}`, { list_id: 999999 });
+  assert.equal(r.status, 400);
+});
+
+test('PATCH /items/:itemId: list_id verschiebt einen gespiegelten Artikel und macht ihn lokal (#998)', async () => {
+  const listA = await newList('MoveCalA');
+  const listB = await newList('MoveCalB');
+  const item = (await call('POST', `/${listA}/items`, { name: 'Käse' })).body.data;
+  db.prepare(`
+    UPDATE shopping_items
+    SET external_uid = 'uid-1', external_source = 'caldav', external_account_id = 1,
+        external_object_url = 'https://caldav.example/x', outbound_dirty = 1
+    WHERE id = ?
+  `).run(item.id);
+
+  const r = await call('PATCH', `/items/${item.id}`, { list_id: listB });
+  assert.equal(r.status, 200);
+
+  const row = db.prepare('SELECT * FROM shopping_items WHERE id = ?').get(item.id);
+  assert.equal(row.list_id, listB);
+  assert.equal(row.external_source, 'local');
+  assert.equal(row.external_uid, null);
+  assert.equal(row.external_account_id, null);
+  assert.equal(row.external_object_url, null);
+  assert.equal(row.outbound_dirty, 0);
+});
+
+test('PATCH /items/:itemId: dieselbe list_id ist kein Verschieben, keine Neu-Einordnung', async () => {
+  const list = await newList('MoveSame');
+  const cats = await call('GET', '/categories');
+  const cat = cats.body.data[0].name;
+  const a = (await call('POST', `/${list}/items`, { name: 'A', category: cat })).body.data;
+  const b = (await call('POST', `/${list}/items`, { name: 'B', category: cat })).body.data;
+  await call('PATCH', `/${list}/items/reorder`, { category: cat, order: [b.id, a.id] });
+
+  await call('PATCH', `/items/${a.id}`, { list_id: list, name: 'A' });
+
+  const items = await call('GET', `/${list}/items`);
+  assert.deepEqual(items.body.data.map((i) => i.name), ['B', 'A']); // Reihenfolge unangetastet
 });
 
 test('DELETE /items/:itemId: unbekannt → 404', async () => {
@@ -375,6 +728,65 @@ test('DELETE /:listId/items/checked: entfernt nur abgehakte, zählt', async () =
   assert.equal(r.status, 200);
   assert.equal(r.body.deleted, 1);
   assert.equal(db.prepare('SELECT COUNT(*) c FROM shopping_items WHERE list_id = ?').get(list).c, 1);
+});
+
+test('PATCH /:listId/items/checked: unbekannte Liste → 404', async () => {
+  const r = await call('PATCH', '/999999/items/checked');
+  assert.equal(r.status, 404);
+});
+
+test('PATCH /:listId/items/checked: setzt alle abgehakten zurueck, behaelt die Zeilen (#1103)', async () => {
+  const list = await newList('Reset');
+  const a = (await call('POST', `/${list}/items`, { name: 'A' })).body.data;
+  const b = (await call('POST', `/${list}/items`, { name: 'B' })).body.data;
+  await call('POST', `/${list}/items`, { name: 'C' }); // bleibt unbetroffen (nie abgehakt)
+  await call('PATCH', `/items/${a.id}`, { is_checked: true });
+  await call('PATCH', `/items/${b.id}`, { is_checked: true });
+
+  const r = await call('PATCH', `/${list}/items/checked`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.reset, 2);
+
+  const items = await call('GET', `/${list}/items`);
+  assert.equal(items.body.data.length, 3);
+  assert.ok(items.body.data.every((i) => i.is_checked === 0));
+});
+
+test('PATCH /:listId/items/checked: keine abgehakten → reset 0, kein Fehler', async () => {
+  const list = await newList('ResetEmpty');
+  await call('POST', `/${list}/items`, { name: 'A' });
+  const r = await call('PATCH', `/${list}/items/checked`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.reset, 0);
+});
+
+test('PATCH /:listId/items/unchecked: unbekannte Liste → 404', async () => {
+  const r = await call('PATCH', '/999999/items/unchecked');
+  assert.equal(r.status, 404);
+});
+
+test('PATCH /:listId/items/unchecked: hakt alle offenen ab, behaelt die Zeilen (#1103)', async () => {
+  const list = await newList('CheckAll');
+  const a = (await call('POST', `/${list}/items`, { name: 'A' })).body.data;
+  await call('POST', `/${list}/items`, { name: 'B' });
+  await call('PATCH', `/items/${a.id}`, { is_checked: true }); // A ist schon abgehakt
+
+  const r = await call('PATCH', `/${list}/items/unchecked`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.checked, 1); // nur B war noch offen
+
+  const items = await call('GET', `/${list}/items`);
+  assert.equal(items.body.data.length, 2);
+  assert.ok(items.body.data.every((i) => i.is_checked === 1));
+});
+
+test('PATCH /:listId/items/unchecked: alles schon abgehakt → checked 0, kein Fehler', async () => {
+  const list = await newList('CheckAllEmpty');
+  const a = (await call('POST', `/${list}/items`, { name: 'A' })).body.data;
+  await call('PATCH', `/items/${a.id}`, { is_checked: true });
+  const r = await call('PATCH', `/${list}/items/unchecked`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.checked, 0);
 });
 
 // --------------------------------------------------------------------------

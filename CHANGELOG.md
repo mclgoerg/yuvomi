@@ -9,6 +9,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A shopping list can be duplicated, and any list can be marked as a template** (#1103). "Duplicate"
+  sits in the list menu next to rename/delete and copies every item into a new list, with category
+  assignment and the manual per-category order always carried over - that is the point of
+  duplicating, not a switch. Three flags control the rest: reset checked state, keep quantities, and
+  keep notes & links, all on by default. Marking a list as a template is a plain flag on the same
+  row, not a second kind of object - a template stays fully editable, gets a badge in the tab bar,
+  and its tab leads with a "Duplicate to start shopping" action instead of the usual add-item row.
+
+  A duplicated item is a new, local item: CalDAV sync fields, the originating meal, and any recorded
+  price are never copied, since each names something true of the *original* item only (a synced
+  remote object, a specific meal, a price actually paid), never of a fresh copy.
+
+  Picking a suggestion while adding an item now also carries over that item's most recently used
+  category and quantity, instead of only its name - the same gap the discussion opened with, and a
+  small win on its own even without a template list. Suggestions are also now ordered by most
+  recently used first, instead of alphabetically - a household buys the same handful of things
+  again and again, and the ones bought last stand out less behind everything the alphabet puts
+  first. Adding an item with the same (open) name as one already on the list no longer creates a
+  second row - the same "already there" treatment a duplicate shop name already got. If a typed
+  quantity differs from the existing one, it replaces it; otherwise - no quantity typed, or the same
+  one resubmitted, which is what happens when the autocomplete suggestion has already prefilled the
+  field with the item's last quantity - the existing quantity is bumped instead: a bare number is
+  increased by 1 ("Bananen" again turns "2" into "3"), and no quantity at all counts as one, so a
+  second add jumps straight to "2" ("Brot" with nothing set becomes "2" the moment it's added
+  again). Anything with a unit ("500g") is left exactly as it was rather than guessed at. Quick-add's
+  category selector now resets to the default after every item added, instead of staying on
+  whatever a previous suggestion or manual pick set it to - otherwise an unrelated item typed right
+  after could quietly land in the wrong aisle.
+
+- **A shopping list can be archived instead of only deleted** (#1103). Archiving removes it from
+  the everyday tab bar without touching its items, unlike delete, which is permanent and takes
+  everything with it. An "Archived lists" entry in the list menu opens every archived list with a
+  restore action, plus a genuine delete for lists that really are done.
+
+- **An item can be moved to a different shopping list** (#998). The item dialog gained a list
+  picker next to the category picker; moving re-ranks the item to the end of its category on the
+  destination list, since its old position has no meaning there. A mirrored (CalDAV-synced) item
+  is deleted from the old collection and becomes a plain local item on the move - it uploads as a
+  genuinely new object if the destination list is itself synced, rather than silently repointing
+  the shared remote item.
+
+- **An item can be dragged from one category into another**, not only reordered within one -
+  category assignment used to be edit-dialog-only. Dropping it into a different group changes its
+  category and adopts the exact drop position, the same as an ordinary same-category reorder.
+
+- **"Uncheck all" resets every checked item on a list back to open**, for reusing the same list on
+  the next trip without duplicating it or losing the items themselves (the existing "clear
+  checked" removes them instead). **"Check all" does the opposite** - checks off everything still
+  open, for closing out a trip in one step instead of tapping every row.
+
+- **A checked-items price total** appears once at least one checked item has a recorded price -
+  quiet otherwise, since most households never touch the price field at all.
+
 - **A shopping item can carry a price and the shop it was bought at** (#1003, first cut). Both sit
   in the item dialog, where the item is already open - the checkbox stays the fastest gesture in the
   app and gains no second step. The price is stored in whole minor units (cents, yen, fils) rather

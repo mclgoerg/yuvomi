@@ -53,15 +53,17 @@
 
 .list-tabs-bar::-webkit-scrollbar { display: none; }
 
-/* Kategorie-Marker: bleibt links stehen (scrollt nicht mit den Chips weg). */
+/* Kategorie-Marker: rein dekorativ, läuft mit den Chips mit statt fest zu
+ * stehen. War vorher `position: sticky`, eine feste 16px-Box auf der Zeilenhöhe
+ * von 48px - darüber und darunter blieb sie leer, und genau dort schien ein
+ * darunter wegscrollender Tab-Chip durch (das Symbol sah aus, als säße es
+ * MITTEN in einem fremden Chip statt davor). Ein dauerhaft klebendes Symbol
+ * ohne eigene Handlung war ausserdem nie mehr als Dekoration - es scrollt jetzt
+ * einfach mit weg wie jeder Chip auch. */
 .list-tabs-bar__marker {
-  position: sticky;
-  left: 0;
   flex-shrink: 0;
   width: var(--space-4);
-  height: var(--space-4);
   color: var(--color-text-tertiary);
-  background-color: var(--color-surface);
 }
 
 .list-tab {
@@ -123,6 +125,14 @@
   font-size: var(--text-xs);
 }
 
+/* Vorlagen-Kennzeichnung (#1103): dekorativ, aria-hidden - die Ansage steht im
+ * aria-label des Chips selbst (renderTabs), nicht ein zweites Mal hier. Erbt
+ * die Chip-Farbe (aktiv/inaktiv) statt einer eigenen - kein zweiter Tonwert
+ * neben dem, den .list-tab/.list-tab--active schon setzen. */
+.list-tab__template-badge {
+  color: currentColor;
+}
+
 .list-tab__new {
   display: inline-flex;
   align-items: center;
@@ -161,16 +171,34 @@
  * `right: 0` statt `inset-inline-end`: `position: sticky` löst logische
  * Eigenschaften zwar korrekt auf, aber die Leiste scrollt physisch, und der
  * Marker gegenüber steht aus demselben Grund auf `left: 0`. */
+/* Der Verlauf statt einer harten Kante: ein Tab-Chip, der unter dieses
+ * klebende Element scrollt, wurde bisher mitten im Wort gekappt - die feste
+ * Deckfarbe begann exakt an der Divider-Linie, ohne Uebergang. Ein
+ * Farbverlauf von durchsichtig auf `--space-3` Breite loest dasselbe Problem
+ * wie `has-fade-end` (filter-chip.css) an jeder anderen scrollenden
+ * Tab-Leiste - nur hier am STICKY ELEMENT selbst statt an der ganzen Leiste,
+ * weil sonst auch der Knopf mitverblasste. Der Knopf selbst sitzt hinter dem
+ * undurchsichtigen Teil und bleibt scharf.
+ *
+ * `right: calc(-1 * var(--page-inline-pad))` statt `right: 0` (gemeldet
+ * 2026-09-11, zweiter Fund derselben Ursache): `position: sticky` haelt das
+ * Element am PADDING-Rand der Leiste an, nicht an ihrer wahren Kante - das
+ * eigene `padding-inline-end` der Leiste blieb also ein schmaler Streifen
+ * AUSSERHALB dieser Box, in dem ein durchscrollender Chip weiterhin sichtbar
+ * war (ein Fetzen "REW...9." rechts neben den drei Punkten). Der negative
+ * Versatz schiebt die Box bis zur wahren Kante; das eigene
+ * `padding-inline-end` gleicht den Abstand zum Knopf wieder aus, sodass der
+ * sichtbare Abstand unveraendert bleibt - nur jetzt von dieser Box gedeckt. */
 .list-tabs-bar__actions {
   position: sticky;
-  right: 0;
+  right: calc(-1 * var(--page-inline-pad));
   display: flex;
   align-items: center;
   flex-shrink: 0;
   margin-inline-start: auto;
-  padding-inline-start: var(--space-2);
-  border-inline-start: 1px solid var(--color-border);
-  background-color: var(--color-surface);
+  padding-inline-start: var(--space-3);
+  padding-inline-end: var(--page-inline-pad);
+  background: linear-gradient(to right, transparent, var(--color-surface) var(--space-3));
 }
 
 /* --------------------------------------------------------
@@ -263,6 +291,67 @@
  * mit dem Kopf selbst entfallen (siehe „Liste-Header" weiter oben). Die Zeile,
  * die den Listennamen trägt, ist jetzt die Chip-Leiste - sie scrollt horizontal
  * und kennt deshalb gar kein Umbruchproblem. */
+
+/* --------------------------------------------------------
+ * Vorlagen-Banner (#1103)
+ * -------------------------------------------------------- */
+.shopping-template-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background-color: color-mix(in srgb, var(--module-accent, var(--color-accent)) var(--tint-wash), var(--color-surface));
+  max-width: var(--content-max-width-narrow);
+}
+
+/* Der Ton steht nur hier, nicht zusaetzlich als Schriftfarbe der Flaeche -
+ * beides zusammen waere dieselbe Identitaet zweimal blass genannt
+ * (DESIGN.md, Colors: Skalen-Regel). Titel/Beschreibung bleiben neutral. */
+.shopping-template-banner__icon {
+  color: var(--module-accent, var(--color-accent));
+  flex-shrink: 0;
+}
+
+.shopping-template-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.shopping-template-banner__title {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.shopping-template-banner__description {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 639px) {
+  .shopping-template-banner {
+    flex-wrap: wrap;
+  }
+  .shopping-template-banner .btn {
+    width: 100%;
+  }
+}
+
+/* --------------------------------------------------------
+ * Preissumme abgehakter Artikel (#1103)
+ * -------------------------------------------------------- */
+.shopping-price-summary {
+  padding: 0 var(--space-4) var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  max-width: var(--content-max-width-narrow);
+}
+
+.shopping-price-summary[hidden] {
+  display: none;
+}
 
 /* --------------------------------------------------------
  * Quick-Add Eingabe
@@ -591,6 +680,15 @@
 
   .page-measure--narrow .list-tabs-bar {
     max-width: calc(var(--page-measure) + var(--page-inline-pad));
+    padding-inline-end: 0;
+  }
+
+  /* Die sticky Aktionszone gleicht das wegfallende Polster hier NICHT aus
+   * (anders als in der Grundregel oben) - die Leiste hat an dieser Kante
+   * schon kein eigenes Polster mehr, ein zweites in der Box waere ein
+   * Rueckfall in genau die Luecke, die diese Regel gerade schliesst. */
+  .page-measure--narrow .list-tabs-bar .list-tabs-bar__actions {
+    right: 0;
     padding-inline-end: 0;
   }
 }
