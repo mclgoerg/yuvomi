@@ -951,7 +951,11 @@
         "filtersActive_one": "1 filtre actif",
         "filtersReset": "Effacer tous les filtres",
         "filtersDisplay": "Affichage",
-        "agendaDayEmpty": "Rien de prévu"
+        "agendaDayEmpty": "Rien de prévu",
+        "openInMap": "Ouvrir dans Maps",
+        "syncTargetAssigneeAmbiguous": "Plusieurs calendriers ont cette personne comme attribution par défaut. Choisis toi-même la destination.",
+        "filtersSources": "Calendriers",
+        "filterUnassigned": "Non attribués"
     },
     "noteCategories": {
         "permissionLabel": "Gérer les catégories de notes du foyer"
@@ -2285,7 +2289,7 @@
         "pageKitchen": "Cuisine",
         "pageKitchenDescription": "Choisir les repas visibles dans le planificateur de repas.",
         "pageModuleOptions": "Options des modules",
-        "pageModuleOptionsDescription": "Définir des options ponctuelles pour Budget, Santé et Aide ménagère.",
+        "pageModuleOptionsDescription": "Options supplémentaires pour quelques modules.",
         "pageCalendarModule": "Calendrier",
         "pageCalendarModuleDescription": "Définissez les jours fériés, le début de semaine et la durée par défaut d’un événement.",
         "pageSyncCalendar": "Synchronisation des calendriers",
@@ -2477,7 +2481,8 @@
         "sync": {
             "defaultAssignee": "Attribution par défaut",
             "defaultAssigneeNone": "Aucune",
-            "defaultAssigneeHint": "Les événements nouvellement synchronisés sont automatiquement attribués à cette personne."
+            "defaultAssigneeHint": "Les événements nouvellement synchronisés sont automatiquement attribués à cette personne.",
+            "defaultAssigneeRoutingHint": "Attribution par défaut: les événements d'un calendrier reçoivent la personne choisie pour lui, et un nouvel événement attribué uniquement à cette personne est créé dans ce calendrier. Cela vaut pour les calendriers Google et CalDAV, pas pour Apple ni Outlook."
         },
         "calendarDefaultsTitle": "Valeurs par défaut des nouveaux événements",
         "calendarDefaultsDescription": "Préréglages appliqués automatiquement aux nouveaux événements.",

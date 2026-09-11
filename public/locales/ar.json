@@ -951,7 +951,11 @@
         "filtersActive_one": "عامل تصفية واحد نشط",
         "filtersReset": "إزالة كل عوامل التصفية",
         "filtersDisplay": "العرض",
-        "agendaDayEmpty": "لا شيء مُخطط"
+        "agendaDayEmpty": "لا شيء مُخطط",
+        "openInMap": "فتح في الخرائط",
+        "syncTargetAssigneeAmbiguous": "لدى عدة تقويمات هذا الشخص كإسناد افتراضي. اختر الوجهة بنفسك.",
+        "filtersSources": "التقويمات",
+        "filterUnassigned": "غير مُسندة"
     },
     "noteCategories": {
         "permissionLabel": "إدارة فئات ملاحظات الأسرة"
@@ -2285,7 +2289,7 @@
         "pageKitchen": "المطبخ",
         "pageKitchenDescription": "اختر الوجبات الظاهرة في خطة الوجبات.",
         "pageModuleOptions": "خيارات الوحدات",
-        "pageModuleOptionsDescription": "ضبط خيارات مفردة للميزانية والصحة والمساعدة المنزلية.",
+        "pageModuleOptionsDescription": "خيارات إضافية لبعض الوحدات.",
         "pageCalendarModule": "التقويم",
         "pageCalendarModuleDescription": "حدد العطلات وبداية الأسبوع والمدة الافتراضية للموعد.",
         "pageSyncCalendar": "مزامنة التقويم",
@@ -2477,7 +2481,8 @@
         "sync": {
             "defaultAssignee": "الإسناد الافتراضي",
             "defaultAssigneeNone": "بلا",
-            "defaultAssigneeHint": "تُسنَد الأحداث المُزامَنة حديثًا تلقائيًا إلى هذا الشخص."
+            "defaultAssigneeHint": "تُسنَد الأحداث المُزامَنة حديثًا تلقائيًا إلى هذا الشخص.",
+            "defaultAssigneeRoutingHint": "الإسناد الافتراضي: تحصل مواعيد التقويم على الشخص المختار له، والموعد الجديد المُسند إلى هذا الشخص وحده يُنشأ في ذلك التقويم. ينطبق ذلك على تقويمات Google وCalDAV، وليس على Apple أو Outlook."
         },
         "calendarDefaultsTitle": "الإعدادات الافتراضية للأحداث الجديدة",
         "calendarDefaultsDescription": "إعدادات مسبقة تُطبَّق تلقائيًا على الأحداث الجديدة.",

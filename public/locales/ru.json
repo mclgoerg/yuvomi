@@ -951,7 +951,11 @@
         "filtersActive_one": "1 активный фильтр",
         "filtersReset": "Снять все фильтры",
         "filtersDisplay": "Отображение",
-        "agendaDayEmpty": "Ничего не запланировано"
+        "agendaDayEmpty": "Ничего не запланировано",
+        "openInMap": "Открыть в Картах",
+        "syncTargetAssigneeAmbiguous": "У нескольких календарей этот человек назначен по умолчанию. Выбери цель сам.",
+        "filtersSources": "Календари",
+        "filterUnassigned": "Не назначенные"
     },
     "noteCategories": {
         "permissionLabel": "Управлять семейными категориями заметок"
@@ -2285,7 +2289,7 @@
         "pageKitchen": "Кухня",
         "pageKitchenDescription": "Выберите, какие приёмы пищи видны в плане питания.",
         "pageModuleOptions": "Параметры модулей",
-        "pageModuleOptionsDescription": "Задать отдельные параметры для Бюджета, Здоровья и Помощи по дому.",
+        "pageModuleOptionsDescription": "Дополнительные параметры для нескольких модулей.",
         "pageCalendarModule": "Календарь",
         "pageCalendarModuleDescription": "Задайте праздники, начало недели и длительность события по умолчанию.",
         "pageSyncCalendar": "Синхронизация календарей",
@@ -2477,7 +2481,8 @@
         "sync": {
             "defaultAssignee": "Назначение по умолчанию",
             "defaultAssigneeNone": "Нет",
-            "defaultAssigneeHint": "Новые синхронизированные события автоматически назначаются этому человеку."
+            "defaultAssigneeHint": "Новые синхронизированные события автоматически назначаются этому человеку.",
+            "defaultAssigneeRoutingHint": "Назначение по умолчанию: события из календаря получают выбранного там человека, а новое событие, назначенное только ему, создаётся в этом календаре. Это касается календарей Google и CalDAV, но не Apple или Outlook."
         },
         "calendarDefaultsTitle": "Значения по умолчанию для новых событий",
         "calendarDefaultsDescription": "Настройки, автоматически применяемые к новым событиям.",

@@ -951,7 +951,11 @@
         "filtersActive_one": "フィルター 1 件が有効",
         "filtersReset": "すべてのフィルターを解除",
         "filtersDisplay": "表示",
-        "agendaDayEmpty": "予定なし"
+        "agendaDayEmpty": "予定なし",
+        "openInMap": "地図で開く",
+        "syncTargetAssigneeAmbiguous": "複数のカレンダーでこの人が既定の割り当てになっています。保存先を自分で選んでください。",
+        "filtersSources": "カレンダー",
+        "filterUnassigned": "割り当てなし"
     },
     "noteCategories": {
         "permissionLabel": "世帯のメモカテゴリーを管理"
@@ -2285,7 +2289,7 @@
         "pageKitchen": "キッチン",
         "pageKitchenDescription": "献立プランに表示する食事を選択します。",
         "pageModuleOptions": "モジュールのオプション",
-        "pageModuleOptionsDescription": "家計・健康・家事サポートの個別オプションを設定します。",
+        "pageModuleOptionsDescription": "いくつかのモジュール向けの追加オプションです。",
         "pageCalendarModule": "カレンダー",
         "pageCalendarModuleDescription": "祝日、週の開始日、予定の既定の長さを設定します。",
         "pageSyncCalendar": "カレンダー同期",
@@ -2477,7 +2481,8 @@
         "sync": {
             "defaultAssignee": "既定の割り当て先",
             "defaultAssigneeNone": "なし",
-            "defaultAssigneeHint": "新しく同期された予定は自動的にこの人に割り当てられます。"
+            "defaultAssigneeHint": "新しく同期された予定は自動的にこの人に割り当てられます。",
+            "defaultAssigneeRoutingHint": "既定の割り当て先: カレンダーの予定にはそこで選んだ人が割り当てられ、その人だけに割り当てた新しい予定はそのカレンダーに作成されます。Google と CalDAV のカレンダーが対象で、Apple と Outlook は対象外です。"
         },
         "calendarDefaultsTitle": "新しい予定の既定値",
         "calendarDefaultsDescription": "新しい予定に自動的に適用される既定設定。",

@@ -951,7 +951,11 @@
         "filtersActive_one": "1 filtro activo",
         "filtersReset": "Quitar todos los filtros",
         "filtersDisplay": "Visualización",
-        "agendaDayEmpty": "Nada planeado"
+        "agendaDayEmpty": "Nada planeado",
+        "openInMap": "Abrir en Maps",
+        "syncTargetAssigneeAmbiguous": "Varios calendarios tienen a esta persona como asignación predeterminada. Elige tú el destino.",
+        "filtersSources": "Calendarios",
+        "filterUnassigned": "Sin asignar"
     },
     "noteCategories": {
         "permissionLabel": "Gestionar categorías de notas del hogar"
@@ -2285,7 +2289,7 @@
         "pageKitchen": "Cocina",
         "pageKitchenDescription": "Elige qué comidas se ven en el plan de comidas.",
         "pageModuleOptions": "Opciones de módulos",
-        "pageModuleOptionsDescription": "Definir opciones concretas de Presupuesto, Salud y Ayuda doméstica.",
+        "pageModuleOptionsDescription": "Opciones adicionales para algunos módulos.",
         "pageCalendarModule": "Calendario",
         "pageCalendarModuleDescription": "Define festivos, inicio de semana y la duración predeterminada del evento.",
         "pageSyncCalendar": "Sincronización de calendarios",
@@ -2477,7 +2481,8 @@
         "sync": {
             "defaultAssignee": "Asignación predeterminada",
             "defaultAssigneeNone": "Ninguno",
-            "defaultAssigneeHint": "Los eventos recién sincronizados se asignan automáticamente a esta persona."
+            "defaultAssigneeHint": "Los eventos recién sincronizados se asignan automáticamente a esta persona.",
+            "defaultAssigneeRoutingHint": "Asignación predeterminada: los eventos de un calendario reciben a la persona elegida allí, y un evento nuevo asignado solo a esa persona se crea en ese calendario. Se aplica a calendarios de Google y CalDAV, no a Apple ni Outlook."
         },
         "calendarDefaultsTitle": "Valores predeterminados para nuevos eventos",
         "calendarDefaultsDescription": "Ajustes que se aplican automáticamente a los nuevos eventos.",

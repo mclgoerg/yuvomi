@@ -951,7 +951,11 @@
         "filtersActive_one": "1 filtre etkin",
         "filtersReset": "Tüm filtreleri kaldır",
         "filtersDisplay": "Görünüm",
-        "agendaDayEmpty": "Planlanmış bir şey yok"
+        "agendaDayEmpty": "Planlanmış bir şey yok",
+        "openInMap": "Haritada aç",
+        "syncTargetAssigneeAmbiguous": "Birden fazla takvimde bu kişi varsayılan atama olarak ayarlı. Hedefi kendin seç.",
+        "filtersSources": "Takvimler",
+        "filterUnassigned": "Atanmamış"
     },
     "noteCategories": {
         "permissionLabel": "Ev notu kategorilerini yönet"
@@ -2285,7 +2289,7 @@
         "pageKitchen": "Mutfak",
         "pageKitchenDescription": "Yemek planında hangi öğünlerin görüneceğini seçin.",
         "pageModuleOptions": "Modül seçenekleri",
-        "pageModuleOptionsDescription": "Bütçe, Sağlık ve Ev yardımı için tek tek seçenekleri belirleme.",
+        "pageModuleOptionsDescription": "Birkaç modül için ek seçenekler.",
         "pageCalendarModule": "Takvim",
         "pageCalendarModuleDescription": "Tatilleri, hafta başlangıcını ve varsayılan etkinlik süresini belirleyin.",
         "pageSyncCalendar": "Takvim eşitleme",
@@ -2477,7 +2481,8 @@
         "sync": {
             "defaultAssignee": "Varsayılan atama",
             "defaultAssigneeNone": "Yok",
-            "defaultAssigneeHint": "Yeni eşitlenen etkinlikler otomatik olarak bu kişiye atanır."
+            "defaultAssigneeHint": "Yeni eşitlenen etkinlikler otomatik olarak bu kişiye atanır.",
+            "defaultAssigneeRoutingHint": "Varsayılan atama: bir takvimdeki etkinlikler orada seçilen kişiye atanır ve yalnızca o kişiye atanan yeni bir etkinlik o takvimde oluşturulur. Google ve CalDAV takvimleri için geçerlidir, Apple veya Outlook için değil."
         },
         "calendarDefaultsTitle": "Yeni etkinlikler için varsayılanlar",
         "calendarDefaultsDescription": "Yeni etkinliklere otomatik uygulanan ön ayarlar.",
