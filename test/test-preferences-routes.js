@@ -585,7 +585,11 @@ test('GET /holidays/countries: gestubbte API -> 200 mit sortierter Liste', async
   }));
   const res = await raw('GET', '/holidays/countries');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body.data.map((c) => c.isoCode), ['AT', 'DE']); // nach name sortiert
+  // Neben AT/DE aus dem gestubbten API-Ergebnis erscheinen die sechs lokal
+  // berechneten Laender aus #965 (Australia, Brazil, Canada, New Zealand,
+  // United Kingdom, United States) - alle nach Name eingesortiert.
+  assert.deepEqual(res.body.data.map((c) => c.isoCode),
+    ['AU', 'AT', 'BR', 'CA', 'DE', 'NZ', 'GB', 'US']);
   holidays.__setFetchImpl(null);
 });
 test('GET /holidays/countries: API-Fehler -> 502', async () => {

@@ -1828,6 +1828,7 @@
         },
         "ics": {
             "title": "ICS Subscriptions",
+            "holidayHint": "Tip: you can also use this for a country's public holidays not yet covered by the Holidays sync under Calendar settings.",
             "add": "Add subscription",
             "addedToast": "Subscription added.",
             "deletedToast": "Subscription deleted.",
@@ -2201,6 +2202,7 @@
         "holidayGroupHint": "Some multilingual cantons have different school-holiday dates depending on the language region. Choose the matching region for correct dates.",
         "holidayPublicLabel": "Show public holidays",
         "holidaySchoolLabel": "Show school holidays",
+        "holidaySchoolUnavailable": "No school-holiday data is available for this country.",
         "holidayPublicColor": "Public holiday color",
         "holidaySchoolColor": "School holiday color",
         "holidaySaveBtn": "Save",

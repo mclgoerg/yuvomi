@@ -1788,6 +1788,7 @@
         },
         "ics": {
             "title": "ICS-prenumerationer",
+            "holidayHint": "Tips: detta fungerar även bra för ett lands helgdagar som ännu inte täcks av helgdagssynkroniseringen i kalenderinställningarna.",
             "add": "Lägg till prenumeration",
             "addedToast": "Prenumeration tillagd.",
             "deletedToast": "Prenumeration borttagen.",
@@ -2178,6 +2179,7 @@
         "holidayGroupHint": "Vissa flerspråkiga kantoner har olika skollovsdatum beroende på språkregion. Välj rätt region för korrekta datum.",
         "holidayPublicLabel": "Visa helgdagar",
         "holidaySchoolLabel": "Visa skollov",
+        "holidaySchoolUnavailable": "Det finns inga skollovsdata tillgängliga för detta land.",
         "holidayPublicColor": "Färg för helgdagar",
         "holidaySchoolColor": "Färg för skollov",
         "holidaySaveBtn": "Spara",

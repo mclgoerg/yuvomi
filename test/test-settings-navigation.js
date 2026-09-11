@@ -30,6 +30,7 @@ import {
 } from '../public/settings/module-order.js';
 import {
   applyHolidaySubdivisionSelection,
+  countrySchoolHolidaysAvailable,
   ensureHolidayLayerSelection,
   isHolidayCountryResolved,
   resolveHolidayLocation,
@@ -888,6 +889,18 @@ test('holiday sync enables public holidays when every layer is disabled', () => 
     showPublic: false,
     showSchool: true,
   });
+});
+
+test('#965: school holidays are available unless the country entry says otherwise', () => {
+  const countries = [
+    { isoCode: 'DE', name: 'Germany' },
+    { isoCode: 'US', name: 'United States', schoolHolidays: false },
+  ];
+  assert.equal(countrySchoolHolidaysAvailable(countries, ''), true, 'kein gewaehltes Land - kein Grund zu sperren');
+  assert.equal(countrySchoolHolidaysAvailable(countries, 'DE'), true, 'ein gewoehnliches OpenHolidays-Land traegt kein Flag');
+  assert.equal(countrySchoolHolidaysAvailable(countries, 'US'), false, 'das Flag ist eine Ausnahmemarkierung, keine Positivliste');
+  assert.equal(countrySchoolHolidaysAvailable(countries, 'FR'), true, 'ein Land ausserhalb der Liste gilt nicht als gesperrt');
+  assert.equal(countrySchoolHolidaysAvailable([], 'US'), true, 'ohne geladene Laenderliste noch keine Sperre - kein Fehlzustand vortaeuschen');
 });
 
 test('holiday country remains unresolved until discovery contains the persisted value', () => {

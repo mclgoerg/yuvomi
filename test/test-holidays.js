@@ -11,7 +11,15 @@ import assert from 'node:assert/strict';
 import test, { beforeEach } from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
 import { MIGRATIONS, _setTestDatabase, _resetTestDatabase } from '../server/db.js';
-import { sync, getForRange, getCountries, getSubdivisions, getGroups, __setFetchImpl } from '../server/services/holidays.js';
+import { sync, getForRange, getCountries, getSubdivisions, getGroups, __setFetchImpl, __test } from '../server/services/holidays.js';
+
+const { localHolidayFallback } = __test;
+// Nur die Daten - fuer Fixture-Vergleiche ausreichend und stabiler gegenueber
+// Umbau der internen Sortierung als ein voller Objektabgleich.
+const namesAndDates = (year, country, subdivision) =>
+  localHolidayFallback(country, 'public', year, 'EN', subdivision)
+    .map((h) => `${h.startDate} ${h.name}`)
+    .sort();
 
 // In-Memory-DB mit allen Migrationen (inkl. v49 holiday_cache) aufbauen.
 function buildTestDb() {
@@ -89,7 +97,10 @@ function makeApiMock() {
     const path = new URL(s).pathname;
     const country = new URL(s).searchParams.get('countryIsoCode');
     if (path === '/PublicHolidays') {
-      if (country === 'BR') return okJson([]);
+      // Alle lokal berechneten Laender aus #965: OpenHolidays kennt sie nicht
+      // (oder liefert wie bei BR real eine leere Antwort) - derselbe
+      // "erfolgreich, aber leer" Pfad wie beim urspruenglichen Brasilien-Fall.
+      if (['BR', 'US', 'CA', 'GB', 'AU', 'NZ'].includes(country)) return okJson([]);
       // Spanien wie in #946: die Landessprache steht ZUERST im Array, Englisch
       // weiter hinten - und "Reyes" fuehrt die API nur auf Spanisch und
       // Katalanisch. So laesst sich beides pruefen: die Wahl der Wunschsprache
@@ -124,6 +135,10 @@ function makeApiMock() {
         name: [{ language: 'DE', text: 'Neujahr' }, { language: 'EN', text: "New Year's Day" }] }]);
     }
     if (path === '/SchoolHolidays') {
+      // Keins der #965-Laender hat eine Schulferien-Quelle (real nicht bei
+      // OpenHolidays gefuehrt) - der Mock muss das nachbilden, sonst wuerde er
+      // faelschlich deutsche Sommerferien fuer z. B. die USA zurueckgeben.
+      if (['BR', 'US', 'CA', 'GB', 'AU', 'NZ'].includes(country)) return okJson([]);
       return okJson([
         { startDate: '2026-07-20', endDate: '2026-08-30',
           name: [{ language: 'DE', text: 'Sommerferien' }, { language: 'EN', text: 'Summer break' }] },
@@ -1033,15 +1048,281 @@ test('sync: der wartende Lauf sieht den NEUEN Stand, nicht den alten (#946)', as
   assert.ok(db.prepare("SELECT value FROM sync_config WHERE key='holiday_last_sync_scope'").get()?.value?.startsWith('EN|'));
 });
 
+// ---- #965: lokal berechnete Laender (US/CA/GB/AU/NZ) ------------------------
+// Jedes Datum unten wurde unabhaengig gegen `date -d` (Wochentags-Fakten) und
+// gegen amtliche/gut belegte Quellen (GOV.UK, mygov.scot, MBIE, Canada.ca)
+// geprueft, nicht nur gegen die eigene Implementierung - sonst bewiese ein
+// Test nur, dass Code und Fixture denselben (moeglicherweise falschen)
+// Gedankengang teilen.
+
+test('US: 11 Bundesfeiertage, inkl. Beobachtungsregel (Samstag zurueck, Sonntag vor)', () => {
+  const names2026 = namesAndDates(2026, 'US');
+  assert.equal(names2026.length, 11);
+  // 2026: 4. Juli faellt auf einen Samstag -> beobachtet am 3. Juli (rueckwaerts).
+  assert.ok(names2026.includes('2026-07-03 Independence Day'));
+  assert.ok(!names2026.some((n) => n.includes('07-04')));
+  // 19. Juni 2026 ist ein Freitag (Werktag) - keine Verschiebung.
+  assert.ok(names2026.includes('2026-06-19 Juneteenth National Independence Day'));
+  // n-ter-Wochentag-Feiertage 2026, unabhaengig gegengeprueft:
+  assert.ok(names2026.includes('2026-01-19 Martin Luther King, Jr. Day'));   // 3. Montag Januar
+  assert.ok(names2026.includes('2026-02-16 Washington\'s Birthday'));         // 3. Montag Februar
+  assert.ok(names2026.includes('2026-05-25 Memorial Day'));                  // letzter Montag Mai
+  assert.ok(names2026.includes('2026-09-07 Labor Day'));                     // 1. Montag September
+  assert.ok(names2026.includes('2026-10-12 Columbus Day'));                  // 2. Montag Oktober
+  assert.ok(names2026.includes('2026-11-26 Thanksgiving Day'));              // 4. Donnerstag November
+});
+
+test('US: Sonntag verschiebt vorwaerts auf Montag', () => {
+  // 2027: 4. Juli ist ein Sonntag -> beobachtet Montag 5. Juli.
+  const names2027 = namesAndDates(2027, 'US');
+  assert.ok(names2027.includes('2027-07-05 Independence Day'));
+  // 19. Juni 2027 ist ein Samstag -> beobachtet Freitag 18. Juni (rueckwaerts).
+  assert.ok(names2027.includes('2027-06-18 Juneteenth National Independence Day'));
+});
+
+test('US: ein auf das Vorjahr zurueckfallendes Beobachtungsdatum bleibt korrekt (Neujahr 2028)', () => {
+  // 1. Januar 2028 ist ein Samstag -> beobachtet Freitag, 31. Dezember 2027 -
+  // ein Datum im VORjahr, obwohl es aus der Feiertagsliste fuer 2028 stammt.
+  // getForRange() filtert ohnehin nur nach Datum, nicht nach dem year-Feld,
+  // daher ist das unschaedlich - aber ohne diesen Test unbemerkt falsch
+  // gewesen waere es leicht gewesen.
+  const names2028 = namesAndDates(2028, 'US');
+  assert.ok(names2028.includes("2027-12-31 New Year's Day"),
+    `erwartet 2027-12-31, bekam: ${names2028.filter((n) => n.includes('New Year')).join(', ')}`);
+});
+
+test('CA: 10 Feiertage, EN/FR-Kaskade, Victoria Day zwischen dem 18. und 24. Mai', () => {
+  const en2026 = namesAndDates(2026, 'CA');
+  assert.equal(en2026.length, 10);
+  // 2026: der 25. Mai selbst ist ein Montag - Victoria Day bleibt trotzdem der
+  // 18. ("Monday PRECEDING May 25", nicht "on or before"), sonst waere das
+  // Gesetz identisch mit "letzter Montag im Mai" und Victoria Day faelschlich
+  // auf den 25.
+  assert.ok(en2026.includes('2026-05-18 Victoria Day'), `bekam: ${en2026.filter((n) => n.includes('Victoria')).join(', ')}`);
+
+  const fr2026 = localHolidayFallback('CA', 'public', 2026, 'FR')
+    .map((h) => `${h.startDate} ${h.name}`).sort();
+  assert.ok(fr2026.includes('2026-05-18 Fête de la Reine'));
+  assert.ok(fr2026.includes('2026-07-01 Fête du Canada') || fr2026.some((n) => n.includes('Fête du Canada')));
+});
+
+test('CA: Victoria Day faellt auf den 24., wenn der selbst ein Montag ist', () => {
+  // 2027: der 24. Mai ist ein Montag und liegt noch im erlaubten Bereich
+  // (18.-24. inklusive) - Victoria Day faellt hier auf den 24., nicht den 17.
+  const names2027 = namesAndDates(2027, 'CA');
+  assert.ok(names2027.includes('2027-05-24 Victoria Day'));
+});
+
+test('CA: nur Sonntag verschiebt, Samstag bleibt unveraendert', () => {
+  // 1. Januar 2028 ist ein Samstag - anders als in den USA (rueckwaerts auf
+  // Freitag) bleibt der kanadische Feiertag unveraendert am Samstag stehen,
+  // weil Kanadas Regel nur Sonntag->Montag kennt (siehe Code-Kommentar).
+  const names2028 = namesAndDates(2028, 'CA');
+  assert.ok(names2028.includes("2028-01-01 New Year's Day"));
+});
+
+test('CA: Weihnachten und Boxing Day werden unabhaengig verschoben - dokumentierte Kollision moeglich', () => {
+  // 2022: 25. Dezember ist ein Sonntag (-> Montag 26.), 26. Dezember ist
+  // bereits ein Montag (unveraendert) - beide landen auf demselben Datum.
+  // Das ist die im Code-Kommentar dokumentierte, bewusst hingenommene Luecke
+  // gegenueber dem UK/NZ-Paarschema, nicht ein uebersehener Fehler.
+  const names2022 = namesAndDates(2022, 'CA');
+  const dec26 = names2022.filter((n) => n.startsWith('2022-12-26'));
+  assert.deepEqual(dec26, ['2022-12-26 Boxing Day', '2022-12-26 Christmas Day']);
+});
+
+test('GB (England & Wales): 8 Feiertage; Neujahr verschiebt VORWAERTS auf Montag, anders als die USA', () => {
+  const namesEng = namesAndDates(2026, 'GB', 'GB-ENG');
+  assert.equal(namesEng.length, 8);
+  // 1. Januar 2028 ist ein Samstag: UK "mondayised" verschiebt vorwaerts auf
+  // Montag 3. Januar - im Gegensatz zu den USA, die am selben Kalenderdatum
+  // rueckwaerts auf den 31. Dezember 2027 verschieben (siehe US-Test oben).
+  const names2028 = namesAndDates(2028, 'GB', 'GB-ENG');
+  assert.ok(names2028.includes("2028-01-03 New Year's Day"),
+    `erwartet Montag 3.1.2028 (vorwaerts), bekam: ${names2028.filter((n) => n.includes('New Year')).join(', ')}`);
+});
+
+test('GB (England & Wales): Weihnachten/Boxing Day Paar-Verschiebung, amtlich belegte Jahre', () => {
+  // 2026: Weihnachten faellt auf Freitag (Werktag, unveraendert); Boxing Day
+  // auf Samstag -> Ersatztag Montag 28.12. (GOV.UK/Presseberichte bestaetigt).
+  const names2026 = namesAndDates(2026, 'GB', 'GB-ENG');
+  assert.ok(names2026.includes('2026-12-25 Christmas Day'));
+  assert.ok(names2026.includes('2026-12-28 Boxing Day'));
+
+  // 2027: Weihnachten Samstag -> Ersatztag Montag 27.; Boxing Day Sonntag ->
+  // Ersatztag Dienstag 28. (ebenfalls amtlich bestaetigt, siehe #965-Recherche).
+  const names2027 = namesAndDates(2027, 'GB', 'GB-ENG');
+  assert.ok(names2027.includes('2027-12-27 Christmas Day'));
+  assert.ok(names2027.includes('2027-12-28 Boxing Day'));
+});
+
+test('GB (Schottland): 9 Feiertage, kein Ostermontag, eigener Sommertermin, 2. Januar als Paar', () => {
+  const namesSct2026 = namesAndDates(2026, 'GB', 'GB-SCT');
+  assert.equal(namesSct2026.length, 9);
+  assert.ok(!namesSct2026.some((n) => n.includes('Easter Monday')));
+
+  // 2022: 1. Januar Samstag, 2. Januar Sonntag -> Ersatztage Montag 3. und
+  // Dienstag 4. Januar (amtlich belegtes Beispiel aus der Recherche).
+  const namesSct2022 = namesAndDates(2022, 'GB', 'GB-SCT');
+  assert.ok(namesSct2022.includes("2022-01-03 New Year's Day"),
+    `bekam: ${namesSct2022.filter((n) => n.includes('01-0')).join(', ')}`);
+  assert.ok(namesSct2022.includes('2022-01-04 2 January'));
+});
+
+test('GB (Nordirland): 10 Feiertage, St Patrick\'s Day + Battle of the Boyne mit Mondayisation', () => {
+  const namesNir2026 = namesAndDates(2026, 'GB', 'GB-NIR');
+  assert.equal(namesNir2026.length, 10);
+  // 2026: Battle of the Boyne (12. Juli) faellt auf einen Sonntag -> Ersatztag
+  // Montag 13. Juli (amtlich bestaetigt); St Patrick's Day faellt 2026 auf
+  // einen Dienstag (Werktag) und bleibt unveraendert.
+  assert.ok(namesNir2026.includes('2026-07-13 Battle of the Boyne (Orangemen’s Day)'),
+    `bekam: ${namesNir2026.filter((n) => n.includes('Boyne')).join(', ')}`);
+  assert.ok(namesNir2026.includes("2026-03-17 St Patrick's Day"));
+});
+
+test('GB: ohne gewaehlte Subdivision gilt England & Wales', () => {
+  assert.deepEqual(namesAndDates(2026, 'GB'), namesAndDates(2026, 'GB', 'GB-ENG'));
+});
+
+test('AU: 7 landesweite Feiertage, KEINE Wochenend-Verschiebung', () => {
+  // Australien hat kein Bundesgesetz fuer Ersatztage (jeder Bundesstaat regelt
+  // das selbst, siehe #965-Recherche) - die Liste zeigt daher immer das echte
+  // Kalenderdatum, auch wenn es auf ein Wochenende faellt.
+  const names2026 = namesAndDates(2026, 'AU');
+  assert.equal(names2026.length, 7);
+  assert.ok(names2026.includes('2026-04-25 Anzac Day')); // 2026: ein Samstag, bewusst unverschoben
+});
+
+test('NZ: Mondayisation fuer Waitangi/Anzac, Matariki nur innerhalb der amtlichen Tabelle', () => {
+  // 2026: Anzac Day (25. April) faellt auf einen Samstag -> mondayised auf
+  // Montag 27. April (im #965-Rechercheergebnis direkt bestaetigtes Beispiel).
+  const names2026 = namesAndDates(2026, 'NZ');
+  assert.ok(names2026.includes('2026-04-27 Anzac Day'), `bekam: ${names2026.filter((n) => n.includes('Anzac')).join(', ')}`);
+  // Matariki 2026 laut MBIE: Freitag, 10. Juli (nicht der 9., wie eine grobe
+  // Schaetzung nahelegen wuerde - deshalb eine amtliche Tabelle, keine Formel).
+  assert.ok(names2026.includes('2026-07-10 Matariki'));
+
+  // Jenseits der veroeffentlichten Tabelle (bis 2052) gibt es keinen Matariki-
+  // Eintrag - lieber eine Luecke als ein geratenes Datum.
+  const names2053 = namesAndDates(2053, 'NZ');
+  assert.ok(!names2053.some((n) => n.includes('Matariki')));
+});
+
+test('NZ: Neujahr/2.-Januar- und Weihnachten/Boxing-Day-Paare wie in Schottland', () => {
+  // 2028: gleiches Wochentagsmuster wie das Schottland-Beispiel oben (1.
+  // Januar Samstag) - dieselbe Formel muss dasselbe Ergebnis liefern.
+  const names2028 = namesAndDates(2028, 'NZ');
+  assert.ok(names2028.includes("2028-01-03 New Year's Day"));
+  assert.ok(names2028.includes('2028-01-04 Day after New Year’s Day'));
+
+  // 2021: Weihnachten Samstag, Boxing Day Sonntag -> Montag 27./Dienstag 28.
+  // (dasselbe amtlich belegte Beispiel wie fuer UK oben, hier fuer NZ).
+  const names2021 = namesAndDates(2021, 'NZ');
+  assert.ok(names2021.includes('2021-12-27 Christmas Day'));
+  assert.ok(names2021.includes('2021-12-28 Boxing Day'));
+});
+
+test('sync: US public holidays cache via the same empty-fetch fallback path as Brazil', async () => {
+  const mock = makeApiMock();
+  __setFetchImpl(mock);
+  setConfig({ holiday_country: 'US', holiday_show_public: '1', holiday_show_school: '0', language: 'de' });
+
+  const res = await sync(true);
+
+  assert.equal(res.synced, SYNC_YEAR_SPAN * 11);
+  assert.ok(mock.calls.every((url) => url.includes('countryIsoCode=US')));
+  // Nur EN-Namen fuer die USA - eine deutsche Datensprache bekommt trotzdem
+  // Englisch, dokumentiert als bewusste Einschraenkung (siehe Code-Kommentar).
+  const currentYear = new Date().getFullYear();
+  const namen = db.prepare(
+    "SELECT name FROM holiday_cache WHERE country='US' AND type='public' AND year=?",
+  ).all(currentYear).map((r) => r.name);
+  assert.ok(namen.includes('Christmas Day'));
+});
+
+test('sync: GB with a chosen subdivision fetches/caches that nation\'s own list', async () => {
+  __setFetchImpl(makeApiMock());
+  setConfig({ holiday_country: 'GB', holiday_subdivision: 'GB-SCT', holiday_show_public: '1', holiday_show_school: '0' });
+
+  const res = await sync(true);
+
+  assert.equal(res.synced, SYNC_YEAR_SPAN * 9); // Schottland: 9 statt 8 (England/Wales)
+  const currentYear = new Date().getFullYear();
+  const namen = db.prepare(
+    "SELECT name FROM holiday_cache WHERE country='GB' AND type='public' AND year=?",
+  ).all(currentYear).map((r) => r.name);
+  assert.ok(namen.includes("St Andrew's Day"));
+  assert.ok(!namen.includes('Easter Monday'));
+});
+
+test('sync: school holidays for a #965 country store nothing and report incomplete: false', async () => {
+  // Der Schulferien-Schalter darf fuer diese Laender technisch eingeschaltet
+  // bleiben (kein Server-seitiges Verbot noetig) - es gibt nur nichts zu
+  // synchronisieren, und das ist eine Auskunft, kein Fehlschlag.
+  __setFetchImpl(makeApiMock());
+  setConfig({ holiday_country: 'US', holiday_show_public: '0', holiday_show_school: '1' });
+
+  const res = await sync(true);
+
+  assert.equal(res.incomplete, false);
+  assert.equal(db.prepare("SELECT COUNT(*) c FROM holiday_cache WHERE country='US' AND type='school'").get().c, 0);
+});
+
 // ---- getCountries / getSubdivisions -----------------------------------------
 
 test('getCountries: prefers EN names and sorts alphabetically', async () => {
   __setFetchImpl(makeApiMock());
   const list = await getCountries();
+  // Neben den zwei API-Laendern erscheinen die sechs lokal berechneten
+  // Laender aus #965 - keins davon liefert der Mock, also gewinnt hier
+  // niemand gegen die API, es wird nur ergaenzt.
   assert.deepEqual(list, [
+    { isoCode: 'AU', name: 'Australia', schoolHolidays: false },
+    { isoCode: 'BR', name: 'Brazil', schoolHolidays: false },
+    { isoCode: 'CA', name: 'Canada', schoolHolidays: false },
     { isoCode: 'FR', name: 'France' },
     { isoCode: 'DE', name: 'Germany' },
+    { isoCode: 'NZ', name: 'New Zealand', schoolHolidays: false },
+    { isoCode: 'GB', name: 'United Kingdom', schoolHolidays: false },
+    { isoCode: 'US', name: 'United States', schoolHolidays: false },
   ]);
+});
+
+test('getCountries: an API-listed local country is not duplicated - the API entry wins', async () => {
+  // Simuliert die echte OpenHolidays-API, die Brasilien tatsaechlich fuehrt
+  // (siehe #965-Recherche): unsere lokale BR-Ergaenzung darf dann nicht als
+  // zweiter Eintrag erscheinen.
+  __setFetchImpl(async (url) => {
+    const path = new URL(String(url)).pathname;
+    if (path === '/Countries') {
+      return okJson([{ isoCode: 'BR', name: [{ language: 'EN', text: 'Brazil (API)' }] }]);
+    }
+    return okJson([]);
+  });
+  const list = await getCountries();
+  const brEntries = list.filter((c) => c.isoCode === 'BR');
+  assert.equal(brEntries.length, 1);
+  assert.equal(brEntries[0].name, 'Brazil (API)');
+  assert.equal(brEntries[0].schoolHolidays, undefined, 'der API-Eintrag traegt kein schoolHolidays-Flag');
+});
+
+test('getSubdivisions: GB is answered locally, without an API call (#965)', async () => {
+  const mock = makeApiMock();
+  __setFetchImpl(mock);
+  const list = await getSubdivisions('GB');
+  assert.deepEqual(list, [
+    { isoCode: 'GB-ENG', name: 'England and Wales' },
+    { isoCode: 'GB-NIR', name: 'Northern Ireland' },
+    { isoCode: 'GB-SCT', name: 'Scotland' },
+  ]);
+  assert.equal(mock.calls.length, 0, 'GB ist kein echtes OpenHolidays-Land - kein Netzwerkaufruf noetig');
+});
+
+test('getGroups: GB has none, answered locally without an API call', async () => {
+  const mock = makeApiMock();
+  __setFetchImpl(mock);
+  assert.deepEqual(await getGroups('GB', 'GB-ENG'), []);
+  assert.equal(mock.calls.length, 0);
 });
 
 test('getSubdivisions: maps code/name, falls back to shortName, sorts', async () => {

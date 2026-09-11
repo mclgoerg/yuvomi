@@ -1788,6 +1788,7 @@
         },
         "ics": {
             "title": "Abbonamenti ICS",
+            "holidayHint": "Suggerimento: funziona bene anche per le festività di un paese non ancora coperto dalla sincronizzazione delle festività nelle impostazioni del calendario.",
             "add": "Aggiungi abbonamento",
             "addedToast": "Abbonamento aggiunto.",
             "deletedToast": "Abbonamento eliminato.",
@@ -2178,6 +2179,7 @@
         "holidayGroupHint": "Alcuni cantoni plurilingui hanno date delle vacanze scolastiche diverse a seconda della regione linguistica. Scegli la regione corretta per date accurate.",
         "holidayPublicLabel": "Mostra giorni festivi",
         "holidaySchoolLabel": "Mostra vacanze scolastiche",
+        "holidaySchoolUnavailable": "Per questo paese non sono disponibili dati sulle vacanze scolastiche.",
         "holidayPublicColor": "Colore giorni festivi",
         "holidaySchoolColor": "Colore vacanze scolastiche",
         "holidaySaveBtn": "Salva",
