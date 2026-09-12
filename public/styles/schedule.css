@@ -327,6 +327,16 @@
   gap: var(--space-2);
 }
 
+/* App-weite UX-Durchsicht 2026-09-12 (Batch 4): Ersatz fuer das zuvor hier
+ * missbrauchte `.segmented` (eine Reihe einmaliger Aktionen, kein Umschalter
+ * zwischen sich ausschliessenden Zustaenden) - eine schlichte, umbrechende
+ * Knopfreihe, dieselbe Koernung wie `.empty-state__actions` (layout.css). */
+.schedule-quickstart-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .schedule-icon-picker {
   display: inline-flex;
   align-items: center;
@@ -792,7 +802,26 @@
   border-top: 1px solid var(--color-border);
 }
 
+/* App-weite UX-Durchsicht 2026-09-12 (Batch 4): `.schedule-overview__scroll`
+ * ist der EINE Scroll-Container fuer beide Achsen (waagerecht: Tage/Personen,
+ * senkrecht: Stunden, siehe Kommentar dort) - beim senkrechten Scrollen durch
+ * eine lange Stundenspanne verschwand der Tageskopf mit nach oben aus dem
+ * sichtbaren Bereich, und ein Block mitten in der Liste liess sich keinem Tag
+ * mehr zuordnen. `position: sticky` haengt den Kopf an der Blockachse (oben)
+ * dieses Scroll-Containers fest - dieselbe Technik wie `.schedule-overview__
+ * gutter` schon fuer die Inline-Achse (links) einsetzt, nur auf der anderen
+ * Achse. Der eigene Hintergrund verhindert, dass durchscrollende Stunden-
+ * Linien/Bloecke unter dem angehefteten Kopf durchscheinen; der z-index liegt
+ * ueber dem der Zeitspalte (2), damit die Kopfzeile der Zeitspalte selbst
+ * (ein leerer Platzhalter, siehe renderOverview()) nicht ueber einen echten
+ * Tageskopf gewinnt, wenn beide Achsen gleichzeitig angeheftet sind. Der
+ * Woche/Tag-Umschalter daneben (ein echter Umschalter zwischen zwei sich
+ * ausschliessenden Ansichten) bleibt unveraendert ein `.segmented`. */
 .schedule-overview__day-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--color-surface);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);

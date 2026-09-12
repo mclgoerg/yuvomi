@@ -1402,7 +1402,11 @@ test('the quickstart template list is filtered by the household schedule_hidden_
   assert.match(schedulePage, /const hidden = new Set\(state\.hiddenTemplates \?\? \[\]\);/);
   assert.match(schedulePage, /QUICKSTART_TEMPLATES\.filter\(\(\[key\]\) => !hidden\.has\(key\)\)/);
   assert.match(schedulePage, /visibleQuickstartTemplates\(\)\.map/, 'the empty state must consume the filtered list, not the raw one');
-  assert.match(schedulePage, /state\.types\.length && visibleQuickstartTemplates\(\)\.length \? '<div class="segmented"/, 'the header picker must not render an empty wrapper once every template is hidden');
+  // App-weite UX-Durchsicht 2026-09-12 (Batch 4): das Header-Picker-Markup
+  // wechselte von `.segmented` (Umschalter-Optik fuer einmalige Aktionen, ein
+  // Missbrauch des Idioms) auf eine schlichte Knopfreihe - die Bedingung
+  // ("kein leerer Wrapper, sobald jede Vorlage ausgeblendet ist") gilt unveraendert.
+  assert.match(schedulePage, /state\.types\.length && visibleQuickstartTemplates\(\)\.length \? '<div class="schedule-quickstart-actions"/, 'the header picker must not render an empty wrapper once every template is hidden');
   assert.match(schedulePage, /hiddenTemplates: Array\.isArray\(householdPrefs\.data\?\.schedule_hidden_templates\)/, 'load() must read the household preference, not just default to showing everything');
 });
 
@@ -1442,8 +1446,14 @@ test('the Patterns tab folds patterns, overrides, and extras into one tab and on
   assert.match(patternsBranch, /schedule-library--patterns/);
   assert.match(patternsBranch, /schedule-library--overrides/, 'the overrides list must render inside the patterns branch, not a separate view');
   assert.match(patternsBranch, /schedule-library--extras/, 'the extras list must render inside the patterns branch, not a separate view');
-  assert.match(patternsBranch, /data-action="open-create-override"/);
-  assert.match(patternsBranch, /data-action="open-create-extra"/);
+  // App-weite UX-Durchsicht 2026-09-12 (Batch 4): der Abschnittskopf trug
+  // frueher einen EIGENEN, immer sichtbaren Anlege-Knopf hier - das duplizierte
+  // sich mit der eigenen Leerzustand-CTA (nur ohne Eintraege) und dem globalen
+  // FAB. Siehe die eigene Test-Gruppe unten ("consolidated add affordances")
+  // fuer die volle Begruendung; hier nur die Gegenprobe, dass der Kopf selbst
+  // keinen eigenen Knopf mehr traegt.
+  assert.doesNotMatch(patternsBranch, /data-action="open-create-override"/);
+  assert.doesNotMatch(patternsBranch, /data-action="open-create-extra"/);
 
   const modalFn = schedulePage.slice(schedulePage.indexOf("function openScheduleCreateModal"), schedulePage.indexOf('async function saveCreatedSchedule'));
   assert.match(modalFn, /name="mode"/, 'a hidden field must carry the active mode');
@@ -2055,4 +2065,73 @@ test('weeklyHours: 0 stays rejected server-side - S-24 was answered with a separ
   const prefsRoute = readFileSync(new URL('../server/routes/schedule-preferences.js', import.meta.url), 'utf8');
   assert.match(prefsRoute, /n < 1 \|\| n > MAX_WEEKLY_HOURS/, 'weeklyHours must still reject 0 - overtimeEnabled is the real answer to "disable overtime", not a reinterpreted 0');
   assert.match(prefsRoute, /typeof raw !== 'boolean'/, 'overtimeEnabled must be validated as a real boolean, not loosely coerced');
+});
+
+// App-weite UX-Durchsicht 2026-09-12 (Batch 4): "Schedule: hierarchy + actions".
+
+test('the Today card lives in its own slot above `.schedule-body` and no longer depends on the active tab', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  // renderShell() builds the slot exactly once, as a sibling of `.schedule-body`
+  // - never inside it, so a tab switch (which only rebuilds `.schedule-body`)
+  // cannot make the card appear/disappear or shift the rest of the page.
+  const shellFn = schedulePage.slice(schedulePage.indexOf('function renderShell()'), schedulePage.indexOf('function renderTodayCard()'));
+  assert.match(shellFn, /<div class="schedule-today-slot"><\/div>\s*\n\s*<div class="schedule-body"><\/div>/, 'the today slot must be a sibling that precedes .schedule-body, built once in renderShell()');
+  assert.doesNotMatch(shellFn.slice(0, shellFn.indexOf('schedule-today-slot')), /schedule-body/, 'the today slot must come before .schedule-body in the shell markup');
+
+  const todayCardFn = schedulePage.slice(schedulePage.indexOf('function renderTodayCard()'), schedulePage.indexOf('function renderTodayCard()') + 800);
+  // The old gate additionally hid the card on the statistics/overview tabs
+  // (the very thing that made the first block of the page change per tab) -
+  // only the inUse guard (unchanged data condition) may remain.
+  assert.doesNotMatch(todayCardFn, /activeView === 'statistics'/, 'the today card must no longer be gated on which tab is active');
+  assert.doesNotMatch(todayCardFn, /activeView === 'overview'/, 'the today card must no longer be gated on which tab is active');
+  assert.match(todayCardFn, /const inUse = state\.types\.length \|\| state\.patterns\.length\s*\n\s*\|\| state\.overrides\.length \|\| state\.entries\.length;/, 'the inUse guard itself (a fresh household shows no empty-state pileup) must survive unchanged');
+  assert.match(todayCardFn, /if \(inUse\) \{/, 'an empty household must still render nothing in the slot');
+
+  // renderPage() must refresh the slot on every call (every tab switch, every
+  // mutation), not just on initial mount.
+  const renderPageFn = schedulePage.slice(schedulePage.indexOf('function renderPage()'), schedulePage.indexOf('function renderTodayCard()'));
+  assert.match(renderPageFn, /renderTodayCard\(\);/);
+});
+
+test('Planning tab: Override/Extra no longer duplicate their "add" affordance in the section head (consolidated add affordances)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const renderPageFn = schedulePage.slice(schedulePage.indexOf('function renderPage()'), schedulePage.indexOf('function renderTodayCard()'));
+  // The section head must be a bare title (same shape as the Patterns section
+  // right above it) - no unconditional header button competing with the
+  // section's own empty-state CTA and with the page FAB.
+  assert.match(renderPageFn, /<section class="schedule-library schedule-library--overrides"><h2 class="u-section-title">' \+ esc\(t\('schedule\.overrides'\)\) \+ '<\/h2>' \+ overrideRows\(\) \+ '<\/section>'/);
+  assert.match(renderPageFn, /<section class="schedule-library schedule-library--extras"><h2 class="u-section-title">' \+ esc\(t\('schedule\.extraShifts'\)\) \+ '<\/h2>' \+ extraRows\(\) \+ '<\/section>'/);
+  assert.doesNotMatch(renderPageFn, /data-action="open-create-override"/, 'the header must not carry its own always-visible "create override" button anymore');
+  assert.doesNotMatch(renderPageFn, /data-action="open-create-extra"/, 'the header must not carry its own always-visible "add extra shift" button anymore');
+  // The action itself must still exist - only reachable via the FAB and each
+  // section's own (contextual, empty-only) empty-state CTA now (emptyStateHTML's
+  // `attrs` object, not a literal HTML string - it is serialized at runtime).
+  assert.match(schedulePage, /attrs: \{ 'data-action': 'open-create-override' \}/, 'the action must still be reachable, e.g. from the empty state');
+  assert.match(schedulePage, /attrs: \{ 'data-action': 'open-create-extra' \}/, 'the action must still be reachable, e.g. from the empty state');
+  // And the click handler that both the FAB-opened modal and the empty-state
+  // CTA ultimately share must still be wired.
+  assert.match(schedulePage, /if \(button\.dataset\.action === 'open-create-override'\) \{/);
+  assert.match(schedulePage, /if \(button\.dataset\.action === 'open-create-extra'\) \{/);
+});
+
+test('Shift types quick-start: plain buttons replace the misused `.segmented` control (one-shot actions, not exclusive state)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const shiftsPanel = schedulePage.slice(schedulePage.indexOf("activeView === 'shifts'"), schedulePage.indexOf(": activeView === 'patterns'"));
+  assert.doesNotMatch(shiftsPanel, /class="segmented"/, 'the quick-start template triggers must not be styled as a segmented/exclusive-state control');
+  assert.match(shiftsPanel, /class="schedule-quickstart-actions"/, 'a plain button row replaces it');
+  assert.match(shiftsPanel, /class="btn btn--secondary btn--sm" data-action="quick-start-shifts"/, 'each template stays an ordinary secondary button, an existing variant');
+  // The household template visibility filter must be respected unchanged.
+  assert.match(shiftsPanel, /visibleQuickstartTemplates\(\)\.map\(\(\[template, key\]\)/);
+});
+
+test('Compare/Overview tab: the day-head is sticky on the block axis while the week/day density toggle stays a real segmented control', () => {
+  const scheduleCss = readFileSync(new URL('../public/styles/schedule.css', import.meta.url), 'utf8');
+  const rule = scheduleCss.slice(scheduleCss.indexOf('.schedule-overview__day-head {'), scheduleCss.indexOf('.schedule-overview__day-head {') + 400);
+  assert.match(rule, /position:\s*sticky;/);
+  assert.match(rule, /top:\s*0;/);
+  assert.match(rule, /background:\s*var\(--color-surface\);/, 'must not scroll transparently over passing hour lines/entries');
+
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  assert.match(schedulePage, /data-action="overview-view-mode" data-mode="week"/, 'the week/day density toggle is legitimate mutually-exclusive state and must remain a segmented control');
+  assert.match(schedulePage, /class="segmented"[^>]*>\s*\n\s*<button type="button" class="segmented__item\$\{overview\.viewMode === 'week'/);
 });

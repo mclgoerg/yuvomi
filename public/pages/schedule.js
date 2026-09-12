@@ -1736,6 +1736,7 @@ function renderShell() {
         ${tabs.map(([id, label]) => `<button class="sub-tab${id === activeView ? ' sub-tab--active' : ''}" type="button" role="tab" data-tab-id="${id}" aria-selected="${id === activeView ? 'true' : 'false'}" tabindex="${id === activeView ? '0' : '-1'}">${esc(label)}</button>`).join('')}
       </div>
     </header>
+    <div class="schedule-today-slot"></div>
     <div class="schedule-body"></div>
   </div>`);
   // Geteilte Tablist-Verhaltensschicht (Klick + Pfeiltasten/Home/End + Roving-
@@ -1894,32 +1895,47 @@ function renderPage() {
     // ein Haushalt kann durchaus "Arbeit" fuer ein Mitglied und spaeter
     // "Schule" fuer ein anderes brauchen, nicht nur beim allerersten Typ.
     ? '<section class="schedule-library schedule-library--shifts"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.shiftTypes')) + '</h2>'
-      + (locked ? '' : (state.types.length && visibleQuickstartTemplates().length ? '<div class="segmented" role="group" aria-label="' + esc(t('schedule.quickStartShiftTypes')) + '">'
-        + visibleQuickstartTemplates().map(([template, key]) => '<button type="button" class="segmented__item" data-action="quick-start-shifts" data-template="' + template + '">' + esc(t(key)) + '</button>').join('')
+      // App-weite UX-Durchsicht 2026-09-12 (Batch 4): `.segmented` bildet eine
+      // Auswahl aus sich GEGENSEITIG AUSSCHLIESSENDEN Zustaenden ab (Statistik-
+      // Zeitraum, Woche/Tag im Uebersicht-Tab, Muster/Ersetzen/Extra im
+      // Anlege-Formular) - hier stand es fuer drei EINMALIGE AKTIONEN
+      // (Vorlage anlegen), die sich weder gegenseitig ausschliessen noch
+      // einen "aktiven" Zustand kennen (keins traegt je `is-active`/
+      // `aria-pressed`, es gab nie einen zu markierenden Ist-Zustand). Plain
+      // Buttons wie in emptyShiftTypesState() (derselbe Sparkles-Weg im
+      // Leerzustand) statt des Umschalter-Aussehens; die Haushalts-Vorlagen-
+      // Filterung (visibleQuickstartTemplates()) bleibt unveraendert.
+      + (locked ? '' : (state.types.length && visibleQuickstartTemplates().length ? '<div class="schedule-quickstart-actions" role="group" aria-label="' + esc(t('schedule.quickStartShiftTypes')) + '">'
+        + visibleQuickstartTemplates().map(([template, key]) => '<button type="button" class="btn btn--secondary btn--sm" data-action="quick-start-shifts" data-template="' + template + '"><i data-lucide="sparkles" aria-hidden="true"></i>' + esc(t(key)) + '</button>').join('')
         + '</div>' : '')) + '</div>'
       + (state.types.length ? state.types.map(shiftTypeCard).join('') : emptyShiftTypesState()) + '</section>'
       + customFieldsSection()
     : activeView === 'patterns'
       ? '<section class="schedule-library schedule-library--patterns"><h2 class="u-section-title">' + esc(t('schedule.patterns')) + '</h2>' + (state.patterns.length ? state.patterns.map(patternCard).join('') : emptyPatternState()) + '</section>'
-        + '<section class="schedule-library schedule-library--overrides"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.overrides')) + '</h2>' + (locked ? '' : '<button type="button" class="btn btn--secondary" data-action="open-create-override"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.createOverride')) + '</button>') + '</div>' + overrideRows() + '</section>'
-        + '<section class="schedule-library schedule-library--extras"><div class="schedule-library__head"><h2 class="u-section-title">' + esc(t('schedule.extraShifts')) + '</h2>' + (locked ? '' : '<button type="button" class="btn btn--secondary" data-action="open-create-extra"><i data-lucide="plus" aria-hidden="true"></i>' + esc(t('schedule.addExtraShift')) + '</button>') + '</div>' + extraRows() + '</section>'
+        // App-weite UX-Durchsicht 2026-09-12 (Batch 4, "bis zu vier
+        // konkurrierende Anlege-Wege"): Override/Extra trugen bisher JE EINEN
+        // Anlege-Knopf im Abschnittskopf, IMMER sichtbar - zusaetzlich zur
+        // eigenen leeren-Zustand-CTA (emptyOverrideState()/
+        // emptyExtraShiftsState(), nur ohne Eintraege) und zum globalen FAB
+        // ("Add entry", oeffnet dasselbe Formular mit demselben Modus - siehe
+        // 'open-create-override'/'open-create-extra' weiter unten, die schon
+        // vorher nur openScheduleCreateModal('patterns', {mode}) aufriefen).
+        // Bei leerem Abschnitt standen so ZWEI identische Knoepfe uebereinander.
+        // DESIGN.md untersagt genau das ("kein zweiter Anlege-Weg neben einem
+        // sichtbaren, es sei denn unter DERSELBEN Bedingung") - jetzt EIN
+        // Kopf ohne eigenen Knopf, wie ihn die Muster-Sektion direkt darueber
+        // schon immer hatte: der FAB bleibt der durchgehende Weg, die
+        // Leerzustand-CTA bleibt der kontextuelle (nur wenn wirklich nichts
+        // da ist) - nichts entfernt, nur nicht mehr doppelt angeboten.
+        + '<section class="schedule-library schedule-library--overrides"><h2 class="u-section-title">' + esc(t('schedule.overrides')) + '</h2>' + overrideRows() + '</section>'
+        + '<section class="schedule-library schedule-library--extras"><h2 class="u-section-title">' + esc(t('schedule.extraShifts')) + '</h2>' + extraRows() + '</section>'
       : activeView === 'overview'
         ? renderOverview()
         : renderStatistics();
   const body = root.querySelector('.schedule-body');
   body.replaceChildren();
-  // Die Heute-Karte erst, wenn das Modul in Betrieb ist: ein frischer Haushalt
-  // sah sonst ZWEI Leerzustaende uebereinander („Noch keine Schichteintraege."
-  // + „Noch kein Schichtplan") - zwei Meldungen fuer eine Tatsache, und die
-  // Onboarding-Anleitung des Panels stand erst an zweiter Stelle
-  // (Critique 2026-08-27, P2). Die Uebersicht zeigt bereits mehrere Personen
-  // ueber eine ganze Woche - dieselbe "Heute"-Karte daneben waere redundant,
-  // genau wie bei Statistics.
-  const inUse = state.types.length || state.patterns.length
-    || state.overrides.length || state.entries.length;
-  body.insertAdjacentHTML('beforeend',
-    (activeView === 'statistics' || activeView === 'overview' || !inUse ? '' : '<section class="card card--padded schedule-today"><h2 class="u-section-title">' + esc(t('schedule.today')) + '</h2>' + renderToday() + renderScheduleWarnings() + '</section>')
-    + `<div class="schedule-content">${panel}</div>`);
+  body.insertAdjacentHTML('beforeend', `<div class="schedule-content">${panel}</div>`);
+  renderTodayCard();
   updateScheduleFab();
   window.lucide?.createIcons({ el: body });
   wireShiftTypeFieldSortables(body);
@@ -1928,6 +1944,34 @@ function renderPage() {
     wireScrollFade(body.querySelector('.schedule-overview__scroll'));
   }
   if (scrollPort) scrollPort.scrollTop = scrollTop;
+}
+
+// App-weite UX-Durchsicht 2026-09-12 (Batch 4): vorher war die "Heute"-Karte
+// der ERSTE Block INNERHALB des je Tab-Wechsel komplett neu gebauten
+// `.schedule-body` - und nur auf Schichtarten/Planung ueberhaupt vorhanden
+// (Statistik/Uebersicht liessen sie weg, siehe der fruehere Kommentar an
+// dieser Stelle). Ein Wechsel zu Statistik/Uebersicht liess sie verschwinden,
+// und der gesamte restliche Inhalt sprang nach oben - "der erste Block der
+// Seite" aendert sich beim Tab-Wechsel, obwohl "was ist heute" nichts mit dem
+// gewaehlten Tab zu tun hat. Jetzt lebt sie in `.schedule-today-slot`, einem
+// eigenen Geschwister-Element ausserhalb von `.schedule-body` (siehe
+// renderShell()), das nie durch den Tab-Wechsel ersetzt wird - nur sein
+// Inhalt wird bei jedem renderPage() aufgefrischt, unabhaengig von
+// `activeView`. Der `inUse`-Waechter bleibt UNVERAENDERT (ein frischer
+// Haushalt sieht auf KEINEM Tab zwei Leerzustaende uebereinander - „Noch keine
+// Schichteintraege." + „Noch kein Schichtplan", Critique 2026-08-27, P2) -
+// nur die fruehere Tab-Bedingung (`activeView === 'statistics' ||
+// activeView === 'overview'`) entfaellt, denn genau DIE erzeugte den Sprung.
+function renderTodayCard() {
+  const slot = root?.querySelector('.schedule-today-slot');
+  if (!slot) return;
+  const inUse = state.types.length || state.patterns.length
+    || state.overrides.length || state.entries.length;
+  slot.replaceChildren();
+  if (inUse) {
+    slot.insertAdjacentHTML('beforeend', '<section class="card card--padded schedule-today"><h2 class="u-section-title">' + esc(t('schedule.today')) + '</h2>' + renderToday() + renderScheduleWarnings() + '</section>');
+  }
+  window.lucide?.createIcons({ el: slot });
 }
 
 // Drag ist NIE der einzige Weg (siehe utils/sortable.js) - die Auf/Ab-Knoepfe
