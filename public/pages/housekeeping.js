@@ -1230,6 +1230,46 @@ function openStaffModal(worker, content, options = {}) {
   if (window.lucide) window.lucide.createIcons({ el: panel });
 }
 
+// `?editVisit=<id>` (Deep-Link aus einer Reminder-/Kalender-Benachrichtigung
+// heraus): der Fehlerfall war zuvor ein leerer `catch` - eine falsche,
+// geloeschte oder fremde ID landete unauffaellig auf dem normalen Dashboard,
+// nicht unterscheidbar von einem funktionierenden Link (#1139). Die
+// fehlgeschlagene Kennung wird sofort aus der URL entfernt, damit ein erneutes
+// Rendern (Zurueck-Navigation, Reload) den Aufruf nicht wiederholt; ein erneuter
+// Versuch ueber den Retry-Toast haelt die ID dafuer in diesem Closure fest.
+// 404/403 sind Endzustaende fuer dieselbe ID - ein Retry liefert nur denselben
+// Fehler noch einmal. Alles andere (Serverfehler, Netzwerk) darf es erneut
+// versuchen.
+function describeDeepLinkError(err) {
+  const status = err?.status;
+  return {
+    message: window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'),
+    offerRetry: status !== 404 && status !== 403,
+  };
+}
+
+async function openVisitFromDeepLink(editVisitId, container) {
+  try {
+    const res = await api.get(`/housekeeping/visits/${editVisitId}`);
+    const visit = res.data;
+    if (visit) {
+      const content = container.querySelector('#housekeeping-content') || container;
+      openVisitEditModal(visit, content);
+    }
+  } catch (err) {
+    history.replaceState(null, '', location.pathname);
+    const { message, offerRetry } = describeDeepLinkError(err);
+    if (offerRetry) {
+      window.yuvomi?.showToast(message, 'danger', 6000, {
+        label: t('common.retry'),
+        onClick: () => openVisitFromDeepLink(editVisitId, container),
+      });
+    } else {
+      window.yuvomi?.showToast(message, 'danger');
+    }
+  }
+}
+
 export async function render(container) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -1241,18 +1281,7 @@ export async function render(container) {
     await loadData();
     renderShell(container);
     const editVisitId = new URLSearchParams(window.location.search).get('editVisit');
-    if (editVisitId) {
-      try {
-        const res = await api.get(`/housekeeping/visits/${editVisitId}`);
-        const visit = res.data;
-        if (visit) {
-          const content = container.querySelector('#housekeeping-content') || container;
-          openVisitEditModal(visit, content);
-        }
-      } catch {
-        // visit not found or unauthorized — silently ignore
-      }
-    }
+    if (editVisitId) await openVisitFromDeepLink(editVisitId, container);
   } catch (err) {
     // Vorher: Leerzustands-Markup ohne Rolle, ohne Ausweg - und als Erklaerung
     // der rohe `err.message`. Der ist bei allen Routen das unlokalisierte
@@ -1271,3 +1300,7 @@ export async function render(container) {
     });
   }
 }
+
+// Testflaeche: nur reine bzw. verhaltenspruefbare Funktionen, deren Vertrag
+// ausserhalb dieser Datei zaehlt.
+export const __test = { describeDeepLinkError, openVisitFromDeepLink };
