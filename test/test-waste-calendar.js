@@ -201,17 +201,28 @@ test('wasteEnabled(): true, wenn eingeschaltet und lesbar (Standard ohne geladen
 // holidays/school/schedule/birthdays
 // -------------------------------------------------------------------------
 
-test('activeFilterCount(): zaehlt eine abgeschaltete Waste-Ebene nur, wenn das Modul ueberhaupt lesbar ist', () => {
-  withWasteViewState({ layerWaste: false, layerBirthdays: true, holidayPrefs: {} }, {}, () => {
-    const withAccess = calendarHelpers.activeFilterCount();
-    assert(withAccess === 1, `layerWaste=false bei lesbarem Modul muss zaehlen: ${withAccess}`);
+test('activeFilterCount(): die AUS-Vorgabe der Waste-Ebene zaehlt nie - nur eine gewaehlte Typ-Teilmenge (Round-3-Blocker)', () => {
+  // Modul an, unangetastete Vorgaben (Ebene aus, keine Typ-Teilmenge): 0.
+  // Die AUS-Stellung IST die Vorgabe (Opt-in) und nimmt nichts weg - vorher
+  // stand hier ab dem ersten Laden eine 1, die auch "Filter zuruecksetzen"
+  // nie loswurde, weil der Reset layerWaste selbst auf false setzt.
+  withWasteViewState({ layerWaste: false, wasteVisibleTypeIds: new Set(), layerBirthdays: true, holidayPrefs: {} }, {}, () => {
+    const untouched = calendarHelpers.activeFilterCount();
+    assert(untouched === 0, `unangetastete Vorgaben duerfen keinen Filter zaehlen: ${untouched}`);
   });
+  // Ebene an + gewaehlte Typ-Teilmenge: 1 - die Teilmenge blendet wirklich
+  // etwas aus, also darf und muss sie zaehlen.
+  withWasteViewState({ layerWaste: true, wasteVisibleTypeIds: new Set([1]), layerBirthdays: true, holidayPrefs: {} }, {}, () => {
+    const subset = calendarHelpers.activeFilterCount();
+    assert(subset === 1, `eine gewaehlte Typ-Teilmenge muss als ein Filter zaehlen: ${subset}`);
+  });
+  // Modul aus (Kontrolle): 0 - kein Filter, den niemand umschalten kann.
   withWasteViewState(
-    { layerWaste: false, layerBirthdays: true, holidayPrefs: {} },
+    { layerWaste: false, wasteVisibleTypeIds: new Set(), layerBirthdays: true, holidayPrefs: {} },
     { yuvomi: { isModuleDisabled: () => true, navigate: () => {} } },
     () => {
-      const withoutAccess = calendarHelpers.activeFilterCount();
-      assert(withoutAccess === 0, `ein abgeschaltetes Modul darf keinen Filter zaehlen, den niemand umschalten kann: ${withoutAccess}`);
+      const withoutModule = calendarHelpers.activeFilterCount();
+      assert(withoutModule === 0, `ein abgeschaltetes Modul darf keinen Filter zaehlen: ${withoutModule}`);
     },
   );
 });

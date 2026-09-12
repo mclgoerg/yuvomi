@@ -1167,7 +1167,14 @@ function activeFilterCount() {
   if (hp.holiday_show_school && !state.layerSchool) n += 1;
   if (!state.layerBirthdays) n += 1;
   if (scheduleEnabled() && !state.layerSchedule) n += 1;
-  if (wasteEnabled() && !state.layerWaste) n += 1;
+  // Die AUS-Stellung der Waste-Ebene zaehlt NICHT: sie ist Opt-in und AUS ist
+  // ihre Vorgabe (siehe state.layerWaste und #cal-filters-reset), also nimmt
+  // sie im Auslieferungszustand nichts weg - sonst bliebe ein Filter aktiv,
+  // der nichts wegnimmt, und der Zaehler am Knopf loege ab dem ersten Laden;
+  // Reset koennte die 0 nie erreichen, weil er layerWaste selbst auf false
+  // setzt. Dieselbe Regel, nach der die Feiertage oben nur zaehlen, wenn der
+  // Haushalt sie an hat und dieses Geraet sie abgewaehlt hat. Eine gewaehlte
+  // Typ-Teilmenge dagegen blendet wirklich etwas aus und zaehlt.
   if (wasteEnabled() && state.layerWaste && state.wasteVisibleTypeIds.size > 0) n += 1;
   return n;
 }
