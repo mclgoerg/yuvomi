@@ -3,11 +3,14 @@
  * Zweck: Vorher verschwand jeder Fehler beim Nachladen der Ziel-Besuchsanfrage
  *        in einem leeren `catch` - eine geloeschte, ungueltige oder fremde ID
  *        sah fuer die Person genauso aus wie ein erfolgreicher Link. Dieser
- *        Test deckt die Fehler-Klassifizierung (404/403 sind Endzustaende,
- *        alles andere darf erneut versucht werden) und das Verhalten des
- *        Deep-Link-Handlers ab: Toast-Ton, Retry-Angebot, und dass die
- *        gescheiterte ID sofort aus der URL entfernt wird, damit ein erneutes
- *        Rendern (Reload, Zurueck-Navigation) den Aufruf nicht wiederholt.
+ *        Test deckt die Fehler-Klassifizierung ab - jeder 4xx (404 fehlt, 403
+ *        kein Zugriff, 400 z.B. eine verstuemmelte ID) ist ein Endzustand ohne
+ *        Retry, nur ein Server-/Netzwerkfehler darf es erneut versuchen - und
+ *        das Verhalten des Deep-Link-Handlers: Toast-Ton, Retry-Angebot, dass
+ *        ein 4xx nie die rohe unlokalisierte Servermeldung durchreicht, und
+ *        dass die gescheiterte ID sofort aus der URL entfernt wird, damit ein
+ *        erneutes Rendern (Reload, Zurueck-Navigation) den Aufruf nicht
+ *        wiederholt.
  *
  *        Der Erfolgsfall (`openVisitEditModal`) haengt am geteilten
  *        Modal-System (`openModal`), das ein echtes DOM braucht - wie schon
@@ -57,6 +60,15 @@ test('describeDeepLinkError: 403 ist ein Endzustand - kein Retry, keine Besuchsd
   assert.ok(!message.includes('42'), 'die ID darf nicht in der Meldung auftauchen');
 });
 
+test('describeDeepLinkError: eine ungueltige ID (400) ist ein Endzustand - kein Retry, keine rohe Servermeldung', () => {
+  const err = apiError(400, 'id must be a positive integer');
+  err.data = { error: 'id must be a positive integer', code: 400 };
+  const { message, offerRetry } = describeDeepLinkError(err);
+  assert.equal(offerRetry, false);
+  assert.equal(message, 'common.errorGeneric');
+  assert.ok(!message.includes('positive integer'), 'die rohe, unlokalisierte Servermeldung darf nicht durchgereicht werden');
+});
+
 test('describeDeepLinkError: Serverfehler darf erneut versucht werden', () => {
   const { offerRetry } = describeDeepLinkError(apiError(500));
   assert.equal(offerRetry, true);
@@ -95,6 +107,28 @@ test('openVisitFromDeepLink: fremder Besuch (403) zeigt Meldung ohne Retry, kein
   assert.equal(toastCalls.length, 1);
   const [message, , , action] = toastCalls[0];
   assert.equal(message, 'Zugriff verweigert.');
+  assert.equal(action, undefined);
+});
+
+test('openVisitFromDeepLink: eine ungueltige ID (400) zeigt eine generische Meldung ohne Retry und raeumt die URL', async () => {
+  toastCalls.length = 0;
+  replaceStateCalls.length = 0;
+  globalThis.__apiStub = {
+    get: async () => {
+      const err = apiError(400, 'id must be a positive integer');
+      err.data = { error: 'id must be a positive integer', code: 400 };
+      throw err;
+    },
+  };
+
+  await openVisitFromDeepLink('not-a-number', { querySelector: () => null });
+
+  assert.equal(replaceStateCalls.length, 1);
+  assert.equal(toastCalls.length, 1);
+  const [message, type, duration, action] = toastCalls[0];
+  assert.equal(message, 'common.errorGeneric');
+  assert.equal(type, 'danger');
+  assert.equal(duration, undefined);
   assert.equal(action, undefined);
 });
 

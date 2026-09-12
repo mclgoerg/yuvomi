@@ -1237,15 +1237,20 @@ function openStaffModal(worker, content, options = {}) {
 // fehlgeschlagene Kennung wird sofort aus der URL entfernt, damit ein erneutes
 // Rendern (Zurueck-Navigation, Reload) den Aufruf nicht wiederholt; ein erneuter
 // Versuch ueber den Retry-Toast haelt die ID dafuer in diesem Closure fest.
-// 404/403 sind Endzustaende fuer dieselbe ID - ein Retry liefert nur denselben
-// Fehler noch einmal. Alles andere (Serverfehler, Netzwerk) darf es erneut
-// versuchen.
+// Jeder 4xx-Status (404 fehlt, 403 kein Zugriff, 400 z.B. eine verstuemmelte
+// ID) ist ein Endzustand fuer dieselbe ID - ein Retry liefert nur denselben
+// Fehler noch einmal. Nur ein Serverfehler oder ein Netzwerkproblem (kein
+// Status) darf es erneut versuchen. `friendlyError()` kennt nur 403/404/5xx
+// explizit und faellt sonst auf den rohen, unlokalisierten Servertext zurueck
+// (`err.data.error`) - fuer jeden anderen 4xx wird deshalb bewusst die
+// generische, lokalisierte Meldung erzwungen statt dieser Fallback-String.
 function describeDeepLinkError(err) {
   const status = err?.status;
-  return {
-    message: window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'),
-    offerRetry: status !== 404 && status !== 403,
-  };
+  const isTransient = status == null || status >= 500;
+  const message = (status >= 400 && status < 500 && status !== 403 && status !== 404)
+    ? t('common.errorGeneric')
+    : (window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'));
+  return { message, offerRetry: isTransient };
 }
 
 async function openVisitFromDeepLink(editVisitId, container) {
