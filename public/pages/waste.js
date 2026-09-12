@@ -67,6 +67,51 @@ const TYPE_PRESETS = [
   { key: 'bulky', icon: 'armchair', color: '#7C3AED' },
 ];
 
+/**
+ * DIE KURATIERTE PALETTE ERSETZT DEN FREIEN FARBWAEHLER (Audit UX,
+ * 2026-09-12). Der Dialog bot vorher ein nacktes `<input type="color">` an -
+ * also 16,7 Millionen Farben ohne jede Untergrenze. Wer dort Weiss, Hellgelb
+ * oder Schwarz waehlte, bekam ein Abfallart-Symbol, das auf der Karte
+ * praktisch verschwand (hell auf hellem Grund) bzw. im dunklen Thema
+ * unsichtbar wurde - und nichts im Dialog hielt ihn davon ab.
+ *
+ * Dieselbe Antwort, die Notizen, Kalender, Budget und der
+ * Kategorie-Verwalter auf dieselbe Frage schon geben: eine kleine feste
+ * Auswahl statt eines Regenbogens. Die Werte sind bewusst die Tailwind-600er
+ * -Familie - also exakt das Helligkeitsband, in dem die sechs
+ * `TYPE_PRESETS`-Farben oben ohnehin schon liegen. Dadurch traegt jede Farbe
+ * auf `--color-surface-*` UND auf dem dunklen Kartengrund genug Eigenhelligkeit,
+ * ohne in einem der beiden Themen auszubrennen.
+ *
+ * Die ersten sechs Eintraege SIND die Preset-Farben, in Preset-Reihenfolge:
+ * nur so kann die Preset-Auswahl im Dialog ihre Farbe als aktiven Swatch
+ * zeigen, statt einen Wert zu setzen, den das Raster gar nicht kennt.
+ *
+ * KEIN `getReadableTextColor()`. Diese Farbe wird nirgends als TEXTfarbe auf
+ * einem freien Grund gesetzt - waste.js faerbt damit ausschliesslich das
+ * `aria-hidden` SVG-Symbol der Zeile (Typkarte und Abholzeile). Sie ist damit
+ * eine Schmuckfarbe im Sinne der User-Farben-Regel, kein Schriftzug, und
+ * braucht keine gerechnete Tinte - wohl aber die Untergrenze, die diese
+ * Palette ist.
+ */
+const WASTE_TYPE_COLORS = [
+  '#64748B', '#2563EB', '#16A34A', '#D97706', '#059669',
+  '#7C3AED', '#DC2626', '#0891B2', '#EA580C', '#DB2777',
+];
+
+const WASTE_TYPE_COLOR_NAMES = () => ({
+  '#64748B': t('waste.colorGray'),
+  '#2563EB': t('waste.colorBlue'),
+  '#16A34A': t('waste.colorGreen'),
+  '#D97706': t('waste.colorOcher'),
+  '#059669': t('waste.colorTeal'),
+  '#7C3AED': t('waste.colorViolet'),
+  '#DC2626': t('waste.colorRed'),
+  '#0891B2': t('waste.colorCyan'),
+  '#EA580C': t('waste.colorOrange'),
+  '#DB2777': t('waste.colorMagenta'),
+});
+
 let _container = null;
 let state = { types: [], schedules: [], occurrences: [], sources: [], loading: true, error: null, upcomingExpanded: false };
 // Router-bridged controller (#976/#977, see /utils/page-lifecycle.js) for the
@@ -199,10 +244,27 @@ function occurrenceRowHtml(occurrence) {
         </div>
       </div>`;
 
+  // ZWEI KLASSENNOTIZEN, die fuer ALLE vier Zeilentypen dieses Moduls gelten
+  // (Abholung, Abfallart, Serie, Quelle) - deshalb stehen sie hier, an der
+  // ersten Zeile, und nicht viermal:
+  //
+  // 1. `waste-row` ist die gemeinsame Marke. Dieses Modul steckt das Symbol MIT
+  //    IN `.list-row__main` und buendelt Name und Meta darunter in
+  //    `.list-row__body` - eine Struktur, die list-row.css nicht kennt und die
+  //    waste.css deshalb selbst bedienen muss (Symbol | Textspalte als
+  //    Flex-Zeile). Die Marke sagt genau: „diese Zeile hat den Symbol-Slot".
+  //
+  // 2. `list-row__main` steht IMMER, `--interactive` nur zusaetzlich. Der
+  //    Modifikator traegt ausschliesslich die Knopf-Zuruecksetzung (Rand,
+  //    Polsterung, Cursor); `flex: 1 1 auto` und `min-width: 0` kommen aus der
+  //    Basisklasse. Wo er allein stand, loeste die Textspalte auf ihre
+  //    Inhaltsbreite auf und zog die Bedienzone mit: gemessen 372px Luft rechts
+  //    neben dem „..."-Knopf der Abfallart. Vorrat und Inventar schreiben
+  //    darum beide Klassen nebeneinander - hier fehlte die Basis.
   return `
-    <div class="list-row waste-occurrence-row" data-key="${esc(occurrence.key)}" data-type-id="${occurrence.type_id}" data-date="${esc(occurrence.date_key)}">
+    <div class="list-row waste-row waste-occurrence-row" data-key="${esc(occurrence.key)}" data-type-id="${occurrence.type_id}" data-date="${esc(occurrence.date_key)}">
       <div class="list-row__main">
-        <i data-lucide="${esc(occurrence.type_icon || 'trash-2')}" class="waste-occurrence-row__icon" style="color:${esc(occurrence.type_color || '')}" aria-hidden="true"></i>
+        <i data-lucide="${esc(occurrence.type_icon || 'trash-2')}" style="color:${esc(occurrence.type_color || '')}" aria-hidden="true"></i>
         <span class="list-row__body">
           <span class="list-row__name">${esc(occurrence.type_name ?? '')}</span>
           <span class="list-row__meta">${esc(formatDate(occurrence.date_key))} ${originBadges(occurrence)}</span>
@@ -311,9 +373,18 @@ function scheduleRowHtml(schedule) {
   // auch die des Haupt-Feldes, das sonst als role="button" den Bearbeiten-Dialog
   // oeffnet. Eine Zeile, die aussieht wie ein Knopf, ist ein Versprechen.
   const ro = readOnly();
+  // EINE ZEILENGRAMMATIK FUER DAS GANZE MODUL (Audit UX, 2026-09-12). Diese
+  // Zeile trug ihre einzige - und zerstoerende - Aktion als nacktes
+  // Muelltonnen-Icon direkt in der Zeile, waehrend die Abholzeile darueber
+  // dieselbe Loeschung hinter „..." fuehrt. Zwei Zeilentypen, zwei Regeln, und
+  // ausgerechnet der gefaehrlichere Weg war der kuerzere: ein Fehlgriff neben
+  // dem Zeilenkoerper loeschte hier sofort eine ganze Serie.
+  // Ein Menue mit einem Eintrag ist bewusst in Kauf genommen - die Alternative
+  // waere, die Ausnahme zur Regel zu machen.
+  const menuId = `waste-schedule-menu-${schedule.id}`;
   return `
-    <div class="list-row waste-schedule-row${schedule.active ? '' : ' waste-schedule-row--paused'}" data-id="${schedule.id}">
-      <div class="${ro ? 'list-row__main' : 'list-row__main--interactive'}"${ro ? '' : ` data-action="edit-schedule" data-id="${schedule.id}" role="button" tabindex="0"`}>
+    <div class="list-row waste-row waste-schedule-row${schedule.active ? '' : ' waste-schedule-row--paused'}" data-id="${schedule.id}">
+      <div class="list-row__main${ro ? '' : ' list-row__main--interactive'}"${ro ? '' : ` data-action="edit-schedule" data-id="${schedule.id}" role="button" tabindex="0"`}>
         <i data-lucide="repeat" aria-hidden="true"></i>
         <span class="list-row__body">
           <span class="list-row__name">${esc(recurrenceSummary(schedule))}</span>
@@ -325,9 +396,12 @@ function scheduleRowHtml(schedule) {
       </div>
       ${ro ? '' : `
         <div class="row-actions">
-          <button type="button" class="row-action" data-action="delete-schedule" data-id="${schedule.id}" aria-label="${esc(t('common.delete'))}">
-            <i data-lucide="trash-2" aria-hidden="true"></i>
+          <button type="button" class="row-action" popovertarget="${menuId}" aria-label="${esc(t('waste.moreActions'))}">
+            <i data-lucide="more-horizontal" aria-hidden="true"></i>
           </button>
+          <div class="popover-menu" id="${menuId}" popover role="menu">
+            <button type="button" role="menuitem" class="popover-menu__item popover-menu__item--danger" data-action="delete-schedule" data-id="${schedule.id}"><i data-lucide="trash-2" aria-hidden="true"></i>${esc(t('common.delete'))}</button>
+          </div>
         </div>`}
     </div>`;
 }
@@ -335,10 +409,27 @@ function scheduleRowHtml(schedule) {
 function typeCardHtml(type, index, total) {
   const schedules = schedulesForType(type.id);
   const ro = readOnly();
+  const menuId = `waste-type-menu-${type.id}`;
+  // Drei nackte Icon-Knoepfe (hoch, runter, plus) standen hier nebeneinander -
+  // dieselbe Zeilenbreite, die sich die Abholzeile mit EINEM „..." nimmt. Bei
+  // langen Abfallart-Namen („Gelber Sack / Leichtverpackungen") drueckten sie
+  // den Namen auf zwei Zeilen, und keiner der drei trug eine Beschriftung.
+  //
+  // GRENZEN WERDEN WEGGELASSEN, NICHT AUSGEGRAUT: vorher trugen die
+  // Pfeil-Knoepfe an der ersten/letzten Position `disabled` - ein toter Knopf,
+  // der Platz und Aufmerksamkeit kostet und nichts erklaert. Das Menue der
+  // Abholzeile fuehrt es schon anders vor: was nicht geht, steht nicht drin.
+  // Bei genau EINER Abfallart verschwinden damit beide Pfeile, und das ist die
+  // ehrliche Auskunft - Sortieren gibt es dann nicht.
+  const menuItems = [
+    ...(index > 0 ? [`<button type="button" role="menuitem" class="popover-menu__item" data-action="move-type-up" data-id="${type.id}"><i data-lucide="chevron-up" aria-hidden="true"></i>${esc(t('waste.moveTypeUp'))}</button>`] : []),
+    ...(index < total - 1 ? [`<button type="button" role="menuitem" class="popover-menu__item" data-action="move-type-down" data-id="${type.id}"><i data-lucide="chevron-down" aria-hidden="true"></i>${esc(t('waste.moveTypeDown'))}</button>`] : []),
+    `<button type="button" role="menuitem" class="popover-menu__item" data-action="add-schedule" data-type-id="${type.id}"><i data-lucide="plus" aria-hidden="true"></i>${esc(t('waste.addSchedule'))}</button>`,
+  ].join('\n            ');
   return `
     <div class="waste-type-card${type.archived ? ' waste-type-card--archived' : ''}" data-type-id="${type.id}">
-      <div class="list-row waste-type-row">
-        <div class="${ro ? 'list-row__main' : 'list-row__main--interactive'}"${ro ? '' : ` data-action="edit-type" data-id="${type.id}" role="button" tabindex="0"`}>
+      <div class="list-row waste-row waste-type-row">
+        <div class="list-row__main${ro ? '' : ' list-row__main--interactive'}"${ro ? '' : ` data-action="edit-type" data-id="${type.id}" role="button" tabindex="0"`}>
           <i data-lucide="${esc(type.icon || 'trash-2')}" style="color:${esc(type.color)}" aria-hidden="true"></i>
           <span class="list-row__body">
             <span class="list-row__name">${esc(type.name)}${type.archived ? ` <span class="waste-badge">${esc(t('waste.archived'))}</span>` : ''}</span>
@@ -346,15 +437,12 @@ function typeCardHtml(type, index, total) {
         </div>
         ${ro ? '' : `
           <div class="row-actions">
-            <button type="button" class="row-action" data-action="move-type-up" data-id="${type.id}" aria-label="${esc(t('waste.moveTypeUp'))}"${index === 0 ? ' disabled' : ''}>
-              <i data-lucide="chevron-up" aria-hidden="true"></i>
+            <button type="button" class="row-action" popovertarget="${menuId}" aria-label="${esc(t('waste.moreActions'))}">
+              <i data-lucide="more-horizontal" aria-hidden="true"></i>
             </button>
-            <button type="button" class="row-action" data-action="move-type-down" data-id="${type.id}" aria-label="${esc(t('waste.moveTypeDown'))}"${index === total - 1 ? ' disabled' : ''}>
-              <i data-lucide="chevron-down" aria-hidden="true"></i>
-            </button>
-            <button type="button" class="row-action" data-action="add-schedule" data-type-id="${type.id}" aria-label="${esc(t('waste.addSchedule'))}">
-              <i data-lucide="plus" aria-hidden="true"></i>
-            </button>
+            <div class="popover-menu" id="${menuId}" popover role="menu">
+            ${menuItems}
+            </div>
           </div>`}
       </div>
       <div class="waste-schedule-list">
@@ -421,9 +509,16 @@ function sourceRowHtml(source) {
       ? { action: 'review-source-mapping', icon: 'list-checks', labelKey: 'waste.reviewMappingAction' }
       : { action: 'refresh-source', icon: 'refresh-cw', labelKey: 'waste.refreshNowAction' })
     : { action: 'reimport-source', icon: 'refresh-cw', labelKey: 'waste.reimportAction' };
+  // Diese Zeile hatte das staerkste Argument fuer das Menue: ihre eine Aktion
+  // WECHSELT die Bedeutung (manuell abrufen / Zuordnung pruefen / neu
+  // einlesen), und zwei der drei Faelle trugen dasselbe `refresh-cw`. Das
+  // Icon allein konnte also gar nicht sagen, was passieren wird - die
+  // Unterscheidung stand ausschliesslich im aria-label und war damit fuer
+  // sehende Nutzer unsichtbar. Im Menue traegt jeder Fall seinen Satz.
+  const menuId = `waste-source-menu-${source.id}`;
   return `
-    <div class="list-row waste-source-row" data-source-id="${source.id}">
-      <div class="list-row__main--interactive" data-action="open-source" data-id="${source.id}" role="button" tabindex="0">
+    <div class="list-row waste-row waste-source-row" data-source-id="${source.id}">
+      <div class="list-row__main list-row__main--interactive" data-action="open-source" data-id="${source.id}" role="button" tabindex="0">
         <i data-lucide="${isUrl ? 'link' : 'file-text'}" aria-hidden="true"></i>
         <span class="list-row__body">
           <span class="list-row__name">${esc(source.name)} ${badge ? `<span class="waste-badge waste-badge--${badge.code}">${esc(t(badge.labelKey))}</span>` : ''}</span>
@@ -432,9 +527,12 @@ function sourceRowHtml(source) {
       </div>
       ${readOnly() ? '' : `
         <div class="row-actions">
-          <button type="button" class="row-action" data-action="${rowAction.action}" data-id="${source.id}" aria-label="${esc(t(rowAction.labelKey))}">
-            <i data-lucide="${rowAction.icon}" aria-hidden="true"></i>
+          <button type="button" class="row-action" popovertarget="${menuId}" aria-label="${esc(t('waste.moreActions'))}">
+            <i data-lucide="more-horizontal" aria-hidden="true"></i>
           </button>
+          <div class="popover-menu" id="${menuId}" popover role="menu">
+            <button type="button" role="menuitem" class="popover-menu__item" data-action="${rowAction.action}" data-id="${source.id}"><i data-lucide="${rowAction.icon}" aria-hidden="true"></i>${esc(t(rowAction.labelKey))}</button>
+          </div>
         </div>`}
     </div>`;
 }
@@ -452,7 +550,18 @@ function renderSources() {
     host.insertAdjacentHTML('beforeend', emptyStateHTML({
       title: t('waste.emptySourcesTitle'),
       description: t('waste.emptySourcesDescription'),
+      // Der Leerzustand NANNTE den Weg schon, ohne ihn anzubieten: seine
+      // Beschreibung lautet woertlich „Importiere eine ICS-Datei deiner
+      // Kommune..." - und liess den Leser dann allein damit, diese Datei
+      // hinter dem unbeschrifteten „..." im Seitenkopf zu suchen. Der CTA
+      // nimmt deshalb genau die Aktion, die der Satz darueber beschreibt
+      // (`open-import`), nicht die URL-Quelle: ein Leerzustand, dessen Knopf
+      // etwas anderes tut als sein eigener Text ankuendigt, ist schlimmer als
+      // gar keiner.
+      // Nur-lesen: derselbe Riegel wie beim Abfallart-Leerzustand darueber.
+      action: readOnly() ? null : { label: t('waste.importFileAction'), icon: 'upload', attrs: { id: 'waste-empty-add-source' } },
     }));
+    host.querySelector('#waste-empty-add-source')?.addEventListener('click', () => openImportWizard());
     if (window.lucide) window.lucide.createIcons({ el: host });
     return;
   }
@@ -561,6 +670,17 @@ async function pickTypeIcon(button) {
 function openTypeModal(type = null) {
   const isEdit = !!type;
   const presetOptions = TYPE_PRESETS.map((p) => `<option value="${p.key}">${esc(t(`waste.preset${p.key.charAt(0).toUpperCase()}${p.key.slice(1)}`))}</option>`).join('');
+  // Die Vorgabe fuer eine NEUE Abfallart ist jetzt ein Mitglied der Palette
+  // (vorher `#22C55E`, das in keinem Raster auftauchte und den Dialog damit
+  // ohne aktiven Swatch geoeffnet haette).
+  const selColor = isEdit ? (type.color || WASTE_TYPE_COLORS[0]) : WASTE_TYPE_COLORS[2];
+  // EINE BESTEHENDE FARBE AUSSERHALB DER PALETTE WIRD NICHT STILL UEBERSCHRIEBEN.
+  // Abfallarten aus der Zeit des freien Waehlers tragen beliebige Hex-Werte;
+  // stuenden sie nicht im Raster, waere beim ersten Speichern die Farbe des
+  // Nutzers weg, ohne dass er es angefasst hat. Derselbe Weg, den Notizen und
+  // Kalender fuer ihren Altbestand gehen: der Wert bekommt einen eigenen
+  // Swatch am Ende und heisst dort „Aktuelle Farbe".
+  const swatchColors = WASTE_TYPE_COLORS.includes(selColor) ? WASTE_TYPE_COLORS : [...WASTE_TYPE_COLORS, selColor];
 
   const content = `
     ${isEdit ? '' : `
@@ -580,8 +700,18 @@ function openTypeModal(type = null) {
       <div id="wtm-icon-wrap">${iconButtonHtml(isEdit ? type.icon : 'trash-2')}</div>
     </div>
     <div class="form-group">
-      <label class="form-label" for="wtm-color">${t('waste.typeColorLabel')}</label>
-      <input type="color" class="form-input form-input--color" id="wtm-color" value="${esc(isEdit ? type.color : '#22C55E')}">
+      <label class="form-label" id="wtm-color-label">${t('waste.typeColorLabel')}</label>
+      <div class="waste-color-picker" role="radiogroup" aria-labelledby="wtm-color-label">
+        ${swatchColors.map((c) => `
+          <div class="waste-color-swatch${c === selColor ? ' waste-color-swatch--active' : ''}"
+               data-color="${esc(c)}"
+               style="background-color:${esc(c)}"
+               role="radio"
+               tabindex="${c === selColor ? '0' : '-1'}"
+               aria-checked="${c === selColor ? 'true' : 'false'}"
+               aria-label="${esc(WASTE_TYPE_COLOR_NAMES()[c] ?? t('waste.colorCurrent'))}"></div>
+        `).join('')}
+      </div>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
       <div style="display:flex;gap:var(--space-2)">
@@ -604,11 +734,49 @@ function openTypeModal(type = null) {
       panel.querySelector('#wtm-cancel').addEventListener('click', () => closeModal());
       panel.querySelector('[data-action="pick-type-icon"]').addEventListener('click', (e) => pickTypeIcon(e.currentTarget));
 
+      // Farb-Swatch: Auswahl + ARIA + Keyboard (Roving Tabindex) - dieselbe
+      // Mechanik wie in notes.js/calendar.js, nur auf `waste-` getauft.
+      function selectSwatch(target) {
+        if (!target) return;
+        panel.querySelectorAll('.waste-color-swatch').forEach((s) => {
+          s.classList.remove('waste-color-swatch--active');
+          s.setAttribute('aria-checked', 'false');
+          s.setAttribute('tabindex', '-1');
+        });
+        target.classList.add('waste-color-swatch--active');
+        target.setAttribute('aria-checked', 'true');
+        target.setAttribute('tabindex', '0');
+      }
+      panel.querySelectorAll('.waste-color-swatch').forEach((sw) => {
+        sw.addEventListener('click', () => { selectSwatch(sw); sw.focus(); });
+        sw.addEventListener('keydown', (e) => {
+          const swatches = [...panel.querySelectorAll('.waste-color-swatch')];
+          const idx = swatches.indexOf(sw);
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            const next = swatches[(idx + 1) % swatches.length];
+            selectSwatch(next); next.focus();
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const prev = swatches[(idx - 1 + swatches.length) % swatches.length];
+            selectSwatch(prev); prev.focus();
+          } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            selectSwatch(sw);
+          }
+        });
+      });
+
       panel.querySelector('#wtm-preset')?.addEventListener('change', (e) => {
         const preset = TYPE_PRESETS.find((p) => p.key === e.target.value);
         if (!preset) return;
         panel.querySelector('#wtm-name').value = t(`waste.preset${preset.key.charAt(0).toUpperCase()}${preset.key.slice(1)}`);
-        panel.querySelector('#wtm-color').value = preset.color;
+        // Die Preset-Farbe steht garantiert im Raster (die ersten sechs
+        // Eintraege von WASTE_TYPE_COLORS SIND die Preset-Farben), also
+        // markiert die Vorlage jetzt einen Swatch, statt ein Eingabefeld zu
+        // fuellen. Das Raster bleibt danach frei bedienbar - eine Vorlage ist
+        // ein Startpunkt, keine Festlegung.
+        selectSwatch(panel.querySelector(`.waste-color-swatch[data-color="${preset.color}"]`));
         const hidden = panel.querySelector('input[name="icon"]');
         hidden.value = preset.icon;
         setTypeIconButtonIcon(panel.querySelector('[data-action="pick-type-icon"]'), preset.icon);
@@ -646,7 +814,10 @@ function openTypeModal(type = null) {
         const body = {
           name,
           icon: panel.querySelector('input[name="icon"]').value || 'trash-2',
-          color: panel.querySelector('#wtm-color').value,
+          // Der Rueckfall greift nur, wenn gar kein Swatch aktiv ist - dann
+          // gilt der Stand, mit dem der Dialog geoeffnet wurde, nicht etwa
+          // eine leere Farbe.
+          color: panel.querySelector('.waste-color-swatch--active')?.dataset.color ?? selColor,
         };
         try {
           if (isEdit) await api.put(`/waste/types/${type.id}`, body);
@@ -1266,7 +1437,7 @@ function openSourceModal(source) {
       ${source.last_error ? `<p class="waste-source-detail__error">${esc(source.last_error)}</p>` : ''}
       ${badge ? `<span class="waste-badge waste-badge--${badge.code}">${esc(t(badge.labelKey))}</span>` : ''}
     </div>
-    <h3 class="waste-section-title">
+    <h3 class="waste-section-title u-section-title u-compact">
       ${t('waste.sourceMappingsTitle')}
       <span class="waste-section-title__actions">
         <button type="button" class="btn btn--secondary btn--sm" id="wsrc-mapping-profile-export">${t('waste.mappingProfileExportAction')}</button>
@@ -1632,32 +1803,69 @@ function renderPage() {
       // Eintrag traegt sein Label"), das die Einkaufsliste schon benutzt.
       // Die Eintraege tragen `data-action`, also faengt sie der delegierte
       // Klick-Handler unten mit - keine zweite Verdrahtung, keine eigenen IDs.
-      // Die primaere Aktion („Abholung") liegt weiter im FAB, und eine leere
-      // Seite fuehrt ueber ihren eigenen Empty-State-CTA zur ersten Abfallart.
-      actions: readOnly() ? '' : renderPageActions(popoverMenuHtml({
-        id: 'waste-page-menu',
-        label: t('waste.moreActions'),
-        items: [
-          { action: 'open-import', label: t('waste.importFileAction'), icon: 'upload' },
-          { action: 'open-url-source', label: t('waste.addUrlSourceAction'), icon: 'link' },
-          { action: 'open-reminder-settings', label: t('waste.reminderSettingsAction'), icon: 'bell' },
-          { action: 'add-type', label: t('waste.addType'), icon: 'plus' },
-        ],
-      })),
+      //
+      // EIN SICHTBARER, BESCHRIFTETER WEG ZUR ERSTEN ABFALLART (Audit UX,
+      // 2026-09-12). Vorher lagen ALLE vier Aktionen hinter dem unbeschrifteten
+      // „...", und der einzige beschriftete Weg ins Modul war der FAB - der
+      // aber „Abholung" anlegt, die SELTENSTE der vier. Eine frische
+      // Installation zeigte damit keinen einzigen sichtbaren Weg zur ersten
+      // Abfallart, ohne die man auch keine Abholung eintragen kann.
+      // „Abfallart hinzufuegen" steht deshalb beschriftet im Kopf; im
+      // Ueberlaufmenue ist der Eintrag dafuer ENTFALLEN - zweimal derselbe Weg
+      // macht die Wahl schwerer, nicht leichter.
+      //
+      // SEKUNDAER, NICHT PRIMAER - und das ist keine Abschwaechung, sondern die
+      // Folge davon, wo dieser Knopf landet. Ab 1024px dockt der FAB in
+      // DIESELBE Werkzeugleiste (dockFabIntoToolbar in router.js) und rendert
+      // dort als gefuellte Primaerpille „Abholung". Als `btn--primary` standen
+      // hier also zwei gefuellte Violettknoepfe Kante an Kante, und die Seite
+      // sagte nicht mehr, welcher der Hauptweg ist (Browser-Pruefung am
+      // gebauten Stand). Die Eine-Stimme-Regel (DESIGN.md) laesst pro Ansicht
+      // genau eine Primaeraktion zu; der angedockte FAB ist sie. Sichtbarkeit
+      // und Beschriftung - worum es dem Befund ging - kosten das nichts:
+      // `btn--secondary` ist ein voll sichtbarer Knopf mit Rahmen und Text,
+      // kein verstecktes Menue. Keine automatische Pruefung hat das gefangen,
+      // weil beide Knoepfe je fuer sich regelkonform sind - erst ihre
+      // Nachbarschaft ist der Fehler.
+      //
+      // BEWUSST OHNE `toolbar-new-btn`. Diese Klasse ist NICHT „ein Knopf im
+      // Kopf", sondern die Zeigergeraet-Fassung DESSELBEN Wegs, den der FAB am
+      // Finger anbietet: layout.css blendet unter ihr ab 1024px per
+      // `body:has(.toolbar-new-btn:not([hidden])) #fab-layer .page-fab` den FAB
+      // aus, und der Audit erzwingt die Beschriftung aus `newLabel.*` - dem
+      // Register, mit dem der FAB andockt. Hier sind es aber ZWEI verschiedene
+      // Aktionen: der FAB legt eine Abholung an, dieser Knopf eine Abfallart.
+      // Mit der Klasse waere „Abholung" am Desktop ersatzlos verschwunden -
+      // ein groesserer Schaden als der, den dieser Knopf behebt.
+      actions: readOnly() ? '' : renderPageActions([
+        popoverMenuHtml({
+          id: 'waste-page-menu',
+          label: t('waste.moreActions'),
+          items: [
+            { action: 'open-import', label: t('waste.importFileAction'), icon: 'upload' },
+            { action: 'open-url-source', label: t('waste.addUrlSourceAction'), icon: 'link' },
+            { action: 'open-reminder-settings', label: t('waste.reminderSettingsAction'), icon: 'bell' },
+          ],
+        }),
+        `<button type="button" class="btn btn--secondary" id="waste-add-type-btn" data-action="add-type">
+          <i data-lucide="plus" class="icon-md" aria-hidden="true"></i>
+          <span>${esc(t('waste.addType'))}</span>
+        </button>`,
+      ].join('\n')),
     }),
     body: renderPageBody({
       content: [
         renderListSection({
           className: 'waste-upcoming-section',
-          content: `<h2 class="waste-section-title">${t('waste.upcomingSectionTitle')}</h2><div class="list-rows" id="waste-upcoming-list"></div>`,
+          content: `<h2 class="waste-section-title u-section-title">${t('waste.upcomingSectionTitle')}</h2><div class="list-rows" id="waste-upcoming-list"></div>`,
         }),
         renderListSection({
           className: 'waste-types-section',
-          content: `<h2 class="waste-section-title">${t('waste.typesSectionTitle')}</h2><div id="waste-types-list"></div>`,
+          content: `<h2 class="waste-section-title u-section-title">${t('waste.typesSectionTitle')}</h2><div id="waste-types-list"></div>`,
         }),
         renderListSection({
           className: 'waste-sources-section',
-          content: `<h2 class="waste-section-title">${t('waste.sourcesSectionTitle')}</h2><div class="list-rows" id="waste-sources-list"></div>`,
+          content: `<h2 class="waste-section-title u-section-title">${t('waste.sourcesSectionTitle')}</h2><div class="list-rows" id="waste-sources-list"></div>`,
         }),
       ].join('\n'),
     }),
@@ -1688,8 +1896,20 @@ function bindEvents() {
   // trotzdem gesperrt - ausgeblendet ist nicht dasselbe wie unerreichbar.
   findPageFab('waste-fab-new-pickup').addEventListener('click', () => {
     if (readOnly()) return;
+    // SACKGASSE BEHOBEN (Audit UX, 2026-09-12). Ohne Abfallart liess sich keine
+    // Abholung anlegen - der FAB sagte das auch, tat dann aber NICHTS weiter.
+    // Auf einer frischen Installation war er damit der prominenteste Knopf der
+    // Seite und zugleich der einzige, der garantiert nirgendwohin fuehrte: der
+    // Nutzer musste selbst erraten, dass „Abfallart" hinter dem „..." im Kopf
+    // liegt. Jetzt fuehrt er dorthin, wo er hinweist.
+    // Der Hinweis bleibt BESTEHEN und wird nicht durch das stille Oeffnen
+    // ersetzt: der FAB ist mit „Abholung" beschriftet, und ein Dialog, der
+    // unangekuendigt nach einer ABFALLART fragt, ist ein Themenwechsel, den der
+    // Satz erklaeren muss. Toast und Dialog zusammen sind der vollstaendige
+    // Weg - der Satz sagt warum, der Dialog macht es moeglich.
     if (!state.types.filter((t2) => !t2.archived).length) {
       window.yuvomi?.showToast(t('waste.addTypeFirstHint'), 'default');
+      openTypeModal();
       return;
     }
     openPickupModal();
@@ -1889,4 +2109,9 @@ export const __test = {
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
   defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
   splitUpcomingByType, deepLinkNeedsExpand,
+  // Die drei Zeilenbauer und die Palette: seit der Vereinheitlichung der
+  // Zeilengrammatik (Audit UX 2026-09-12) tragen sie Bedingungen, die man
+  // nicht mehr am Markup ablesen kann - welcher Eintrag bei welcher Position
+  // im Menue steht, und dass die Preset-Farben allesamt im Raster liegen.
+  typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
 };
