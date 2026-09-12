@@ -162,6 +162,22 @@ test('timezone notes: TZID, UTC, and floating times are each labeled distinctly'
   assert.equal(byDate.get('2026-07-03'), 'floating (no timezone in source)');
 });
 
+test('a TZID event just after local midnight lands on ITS local day when the household zone is non-UTC, not the UTC day before', () => {
+  // Round-3 review, should-fix 4: no test bound the pickupDateKey fix to a
+  // real non-UTC household zone. Berlin midnight 2026-07-01 is
+  // 2026-06-30T22:00:00Z - deciding the day in UTC (the pre-fix behaviour,
+  // reinstated by `timeZone = 'UTC'` at the top of buildImportPreview) files
+  // the pickup one day early. 06:00 fixtures never catch this because they
+  // are nowhere near midnight in either zone.
+  const ics = vcalendar([
+    'BEGIN:VEVENT\r\nUID:midnight@x\r\nSUMMARY:Restmüll\r\nDTSTART;TZID=Europe/Berlin:20260701T000000\r\nEND:VEVENT',
+  ]);
+  const preview = buildImportPreview(ics, { today: TODAY, timeZone: 'Europe/Berlin' });
+  assert.equal(preview.candidates.length, 1);
+  assert.equal(preview.candidates[0].date_key, '2026-07-01',
+    'the household-local day, not the UTC day before (2026-06-30)');
+});
+
 test('a label with no CATEGORIES falls back to SUMMARY', () => {
   const ics = vcalendar(['BEGIN:VEVENT\r\nUID:nocat@x\r\nSUMMARY:Gelber Sack\r\nDTSTART;VALUE=DATE:20260701\r\nEND:VEVENT']);
   const preview = buildImportPreview(ics, { today: TODAY });
