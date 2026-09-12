@@ -1537,6 +1537,10 @@ nur das gerenderte Dokument sieht, ob eine Liste ueberhaupt verdrahtet ist.
   app-weiter Kanon, kein Modul-Detail.
 - **Focus:** Akzentkante plus 3px Glow in `--color-accent-light`; interaktive Nicht-Felder
   tragen den app-weiten 2px-Ring.
+- **Klassenname:** `.input` und `.form-input` sind ein Alias auf dieselbe Regel (layout.css).
+  Kanonisch fuer neuen Code ist `.form-input` - der Name, den `.form-group`/`.form-field`/
+  `.form-label` schon fuehren. Bestand bleibt unangetastet, Umbenennen aller Fundstellen ist
+  keine Migration wert.
 
 ### Navigation
 - **Mobil:** schwebende Glas-Kapsel (`--glass-bg-elevated` + `--blur-md` + saturate,

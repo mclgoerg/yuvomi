@@ -138,6 +138,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Dashboard widgets share one header grammar, and more section headings adopt the shared title
+  style.** Three widget header treatments coexisted on the dashboard: most widgets carried a
+  module seal, a title and an optional "view all" link, but Weather and Clock opened straight into
+  their content with no header at all. Both now open with the same seal+title header as their 15
+  neighbours - the large temperature and the clock face stay exactly as prominent as before, they
+  just get a name above them like everywhere else. The metrics tile row is deliberately left alone:
+  each tile already names a different module with its own seal and label, and forcing one title
+  over several modules would misrepresent it, not fix it.
+
+  Separately, Rewards' four section headings and a genuinely unstyled Inventory category heading
+  now use the shared `u-section-title` role instead of a private declaration that had drifted a
+  few pixels off it (Inventory's had no declared size at all - it inherited the browser default,
+  not any design token). Notes' and Budget's section headings, already the right size through their
+  own container rule, now say so directly in markup as well, growing `u-section-title`'s adoption
+  beyond the two files it was previously confined to.
+
+  `.input` and `.form-input` stay aliased to the same rule - renaming roughly 300 existing uses
+  is not worth the review cost - but the alias site and DESIGN.md's Inputs/Fields section now say
+  which one is canonical for new code: `.form-input`, the name `.form-group`/`.form-field`/
+  `.form-label` already use.
+
 - **A scaled ingredient quantity is now written in the household's own digits.** Scaling a recipe
   wrote the number in Latin digits even where the rest of the line used Persian or Arabic ones, so a
   doubled "۲ x ۵۰۰ g" came back as "4 x ۵۰۰ g" - one line in two scripts. That was deliberate at the
