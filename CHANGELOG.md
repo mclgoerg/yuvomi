@@ -193,6 +193,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Split Expenses no longer shows three ways to add an expense at once, or a second page title
+  under Budget's own heading.** Viewed as Budget's Split Expenses tab, the tab used to offer its own
+  header button and its own floating button for adding an expense, on top of Budget's own generic
+  toolbar button and FAB - both of the latter only ever repeated the tab's own button under the
+  hood. Budget's generic add action is now switched off for this tab, the same way it already is for
+  Reports; the tab's own floating button is the one primary action, and its header button steps back
+  to a secondary one. The tab's own `<h1>` - a second page title stacked under Budget's - is now a
+  section heading instead, matching how it already looked in a lighter type size. Deleting a group
+  now gets the same restrained red treatment used for a destructive action elsewhere in the app,
+  instead of looking identical to editing or archiving it.
+
 - **A housekeeper can check out again, and work a second session on the same day** (#1133, #1138).
   The one button that carries both directions was disabled while someone was checked in, and it is
   the only thing that triggers the check-out path - so that path was unreachable: a household could
