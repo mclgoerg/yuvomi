@@ -2180,6 +2180,7 @@
         "holidayPublicLabel": "显示法定节假日",
         "holidaySchoolLabel": "显示学校假期",
         "holidaySchoolUnavailable": "该国家没有可用的学校假期数据。",
+        "holidayAustraliaObservanceHint": "澳大利亚的节假日按实际日期显示——周末节假日的补假日各州规定不同，因此不予显示。",
         "holidayPublicColor": "法定节假日颜色",
         "holidaySchoolColor": "学校假期颜色",
         "holidaySaveBtn": "保存",

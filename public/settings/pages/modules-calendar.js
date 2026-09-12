@@ -112,6 +112,9 @@ function renderPage(container, preferences) {
             <select class="form-input" id="holiday-country" disabled>
               <option value="">${t('settings.holidayCountryPlaceholder')}</option>
             </select>
+            <p class="form-hint" id="holiday-au-observance-hint" hidden>
+              ${t('settings.holidayAustraliaObservanceHint')}
+            </p>
           </div>
           <div class="form-group">
             <label class="form-label" for="holiday-subdivision">${t('settings.holidaySubdivisionLabel')}</label>
@@ -210,6 +213,44 @@ export function countrySchoolHolidaysAvailable(countries, countryCode) {
   if (!countryCode) return true;
   const entry = Array.isArray(countries) ? countries.find((c) => c?.isoCode === countryCode) : null;
   return entry?.schoolHolidays !== false;
+}
+
+/**
+ * #965: fuer ein Land ohne Schulferien-Quelle bleibt der Schalter ehrlich
+ * ausgegraut statt eine Ebene anzubieten, die beim Sync nur leer bliebe.
+ * Serverseitig bleibt der Sync selbst permissiv (ein gespeichertes
+ * holiday_show_school=1 synchronisiert fuer so ein Land einfach nichts) -
+ * diese Sperre ist reine UI-Ehrlichkeit, keine Validierung.
+ *
+ * DER HAKEN WIRD GEMERKT, NICHT NUR GELOESCHT (Review-Fund zu #965). Der
+ * Speichern-Pfad liest `showSchool.checked` woertlich aus dem Formular
+ * (holidayPreferenceData) - bliebe der Haken bei einem gesperrten Land
+ * stehen, wuerde ein Speichern holiday_show_school=1 fuer ein Land ohne
+ * Datenquelle festschreiben. Ihn nur zu loeschen hatte aber die andere
+ * Falle: ein Haushalt mit eingeschalteten Schulferien, der im Dropdown kurz
+ * zu den USA und wieder zurueck blaettert, verlor die Ebene beim naechsten
+ * Speichern, ohne den Schalter je beruehrt zu haben. Also: beim Sperren den
+ * Stand merken und den Haken loeschen, beim Entsperren wiederherstellen -
+ * ein bewusster Klick des Nutzers passiert nur im entsperrten Zustand und
+ * bleibt damit unangetastet.
+ */
+export function createSchoolAvailabilityUpdater({ showSchool, schoolColorGroup, schoolUnavailableHint }) {
+  let gemerkt = null;
+  return (countries, countryCode) => {
+    const available = countrySchoolHolidaysAvailable(countries, countryCode);
+    showSchool.disabled = !available;
+    schoolUnavailableHint.hidden = available;
+    if (!available) {
+      if (gemerkt === null) gemerkt = showSchool.checked;
+      showSchool.checked = false;
+      schoolColorGroup.hidden = true;
+    } else if (gemerkt !== null) {
+      showSchool.checked = gemerkt;
+      schoolColorGroup.hidden = !gemerkt;
+      gemerkt = null;
+    }
+    return available;
+  };
 }
 
 function isHolidayValueResolved(entries, persistedValue) {
@@ -454,25 +495,27 @@ async function bindEvents(container, preferences) {
   const publicColorGroup = container.querySelector('#holiday-public-color-group');
   const schoolColorGroup = container.querySelector('#holiday-school-color-group');
   const schoolUnavailableHint = container.querySelector('#holiday-school-unavailable-hint');
+  const auObservanceHint = container.querySelector('#holiday-au-observance-hint');
   const syncButton = container.querySelector('#holiday-sync-btn');
   const errorElement = container.querySelector('#holidays-form-error');
   const subdivisionRequests = { latestRequestId: 0 };
   const groupRequests = { latestRequestId: 0 };
   let countriesData = [];
 
-  // #965: fuer ein Land ohne Schulferien-Quelle bleibt der Schalter ehrlich
-  // ausgegraut statt eine Ebene anzubieten, die beim Sync nur leer bliebe.
-  // Serverseitig bleibt der Sync selbst permissiv (ein gespeichertes
-  // holiday_show_school=1 synchronisiert fuer so ein Land einfach nichts) -
-  // diese Sperre ist reine UI-Ehrlichkeit, keine Validierung.
+  // Merken-und-Wiederherstellen fuer den Schulferien-Schalter, siehe
+  // createSchoolAvailabilityUpdater (Review-Fund zu #965).
+  const updateSchoolAvailability = createSchoolAvailabilityUpdater({
+    showSchool, schoolColorGroup, schoolUnavailableHint,
+  });
   const applySchoolAvailability = (countryCode) => {
-    const available = countrySchoolHolidaysAvailable(countriesData, countryCode);
-    showSchool.disabled = !available;
-    schoolUnavailableHint.hidden = available;
-    if (!available && showSchool.checked) {
-      showSchool.checked = false;
-      schoolColorGroup.hidden = true;
-    }
+    updateSchoolAvailability(countriesData, countryCode);
+    // #965 Review-Fund: Australiens Liste zeigt bewusst die echten
+    // Kalenderdaten - es gibt kein Bundesgesetz fuer Ersatztage, jeder
+    // Bundesstaat regelt eigene (Begruendung beim AU-Regelsatz im Server).
+    // Sichtbar wird das z. B. Weihnachten 2027 (Sa 25./So 26., waehrend die
+    // Bundesstaaten Mo/Di als Ersatztage beobachten) - ohne diese eine Zeile
+    // saehe das wie ein Rechenfehler aus, nicht wie eine Entscheidung.
+    auObservanceHint.hidden = countryCode !== 'AU';
   };
   const discoveryState = {
     countryReady: false,

@@ -2203,6 +2203,7 @@
         "holidayPublicLabel": "Show public holidays",
         "holidaySchoolLabel": "Show school holidays",
         "holidaySchoolUnavailable": "No school-holiday data is available for this country.",
+        "holidayAustraliaObservanceHint": "For Australia, public holidays are shown on their actual dates – substitute days for holidays falling on a weekend differ by state and are not shown.",
         "holidayPublicColor": "Public holiday color",
         "holidaySchoolColor": "School holiday color",
         "holidaySaveBtn": "Save",

@@ -65,7 +65,18 @@ async function apiFetch(path) {
  * @returns {Promise<Array<{isoCode: string, name: string, schoolHolidays?: boolean}>>}
  */
 async function getCountries() {
-  const raw = await apiFetch('/Countries');
+  // FAELLT DIE API AUS, BLEIBEN DIE LOKALEN LAENDER WAEHLBAR (Review-Fund zu
+  // #965): ohne diesen Fang wurde aus dem Fetch-Fehler ein 502 der Route, das
+  // Frontend fiel auf eine leere Liste zurueck - und ausgerechnet die Laender,
+  // die gar kein Netz brauchen, waren nicht mehr auswaehlbar. Ein Ausfall der
+  // Fremd-API kostet dann nur deren eigene 36 Eintraege, nicht die lokalen.
+  let raw = [];
+  try {
+    raw = await apiFetch('/Countries');
+  } catch (err) {
+    log.warn(`Fetch /Countries failed (${err.message}) - serving the locally computed countries only`);
+    raw = [];
+  }
   const apiCountries = (raw ?? []).map((c) => ({
     isoCode: c.isoCode,
     name: resolveName(c.name),
@@ -435,17 +446,22 @@ const GB_ENGLAND_WALES_HOLIDAYS = [
 ];
 
 const GB_SCOTLAND_HOLIDAYS = [
-  { names: ["New Year's Day", '2 January'], rule: { type: 'pair', month: 1, day1: 1 } },
+  // '2nd January' in GOV.UK-Schreibweise (bank-holidays.json), nicht '2 January'.
+  { names: ["New Year's Day", '2nd January'], rule: { type: 'pair', month: 1, day1: 1 } },
   { names: 'Good Friday', rule: { type: 'easter', offset: -2 } },
   { names: 'Early May Bank Holiday', rule: { type: 'nth', month: 5, weekday: MON, n: 1 } },
   { names: 'Spring Bank Holiday', rule: { type: 'nth', month: 5, weekday: MON, n: -1 } },
   // Schottlands Sommertermin ist der ERSTE Montag im August, nicht der letzte
   // wie in England/Wales - keine Tippfehler-Variante derselben Regel.
   { names: 'Summer Bank Holiday', rule: { type: 'nth', month: 8, weekday: MON, n: 1 } },
-  // St. Andrew's Day hat keine belegte Verschiebungsregel - anders als die
-  // uebrigen schottischen Feiertage bleibt er unveraendert am 30.11., auch
-  // wenn das ein Wochenende ist.
-  { names: "St Andrew's Day", rule: { type: 'fixed', month: 11, day: 30 } },
+  // St Andrew's Day IST mondayised: der St Andrew's Day Bank Holiday
+  // (Scotland) Act 2007 s.1(2) verlegt ihn auf den folgenden Montag, wenn der
+  // 30.11. auf ein Wochenende faellt - GOV.UK (bank-holidays.json) fuehrt
+  // entsprechend 2019-12-02, 2024-12-02 und 2025-12-01 als Ersatztage. Ein
+  // frueherer Kommentar hier behauptete das Gegenteil, und genau daran hing
+  // der Review-Fund zu #965: 2025 (Sonntag) lag im Sync-Fenster und stand
+  // einen Tag zu frueh im Kalender.
+  { names: "St Andrew's Day", rule: { type: 'fixed', month: 11, day: 30 }, observance: 'mondayised' },
   { names: ['Christmas Day', 'Boxing Day'], rule: { type: 'pair', month: 12, day1: 25 } },
 ];
 
@@ -598,23 +614,36 @@ async function syncYearAndType(country, subdivision, year, type, langCode) {
 
   let holidays;
   let fetchFailed = false;
-  try {
-    holidays = await apiFetch(`/${endpoint}?${params}`);
-    // NUR EIN ECHTES LEERES ARRAY IST EINE AUSKUNFT. Ein HTTP 200 mit einem
-    // anderen Rumpf - ein Fehlerobjekt eines vorgeschalteten Proxys, eine
-    // geaenderte Antwortform - sagt gar nichts, und seit `finishEmpty` einen
-    // leeren Bereich RAEUMT, waere daraus Datenverlust geworden: der Cache
-    // gelöscht, der Scope als vollstaendig verbucht, und die Feiertage 30 Tage
-    // lang weg. Ein Nicht-Array zaehlt deshalb wie ein gescheiterter Abruf
-    // (gefunden in der PR-Durchsicht, als Folgefehler genau dieser Aenderung).
-    if (!Array.isArray(holidays)) {
-      log.warn(`Fetch ${endpoint} ${country}/${subdivision ?? '-'}/${year}: unexpected response shape (${typeof holidays})`);
-      fetchFailed = true;
-    }
-  } catch (err) {
-    log.warn(`Fetch ${endpoint} ${country}/${subdivision ?? '-'}/${year}: ${err.message}`);
-    fetchFailed = true;
+  // KEIN LIVE-ABRUF FUER DIE LOKAL BERECHNETEN LAENDER (Review-Fund zu #965):
+  // /PublicHolidays antwortet fuer sie belegt mit 200 [] (fuer BR und US
+  // gemessen, GB fuehrt die API gar nicht) - der Request loeste also nur den
+  // Fallback aus, der hier ohnehin die Daten liefert. Der Kurzschluss spart
+  // nicht bloss vier Requests pro Lauf: er macht den Offline-Fall fuer diese
+  // Laender per Konstruktion funktionsfaehig, statt ihn vom Scheitern eines im
+  // Voraus bekannten sinnlosen Abrufs abhaengig zu machen. Schulferien nehmen
+  // weiter den API-Weg - fuer sie gibt es keinen lokalen Ersatz, und die leere
+  // Antwort bleibt dort die ehrliche Auskunft.
+  if (type === 'public' && LOCAL_COUNTRIES[country]) {
     holidays = localHolidayFallback(country, type, year, langCode, subdivision);
+  } else {
+    try {
+      holidays = await apiFetch(`/${endpoint}?${params}`);
+      // NUR EIN ECHTES LEERES ARRAY IST EINE AUSKUNFT. Ein HTTP 200 mit einem
+      // anderen Rumpf - ein Fehlerobjekt eines vorgeschalteten Proxys, eine
+      // geaenderte Antwortform - sagt gar nichts, und seit `finishEmpty` einen
+      // leeren Bereich RAEUMT, waere daraus Datenverlust geworden: der Cache
+      // gelöscht, der Scope als vollstaendig verbucht, und die Feiertage 30 Tage
+      // lang weg. Ein Nicht-Array zaehlt deshalb wie ein gescheiterter Abruf
+      // (gefunden in der PR-Durchsicht, als Folgefehler genau dieser Aenderung).
+      if (!Array.isArray(holidays)) {
+        log.warn(`Fetch ${endpoint} ${country}/${subdivision ?? '-'}/${year}: unexpected response shape (${typeof holidays})`);
+        fetchFailed = true;
+      }
+    } catch (err) {
+      log.warn(`Fetch ${endpoint} ${country}/${subdivision ?? '-'}/${year}: ${err.message}`);
+      fetchFailed = true;
+      holidays = localHolidayFallback(country, type, year, langCode, subdivision);
+    }
   }
 
   if (!Array.isArray(holidays) || holidays.length === 0) {

@@ -2180,6 +2180,7 @@
         "holidayPublicLabel": "祝日を表示",
         "holidaySchoolLabel": "学校の休暇を表示",
         "holidaySchoolUnavailable": "この国の学校休暇データはありません。",
+        "holidayAustraliaObservanceHint": "オーストラリアでは祝日は実際の日付で表示されます。週末に当たる祝日の振替日は州ごとに異なるため表示されません。",
         "holidayPublicColor": "祝日の色",
         "holidaySchoolColor": "学校の休暇の色",
         "holidaySaveBtn": "保存",

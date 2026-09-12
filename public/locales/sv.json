@@ -2180,6 +2180,7 @@
         "holidayPublicLabel": "Visa helgdagar",
         "holidaySchoolLabel": "Visa skollov",
         "holidaySchoolUnavailable": "Det finns inga skollovsdata tillgängliga för detta land.",
+        "holidayAustraliaObservanceHint": "För Australien visas helgdagar på sitt faktiska datum – ersättningsdagar för helgdagar som infaller på en helg skiljer sig mellan delstaterna och visas inte.",
         "holidayPublicColor": "Färg för helgdagar",
         "holidaySchoolColor": "Färg för skollov",
         "holidaySaveBtn": "Spara",

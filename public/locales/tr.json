@@ -2180,6 +2180,7 @@
         "holidayPublicLabel": "Resmi tatilleri göster",
         "holidaySchoolLabel": "Okul tatillerini göster",
         "holidaySchoolUnavailable": "Bu ülke için okul tatili verisi mevcut değil.",
+        "holidayAustraliaObservanceHint": "Avustralya için tatiller gerçek tarihlerinde gösterilir – hafta sonuna denk gelen tatillerin telafi günleri eyalete göre değişir ve gösterilmez.",
         "holidayPublicColor": "Resmi tatil rengi",
         "holidaySchoolColor": "Okul tatili rengi",
         "holidaySaveBtn": "Kaydet",

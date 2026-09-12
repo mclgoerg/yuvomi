@@ -2215,6 +2215,7 @@
         "holidayPublicLabel": "Feiertage anzeigen",
         "holidaySchoolLabel": "Schulferien anzeigen",
         "holidaySchoolUnavailable": "Für dieses Land liegen keine Schulferien-Daten vor.",
+        "holidayAustraliaObservanceHint": "Für Australien erscheinen Feiertage an ihrem tatsächlichen Datum – Ersatztage für Feiertage am Wochenende regelt jeder Bundesstaat anders, sie werden nicht angezeigt.",
         "holidayPublicColor": "Farbe Feiertage",
         "holidaySchoolColor": "Farbe Schulferien",
         "holidaySaveBtn": "Speichern",

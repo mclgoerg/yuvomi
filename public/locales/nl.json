@@ -2180,6 +2180,7 @@
         "holidayPublicLabel": "Feestdagen weergeven",
         "holidaySchoolLabel": "Schoolvakanties weergeven",
         "holidaySchoolUnavailable": "Voor dit land zijn geen schoolvakantiegegevens beschikbaar.",
+        "holidayAustraliaObservanceHint": "Voor Australië worden feestdagen op hun werkelijke datum getoond – vervangende dagen voor feestdagen in het weekend verschillen per staat en worden niet weergegeven.",
         "holidayPublicColor": "Kleur feestdagen",
         "holidaySchoolColor": "Kleur schoolvakanties",
         "holidaySaveBtn": "Opslaan",

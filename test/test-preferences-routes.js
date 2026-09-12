@@ -592,9 +592,16 @@ test('GET /holidays/countries: gestubbte API -> 200 mit sortierter Liste', async
     ['AU', 'AT', 'BR', 'CA', 'DE', 'NZ', 'GB', 'US']);
   holidays.__setFetchImpl(null);
 });
-test('GET /holidays/countries: API-Fehler -> 502', async () => {
+test('GET /holidays/countries: API-Fehler -> 200 mit den lokalen Laendern (#965 Review)', async () => {
+  // Vorher wurde aus dem Fetch-Fehler ein 502 und das Frontend fiel auf eine
+  // leere Liste zurueck - ausgerechnet die sechs Laender, die gar kein Netz
+  // brauchen, waren dann nicht mehr waehlbar. Der Service degradiert jetzt auf
+  // seine lokale Liste statt zu werfen.
   holidays.__setFetchImpl(async () => { throw new Error('network down'); });
-  assert.equal((await raw('GET', '/holidays/countries')).status, 502);
+  const res = await raw('GET', '/holidays/countries');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.data.map((c) => c.isoCode), ['AU', 'BR', 'CA', 'NZ', 'GB', 'US']);
+  assert.ok(res.body.data.every((c) => c.schoolHolidays === false));
   holidays.__setFetchImpl(null);
 });
 test('GET /holidays/subdivisions/:cc: ungültiger Code -> 400', async () => {

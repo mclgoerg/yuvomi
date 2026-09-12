@@ -482,7 +482,10 @@ test('sync: Brazil local fallback follows the data language, not the country', a
   const res = await sync(true);
 
   assert.equal(res.synced, SYNC_YEAR_SPAN * BRAZIL_PUBLIC_HOLIDAYS_PER_YEAR);
-  assert.ok(mock.calls.every((url) => url.includes('countryIsoCode=BR')));
+  // Seit dem Kurzschluss fuer lokal berechnete Laender (#965 Review) fragt ein
+  // Nur-Feiertage-Sync fuer BR die API gar nicht mehr - die Zusicherung dieses
+  // Tests ist die Sprachkaskade darunter, nicht der Transportweg.
+  assert.deepEqual(mock.calls.filter((url) => url.includes('/PublicHolidays')), []);
 
   const currentYear = new Date().getFullYear();
   const namesOf = () => db.prepare(
@@ -1103,7 +1106,10 @@ test('CA: 10 Feiertage, EN/FR-Kaskade, Victoria Day zwischen dem 18. und 24. Mai
   const fr2026 = localHolidayFallback('CA', 'public', 2026, 'FR')
     .map((h) => `${h.startDate} ${h.name}`).sort();
   assert.ok(fr2026.includes('2026-05-18 Fête de la Reine'));
-  assert.ok(fr2026.includes('2026-07-01 Fête du Canada') || fr2026.some((n) => n.includes('Fête du Canada')));
+  // Review-Fund zu #965: hier stand ein ||, dessen zweiter Operand (`some` +
+  // `includes` auf den Namen) den ersten verschluckte - geprueft war damit nur
+  // noch der Name, nicht das Datum. Exakt gebunden prueft die eine Zeile beides.
+  assert.ok(fr2026.includes('2026-07-01 Fête du Canada'), `bekam: ${fr2026.filter((n) => n.includes('Canada')).join(', ')}`);
 });
 
 test('CA: Victoria Day faellt auf den 24., wenn der selbst ein Montag ist', () => {
@@ -1163,10 +1169,11 @@ test('GB (Schottland): 9 Feiertage, kein Ostermontag, eigener Sommertermin, 2. J
 
   // 2022: 1. Januar Samstag, 2. Januar Sonntag -> Ersatztage Montag 3. und
   // Dienstag 4. Januar (amtlich belegtes Beispiel aus der Recherche).
+  // '2nd January' in GOV.UK-Schreibweise (Review-Fund zu #965).
   const namesSct2022 = namesAndDates(2022, 'GB', 'GB-SCT');
   assert.ok(namesSct2022.includes("2022-01-03 New Year's Day"),
     `bekam: ${namesSct2022.filter((n) => n.includes('01-0')).join(', ')}`);
-  assert.ok(namesSct2022.includes('2022-01-04 2 January'));
+  assert.ok(namesSct2022.includes('2022-01-04 2nd January'));
 });
 
 test('GB (Nordirland): 10 Feiertage, St Patrick\'s Day + Battle of the Boyne mit Mondayisation', () => {
@@ -1222,7 +1229,262 @@ test('NZ: Neujahr/2.-Januar- und Weihnachten/Boxing-Day-Paare wie in Schottland'
   assert.ok(names2021.includes('2021-12-28 Boxing Day'));
 });
 
-test('sync: US public holidays cache via the same empty-fetch fallback path as Brazil', async () => {
+test("GB (Schottland): St Andrew's Day ist mondayised (Act 2007 s.1(2), Review-Fund zu #965)", () => {
+  // GOV.UK (bank-holidays.json) fuehrt 2019-12-02, 2024-12-02 und 2025-12-01
+  // als Ersatztage - der 30.11. fiel in diesen Jahren auf Sa/Sa/So. Die erste
+  // Fassung dieses PRs liess den Tag unverschoben stehen, und 2025 lag im
+  // Sync-Fenster: ein schottischer Haushalt sah das falsche Datum. Der
+  // naechste Wochenend-Fall nach 2025 ist 2030 (Sa -> Mo 2.12.).
+  for (const [year, expected] of [
+    [2019, "2019-12-02 St Andrew's Day"],
+    [2024, "2024-12-02 St Andrew's Day"],
+    [2025, "2025-12-01 St Andrew's Day"],
+    [2026, "2026-11-30 St Andrew's Day"], // Montag - unverschoben
+    [2030, "2030-12-02 St Andrew's Day"],
+  ]) {
+    const names = namesAndDates(year, 'GB', 'GB-SCT');
+    assert.ok(names.includes(expected),
+      `${year}: erwartet "${expected}", bekam: ${names.filter((n) => n.includes('Andrew')).join(', ') || '(nichts)'}`);
+  }
+});
+
+// ---- #965 Review: vollstaendige Jahres-Tabellen 2026 + 2027 -------------------
+// Der Befund: die Fixtures oben pruefen Zaehler und handverlesene Einzeldaten,
+// und sechs Ein-Token-Mutationen der Regeltabelle blieben trotzdem gruen (z. B.
+// Schottlands Sommertermin auf "letzter Montag" gedreht - genau die Verwechslung,
+// vor der der Code-Kommentar warnt). Diese Tabellen pinnen deshalb JEDES Datum
+// beider Jahre, und zwar aus den PRIMAERQUELLEN abgetippt, nicht aus der Engine
+// abgelesen - sonst bewiese der Test nur, dass Code und Fixture denselben
+// (moeglicherweise falschen) Gedankengang teilen:
+//   US: OPM "Federal Holidays" (opm.gov), Tabellen 2026/2027.
+//   CA: canada.ca (CRA) 2026; 2027 nach Holidays Act/Bills of Exchange Act
+//       (nur So->Mo verschiebt; Sa bleibt - die im Code dokumentierte,
+//       bewusste Abweichung von der UK-Paarlogik).
+//   GB: gov.uk/bank-holidays.json (alle drei Nationen, 2026 + 2027).
+//   AU: landesweite Feiertage auf ihrem echten Kalenderdatum - bewusst ohne
+//       Ersatztage (kein Bundesgesetz; siehe AU-Regelsatz).
+//   NZ: employment.govt.nz (MBIE), Tabellen 2026/2027 inkl. Matariki.
+//   BR: feste gesetzliche Daten + Karfreitag.
+// Jede Wochentagsbehauptung wurde zusaetzlich unabhaengig per Datumsarithmetik
+// gegengeprueft (jeder "Montag"-Feiertag ist wirklich ein Montag usw.).
+//
+// BEWUSST NICHT in der Schottland-Tabelle 2026: der per Koeniglicher
+// Proklamation geschaffene, einmalige "World Cup bank holiday" am Mo 15.06.2026
+// (gov.uk fuehrt ihn). Einmalig proklamierte Feiertage kann keine statische
+// Regeltabelle liefern - dokumentierte Grenze, siehe docs/SPEC.md; der
+// ICS-Weg ist dafuer die Antwort.
+
+test('US: vollstaendige Datumstabelle 2026 + 2027 (OPM)', () => {
+  assert.deepEqual(namesAndDates(2026, 'US'), [
+    "2026-01-01 New Year's Day",
+    '2026-01-19 Martin Luther King, Jr. Day',
+    "2026-02-16 Washington's Birthday",
+    '2026-05-25 Memorial Day',
+    '2026-06-19 Juneteenth National Independence Day',
+    '2026-07-03 Independence Day', // 4.7. ist Samstag -> Freitag davor
+    '2026-09-07 Labor Day',
+    '2026-10-12 Columbus Day',
+    '2026-11-11 Veterans Day',
+    '2026-11-26 Thanksgiving Day',
+    '2026-12-25 Christmas Day',
+  ]);
+  assert.deepEqual(namesAndDates(2027, 'US'), [
+    "2027-01-01 New Year's Day",
+    '2027-01-18 Martin Luther King, Jr. Day',
+    "2027-02-15 Washington's Birthday",
+    '2027-05-31 Memorial Day',
+    '2027-06-18 Juneteenth National Independence Day', // 19.6. Samstag -> Freitag
+    '2027-07-05 Independence Day',                     // 4.7. Sonntag -> Montag
+    '2027-09-06 Labor Day',
+    '2027-10-11 Columbus Day',
+    '2027-11-11 Veterans Day',
+    '2027-11-25 Thanksgiving Day',
+    '2027-12-24 Christmas Day',                        // 25.12. Samstag -> Freitag
+  ]);
+});
+
+test('CA: vollstaendige Datumstabelle 2026 + 2027 (canada.ca / Holidays Act)', () => {
+  assert.deepEqual(namesAndDates(2026, 'CA'), [
+    "2026-01-01 New Year's Day",
+    '2026-04-03 Good Friday',
+    '2026-05-18 Victoria Day', // Montag VOR dem 25.5., obwohl der 25. selbst ein Montag ist
+    '2026-07-01 Canada Day',
+    '2026-09-07 Labour Day',
+    '2026-09-30 National Day for Truth and Reconciliation',
+    '2026-10-12 Thanksgiving',
+    '2026-11-11 Remembrance Day',
+    '2026-12-25 Christmas Day',
+    '2026-12-26 Boxing Day', // Samstag - bleibt (nur So->Mo ist belegt)
+  ]);
+  assert.deepEqual(namesAndDates(2027, 'CA'), [
+    "2027-01-01 New Year's Day",
+    '2027-03-26 Good Friday',
+    '2027-05-24 Victoria Day',
+    '2027-07-01 Canada Day',
+    '2027-09-06 Labour Day',
+    '2027-09-30 National Day for Truth and Reconciliation',
+    '2027-10-11 Thanksgiving',
+    '2027-11-11 Remembrance Day',
+    '2027-12-25 Christmas Day', // Samstag - bleibt bewusst unverschoben
+    '2027-12-27 Boxing Day',    // Sonntag -> Montag
+  ]);
+});
+
+test('GB (England & Wales): vollstaendige Datumstabelle 2026 + 2027 (gov.uk)', () => {
+  assert.deepEqual(namesAndDates(2026, 'GB', 'GB-ENG'), [
+    "2026-01-01 New Year's Day",
+    '2026-04-03 Good Friday',
+    '2026-04-06 Easter Monday',
+    '2026-05-04 Early May Bank Holiday',
+    '2026-05-25 Spring Bank Holiday',
+    '2026-08-31 Summer Bank Holiday', // LETZTER Montag im August
+    '2026-12-25 Christmas Day',
+    '2026-12-28 Boxing Day', // 26.12. Samstag -> Ersatztag Montag
+  ]);
+  assert.deepEqual(namesAndDates(2027, 'GB', 'GB-ENG'), [
+    "2027-01-01 New Year's Day",
+    '2027-03-26 Good Friday',
+    '2027-03-29 Easter Monday',
+    '2027-05-03 Early May Bank Holiday',
+    '2027-05-31 Spring Bank Holiday',
+    '2027-08-30 Summer Bank Holiday',
+    '2027-12-27 Christmas Day', // 25.12. Samstag -> Montag
+    '2027-12-28 Boxing Day',    // 26.12. Sonntag -> Dienstag
+  ]);
+});
+
+test('GB (Schottland): vollstaendige Datumstabelle 2026 + 2027 (gov.uk)', () => {
+  assert.deepEqual(namesAndDates(2026, 'GB', 'GB-SCT'), [
+    "2026-01-01 New Year's Day",
+    '2026-01-02 2nd January',
+    '2026-04-03 Good Friday',
+    '2026-05-04 Early May Bank Holiday',
+    '2026-05-25 Spring Bank Holiday',
+    // Hier fehlt bewusst der proklamierte World Cup bank holiday (15.06.2026),
+    // siehe Kommentar ueber diesem Block.
+    '2026-08-03 Summer Bank Holiday', // ERSTER Montag im August, anders als England/Wales
+    "2026-11-30 St Andrew's Day",     // Montag - unverschoben
+    '2026-12-25 Christmas Day',
+    '2026-12-28 Boxing Day',
+  ]);
+  assert.deepEqual(namesAndDates(2027, 'GB', 'GB-SCT'), [
+    "2027-01-01 New Year's Day",
+    '2027-01-04 2nd January', // 2.1. Samstag -> Ersatztag Montag
+    '2027-03-26 Good Friday',
+    '2027-05-03 Early May Bank Holiday',
+    '2027-05-31 Spring Bank Holiday',
+    '2027-08-02 Summer Bank Holiday',
+    "2027-11-30 St Andrew's Day",
+    '2027-12-27 Christmas Day',
+    '2027-12-28 Boxing Day',
+  ]);
+});
+
+test('GB (Nordirland): vollstaendige Datumstabelle 2026 + 2027 (gov.uk)', () => {
+  assert.deepEqual(namesAndDates(2026, 'GB', 'GB-NIR'), [
+    "2026-01-01 New Year's Day",
+    "2026-03-17 St Patrick's Day",
+    '2026-04-03 Good Friday',
+    '2026-04-06 Easter Monday',
+    '2026-05-04 Early May Bank Holiday',
+    '2026-05-25 Spring Bank Holiday',
+    '2026-07-13 Battle of the Boyne (Orangemen’s Day)', // 12.7. Sonntag -> Montag
+    '2026-08-31 Summer Bank Holiday',
+    '2026-12-25 Christmas Day',
+    '2026-12-28 Boxing Day',
+  ]);
+  assert.deepEqual(namesAndDates(2027, 'GB', 'GB-NIR'), [
+    "2027-01-01 New Year's Day",
+    "2027-03-17 St Patrick's Day",
+    '2027-03-26 Good Friday',
+    '2027-03-29 Easter Monday',
+    '2027-05-03 Early May Bank Holiday',
+    '2027-05-31 Spring Bank Holiday',
+    '2027-07-12 Battle of the Boyne (Orangemen’s Day)', // Montag - unverschoben
+    '2027-08-30 Summer Bank Holiday',
+    '2027-12-27 Christmas Day',
+    '2027-12-28 Boxing Day',
+  ]);
+});
+
+test('AU: vollstaendige Datumstabelle 2026 + 2027 (echte Kalenderdaten, keine Ersatztage)', () => {
+  assert.deepEqual(namesAndDates(2026, 'AU'), [
+    "2026-01-01 New Year's Day",
+    '2026-01-26 Australia Day',
+    '2026-04-03 Good Friday',
+    '2026-04-06 Easter Monday',
+    '2026-04-25 Anzac Day', // Samstag - bewusst unverschoben
+    '2026-12-25 Christmas Day',
+    '2026-12-26 Boxing Day',
+  ]);
+  assert.deepEqual(namesAndDates(2027, 'AU'), [
+    "2027-01-01 New Year's Day",
+    '2027-01-26 Australia Day',
+    '2027-03-26 Good Friday',
+    '2027-03-29 Easter Monday',
+    '2027-04-25 Anzac Day',      // Sonntag - bewusst unverschoben
+    '2027-12-25 Christmas Day',  // Samstag - bewusst unverschoben
+    '2027-12-26 Boxing Day',     // Sonntag - bewusst unverschoben
+  ]);
+});
+
+test('NZ: vollstaendige Datumstabelle 2026 + 2027 (employment.govt.nz)', () => {
+  assert.deepEqual(namesAndDates(2026, 'NZ'), [
+    "2026-01-01 New Year's Day",
+    '2026-01-02 Day after New Year’s Day',
+    '2026-02-06 Waitangi Day',
+    '2026-04-03 Good Friday',
+    '2026-04-06 Easter Monday',
+    '2026-04-27 Anzac Day', // 25.4. Samstag -> Montag (Mondayisation seit 2013)
+    "2026-06-01 King's Birthday",
+    '2026-07-10 Matariki',
+    '2026-10-26 Labour Day', // 4. Montag im Oktober
+    '2026-12-25 Christmas Day',
+    '2026-12-28 Boxing Day', // 26.12. Samstag -> Montag
+  ]);
+  assert.deepEqual(namesAndDates(2027, 'NZ'), [
+    "2027-01-01 New Year's Day",
+    '2027-01-04 Day after New Year’s Day', // 2.1. Samstag -> Montag
+    '2027-02-08 Waitangi Day',             // 6.2. Samstag -> Montag
+    '2027-03-26 Good Friday',
+    '2027-03-29 Easter Monday',
+    '2027-04-26 Anzac Day',                // 25.4. Sonntag -> Montag
+    "2027-06-07 King's Birthday",
+    '2027-06-25 Matariki',
+    '2027-10-25 Labour Day',
+    '2027-12-27 Christmas Day',            // 25.12. Samstag -> Montag
+    '2027-12-28 Boxing Day',               // 26.12. Sonntag -> Dienstag
+  ]);
+});
+
+test('BR: vollstaendige Datumstabelle 2026 + 2027 (feste gesetzliche Daten + Karfreitag)', () => {
+  assert.deepEqual(namesAndDates(2026, 'BR'), [
+    '2026-01-01 Universal Brotherhood Day',
+    '2026-04-03 Good Friday',
+    '2026-04-21 Tiradentes Day',
+    '2026-05-01 Labour Day',
+    '2026-09-07 Independence Day',
+    '2026-10-12 Our Lady of Aparecida',
+    "2026-11-02 All Souls' Day",
+    '2026-11-15 Republic Proclamation Day',
+    '2026-11-20 National Zumbi and Black Consciousness Day',
+    '2026-12-25 Christmas Day',
+  ]);
+  assert.deepEqual(namesAndDates(2027, 'BR'), [
+    '2027-01-01 Universal Brotherhood Day',
+    '2027-03-26 Good Friday',
+    '2027-04-21 Tiradentes Day',
+    '2027-05-01 Labour Day',
+    '2027-09-07 Independence Day',
+    '2027-10-12 Our Lady of Aparecida',
+    "2027-11-02 All Souls' Day",
+    '2027-11-15 Republic Proclamation Day',
+    '2027-11-20 National Zumbi and Black Consciousness Day',
+    '2027-12-25 Christmas Day',
+  ]);
+});
+
+test('sync: US public holidays cache locally - ohne einen einzigen /PublicHolidays-Abruf (#965 Review)', async () => {
   const mock = makeApiMock();
   __setFetchImpl(mock);
   setConfig({ holiday_country: 'US', holiday_show_public: '1', holiday_show_school: '0', language: 'de' });
@@ -1230,7 +1492,12 @@ test('sync: US public holidays cache via the same empty-fetch fallback path as B
   const res = await sync(true);
 
   assert.equal(res.synced, SYNC_YEAR_SPAN * 11);
-  assert.ok(mock.calls.every((url) => url.includes('countryIsoCode=US')));
+  // Review-Fund zu #965: der Live-Abruf lieferte fuer die lokalen Laender im
+  // Voraus bekannt 200 [] und loeste nur den Fallback aus - er ist jetzt
+  // kurzgeschlossen. Vier gesparte Requests pro Lauf, und der Offline-Fall
+  // funktioniert per Konstruktion (eigener Test weiter unten).
+  assert.deepEqual(mock.calls.filter((url) => url.includes('/PublicHolidays')), [],
+    'ein lokal berechnetes Land darf /PublicHolidays gar nicht erst fragen');
   // Nur EN-Namen fuer die USA - eine deutsche Datensprache bekommt trotzdem
   // Englisch, dokumentiert als bewusste Einschraenkung (siehe Code-Kommentar).
   const currentYear = new Date().getFullYear();
@@ -1240,7 +1507,7 @@ test('sync: US public holidays cache via the same empty-fetch fallback path as B
   assert.ok(namen.includes('Christmas Day'));
 });
 
-test('sync: GB with a chosen subdivision fetches/caches that nation\'s own list', async () => {
+test('sync: GB with a chosen subdivision caches that nation\'s own list', async () => {
   __setFetchImpl(makeApiMock());
   setConfig({ holiday_country: 'GB', holiday_subdivision: 'GB-SCT', holiday_show_public: '1', holiday_show_school: '0' });
 
@@ -1286,6 +1553,42 @@ test('getCountries: prefers EN names and sorts alphabetically', async () => {
     { isoCode: 'GB', name: 'United Kingdom', schoolHolidays: false },
     { isoCode: 'US', name: 'United States', schoolHolidays: false },
   ]);
+});
+
+test('getCountries: OpenHolidays nicht erreichbar -> die lokalen Laender bleiben waehlbar (#965 Review)', async () => {
+  // Vorher warf getCountries den Fetch-Fehler durch, die Route machte daraus
+  // ein 502 und das Frontend fiel auf eine leere Liste zurueck - ausgerechnet
+  // die Laender, die gar kein Netz brauchen, waren dann nicht mehr waehlbar.
+  __setFetchImpl(async () => { throw new Error('network down'); });
+  let list;
+  const lines = await captureConsole(async () => { list = await getCountries(); });
+  assert.deepEqual(list, [
+    { isoCode: 'AU', name: 'Australia', schoolHolidays: false },
+    { isoCode: 'BR', name: 'Brazil', schoolHolidays: false },
+    { isoCode: 'CA', name: 'Canada', schoolHolidays: false },
+    { isoCode: 'NZ', name: 'New Zealand', schoolHolidays: false },
+    { isoCode: 'GB', name: 'United Kingdom', schoolHolidays: false },
+    { isoCode: 'US', name: 'United States', schoolHolidays: false },
+  ]);
+  assert.ok(lines.warn.some((l) => /Countries/.test(l)),
+    'der Ausfall gehoert ins Log - sonst sieht der Betreiber nie, warum nur sechs Laender da sind');
+});
+
+test('sync: ein lokal berechnetes Land synchronisiert auch komplett offline (#965 Review)', async () => {
+  // Die Gegenprobe zum Kurzschluss: selbst wenn JEDER Fetch scheitert, laeuft
+  // ein Nur-Feiertage-Sync fuer ein lokales Land vollstaendig durch - die
+  // Daten sind reine Datumsarithmetik, kein Netz noetig. Vorher haette der
+  // sinnlose /PublicHolidays-Abruf den Lauf zwar auch ueber den Fallback
+  // gerettet, ihn aber als Fehlschlag verbucht (failed -> Reparaturmarke).
+  __setFetchImpl(async () => { throw new Error('network down'); });
+  setConfig({ holiday_country: 'GB', holiday_subdivision: 'GB-SCT', holiday_show_public: '1', holiday_show_school: '0' });
+
+  const res = await sync(true);
+
+  assert.equal(res.synced, SYNC_YEAR_SPAN * 9);
+  assert.equal(res.incomplete, false, 'offline ist fuer ein lokales Land kein Fehlschlag');
+  assert.equal(db.prepare("SELECT value FROM sync_config WHERE key='holiday_retry_after'").get()?.value, undefined,
+    'und darf deshalb auch keine Reparaturmarke hinterlassen');
 });
 
 test('getCountries: an API-listed local country is not duplicated - the API entry wins', async () => {

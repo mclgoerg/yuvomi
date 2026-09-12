@@ -779,10 +779,14 @@ shifts only Sunday forward (and only for five specifically legislated holidays; 
 deliberately left unshifted since no uniform national rule covers it, unlike the specific
 carve-out that already exists for the Brazil entries above); the United Kingdom and New Zealand
 "Mondayise" (weekend → next Monday) and additionally use a shared same-weekday lookup table for
-adjacent-day pairs (Christmas/Boxing Day; New Year's Day/2 January in Scotland and New Zealand) so the
+adjacent-day pairs (Christmas/Boxing Day; New Year's Day/2nd January in Scotland and New Zealand) so the
 two never collide on one substitute date; Australia has no national substitute-day rule at all (each
 state legislates its own), so its list always shows the plain calendar date, including on Anzac Day
-falling on a weekend.
+falling on a weekend. Also a known, accepted boundary: one-off holidays created by proclamation
+rather than statute (the UK's royal-proclamation bank holidays — VE Day 2020, the 2022 Platinum
+Jubilee and State Funeral, the 2023 Coronation, the Scotland-only World Cup bank holiday on Monday
+15 June 2026 — and New Zealand's equivalents) cannot come from a static rule table and will be
+missing from the computed list; the ICS-subscription path below is the intended answer for them.
 
 For every country and region this doesn't cover, the household can still track a public-holiday
 calendar via an ordinary ICS subscription (Settings → Personal → Calendar subscriptions) — those

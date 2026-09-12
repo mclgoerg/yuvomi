@@ -2180,6 +2180,7 @@
         "holidayPublicLabel": "Mostrar días festivos",
         "holidaySchoolLabel": "Mostrar vacaciones escolares",
         "holidaySchoolUnavailable": "No hay datos de vacaciones escolares disponibles para este país.",
+        "holidayAustraliaObservanceHint": "Para Australia, los días festivos se muestran en su fecha real: los días sustitutivos de los festivos que caen en fin de semana varían según el estado y no se muestran.",
         "holidayPublicColor": "Color de días festivos",
         "holidaySchoolColor": "Color de vacaciones escolares",
         "holidaySaveBtn": "Guardar",

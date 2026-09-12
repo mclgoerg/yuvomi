@@ -2215,6 +2215,7 @@
         "holidayPublicLabel": "Ipakita ang mga pistang opisyal",
         "holidaySchoolLabel": "Ipakita ang bakasyon sa paaralan",
         "holidaySchoolUnavailable": "Walang available na datos ng bakasyon sa paaralan para sa bansang ito.",
+        "holidayAustraliaObservanceHint": "Para sa Australia, ipinapakita ang mga pista opisyal sa aktuwal nilang petsa – iba-iba bawat estado ang mga kapalit na araw para sa mga pistang tumatapat sa Sabado o Linggo at hindi ipinapakita ang mga ito.",
         "holidayPublicColor": "Kulay ng pistang opisyal",
         "holidaySchoolColor": "Kulay ng bakasyon sa paaralan",
         "holidaySaveBtn": "I-save",
