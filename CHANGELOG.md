@@ -204,6 +204,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   requiring a number nobody's schedule will ever cross. All of the above is translated into all 24
   languages.
 
+- **Schedule: a stable "Today" card and one clear way to add an entry.** The Today card used to be
+  the first block of the Planning/Shift-types tabs only, so switching to Statistics or Compare made
+  it vanish and everything below it jump up to fill the gap; it now renders once, above the
+  per-tab content, and simply stays in place across every tab (still hidden entirely for a household
+  that hasn't used the module yet). The Planning tab offered up to four "add" affordances at once -
+  the page's own FAB, an always-visible "Create override" button, an always-visible "Add extra
+  shift" button, and each section's empty-state CTA underneath its own always-visible twin; a
+  household with nothing entered yet saw two identical buttons stacked in both the Overrides and
+  Extras sections. The FAB (which already opens the same form, pre-selecting the right mode) is now
+  the one durable way in; the section headers no longer carry their own button, and each empty-state
+  CTA remains as the contextual nudge for first-time setup, matching how the Patterns section already
+  worked. The three quick-start template buttons on the Shift-types tab looked like a segmented
+  toggle even though picking one is a one-shot action with no "selected" state to show - they're
+  plain buttons now, and the household's own hidden-template setting still filters which ones
+  appear. The Compare tab's day headers scrolled away with the hours beneath them; they now stay
+  pinned to the top of the scroll area while the day's shifts scroll past, so a block halfway down a
+  long day is never orphaned from the day it belongs to.
+
 ## [2.66.0] - 2026-09-13
 
 ### Added
