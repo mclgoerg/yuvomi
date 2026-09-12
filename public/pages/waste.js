@@ -11,7 +11,7 @@
 import { api } from '/api.js';
 import { t, formatDate } from '/i18n.js';
 import { esc } from '/utils/html.js';
-import { todayKey, addLocalDays } from '/utils/date.js';
+import { todayKey, addLocalDays, parseLocalDateKey, toLocalDateKey } from '/utils/date.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, btnLoading, refocusAfterRender } from '/components/modal.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
@@ -42,16 +42,21 @@ const ORDINAL_LABEL_KEYS = {
 // actual occurrence (the server remains the one place recurrence math lives).
 const DAY_INDEX = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
 
-/** Same nth/last-weekday-of-month math as recurrence.js's own nthWeekdayOfMonth, for anchor pre-fill only. */
-function nthWeekdayOfMonthUTC(year, month, weekday, ordinal) {
+/** Same nth/last-weekday-of-month math as recurrence.js's own nthWeekdayOfMonth, for anchor pre-fill only.
+ *  Rechnet auf LOKALEN Date-Feldern, damit das Ergebnis ohne Umweg ueber die
+ *  UTC-Getter durch toLocalDateKey() zurueck zum Datums-Key darf - ein per
+ *  Date.UTC gebautes Date liest toLocalDateKey westlich von UTC einen Tag
+ *  frueher. Der Eingabe-Key kommt aus todayKey(), der Ausgabe-Key ist ein
+ *  Kalendertag; Zonen kommen in dieser Rechnung nirgends vor. */
+function nthWeekdayOfMonthLocal(year, month, weekday, ordinal) {
   if (ordinal === -1) {
-    const last = new Date(Date.UTC(year, month + 1, 0));
-    const diff = (last.getUTCDay() - weekday + 7) % 7;
-    return new Date(Date.UTC(year, month, last.getUTCDate() - diff));
+    const last = new Date(year, month + 1, 0);
+    const diff = (last.getDay() - weekday + 7) % 7;
+    return new Date(year, month, last.getDate() - diff);
   }
-  const first = new Date(Date.UTC(year, month, 1));
-  const diff = (weekday - first.getUTCDay() + 7) % 7;
-  return new Date(Date.UTC(year, month, 1 + diff + (ordinal - 1) * 7));
+  const first = new Date(year, month, 1);
+  const diff = (weekday - first.getDay() + 7) % 7;
+  return new Date(year, month, 1 + diff + (ordinal - 1) * 7);
 }
 const TYPE_PRESETS = [
   { key: 'general', icon: 'trash-2', color: '#64748B' },
@@ -756,12 +761,12 @@ function openScheduleModal(type, schedule = null) {
       // "start now" default.
       function nearestOrdinalAnchor(ordinal, weekdayCode) {
         const weekday = DAY_INDEX[weekdayCode];
-        const today = new Date(`${todayKey()}T00:00:00Z`);
-        const candidateInThisMonth = nthWeekdayOfMonthUTC(today.getUTCFullYear(), today.getUTCMonth(), weekday, ordinal);
+        const today = parseLocalDateKey(todayKey());
+        const candidateInThisMonth = nthWeekdayOfMonthLocal(today.getFullYear(), today.getMonth(), weekday, ordinal);
         const target = candidateInThisMonth >= today
           ? candidateInThisMonth
-          : nthWeekdayOfMonthUTC(today.getUTCFullYear(), today.getUTCMonth() + 1, weekday, ordinal);
-        return target.toISOString().slice(0, 10);
+          : nthWeekdayOfMonthLocal(today.getFullYear(), today.getMonth() + 1, weekday, ordinal);
+        return toLocalDateKey(target);
       }
       function refreshOrdinalAnchor() {
         if (kindSelect.value !== 'monthly_ordinal_weekday') return;

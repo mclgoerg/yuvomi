@@ -484,8 +484,8 @@ test('date helpers produce local YYYY-MM-DD keys without toISOString slicing', a
   assert.equal(toLocalDateKey(date), '2026-05-24');
 });
 
-test('meals and budget pages do not slice toISOString for date keys', () => {
-  for (const file of ['../public/pages/meals.js', '../public/pages/budget.js']) {
+test('meals, budget and waste pages do not slice toISOString for date keys', () => {
+  for (const file of ['../public/pages/meals.js', '../public/pages/budget.js', '../public/pages/waste.js']) {
     assert.doesNotMatch(read(file), /toISOString\(\)\.slice\(0,\s*10\)/, `${file} must use local date keys`);
   }
 });
