@@ -106,19 +106,19 @@ test('fresh schema: updated_at triggers fire on UPDATE for every table', () => {
 });
 
 // -------------------------------------------------------------------------
-// Upgrade path: migrations < 194 leave no Waste tables; 194 alone adds them
+// Upgrade path: migrations < 197 leave no Waste tables; 197 alone adds them
 // without touching anything else.
 // -------------------------------------------------------------------------
 
-test('upgrade: a database migrated only through 193 has no Waste tables, and pre-existing tables survive 194', () => {
-  const preWaste = buildMigratedDatabase(MIGRATIONS.filter((m) => m.version < 194));
+test('upgrade: a database migrated only through 196 has no Waste tables, and pre-existing tables survive 197', () => {
+  const preWaste = buildMigratedDatabase(MIGRATIONS.filter((m) => m.version < 197));
   const before = preWaste.prepare(
     `SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'waste_%'`
   ).all();
   assert.deepEqual(before, []);
 
   const usersBefore = preWaste.prepare('SELECT COUNT(*) AS n FROM users').get().n;
-  applyMigration(preWaste, MIGRATIONS.find((m) => m.version === 194));
+  applyMigration(preWaste, MIGRATIONS.find((m) => m.version === 197));
 
   const after = preWaste.prepare(
     `SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'waste_%' ORDER BY name`

@@ -84,7 +84,7 @@ export function updateType(d, id, input) {
 }
 
 /**
- * Every user's stored feed type selection (waste_feed_type_ids, Migration 202)
+ * Every user's stored feed type selection (waste_feed_type_ids, Migration 205)
  * is a bare JSON array of ids with no foreign key of its own (see
  * waste-ics.js) - deleting a type left a dangling id inside it, benign today
  * (the read-time filter just never matches it) but a live drift risk since

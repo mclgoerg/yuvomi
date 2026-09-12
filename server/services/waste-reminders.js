@@ -9,7 +9,7 @@
  * WHY AN ANCHOR TABLE, same reasoning as schedule-reminders.js: a Waste
  * occurrence is computed on read (server/services/waste-domain.js), not a
  * stored row, so reminders.entity_id has nothing stable to point at without
- * one. waste_reminder_entries (migration 200) gives one anchor per (user,
+ * one. waste_reminder_entries (migration 203) gives one anchor per (user,
  * type, date_key) - exactly the coalesced occurrence identity the resolver
  * already uses, so a moved/skipped/re-mapped occurrence lands on a cleanly
  * different anchor rather than a duplicate, and the old anchor (with its

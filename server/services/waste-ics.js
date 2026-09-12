@@ -17,7 +17,7 @@
  * waste_feed_type_ids stores the subscriber's optional type selection
  * alongside the token (NULL = every active type) rather than as a query
  * parameter on the public URL, so the subscription URL stays stable across
- * edits to the selection (see Migration 202).
+ * edits to the selection (see Migration 205).
  */
 
 import { randomBytes, timingSafeEqual } from 'node:crypto';

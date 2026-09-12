@@ -634,6 +634,9 @@ them with 400 (see the Reminders section), because the run would recreate them w
 | external_calendar_id | TEXT | ID from external calendar |
 | external_source | TEXT | local, google, apple, ics, caldav |
 | recurrence_rule | TEXT | iCal RRULE — supported subset `FREQ` (DAILY/WEEKLY/MONTHLY/YEARLY), `INTERVAL`, `BYDAY`, `BYMONTHDAY` (only `-1`, and only under MONTHLY; v2.61.0), and a mutually-exclusive end condition `UNTIL` **or** `COUNT`. Stored in **both spellings**: locally created series hold the bare rule body, series read in from CalDAV/ICS hold the full line including its `RRULE:` prefix. Unifying them would cost more than a migration is worth, so every *output* path has to resolve the ambiguity instead — through `rruleValue()` (bare value, for APIs that want the value) and `rruleLine()` (the ICS line with exactly one prefix), both in `server/services/recurrence.js` since **v2.12.0** (#761). Until then each of six modules built the line for itself, five correctly and one not: the export feed put a prefix in front of a rule that already had one and emitted `RRULE:RRULE:FREQ=...`, which Apple tolerates and strict parsers reject. An unchanged rule is written back verbatim rather than rebuilt from the form, so parts outside the supported subset (`WKST`, `BYMONTHDAY`, `BYSETPOS`) survive an edit to any other field (v2.8.1, #756). **A monthly series on the 29th to 31st clamps to the last day of a short month rather than skipping it (v2.60.0).** Until then the clamp never took effect: `setUTCMonth()` had already rolled over on a date still carrying the 31st, so `lastDay` was computed for the month the overflow had landed in, and February simply fell out — a monthly task on the 31st arrived in seven months out of twelve, and with `INTERVAL=2` the skipped month shifted the rhythm as well. It affects tasks and calendar events alike, since `expandRecurringEvents` walks the same function. **Both remaining halves of that were closed in v2.61.0** (#960, #978), because they had one cause: the intended day was derived from the *previous* occurrence, and a clamp in a short month therefore rewrote it for good. Two ways out, and the code carries both. The **rule** can name the day: `BYMONTHDAY=-1`, "on the last day of the month", and nothing else. That is the one statement a start date cannot express, since it means a different day every month; "on the 15th" needs no field, because you create the series on the 15th. **Reading the wider range was tried and taken back** in review: accepting values the engine cannot honour opened seven failure cases at once - RFC 5545 wants `BYMONTHDAY=31` to be *omitted* in February rather than clamped, `1,15` means two days a month, `FREQ=YEARLY;BYMONTHDAY=-1` means twelve occurrences a year rather than one, and under DAILY/WEEKLY the component filters days instead of setting them. A value that is read but computed wrongly moves appointments silently, while one that is ignored leaves the series on its DTSTART day - which is what it did before. So the parser, the validator regex and the ICS import reducer all accept exactly `-1` under `FREQ=MONTHLY`; everything else passes through untouched, and an edit returns it verbatim (#756). The **caller** can name it instead: whoever knows DTSTART passes it as an anchor, which the calendar expansion, the ICS parser and the series arithmetic all do - they iterate from the series start anyway. The recurrence form follows the same ownership boundary: the calendar passes its active timed or all-day start explicitly and the shared widget formats a concrete first-occurrence preview without querying caller-owned fields; tasks keep their separate due-date explanation. Calendar chips with a written title carry a labelled repeat mark before it, while the compact mobile month grid remains dots-only. `nextDueAfterCompletion` cannot use a series anchor, because a task series is a chain of separate rows that does not know its origin, and there the previous behaviour stands. One consequence worth naming: **the Outlook push drops the recurrence entirely for such a series** rather than sending a different one. Graph has no absolute last-day pattern, and the obvious substitute is not one - `relativeMonthly` with `index: "last"` over all seven weekdays reads like "the last day" but selects the first day matching the pattern, and it would come back through ICS as a `BYSETPOS` rule this engine does not read. A single appointment in Outlook is visibly incomplete; a series on the wrong day is not. Because the sync updates via PATCH, where an omitted field is left unchanged, the payload sets `recurrence: null` explicitly - otherwise the remote copy would keep its previous recurrence while the content hash recorded the update as converged |
+| recurrence_parent_id | INTEGER | Self foreign key to the recurring master with ON DELETE CASCADE, nullable (migration v194) |
+| recurrence_id | TEXT | Original recurrence slot of a linked replacement, not its possibly moved displayed start, nullable (migration v194) |
+| overridden_fields | TEXT | Canonical JSON array naming the fields intentionally owned by a linked replacement, nullable (migration v194) |
 | tzid | TEXT | IANA time zone of a synced recurring series (e.g. `Europe/Berlin`), nullable (migration v97). Lets the expansion keep the local wall-clock time across DST; NULL = floating/UTC. Written by CalDAV, Apple and - since v2.27.0 (#829) - Google, which sends the zone in `start.timeZone` |
 | subscription_id | INTEGER | FK → ICS Subscriptions (CASCADE delete) |
 | user_modified | INTEGER | 0/1 — prevents sync overwrite when 1. Set on **any** edit to a mirrored appointment, which is why it no longer gates the colour, see below |
@@ -697,6 +700,22 @@ Excluded single occurrences of a recurring series (EXDATE, migration v85). One r
 | exception_date | TEXT | YYYY-MM-DD — local start date of the excluded instance, NOT NULL |
 | created_at | TEXT | DATETIME, default now |
 | PRIMARY KEY | | (event_id, exception_date) |
+
+**Linked local occurrence overrides (migration v194, #975).** The current only-this edit path stores a concrete replacement row with `recurrence_parent_id`, `recurrence_id`, and `overridden_fields`. The parent plus original slot is the durable identity, so moving the displayed start does not change which occurrence is being edited. This model also subsumes the existing imported `${uid}::${recurrenceId}` identity: an imported override is already a concrete rule-less event row, and a future migration can locate its master and populate the same parent and original-slot columns. It does not need a second override table or a second read model. The current day-based key and unique `(recurrence_parent_id, recurrence_id)` index allow exactly one overridden original slot per series per day; importing multiple occurrences on the same day would require widening the key, index, and date-key validation first. Migration v194 deliberately performs no such import migration and does not heuristically relink historic detached local edits, because their original slot cannot be recovered unambiguously.
+
+Eligibility for linked overrides is server-owned and local-only. A series must have a recurrence rule, have `external_source = 'local'`, carry no external UID, object URL, calendar reference, subscription, provider link, or Google, CalDAV, or Outlook outbound target, and have no birthday, name-day, housekeeping, or other generated owner. `is_local_recurring_series` describes local origin, independently of `can_override_occurrence`. A locally owned series with an outbound target, Outlook auto-sync exposure, or a birthday, name-day, housekeeping, or other generated owner remains local and exposes `can_detach_occurrence` to visible actors instead: all three scopes retain the legacy standalone-event plus EXDATE / truncate-plus-successor workflow. That fallback intentionally retains its existing multi-request partial-failure window, while linked overrides are atomic. Imported series keep whole-series behavior and never use that fallback. Occurrence mutations use the same row-visibility authorization as the established whole-series PUT/DELETE path; there is no extra creator-only tier. Apple auto-sync excludes linked children and masters with linked children, but a deletion-only EXDATE does not remove a series from its existing outbound behavior. API capability fields are presentation data; the server repeats authoritative visibility and eligibility checks before writing.
+
+The master owns recurrence, creator, provider/source identity, calendar and subscription references, timezone identity, and outbound targets. A linked replacement may intentionally own only `title`, `description`, `start_datetime`, `end_datetime`, `all_day`, `location`, `color`, `icon`, `assignments`, `visibility`, `countdown`, `attachment`, and `reminders`. Unmarked values inherit from the current expanded master occurrence. The resolver exposes effective assignment, attachment, and reminder owner IDs; occurrence-owned reminders use the child start as their anchor, while inherited reminders use the master anchor. Whole-series changes refresh unowned materialized projections for indexing and foreign keys, but semantic reads still overlay only marked child values on current master values.
+
+Schedule's migration-189 custom-field values belong to computed Schedule entries, not persisted `calendar_events`. They remain a separate domain-owned mechanism. The accepted Waste collection scope (#1063) likewise calls for its own computed calendar layer and pickup overrides, with no materialized calendar rows; this migration does not take ownership of either layer or implement that module.
+
+Only-this editing writes or updates the child, its owned assignments, attachment and reminders, and the master EXDATE in one transaction. If a linked child is restored to the master defaults, that child and its EXDATE are removed so the expanded master slot returns; a no-difference request for a slot already owned by a detached replacement or deletion leaves its pre-existing EXDATE intact. Only-this deletion removes a linked child and retains or creates the EXDATE. This-and-following deletion truncates the master and removes later linked children atomically, but preserves later EXDATE rows so extending the rule cannot resurrect deleted slots or duplicate detached replacements. This-and-following editing atomically truncates the old master, creates the successor at the selected original slot, transfers every later EXDATE except the split slot itself, reparents future children, absorbs a selected child that became the new default, and recomputes remaining inheritance markers. Transferred exclusions are retained even when the successor rule cannot currently reach them or their replacement was detached; they remain harmless until a later rule or target change makes the original slot reachable again. Whole-series deletion cascades through both EXDATE and linked child ownership.
+
+Before a rule or anchor change, the server counts linked original slots that the proposed recurrence can no longer reach. The first request returns conflict `calendar_override_orphans` with the exact `orphaned_override_count`; a retry supplies that exact count. The count is recomputed inside the transaction, and a stale count produces a new conflict. The client performs at most three conflict/confirmation attempts before requiring a reload. Confirmation gates restore the same editor on both outcomes; only successful saving closes it, so validation and server failures retain entered values. A matching confirmation resolves each orphan, preserves it as an independent event, and retains its master EXDATE before committing. The same invariant applies when all linked children are detached for an outbound target: each standalone replacement keeps suppressing its original master slot. An EXDATE the current rule cannot reach is harmless and remains necessary if a later rule change makes that slot reachable again. Deletion-only EXDATE rows survive whole-series rule changes, including temporarily unreachable dates: a daily-to-weekly-to-daily round trip must not resurrect previously deleted occurrences. Assigning an outbound target uses the same exact-count confirmation because linked local overrides would otherwise cross the eligibility boundary. Outlook auto-sync is a configured target even while its account needs reauthentication: activation, owner changes, and calendar enabling check actual candidate series against their effective per-account target and its enabled/writable state. Explicit target precedence is the same as in the push collector. The runtime repeats the check before Graph writes, catching later visibility or write-access changes. A blocked account reports an error rather than uploading an incomplete master. An event visibility or assignment change that first makes a linked series an auto-sync candidate uses the same exact-count detach confirmation. Splitting applies that check to the successor's effective visibility and assignments, including values inherited from the selected replacement, before reparenting any future children. Eligibility and capability reads use the same effective enabled/writable target boundary, so configuring a disabled target cannot make existing linked overrides uneditable. If external write access later returns for a series that already owns linked children, the runtime blocks its push and the UI must not offer legacy detachment. The error explains that disabling the Outlook target restores local linked editing without deleting any exception; both the master and its children withhold legacy capability until recovery. Reauthentication itself always refreshes the existing account tokens and clears `needs_reauth`; it does not reactivate or change the configured target and therefore must not be blocked by linked overrides.
+
+Range, upcoming/dashboard, calendar and global search, countdown, detail/deep-link, assignment and visibility filtering, attachment and reminder ownership, MCP upcoming reads, and the local ICS feed consume the same resolved occurrence model. When a persisted child can no longer be reached after an imported or later-changed rule, read paths log it and return its stored effective row as a flagged standalone event instead of failing the entire response. The feed retains the master EXDATE in that degradation case, so the now-independent child cannot resurrect the old series slot. When a child is detached or a series is split, every user's resolved self-owned reminder is retained with its ownership, anchor shift, and dismissal state; derived reminders retain their fan-out provenance and are reconciled against the resulting assignments. A moved child is selected by its displayed range, while its original master slot remains suppressed internally by EXDATE. Search indexes a linked child's title, description, or location only when that field is explicitly overridden, preventing inherited child copies from filling the result limit with duplicates. MCP upcoming reads have no fixed future cutoff. Each series generates at most the requested number of eligible future occurrences after EXDATE and time filtering; assignment and birthday exclusions are applied before expansion, and resolved replacements compete in the final effective-instant ordering before the global limit. Traversal from the original anchor retains the existing 100,000-iteration safety ceiling, so pathological historical series can still exhaust that guard. Compact reads avoid inline attachment bodies. Search override-field membership uses guarded JSON array values, including escaped names and malformed-metadata fallback. The ICS feed emits the recurring master with RRULE and one replacement VEVENT with the master UID, no RRULE, a `RECURRENCE-ID` in the master's all-day, floating, or TZID notation, and the resolved moved DTSTART/DTEND; it deliberately omits the master's internal EXDATE for that linked slot because `EXDATE` and `RECURRENCE-ID` are alternative RFC 5545 representations and strict clients may otherwise discard the replacement. Unlinked historical TZID EXDATEs reconstruct the same recurrence instant as the expansion path in constant work, including DST and local/UTC day-boundary cases, so an exception outside the currently expandable rule remains harmless. This remains a household feed rather than a personal row boundary: linked private and assignee-only masters and replacements are deliberately exported just like other calendar rows. Provider and imported rows are not converted into linked replacements by this read path.
+
+The migration v85 behavior recorded below remains historic context. Where it describes detached only-this edits or separate child and EXDATE requests, migration v194 supersedes it for eligible local series.
 
 **Editing and deleting occurrences of a recurring series (migration v85 · #532):** deleting *or* editing an event of a recurring series offers the standard scope choice — *only this event*, *this and following*, or the *whole series* — via one shared control (a select defaulting to "only this event", the least-destructive option). **Delete:** "only this event" records an exception (EXDATE) and the series continues; "this and following" truncates the series' RRULE with an `UNTIL` bound at the day before the occurrence (or deletes the whole series when the occurrence is the first); "whole series" deletes the master. **Edit:** "only this event" writes an exception for that date and creates a detached, non-recurring event carrying the edits; "this and following" truncates the master and creates a new series from the occurrence with the edited fields; "whole series" updates the master while preserving its `DTSTART` (the edited instance's time shift is re-applied to the series anchor instead of re-anchoring the series to the instance). The recurrence expansion skips excluded dates on every read path (list, upcoming/dashboard, search), and exceptions are emitted as `EXDATE` lines in the ICS export feed. The scope choice is offered for **local series only** — externally synced series (Google/Apple/CalDAV via `calendar_ref_id`, ICS via `subscription_id`) keep whole-series behavior, since an EXDATE or truncation would return on the next sync. **Those now say so before they do it (v2.47.0 · #880):** whole-series delete is the right scope, but doing it wordlessly is not - tapping one occurrence in the month view and pressing delete made every occurrence disappear without a prompt. A foreign series asks for confirmation that *names* the reach rather than offering a choice (a dialog with one selectable answer would be a prop), and the wording follows what actually happens, because promising something that does not hold is worse than promising nothing: a **birthday event** mirrors a `birthdays` row and `syncBirthdayCalendarEvent` recreates and re-uploads it on the next run, so it says the entry has to go via the birthday itself; an **ICS subscription** event cannot be deleted at the source at all (`OUTBOUND_SOURCES` has no `ics`) and `ics-subscription.js` keeps no tombstones, so the next fetch inserts it again; everything else is told that the whole series falls, with all its occurrences - **not** that it also falls in the source calendar, since `acceptsOutbound()` requires a writing connection that a read-only Google account or a removed CalDAV account does not have. `isLocalRecurringSeries`/`isExternalRecurringSeries` live in `public/utils/recurrence-scope.js` next to the scope arithmetic rather than in the page: a rule that decides over data loss has to be testable without half a browser, and until then it had no test at all. `POST /api/v1/calendar/:id/exceptions { date }` records an exception; series deletion removes its exceptions via CASCADE. Pending deletes remain a client-side overlay during the five-second Undo window and are reapplied after every range load; Undo merges the latest hidden rows by occurrence identity instead of appending duplicates, and a successful commit authoritatively reloads the currently selected view. Full and event-only loads share one generation guard, every response is checked against the selected view and cursor, cached out-and-back navigation invalidates the range just left, and writes for the same series are serialized in initiation order so two delayed truncations cannot widen the server rule. **"The first occurrence" stopped meaning "the stored date" in v2.61.0 (#960).** A start may sit off its own rule - a `BYMONTHDAY=-1` series begun on the 15th, or the older case of a `BYDAY=MO` series begun on a Saturday (#549, how some calendars serialise it). The first appointment shown is then a date the master does not carry, and the scope flow asked `is_recurring_instance` - "does this differ from the stored date?" - which had been indistinguishable from "is this not the beginning" only because every start used to sit on its rule. Truncating there writes an `UNTIL` in front of the first occurrence and leaves a series with nothing in it: the appointment vanishes while its row stays behind with its assignments and exceptions. The expansion therefore marks the first occurrence as `is_series_start` (it counts occurrences for `COUNT` anyway), and `followingMeansWholeSeries()` in `public/utils/recurrence-scope.js` answers the question once for both flows rather than each deciding for itself - the same wrong assumption stood twice, and a third call site would have inherited it. `is_series_start` is computed per expanded instance and is not a stored column.
 
@@ -1500,7 +1519,7 @@ Per-user reminders attached to tasks, calendar events, subscriptions, inventory 
 
 | Column | Type | Constraint |
 |--------|------|-----------|
-| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item`, `schedule_entry` (migration v178), or `waste_pickup` (migration v200, #1063 Phase 8), NOT NULL |
+| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item`, `schedule_entry` (migration v178), or `waste_pickup` (migration v203, #1063 Phase 8), NOT NULL |
 | entity_id | INTEGER | Entity identifier, NOT NULL |
 | remind_at | TEXT | ISO 8601 datetime, NOT NULL |
 | dismissed | INTEGER | 0/1, default 0 |
@@ -2032,7 +2051,7 @@ Photo log for maintenance issues (migration v33).
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
 
-### Waste Types (migration v194, #1063)
+### Waste Types (migration v197, #1063)
 A household's named waste categories (recycling, organic, general, or custom), each with an icon
 and color. Presets offered in the UI create ordinary rows here, never a closed enum.
 
@@ -2047,8 +2066,8 @@ and color. Presets offered in the UI create ordinary rows here, never a closed e
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
 
-### Waste Schedules (migrations v194, v201, #1063)
-A weekly, fixed-day-of-month, or ordinal-weekday-of-month (migration 201, #1063 Phase 9, e.g. "2nd
+### Waste Schedules (migrations v197, v204, #1063)
+A weekly, fixed-day-of-month, or ordinal-weekday-of-month (migration 204, #1063 Phase 9, e.g. "2nd
 Monday" or "last Friday") manual pickup rhythm for one type. `recurrence_kind` picks which of
 `weekdays` / `month_day` is set (the other stays NULL for `weekly`/`monthly_fixed_day`; both are
 required for `monthly_ordinal_weekday`, enforced by a CHECK constraint); recurrence is delegated to
@@ -2075,7 +2094,7 @@ occurrence of its own month, the same consistency rule `monthly_fixed_day` alrea
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
 
-### Waste Schedule Overrides (migration v194, #1063)
+### Waste Schedule Overrides (migration v197, #1063)
 Moves or skips exactly one of a schedule's calculated occurrences. `replacement_date` NULL means an
 explicit skip; a date moves it. `original_date` must be a real calculated occurrence of the
 schedule (checked against the raw rule, ignoring any other existing override).
@@ -2089,7 +2108,7 @@ schedule (checked against the raw rule, ignoring any other existing override).
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
 
-### Waste One-Off Pickups (migration v194, #1063)
+### Waste One-Off Pickups (migration v197, #1063)
 A manual pickup fact for an irregular or special collection - a domain fact, not a schedule with a
 fake recurrence. API path is `/api/v1/waste/pickups`.
 
@@ -2109,14 +2128,14 @@ no occurrence is ever materialized into a table, and Waste never writes `calenda
 are capped to 731 days inclusive, matching Schedule's own ceiling. See `server/openapi/paths/waste.js`
 for the full request/response contracts.
 
-### Waste Sources (migrations v196, v199, #1063)
+### Waste Sources (migrations v199, v202, #1063)
 One row per imported ICS file or subscribed ICS URL. `content_hash` is the sha256 of the raw ICS text
 behind the current committed snapshot; `version` is bumped on every committed (re)import and is the
 concurrency guard a re-import commit checks against (409 on mismatch, invariant #9). `last_success_at`
 is only touched on a successful commit and is never cleared by a later failed attempt - "needs
 refresh" (invariant #6) is derived at read time from the absence of a future *mapped* imported pickup
 for this source, not from this column or from `coverage_end` (which reflects every parsed candidate
-date, including labels the household chose to ignore). Migration v199 (Phase 7) widened `kind` to add
+date, including labels the household chose to ignore). Migration v202 (Phase 7) widened `kind` to add
 `'url'` and added the columns below it in the table; they are NULL/default for `kind='file'`.
 
 `url` is a credential, not merely data: `server/routes/waste/sources.js` omits it entirely from every
@@ -2151,7 +2170,7 @@ backoff (capped at 24h) and resets to 0 on any successful fetch, whether or not 
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
 
-### Waste Source Mappings (migration v197, #1063)
+### Waste Source Mappings (migration v200, #1063)
 One row per distinct label (an ICS `CATEGORIES` tag, or `SUMMARY` when a feed carries no categories)
 seen for a source. Exactly one of (`type_id` set) / (`ignored`=1) is valid - a label is always either
 mapped or explicitly excluded, never left ambiguous. Rows persist across re-imports (`UNIQUE` on
@@ -2168,7 +2187,7 @@ not re-asked, unless the label itself is new.
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
 
-### Waste Imported Pickups (migration v198, #1063)
+### Waste Imported Pickups (migration v201, #1063)
 One row per concrete pickup fact accepted by a committed import. `identity_key` is the stable
 cross-reimport identity a re-import diffs against: the ICS UID (suffixed with the concrete date for a
 recurring or overridden VEVENT) when the source event had one, otherwise a deterministic fingerprint
@@ -2198,7 +2217,7 @@ third occurrence origin (`kind: 'import'`) alongside `schedule`/`one_off`, coale
 `calendar_events`. See `server/openapi/paths/waste.js` for the full import/source request/response
 contracts.
 
-### Waste Reminder Settings (migration v200, #1063 Phase 8)
+### Waste Reminder Settings (migration v203, #1063 Phase 8)
 One row per (user, waste type): the calling user's own opt-in, lead time, and household-local
 delivery time for that type's pickup reminders. Personal, not household-wide - the same "no admin
 gate, everyone edits only their own" shape as `users.schedule_reminder_offset_minutes`, but per-type
@@ -2216,7 +2235,7 @@ rather than requiring one row per type up front).
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
 
-### Waste Reminder Entries (migration v200, #1063 Phase 8)
+### Waste Reminder Entries (migration v203, #1063 Phase 8)
 The anchor table `reminders.entity_type = 'waste_pickup'` points at - a Waste occurrence is computed
 on read (`server/services/waste-domain.js`), not a stored row, so `reminders.entity_id` has nothing
 stable to reference without one (same reasoning as `schedule_reminder_entries`/
@@ -2243,7 +2262,7 @@ for `GET /reminders/pending` and the generic reminder CRUD routes (`waste_pickup
 entry there, settable only through `waste_reminder_settings`, never through the generic reminder
 routes directly).
 
-### Waste ICS feed and per-type feed selection (migration v202, #1063 Phase 10)
+### Waste ICS feed and per-type feed selection (migration v205, #1063 Phase 10)
 A revocable, read-only iCalendar feed of upcoming (and recently past, 30 days) pickups, mirroring
 the existing per-module feeds (`calendar_feed_token`, `inventory_deadlines_feed_token`,
 `schedule_feed_token`) - one token column added to `users`, generated/rotated/cleared by
@@ -2282,7 +2301,7 @@ shape as the ICS import's own `preview_digest`), then applies every `applicable`
 transactionally. No new table: this reuses `waste_source_mappings` as-is and, like
 `updateMapping()`, never retroactively rewrites already-committed imported pickups.
 
-### Waste in global search (migration v203, #1063 Phase 10)
+### Waste in global search (migration v206, #1063 Phase 10)
 Only the `waste_types` catalog is indexed into the shared `search_index` FTS5 table (entity
 `waste_type`) - never anything `waste-domain.js`'s `expandSchedule()`/`resolveOccurrences()`
 computes at read time, which is unbounded (a weekly schedule has no last date until `valid_until`)

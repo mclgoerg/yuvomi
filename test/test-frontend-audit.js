@@ -8173,7 +8173,6 @@ test('German housekeeping visit copy contains no English fallback strings', () =
   const expected = {
     reports: 'Berichte',
     visitRecordedAt: 'Einsatz erfasst um',
-    checkedInToday: 'Heute erfasst',
     editVisit: 'Einsatz bearbeiten',
     paymentPaid: 'Bezahlt',
     paymentPending: 'Ausstehend',
@@ -8190,6 +8189,71 @@ test('German housekeeping visit copy contains no English fallback strings', () =
     /\.housekeeping-worker-strip__identity\s*\{[\s\S]*gap:\s*var\(--space-1\)/,
     'housekeeper name and status need an explicit visual gap',
   );
+});
+
+test('der Housekeeping-Check-Knopf bleibt in beide Richtungen bedienbar (#1133)', () => {
+  const page = read('../public/pages/housekeeping.js');
+
+  // `toggleSession()` kann ein- UND auschecken, und `[data-worker-check]` ist
+  // sein EINZIGER Ausloeser (eine zweite Fundstelle waere hier ein Signal,
+  // dass diese Zusicherung nicht mehr die ganze Wahrheit ist).
+  const ausloeser = page.match(/data-worker-check/g) ?? [];
+  assert.equal(ausloeser.length, 2,
+    'Knopf-Markup und Handler-Selektor - mehr Stellen heben diesen Guard aus');
+
+  // Der Knopf trug im eingecheckten Zustand `disabled`. Damit war der
+  // Auscheck-Zweig von toggleSession() unerreichbar: toter Code hinter einem
+  // toten Knopf, und die Suiten blieben gruen.
+  const knopf = page.slice(page.indexOf('<button class="btn ${checkedIn'), page.indexOf('</button>', page.indexOf('<button class="btn ${checkedIn')));
+  assert.ok(knopf, 'der Check-Knopf muss auffindbar bleiben');
+  assert.doesNotMatch(knopf, /disabled/,
+    'ein disabled Check-Knopf macht das Auschecken unerreichbar (#1133)');
+  assert.match(knopf, /checkedIn \? t\('housekeeping\.checkOut'\)/,
+    'im eingecheckten Zustand muss der Knopf das Auschecken anbieten');
+
+  // Und er haengt an der OFFENEN Session, nicht an "war heute da" - sonst
+  // bliebe er nach dem Auschecken auf "Auschecken" stehen.
+  assert.match(page, /const checkedIn = !!worker\.current_session;/,
+    'der Zustand kommt aus current_session, nicht aus today_session');
+  assert.match(page, /const current = worker\?\.current_session;/,
+    'toggleSession entscheidet an der offenen Session');
+});
+
+test('Housekeeping: Bezahlen laeuft durch EINE Funktion, die vorher bestaetigt (#1136)', () => {
+  // Ohne Kommentare: ein Kommentar, der die Route nennt, ist kein Post.
+  const page = withoutCommentsKeepingLines(read('../public/pages/housekeeping.js'));
+  const lines = page.split('\n');
+
+  // Genau EIN Post auf die Bezahl-Route. Vor #1136 buchten drei Ausloeser je
+  // selbst, mit einem Klick und ohne Rueckfrage; ein zweiter Post waere wieder
+  // ein Weg an der Bestaetigung vorbei.
+  const posts = [];
+  lines.forEach((l, i) => { if (/\/visits\/\$\{[^}]+\}\/pay`/.test(l)) posts.push(i); });
+  assert.equal(posts.length, 1,
+    `die Bezahl-Route darf nur an einer Stelle gepostet werden, gefunden in Zeile ${posts.map((i) => i + 1).join(', ')}`);
+
+  // Die Funktion um diesen Post muss VOR ihm fragen und bei Nein abbrechen.
+  const kopf = [...lines.keys()].slice(0, posts[0]).reverse()
+    .find((i) => /^(?:export )?(?:async )?function /.test(lines[i]));
+  assert.equal(lines[kopf].match(/function (\w+)/)?.[1], 'payVisit', 'der Post gehoert in payVisit()');
+  const bisZumPost = lines.slice(kopf, posts[0]).join('\n');
+  assert.match(bisZumPost, /const confirmed = await confirmOverModal\(t\('housekeeping\.markPaidConfirm'\)/,
+    'payVisit fragt vor dem Post - ueber confirmOverModal, damit der Besuchsbericht darunter ueberlebt');
+  assert.match(bisZumPost, /if \(!confirmed\) return;/, 'ein Nein bucht nichts');
+  assert.match(bisZumPost, /visit\.payment_task_id\s*\?\s*t\('housekeeping\.markPaidConfirmDetailTask'\)\s*:\s*t\('housekeeping\.markPaidConfirmDetail'\)/,
+    'die Rueckfrage nennt die Zahlungsaufgabe, wenn es eine gibt');
+
+  // Und alle drei Ausloeser gehen durch sie hindurch.
+  for (const selektor of ["'[data-pay-report]'", "'#visit-report-pay'", "'[data-pay-visit]'"]) {
+    const at = page.indexOf(selektor);
+    assert.notEqual(at, -1, `Ausloeser ${selektor} fehlt`);
+    assert.match(page.slice(at, at + 300), /payVisit\(visit, async \(\) => \{/,
+      `${selektor} muss payVisit() rufen, statt selbst zu buchen`);
+  }
+
+  // Die Ruecknahme haengt am Serverfeld; die Seite baut die Admin-Regel nicht nach.
+  assert.match(page, /visit\.can_mark_unpaid/, 'der Ruecknahme-Knopf haengt an can_mark_unpaid');
+  assert.doesNotMatch(page, /authRole|role\s*===\s*'admin'/, 'housekeeping.js entscheidet keine Rolle selbst');
 });
 
 test('holiday chips derive readable ink from each configured color', () => {
@@ -16390,6 +16454,8 @@ function selbstNachziehend(lines) {
  * ohne den Fokus nachzuziehen. Eine eigene Funktion, damit die Sonden weiter
  * unten dieselbe Pruefung an kuenstlichen Quellen fahren wie der Guard am Repo.
  */
+const DEKLARATIONS_KOPF = /^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*[A-Za-z_$][\w$]*\s*\(/;
+
 function fokusLuecken(datei, lines) {
   const fehlend = [];
   const wrapper = rendererIn(lines);
@@ -16401,7 +16467,15 @@ function fokusLuecken(datei, lines) {
   for (const n of schliesst) wrapper.delete(n);
   const nachziehend = selbstNachziehend(lines);
   lines.forEach((zeile, i) => {
-    if (!istSchliessen(zeile, schliesst)) return;
+    // EINE DEKLARATION SCHLIESST NICHTS. `export function confirmModal(` in
+    // modal.js traf den Namen aus ERGEBNIS_DIALOGE und wurde zum Anker - in
+    // Spalte 0, also ohne umschliessende Funktion, und das Fenster las damit
+    // bis weit in die Datei. Beim Merge von #1055 fand es dort das abgewartete
+    // `close` einer Hilfsfunktion und verlangte `refocusAfterRender()`, das die
+    // Wache darunter als tot gemeldet haette.
+    // Weg faellt nur der KOPF, nicht die Zeile: `async function save() {
+    // closeModal();` in einer Zeile bleibt ein Anker (Codex-Review zu #1131).
+    if (!istSchliessen(zeile.replace(DEKLARATIONS_KOPF, ''), schliesst)) return;
     // EIN VERZOEGERTES SCHLIESSEN IST HIER KEINES. `setTimeout(() =>
     // closeModal(...), 700)` in tasks.js laeuft erst, wenn der Block
     // laengst durch ist - der Merker, auf den `refocusAfterRender()`
@@ -17014,6 +17088,37 @@ test('Fokus-Guard: close-Parameter, Einzeiler, Signaturen, Dialog nach dem Neuau
   assert.deepEqual(stellen('danach.js', danach), ['danach.js:2'], 'confirmModal danach findet den Knopf nicht wieder');
   const offen = danach.map((l) => l.replace('if (await confirmModal(frage)) tuNochWas();', 'closeModal();'));
   assert.deepEqual(stellen('danach.js', offen), [], 'ein Dialog, der schon offen war, setzt den Fokus beim Schliessen selbst');
+
+  // Eine Deklaration ist kein Schliessen (Merge von #1055): `confirmModal(` in
+  // der eigenen Signatur liess das Fenster ohne umschliessende Funktion bis in
+  // die naechste lesen, und dort galt das abgewartete `close` als Neuaufbau.
+  const deklaration = [
+    'export function confirmModal(frage) {',
+    '  return new Promise((resolve) => {',
+    '    resolve(true);',
+    '  });',
+    '}',
+    'async function beenden(',
+    '  bestaetigt,',
+    '  { close = closeModal } = {},',
+    ') {',
+    '  if (bestaetigt) await close({ force: true });',
+    '  return bestaetigt;',
+    '}',
+  ];
+  assert.deepEqual(stellen('deklaration.js', deklaration), [],
+    'die Signatur von confirmModal ist kein Anker');
+  const standard = deklaration.map((l, k) => (k === 0 ? 'export default function confirmModal(frage) {' : l));
+  assert.deepEqual(stellen('standard.js', standard), [],
+    'auch nicht als Default-Export (Codex-Review zu #1131)');
+  const gleichzeile = [
+    'async function speichern() { closeModal({ force: true });',
+    '  await api.put(url);',
+    '  renderListe();',
+    '}',
+  ];
+  assert.deepEqual(stellen('gleichzeile.js', gleichzeile), ['gleichzeile.js:1'],
+    'ein Schliessen hinter dem Kopf in derselben Zeile bleibt ein Anker');
 
   // Ein Wrapper, der auf seiner eigenen Ebene nachzieht, deckt seinen Neuaufbau.
   const wrapper = [

@@ -7603,6 +7603,103 @@ const MIGRATIONS = [
   },
   {
     version: 194,
+    description: 'Calendar: linked overrides for local recurring occurrences (#975)',
+    up: `
+      ALTER TABLE calendar_events ADD COLUMN recurrence_parent_id INTEGER
+        REFERENCES calendar_events(id) ON DELETE CASCADE;
+      ALTER TABLE calendar_events ADD COLUMN recurrence_id TEXT;
+      ALTER TABLE calendar_events ADD COLUMN overridden_fields TEXT;
+      CREATE UNIQUE INDEX idx_calendar_occurrence_override_slot
+        ON calendar_events(recurrence_parent_id, recurrence_id)
+        WHERE recurrence_parent_id IS NOT NULL;
+      CREATE INDEX idx_calendar_occurrence_override_range
+        ON calendar_events(recurrence_parent_id, start_datetime)
+        WHERE recurrence_parent_id IS NOT NULL;
+
+      -- A child inherits text it did not override, so indexing its stored copy
+      -- would duplicate the master for ordinary searches and consume LIMIT.
+      DROP TRIGGER IF EXISTS trg_search_events_ai;
+      DROP TRIGGER IF EXISTS trg_search_events_au;
+      DROP TRIGGER IF EXISTS trg_search_events_ad;
+      CREATE TRIGGER trg_search_events_ai AFTER INSERT ON calendar_events BEGIN
+        INSERT INTO search_index (entity, entity_id, title, body)
+        VALUES ('event', NEW.id,
+          CASE WHEN NEW.recurrence_parent_id IS NULL
+                 OR EXISTS (SELECT 1 FROM json_each(
+                      CASE WHEN json_valid(NEW.overridden_fields) THEN
+                        CASE WHEN json_type(NEW.overridden_fields) = 'array' THEN NEW.overridden_fields END
+                      END) WHERE type = 'text' AND value = 'title')
+               THEN COALESCE(NEW.title, '') ELSE '' END,
+          TRIM(
+            CASE WHEN NEW.recurrence_parent_id IS NULL
+                    OR EXISTS (SELECT 1 FROM json_each(
+                         CASE WHEN json_valid(NEW.overridden_fields) THEN
+                           CASE WHEN json_type(NEW.overridden_fields) = 'array' THEN NEW.overridden_fields END
+                         END) WHERE type = 'text' AND value = 'description')
+                 THEN COALESCE(NEW.description, '') ELSE '' END
+            || ' ' ||
+            CASE WHEN NEW.recurrence_parent_id IS NULL
+                    OR EXISTS (SELECT 1 FROM json_each(
+                         CASE WHEN json_valid(NEW.overridden_fields) THEN
+                           CASE WHEN json_type(NEW.overridden_fields) = 'array' THEN NEW.overridden_fields END
+                         END) WHERE type = 'text' AND value = 'location')
+                 THEN COALESCE(NEW.location, '') ELSE '' END));
+      END;
+      CREATE TRIGGER trg_search_events_au AFTER UPDATE ON calendar_events BEGIN
+        DELETE FROM search_index WHERE entity = 'event' AND entity_id = OLD.id;
+        INSERT INTO search_index (entity, entity_id, title, body)
+        VALUES ('event', NEW.id,
+          CASE WHEN NEW.recurrence_parent_id IS NULL
+                 OR EXISTS (SELECT 1 FROM json_each(
+                      CASE WHEN json_valid(NEW.overridden_fields) THEN
+                        CASE WHEN json_type(NEW.overridden_fields) = 'array' THEN NEW.overridden_fields END
+                      END) WHERE type = 'text' AND value = 'title')
+               THEN COALESCE(NEW.title, '') ELSE '' END,
+          TRIM(
+            CASE WHEN NEW.recurrence_parent_id IS NULL
+                    OR EXISTS (SELECT 1 FROM json_each(
+                         CASE WHEN json_valid(NEW.overridden_fields) THEN
+                           CASE WHEN json_type(NEW.overridden_fields) = 'array' THEN NEW.overridden_fields END
+                         END) WHERE type = 'text' AND value = 'description')
+                 THEN COALESCE(NEW.description, '') ELSE '' END
+            || ' ' ||
+            CASE WHEN NEW.recurrence_parent_id IS NULL
+                    OR EXISTS (SELECT 1 FROM json_each(
+                         CASE WHEN json_valid(NEW.overridden_fields) THEN
+                           CASE WHEN json_type(NEW.overridden_fields) = 'array' THEN NEW.overridden_fields END
+                         END) WHERE type = 'text' AND value = 'location')
+                 THEN COALESCE(NEW.location, '') ELSE '' END));
+      END;
+      CREATE TRIGGER trg_search_events_ad AFTER DELETE ON calendar_events BEGIN
+        DELETE FROM search_index WHERE entity = 'event' AND entity_id = OLD.id;
+      END;
+      DELETE FROM search_index WHERE entity = 'event';
+      INSERT INTO search_index (entity, entity_id, title, body)
+      SELECT 'event', id,
+        CASE WHEN recurrence_parent_id IS NULL
+               OR EXISTS (SELECT 1 FROM json_each(
+                    CASE WHEN json_valid(overridden_fields) THEN
+                      CASE WHEN json_type(overridden_fields) = 'array' THEN overridden_fields END
+                    END) WHERE type = 'text' AND value = 'title')
+             THEN COALESCE(title, '') ELSE '' END,
+        TRIM(
+          CASE WHEN recurrence_parent_id IS NULL
+                  OR EXISTS (SELECT 1 FROM json_each(
+                       CASE WHEN json_valid(overridden_fields) THEN
+                         CASE WHEN json_type(overridden_fields) = 'array' THEN overridden_fields END
+                       END) WHERE type = 'text' AND value = 'description')
+               THEN COALESCE(description, '') ELSE '' END
+          || ' ' ||
+          CASE WHEN recurrence_parent_id IS NULL
+                  OR EXISTS (SELECT 1 FROM json_each(
+                       CASE WHEN json_valid(overridden_fields) THEN
+                         CASE WHEN json_type(overridden_fields) = 'array' THEN overridden_fields END
+                       END) WHERE type = 'text' AND value = 'location')
+               THEN COALESCE(location, '') ELSE '' END)
+      FROM calendar_events;    `,
+  },
+  {
+    version: 197,
     description: 'Waste collection: types, manual schedules, per-occurrence overrides, and one-off pickups (#1063)',
     up: `
       CREATE TABLE waste_types (
@@ -7687,7 +7784,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 195,
+    version: 198,
     description: 'ship the Waste collection module disabled by default (households opt in, #1063)',
     up(db) {
       // Same merge-not-replace pattern as migration 145 (Inventory) and 166
@@ -7714,7 +7811,7 @@ const MIGRATIONS = [
     },
   },
   {
-    version: 196,
+    version: 199,
     description: 'Waste collection: ICS import sources with health tracking (#1063 Phase 3)',
     up: `
       -- One row per imported file. version starts at 1 and is bumped on every
@@ -7746,7 +7843,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 197,
+    version: 200,
     description: 'Waste collection: ICS source label-to-type mappings (#1063 Phase 3)',
     up: `
       -- One row per distinct label (CATEGORIES tag, or SUMMARY when a feed
@@ -7776,7 +7873,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 198,
+    version: 201,
     description: 'Waste collection: committed imported pickups (#1063 Phase 3)',
     up: `
       -- One row per concrete pickup fact accepted by a committed import.
@@ -7810,9 +7907,9 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 199,
+    version: 202,
     description: 'Waste collection: automatic ICS URL sources (#1063 Phase 7)',
-    // kind's CHECK only allowed 'file' (migration 196); widening it to add
+    // kind's CHECK only allowed 'file' (migration 199); widening it to add
     // 'url' needs the CREATE+COPY+DROP+RENAME rebuild pattern used elsewhere
     // in this file, since SQLite cannot ALTER an existing CHECK. The DROP
     // TABLE step would otherwise cascade-delete every waste_source_mappings/
@@ -7875,7 +7972,7 @@ const MIGRATIONS = [
     },
   },
   {
-    version: 200,
+    version: 203,
     description: 'Waste collection: per-user, per-type pickup reminders (#1063 Phase 8)',
     // Same reminders-table rebuild pattern as migrations 137/141/148/162/177/
     // 184/187 (widening entity_type's CHECK, which SQLite cannot ALTER) - this
@@ -7955,7 +8052,7 @@ const MIGRATIONS = [
     },
   },
   {
-    version: 201,
+    version: 204,
     description: 'Waste collection: ordinal-weekday monthly schedules (#1063 Phase 9)',
     // recurrence_kind's CHECK only allowed 'weekly'/'monthly_fixed_day' -
     // widening it (and the compound CHECK below it) to add
@@ -8004,7 +8101,7 @@ const MIGRATIONS = [
     },
   },
   {
-    version: 202,
+    version: 205,
     description: 'Waste collection: revocable read-only ICS feed (#1063 Phase 10)',
     // Same personal-token-over-household-content pattern as migrations 61
     // (calendar_feed_token), 144 (inventory_deadlines_feed_token) and 176
@@ -8029,7 +8126,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 203,
+    version: 206,
     description: 'Waste collection: index waste types in the global FTS5 search_index (#1063 Phase 10)',
     // Same trigger shape as migration 66 (medications/health_activities) and
     // 68 (shopping_items). Deliberately indexes ONLY waste_types (the finite,
@@ -8064,14 +8161,14 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 204,
+    version: 207,
     description: 'Waste collection: covering index for per-source pickup-health lookups (audit finding, no data change)',
     // waste-store.js#decorateSourceHealth/listSources both run
     // `WHERE source_id = ? AND date_key >= ?` (single source) or
     // `WHERE date_key >= ? GROUP BY source_id` (every source) against
     // waste_imported_pickups - neither existing index covers that:
     // idx_waste_imported_pickups_source is source_id alone (no date_key), and
-    // idx_waste_imported_pickups_type_date (migration 198) is keyed on
+    // idx_waste_imported_pickups_type_date (migration 201) is keyed on
     // type_id, not source_id. Both queries fell back to the source-only
     // index plus a per-row filter - fine at today's row counts (measured
     // 18-36ms, see the audit report), a table scan by source count that grows

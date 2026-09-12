@@ -11,7 +11,12 @@ import { eachRule } from './css-rules.js';
 
 // /i18n.js wird durch test-browser-loader.mjs gemockt (--loader Flag)
 const {
-  wireBlurValidation, btnSuccess, btnError, focusRestoreTarget, rememberFocus,
+  wireBlurValidation,
+  btnSuccess,
+  btnError,
+  focusRestoreTarget,
+  rememberFocus,
+  __test: modalTest,
   restoreFocusAfterClose, refocusAfterRender, forgetRestore,
 } = await import('../public/components/modal.js');
 
@@ -133,6 +138,69 @@ function makeBtn({ textContent = 'Speichern' } = {}) {
 // --------------------------------------------------------
 // wireBlurValidation
 // --------------------------------------------------------
+
+test('confirmOverModal finalisiert das geparkte Modal gemäß closeOnConfirm', async () => {
+  const suspended = { id: 'editor' };
+  const resumed = [];
+  const closed = [];
+  const dependencies = {
+    resume: (token) => resumed.push(token),
+    close: async (options) => closed.push(options),
+  };
+
+  assert.equal(await modalTest.finishSuspendedConfirmation(
+    false, true, suspended, dependencies
+  ), false);
+  assert.deepEqual(resumed, [suspended]);
+  assert.deepEqual(closed, []);
+
+  assert.equal(await modalTest.finishSuspendedConfirmation(
+    true, false, suspended, dependencies
+  ), true);
+  assert.deepEqual(resumed, [suspended, suspended]);
+  assert.deepEqual(closed, []);
+
+  assert.equal(await modalTest.finishSuspendedConfirmation(
+    true, true, suspended, dependencies
+  ), true);
+  assert.deepEqual(resumed, [suspended, suspended, suspended]);
+  assert.deepEqual(closed, [{ force: true }]);
+});
+
+test('confirmOverModal orchestration passes closeOnConfirm through the real suspended path', async () => {
+  const suspended = { id: 'editor' };
+  const confirmations = [];
+  const resumed = [];
+  const closed = [];
+  const confirmOverModal = modalTest.createConfirmOverModal({
+    getActiveOverlay: () => ({ id: 'active-overlay' }),
+    getModalState: () => 'open',
+    showConfirmation: async () => assert.fail('the fallback confirmation must not run'),
+    suspend: () => suspended,
+    confirmSuspended: async (message, options, token) => {
+      confirmations.push({ message, options, token });
+      return true;
+    },
+    resume: (token) => resumed.push(token),
+    close: async (options) => closed.push(options),
+  });
+
+  assert.equal(await confirmOverModal('Continue saving?', {
+    closeOnConfirm: false,
+    danger: true,
+  }), true);
+  assert.deepEqual(confirmations, [{
+    message: 'Continue saving?',
+    options: { danger: true },
+    token: suspended,
+  }]);
+  assert.deepEqual(resumed, [suspended]);
+  assert.deepEqual(closed, []);
+
+  assert.equal(await confirmOverModal('Delete this event?'), true);
+  assert.deepEqual(resumed, [suspended, suspended]);
+  assert.deepEqual(closed, [{ force: true }]);
+});
 
 test('wireBlurValidation: registriert blur-Listener auf required inputs', () => {
   const input = makeInput();

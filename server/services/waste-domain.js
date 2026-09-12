@@ -196,7 +196,7 @@ export function validateScheduleRecurrence(schedule) {
     }
     // Reuses `weekdays` (exactly ONE code here, not the CSV list a weekly
     // schedule stores) and `month_day` (the ordinal position, not a day
-    // number) - see migration 201's own comment for why no new columns exist.
+    // number) - see migration 204's own comment for why no new columns exist.
     const codes = String(weekdays ?? '').split(',').filter(Boolean);
     const singleWeekdayValid = codes.length === 1 && WEEKDAY_CODES.includes(codes[0]);
     if (!singleWeekdayValid) {

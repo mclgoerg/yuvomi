@@ -435,9 +435,6 @@ function _wireSheetSwipe(panel) {
   });
 }
 
-/** Nur fuer Tests: die Geste ohne echtes Panel treiben (#981). */
-export const __test = { wireSheetSwipe: _wireSheetSwipe };
-
 // --------------------------------------------------------
 // Suspend/Restore für Dialoge über einem offenen Modal (Audit 1.5)
 //
@@ -1478,6 +1475,17 @@ export function confirmModal(message, { confirmLabel, cancelLabel, danger = fals
   });
 }
 
+async function finishSuspendedConfirmation(
+  confirmed,
+  closeOnConfirm,
+  suspended,
+  { resume = _resumeSuspendedModal, close = closeModal } = {},
+) {
+  resume(suspended);
+  if (confirmed && closeOnConfirm) await close({ force: true });
+  return confirmed;
+}
+
 /**
  * Bestätigung ÜBER einem offenen Modal, ohne es zu verdrängen.
  *
@@ -1491,30 +1499,54 @@ export function confirmModal(message, { confirmLabel, cancelLabel, danger = fals
  *
  * Bestätigt der Nutzer, schließt das geparkte Modal mit `force: true`: die
  * Entscheidung nimmt die Eingaben ohnehin mit, eine zweite Rückfrage wäre
- * falsch (#625).
+ * falsch (#625). Mit `closeOnConfirm: false` kehrt das Formular auch nach
+ * Bestätigung zurück: ein Speichern darf anschließend noch validieren,
+ * weitere Entscheidungen erfragen oder einen Serverfehler anzeigen.
  *
  * Ohne offenes Modal identisch mit `confirmModal` - eine Löschfunktion, die aus
  * Liste und Modal gleichermaßen aufgerufen wird, braucht keine Fallunterscheidung.
  *
  * @param {string} message - die Frage (wird zum Titel), wie bei confirmModal
- * @param {Object} [opts]  - identisch zu confirmModal ({ confirmLabel, danger, detail })
+ * @param {Object} [opts] - confirmModal-Optionen plus closeOnConfirm (Default true)
  * @returns {Promise<boolean>}
  */
-export async function confirmOverModal(message, opts = {}) {
-  // Nur ein regulär offenes Modal lässt sich parken: läuft gerade eine
-  // Schließ-Animation oder liegt schon ein Dialog im Slot, gibt es nichts zu
-  // schützen, und ein Suspend würde den laufenden Übergang zerlegen.
-  if (!activeOverlay || modalState !== 'open') return confirmModal(message, opts);
+function createConfirmOverModal({
+  getActiveOverlay = () => activeOverlay,
+  getModalState = () => modalState,
+  showConfirmation = confirmModal,
+  suspend = _suspendActiveModal,
+  confirmSuspended = _confirmOverSuspended,
+  resume = _resumeSuspendedModal,
+  close = closeModal,
+} = {}) {
+  return async function confirmOverModal(message, { closeOnConfirm = true, ...opts } = {}) {
+    // Nur ein regulär offenes Modal lässt sich parken: läuft gerade eine
+    // Schließ-Animation oder liegt schon ein Dialog im Slot, gibt es nichts zu
+    // schützen, und ein Suspend würde den laufenden Übergang zerlegen.
+    if (!getActiveOverlay() || getModalState() !== 'open') return showConfirmation(message, opts);
 
-  const suspended = _suspendActiveModal();
-  const confirmed = await _confirmOverSuspended(message, opts, suspended);
-  // Erst zurückholen, dann ggf. schließen: das Abräumen soll durch die reguläre
-  // Schließ-Logik laufen, nicht an ihrem 'closing'-Wächter vorbei. Der Fokus
-  // kehrt dabei auf den auslösenden Knopf zurück (siehe _resumeSuspendedModal).
-  _resumeSuspendedModal(suspended);
-  if (confirmed) await closeModal({ force: true });
-  return confirmed;
+    const suspended = suspend();
+    const confirmed = await confirmSuspended(message, opts, suspended);
+    // Erst zurückholen, dann ggf. schließen: das Abräumen soll durch die reguläre
+    // Schließ-Logik laufen, nicht an ihrem 'closing'-Wächter vorbei. Der Fokus
+    // kehrt dabei auf den auslösenden Knopf zurück (siehe _resumeSuspendedModal).
+    return finishSuspendedConfirmation(
+      confirmed,
+      closeOnConfirm,
+      suspended,
+      { resume, close },
+    );
+  };
 }
+
+export const confirmOverModal = createConfirmOverModal();
+
+/** Nur fuer Tests: Gesten und Bestaetigungen ohne echtes Panel treiben. */
+export const __test = {
+  wireSheetSwipe: _wireSheetSwipe,
+  createConfirmOverModal,
+  finishSuspendedConfirmation,
+};
 
 // --------------------------------------------------------
 // Validation & Feedback

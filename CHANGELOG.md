@@ -170,7 +170,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   migrates. The four slots now come from one place in the client rather than five copies, so the
   planner, the overview tile and the recipe form always say the same word.
 
+- **Marking a housekeeping visit as paid asks first, and an admin can take a payment back**
+  (#1136). "Mark paid" settled a visit with a single tap - in the report list, in the visit report
+  and in the staff log alike - and checked off the visit's payment task on the way. A paid visit is
+  settled: from then on only an admin can edit or delete it, so a stray tap was not a small thing.
+  All three buttons now open the same confirmation, and it names what happens: the linked payment
+  task is checked off, and only an admin can undo it afterwards. Cancelling from the visit report
+  leaves the report open. The way back sits in the visit report: on a paid visit an admin sees
+  "Undo payment", which marks the visit as pending again and reopens a linked payment task. Whether
+  that button appears is decided by the server for each visit, and the server checks the role again
+  when the payment is taken back.
+
 ### Changed
+
+- **Dashboard widgets share one header grammar, and more section headings adopt the shared title
+  style.** Three widget header treatments coexisted on the dashboard: most widgets carried a
+  module seal, a title and an optional "view all" link, but Weather and Clock opened straight into
+  their content with no header at all. Both now open with the same seal+title header as their 15
+  neighbours - the large temperature and the clock face stay exactly as prominent as before, they
+  just get a name above them like everywhere else. The metrics tile row is deliberately left alone:
+  each tile already names a different module with its own seal and label, and forcing one title
+  over several modules would misrepresent it, not fix it.
+
+  Separately, Rewards' four section headings and a genuinely unstyled Inventory category heading
+  now use the shared `u-section-title` role instead of a private declaration that had drifted a
+  few pixels off it (Inventory's had no declared size at all - it inherited the browser default,
+  not any design token). Notes' and Budget's section headings, already the right size through their
+  own container rule, now say so directly in markup as well, growing `u-section-title`'s adoption
+  beyond the two files it was previously confined to.
+
+  `.input` and `.form-input` stay aliased to the same rule - renaming roughly 300 existing uses
+  is not worth the review cost - but the alias site and DESIGN.md's Inputs/Fields section now say
+  which one is canonical for new code: `.form-input`, the name `.form-group`/`.form-field`/
+  `.form-label` already use.
 
 - **A scaled ingredient quantity is now written in the household's own digits.** Scaling a recipe
   wrote the number in Latin digits even where the rest of the line used Persian or Arabic ones, so a
@@ -195,6 +227,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A housekeeper can check out again, and work a second session on the same day** (#1133, #1138).
+  The one button that carries both directions was disabled while someone was checked in, and it is
+  the only thing that triggers the check-out path - so that path was unreachable: a household could
+  check a housekeeper in and never close the session from the app. The button now offers "Check
+  out" in that state. Behind it, two answers had collapsed into one: a worker's "currently working"
+  and "was here today" both reported the last session of the day, so someone stayed "checked in"
+  after checking out. They are separate again. The check-in route matched the same mistake and
+  refused a second check-in for the rest of the day, which made split shifts, a break with resumed
+  work, and two separate visits impossible; it now only refuses while a session is actually open.
+  Overlapping sessions stay blocked, and each session keeps its own rate, calendar event and
+  payment task. The line under the name still shows today's visit once it is closed.
+
+- **The formatting toolbar over a task's note shows its icons again** (#1141). Switching a task's
+  detail view into edit mode builds that form only then, but the icon-replacing pass over the whole
+  overlay had already run before the form existed, so the 13 buttons of the markdown toolbar (bold,
+  list, link, and so on) stayed blank. The edit form now gets its own icon pass right after it is
+  built.
+
 - **An event moved to another CalDAV calendar can be deleted or edited right away** (#593). A move
   creates the event in the new calendar and removes it from the old one, but until the next sync
   Yuvomi kept pointing at the old copy. Deleting the event in that window went to an address that
@@ -204,6 +254,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the move succeeds, as moves to Google calendars already did. An event deleted while its move is
   still under way has its new copy deleted as well, and an edit or a move made while a change is
   still being sent to the server stays queued instead of being dropped.
+
+- **A change to a synced calendar no longer collides with a sync that is already running**
+  (#593). Every create, edit and delete tries to reach the server right away, and the scheduler
+  runs its own sync every few minutes. Both did the same bookkeeping at the same time, so one
+  could clear the other's notes between two network calls: an event deleted while its move to
+  another calendar was still under way left its new copy behind, and the next sync brought the
+  deleted event back. A provider now runs one pass at a time - the immediate attempt, the
+  scheduled sync and a second scheduled tick wait for each other instead of overlapping, and a
+  burst of edits during a slow pass is followed by one catch-up pass rather than one per edit.
+  This covers Google, CalDAV, iCloud and the CalDAV reminder lists behind Tasks and Shopping.
 
 - **Keyboard focus comes back after a confirmation, an input dialog or the calendar's detail
   popover** (#1083). Confirm a delete, rename a list or a subtask, pick a folder to move to, and
@@ -233,6 +293,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what actually reached Google now counts as done, and anything newer stays queued for the next
   attempt. An edit made while the event is being moved goes to its new calendar in the same run
   instead of waiting for the next sync.
+
+- **Choosing the calendar an event already sits in withdraws a move that has not gone out yet**
+  (#593). A move to another calendar is queued and carried out by the sync, and that attempt can
+  fail - the server may be unreachable right then. Choosing the original calendar again in that
+  window looked like no change at all, so the queued move stayed: the next sync moved the event into
+  a calendar nobody had chosen any more, while the dialog showed the one that was. A target pointing
+  back at the calendar the event sits in now withdraws the queued move, and a target pointing at a
+  third calendar replaces it. Only the choice made in that edit counts: an edit that leaves the
+  target alone keeps a queued move, and a target stored on an older event that differs from its
+  actual calendar is still never read as a wish to move. Withdrawing also works while the sync is
+  set to read-only or its account is gone - it changes nothing at the provider, and a move the user
+  took back must not come back to life once writing is allowed again. Google and CalDAV alike.
 
 - **A review run that stopped at its gate is named as such, even when it first denied having
   reviewed** (#1101). The check behind the automated review reads the run's closing text to say
@@ -637,6 +709,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   direction. Putting the custom field on a third line of its own, as the report asked, would need
   about 51px per block and therefore a taller hour scale - that is a change to the scale, not to
   the block, and is not part of this fix.
+
+- **Editing one occurrence of a local recurring event now keeps it linked to its series** (#975).
+  The edited occurrence keeps all three series scopes when reopened, follows later series changes
+  for fields that were not deliberately changed, and keeps its original recurrence slot even when
+  moved to another date. The replacement and its skipped original slot are saved atomically, and
+  the read-only ICS feed now exports the replacement with standard `RECURRENCE-ID` semantics.
+  Imported series keep their existing whole-series behavior. Generated local series and local
+  series targeted for outbound sync retain their previous standalone-edit and deletion scopes.
+  Historic detached edits are left unchanged rather than guessed back into a series. iCloud auto-sync excludes
+  linked replacements and their masters, without excluding ordinary deletion-only exceptions.
+  Detaching a linked replacement retains its original-slot exception, so outbound targeting or a
+  recurrence-rule round trip cannot resurrect a duplicate master occurrence. Changing a whole-series
+  recurrence rule no longer forgets previously deleted occurrences. Truncating a series likewise
+  retains later exclusions, and splitting a linked series transfers every later exclusion except the
+  new anchor even when the successor rule cannot currently reach it, so a later extension cannot
+  resurrect a deleted slot or duplicate a detached replacement. A no-difference only-this save
+  removes an exclusion only when it also removes the linked replacement that owned that exclusion.
+  Save confirmations preserve entered values on validation or server errors. Outlook checks actual
+  writable push targets before accepting linked-series auto-sync, and MCP upcoming results retain
+  their unrestricted future horizon while recurrence generation stops at the requested result count.
+  ICS deletion exceptions keep the series' local time across daylight-saving changes even when
+  the stored UTC day differs; each exception needs at most three local-date candidates, not a series scan.
+
+## [2.65.3] - 2026-09-12
+
+### Security
+
+- **A household member can no longer take back a paid housekeeping visit through its payment
+  task (GHSA-82jf-c39w-vh8c).** Since v2.64.1 a paid visit can only be changed, deleted or paid
+  again by an admin (GHSA-4p5w-5346-8598). That boundary covered the visit but not the payment
+  task linked to it: reopening the task in Tasks marked the visit unpaid again, and from there a
+  member could change its amount or delete it. Moving the payment task of a paid visit out of
+  done now needs an admin as well, whether from the task form, the checkbox, a swipe or a bulk
+  action. Ticking the task off stays open to members, as paying the visit does. A member who used
+  to correct an accidental tick by unticking the payment task now gets "Permission denied" and has
+  to ask an admin.
 
 ## [2.65.2] - 2026-09-11
 

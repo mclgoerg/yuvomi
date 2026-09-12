@@ -612,7 +612,7 @@ function renderCategoryDetail(list) {
       <i data-lucide="arrow-left" class="inventory-back-link__icon" aria-hidden="true"></i>
       ${esc(t('inventory.backToInventory'))}
     </button>
-    <h2 class="inventory-category-title">${esc(category ? categoryLabel(category) : state.activeCategory)}</h2>`);
+    <h2 class="inventory-category-title u-section-title">${esc(category ? categoryLabel(category) : state.activeCategory)}</h2>`);
   list.querySelector('#inventory-back-link').addEventListener('click', backToBrowse);
 
   const filtered = categoryItems.filter((item) => matchesQuery(item) && matchesAttentionFilter(item));

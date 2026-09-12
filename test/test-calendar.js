@@ -20,6 +20,22 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
+test('Kalender-Speicherbestätigungen halten beide Editor-Save-Gates offen', () => {
+  const source = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  for (const [name, nextName] of [
+    ['confirmCalendarOverrideOrphans', 'confirmLocalWholeSeriesEdit'],
+    ['confirmLocalWholeSeriesEdit', 'confirmLocalWholeSeriesDelete'],
+  ]) {
+    const start = source.indexOf(`function ${name}(`);
+    assert(start >= 0, `${name} muss auffindbar bleiben`);
+    const end = source.indexOf(`function ${nextName}(`, start);
+    assert(end > start, `${name} muss vor ${nextName} stehen`);
+    const body = source.slice(start, end);
+    assert(/confirmOverModal\([\s\S]*closeOnConfirm:\s*false/.test(body),
+      `${name} darf das Editor-Modal vor dem Save-Lauf nicht schließen`);
+  }
+});
+
 test('Kalenderanhänge verwenden Dokument-Endpunkte und behalten Legacy-Data-URLs lesbar', () => {
   const linked = {
     attachment_document_id: 42,
@@ -50,6 +66,48 @@ test('Kalenderanhänge verwenden Dokument-Endpunkte und behalten Legacy-Data-URL
     'Legacy-Blob bleibt als Data URL lesbar'
   );
   assert(calendarHelpers.hasAttachment({}) === false, 'Leeres Event hat keinen Anhang');
+});
+
+test('Vererbte Serientermin-Erinnerungen verwenden den Server-Anker statt des verschobenen Datums', () => {
+  const movedLinkedOccurrence = {
+    id: 99,
+    start_datetime: '2026-11-02T11:00:00Z',
+    reminder_owner_id: 41,
+    reminder_anchor_start: '2026-10-01T09:00:00Z',
+  };
+  const inheritedReminder = { remind_at: '2026-10-01T08:00:00' };
+
+  assert(calendarHelpers.reminderOwnerId(movedLinkedOccurrence) === 41,
+    'die Leseroute muss Erinnerungen beim vom Server genannten Owner laden');
+  assert(calendarHelpers.reminderOffsetFromEvent(movedLinkedOccurrence, inheritedReminder) === '60',
+    'der Offset muss eine Stunde bleiben und darf nicht vom verschobenen 2. November abgeleitet werden');
+});
+
+test('Eigene Serientermin-Erinnerungen verwenden den vom Server gelieferten Child-Anker', () => {
+  const movedLinkedOccurrence = {
+    id: 99,
+    start_datetime: '2026-11-02T11:00:00Z',
+    reminder_owner_id: 99,
+    reminder_anchor_start: '2026-11-02T11:00:00Z',
+  };
+  const ownedReminder = { remind_at: '2026-11-02T10:45:00' };
+
+  assert(calendarHelpers.reminderOwnerId(movedLinkedOccurrence) === 99);
+  assert(calendarHelpers.reminderOffsetFromEvent(movedLinkedOccurrence, ownedReminder) === '15');
+});
+
+test('Serientermin-Speichern legt kanonische Reminder-Offsets in den atomaren Body', () => {
+  assert(
+    JSON.stringify(calendarHelpers.canonicalReminderOffsets([
+      { offset: '' },
+      { offset: '60' },
+      { offset: 'custom', amount: '2', unit: 'days' },
+      { offset: '60' },
+    ])) === JSON.stringify([60, 2880]),
+    'Offsets müssen numerisch, dedupliziert und in Formularreihenfolge an den Occurrence-Endpunkt gehen',
+  );
+  assert(JSON.stringify(calendarHelpers.canonicalReminderOffsets([], false)) === '[]',
+    'ein ausgeschalteter Reminder muss als explizit leeres Offset-Set gesendet werden');
 });
 
 const db = new DatabaseSync(':memory:');
