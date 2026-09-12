@@ -199,6 +199,8 @@
         "countdownOverdue_one": "{{count}} 天前",
         "countdownMore": "还有 {{count}} 项",
         "countdownMore_one": "还有 {{count}} 项",
+        "wasteMore": "还有 {{count}} 项",
+        "wasteMore_one": "还有 {{count}} 项",
         "budgetOverview": "预算概览",
         "monthlyIncome": "收入",
         "monthlyExpenses": "支出",

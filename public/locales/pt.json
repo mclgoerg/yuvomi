@@ -199,6 +199,8 @@
         "countdownOverdue_one": "há {{count}} dia",
         "countdownMore": "+{{count}} outros",
         "countdownMore_one": "+{{count}} outro",
+        "wasteMore": "+{{count}} outros",
+        "wasteMore_one": "+{{count}} outro",
         "budgetOverview": "Visão do orçamento",
         "monthlyIncome": "Receitas",
         "monthlyExpenses": "Despesas",

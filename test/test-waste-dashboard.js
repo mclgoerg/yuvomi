@@ -170,13 +170,13 @@ test('renderWasteWidget: der Kopf zaehlt Typen MIT naechster Abholung, unabhaeng
 test('renderWasteWidget: "+N mehr" erscheint, wenn mehr Typen bestehen als Zeilen passen', () => {
   const items = [1, 2, 3, 4, 5, 6, 7].map((id) => ({ type: type(id), next: occurrence(id, `2026-06-${10 + id}`) }));
   const html = renderWasteWidget({ items, needsRefresh: false }, '1x2'); // Deckel 5, 2 bleiben aussen vor
-  assert.match(html, /dashboard\.countdownMore\{&quot;count&quot;:2\}/, 'die Ueberlauf-Zeile muss die uebrigen zwei Typen nennen');
+  assert.match(html, /dashboard\.wasteMore\{&quot;count&quot;:2\}/, 'die Ueberlauf-Zeile muss die uebrigen zwei Typen nennen');
 });
 
 test('renderWasteWidget: ohne Ueberlauf bleibt "+N mehr" weg', () => {
   const items = [1, 2].map((id) => ({ type: type(id), next: occurrence(id, `2026-06-${10 + id}`) }));
   const html = renderWasteWidget({ items, needsRefresh: false }, '1x2');
-  assert.doesNotMatch(html, /countdownMore/, 'zwei Typen passen locker in den Deckel von 5 - keine Ueberlauf-Zeile');
+  assert.doesNotMatch(html, /wasteMore/, 'zwei Typen passen locker in den Deckel von 5 - keine Ueberlauf-Zeile');
 });
 
 // -------------------------------------------------------------------------

@@ -199,6 +199,8 @@
         "countdownOverdue_one": "{{count}} день назад",
         "countdownMore": "+{{count}} ещё",
         "countdownMore_one": "+{{count}} ещё",
+        "wasteMore": "+{{count}} ещё",
+        "wasteMore_one": "+{{count}} ещё",
         "budgetOverview": "Обзор бюджета",
         "monthlyIncome": "Доходы",
         "monthlyExpenses": "Расходы",

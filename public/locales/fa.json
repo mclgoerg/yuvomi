@@ -211,6 +211,8 @@
         "countdownOverdue_one": "{{count}} روز پیش",
         "countdownMore": "+{{count}} مورد دیگر",
         "countdownMore_one": "+{{count}} مورد دیگر",
+        "wasteMore": "+{{count}} مورد دیگر",
+        "wasteMore_one": "+{{count}} مورد دیگر",
         "budgetOverview": "نمای کلی بودجه",
         "monthlyIncome": "درآمد",
         "monthlyExpenses": "هزینه‌ها",

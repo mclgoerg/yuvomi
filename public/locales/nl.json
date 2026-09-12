@@ -199,6 +199,8 @@
         "countdownOverdue_one": "{{count}} dag geleden",
         "countdownMore": "+{{count}} meer",
         "countdownMore_one": "+{{count}} meer",
+        "wasteMore": "+{{count}} meer",
+        "wasteMore_one": "+{{count}} meer",
         "budgetOverview": "Budgetoverzicht",
         "monthlyIncome": "Inkomsten",
         "monthlyExpenses": "Uitgaven",

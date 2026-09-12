@@ -2206,7 +2206,7 @@ function renderWasteWidget(waste, size) {
 
   const rest = Math.max(0, sorted.length - capped.length);
   const more = rest > 0
-    ? `<p class="waste-widget-more">${esc(t('dashboard.countdownMore', { count: rest }))}</p>`
+    ? `<p class="waste-widget-more">${esc(t('dashboard.wasteMore', { count: rest }))}</p>`
     : '';
   // Quelle-braucht-Auffrischung (invariant #6) ist ein Source-, kein
   // Occurrence-Feld - eigener Fetch auf /waste/sources in ensureWasteSlice(),

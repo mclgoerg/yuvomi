@@ -199,6 +199,8 @@
         "countdownOverdue_one": "{{count}} day ago",
         "countdownMore": "+{{count}} more",
         "countdownMore_one": "+{{count}} more",
+        "wasteMore": "+{{count}} more",
+        "wasteMore_one": "+{{count}} more",
         "budgetOverview": "Budget overview",
         "monthlyIncome": "Income",
         "monthlyExpenses": "Expenses",

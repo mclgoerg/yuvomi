@@ -211,6 +211,8 @@
         "countdownOverdue_one": "{{count}}일 전",
         "countdownMore": "+{{count}}개 더",
         "countdownMore_one": "+{{count}}개 더",
+        "wasteMore": "+{{count}}개 더",
+        "wasteMore_one": "+{{count}}개 더",
         "budgetOverview": "예산 개요",
         "monthlyIncome": "수입",
         "monthlyExpenses": "지출",

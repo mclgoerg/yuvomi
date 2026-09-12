@@ -199,6 +199,8 @@
         "countdownOverdue_one": "{{count}} ngày trước",
         "countdownMore": "+{{count}} mục nữa",
         "countdownMore_one": "+{{count}} mục nữa",
+        "wasteMore": "+{{count}} mục nữa",
+        "wasteMore_one": "+{{count}} mục nữa",
         "budgetOverview": "Tổng quan ngân sách",
         "monthlyIncome": "Thu nhập",
         "monthlyExpenses": "Chi phí",

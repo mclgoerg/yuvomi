@@ -199,6 +199,8 @@
         "countdownOverdue_one": "πριν από {{count}} ημέρα",
         "countdownMore": "+{{count}} ακόμη",
         "countdownMore_one": "+{{count}} ακόμη",
+        "wasteMore": "+{{count}} ακόμη",
+        "wasteMore_one": "+{{count}} ακόμη",
         "budgetOverview": "Επισκόπηση προϋπολογισμού",
         "monthlyIncome": "Έσοδα",
         "monthlyExpenses": "Έξοδα",

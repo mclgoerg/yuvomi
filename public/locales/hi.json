@@ -199,6 +199,8 @@
         "countdownOverdue_one": "{{count}} दिन पहले",
         "countdownMore": "+{{count}} और",
         "countdownMore_one": "+{{count}} और",
+        "wasteMore": "+{{count}} और",
+        "wasteMore_one": "+{{count}} और",
         "budgetOverview": "बजट अवलोकन",
         "monthlyIncome": "आय",
         "monthlyExpenses": "खर्च",

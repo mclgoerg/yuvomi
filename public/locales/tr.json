@@ -199,6 +199,8 @@
         "countdownOverdue_one": "{{count}} gün önce",
         "countdownMore": "+{{count}} tane daha",
         "countdownMore_one": "+{{count}} tane daha",
+        "wasteMore": "+{{count}} tane daha",
+        "wasteMore_one": "+{{count}} tane daha",
         "budgetOverview": "Bütçe özeti",
         "monthlyIncome": "Gelir",
         "monthlyExpenses": "Giderler",

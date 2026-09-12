@@ -199,6 +199,8 @@
         "countdownOverdue_one": "{{count}}日前",
         "countdownMore": "他{{count}}件",
         "countdownMore_one": "他{{count}}件",
+        "wasteMore": "他{{count}}件",
+        "wasteMore_one": "他{{count}}件",
         "budgetOverview": "予算の概要",
         "monthlyIncome": "収入",
         "monthlyExpenses": "支出",

@@ -455,10 +455,12 @@ function parseMobileNavOrder(raw) {
  * nur, dass hier unbegrenzt viel Fremdinhalt in `sync_config` landet.
  *
  * Erlaubt sind Boolean, endliche Zahlen, kurze Strings und Listen kurzer
- * Strings ODER endlicher Zahlen (#1063 Phase 10: die Waste-Kachel filtert
+ * Strings ODER ganzer Zahlen (#1063 Phase 10: die Waste-Kachel filtert
  * nach Typ-Ids, keine Kategorie-Schlüsseln - eine Liste darf deshalb nicht
- * mehr nur Strings tragen). Verschachtelte Objekte nicht: sie hätten keine
- * Tiefengrenze, und kein Widget braucht sie.
+ * mehr nur Strings tragen; Ids sind Integer, also lässt die Liste auch nur
+ * Integer durch statt beliebiger endlicher Zahlen wie 1e308 oder Brüche).
+ * Verschachtelte Objekte nicht: sie hätten keine Tiefengrenze, und kein
+ * Widget braucht sie.
  *
  * @returns {object|null} normalisierte Optionen, oder null wenn die Form nicht stimmt
  */
@@ -484,7 +486,7 @@ function normalizeWidgetOptions(input) {
     if (Array.isArray(value)) {
       if (value.length > MAX_WIDGET_OPTION_VALUES) return null;
       if (!value.every((v) => (typeof v === 'string' && v.length <= MAX_WIDGET_OPTION_LENGTH)
-        || (typeof v === 'number' && Number.isFinite(v)))) return null;
+        || (typeof v === 'number' && Number.isInteger(v)))) return null;
       out[key] = [...value];
       continue;
     }

@@ -199,6 +199,8 @@
         "countdownOverdue_one": "{{count}} день тому",
         "countdownMore": "+{{count}} ще",
         "countdownMore_one": "+{{count}} ще",
+        "wasteMore": "+{{count}} ще",
+        "wasteMore_one": "+{{count}} ще",
         "budgetOverview": "Огляд бюджету",
         "monthlyIncome": "Доходи",
         "monthlyExpenses": "Витрати",

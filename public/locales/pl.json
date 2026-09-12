@@ -211,6 +211,8 @@
         "countdownOverdue_one": "{{count}} dzień temu",
         "countdownMore": "+{{count}} więcej",
         "countdownMore_one": "+{{count}} więcej",
+        "wasteMore": "+{{count}} więcej",
+        "wasteMore_one": "+{{count}} więcej",
         "budgetOverview": "Przegląd budżetu",
         "monthlyIncome": "Przychody",
         "monthlyExpenses": "Wydatki",

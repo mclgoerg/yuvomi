@@ -199,6 +199,8 @@
         "countdownOverdue_one": "för {{count}} dag sedan",
         "countdownMore": "+{{count}} till",
         "countdownMore_one": "+{{count}} till",
+        "wasteMore": "+{{count}} till",
+        "wasteMore_one": "+{{count}} till",
         "budgetOverview": "Budgetöversikt",
         "monthlyIncome": "Inkomster",
         "monthlyExpenses": "Utgifter",

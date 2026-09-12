@@ -211,6 +211,8 @@
         "countdownOverdue_one": "{{count}} hari lalu",
         "countdownMore": "+{{count}} lagi",
         "countdownMore_one": "+{{count}} lagi",
+        "wasteMore": "+{{count}} lagi",
+        "wasteMore_one": "+{{count}} lagi",
         "budgetOverview": "Ringkasan anggaran",
         "monthlyIncome": "Pemasukan",
         "monthlyExpenses": "Pengeluaran",

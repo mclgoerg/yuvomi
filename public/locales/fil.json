@@ -211,6 +211,8 @@
         "countdownOverdue_one": "{{count}} araw na nakalipas",
         "countdownMore": "mga {{count}} pa",
         "countdownMore_one": "mga {{count}} pa",
+        "wasteMore": "mga {{count}} pa",
+        "wasteMore_one": "mga {{count}} pa",
         "budgetOverview": "Pangkalahatang-tanaw ng badyet",
         "monthlyIncome": "Kita",
         "monthlyExpenses": "Gastos",

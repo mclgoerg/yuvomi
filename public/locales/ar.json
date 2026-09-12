@@ -199,6 +199,8 @@
         "countdownOverdue_one": "قبل {{count}} يوم",
         "countdownMore": "+{{count}} أخرى",
         "countdownMore_one": "+{{count}} آخر",
+        "wasteMore": "+{{count}} أخرى",
+        "wasteMore_one": "+{{count}} آخر",
         "budgetOverview": "نظرة عامة على الميزانية",
         "monthlyIncome": "الدخل",
         "monthlyExpenses": "المصروفات",

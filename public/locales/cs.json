@@ -199,6 +199,8 @@
         "countdownOverdue_one": "před {{count}} dnem",
         "countdownMore": "+{{count}} dalších",
         "countdownMore_one": "+{{count}} další",
+        "wasteMore": "+{{count}} dalších",
+        "wasteMore_one": "+{{count}} další",
         "budgetOverview": "Přehled rozpočtu",
         "monthlyIncome": "Příjmy",
         "monthlyExpenses": "Výdaje",
