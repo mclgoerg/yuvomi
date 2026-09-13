@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Typisch bereik: {{min}}-{{max}} dagen",
                 "likelihoodTitle": "Symptoompatronen",
                 "likelihoodCaption": "Kies een symptoom om te zien op welke dagen het, op basis van je geschiedenis, vaak voorkomt.",
-                "likelyToday": "{{symptom}} komt vaak rond deze dag van je cyclus voor.",
                 "symptomTracked": "Geregistreerd",
                 "symptomPredicted": "Komt hier vaak voor",
                 "phaseOther": "Overig",
@@ -4545,7 +4544,20 @@
                 "fertile": "Vruchtbaar venster tot {{date}}",
                 "fertileConfirmed": "Vruchtbaar venster (eisprong bevestigd) tot {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "De eisprong van deze cyclus is bevestigd door een temperatuurstijging. Toekomstige cycli blijven op de kalendermethode gebaseerd; dit vervangt geen anticonceptie of medisch advies."
+            "fertilityDisclaimerConfirmed": "De eisprong van deze cyclus is bevestigd door een temperatuurstijging. Toekomstige cycli blijven op de kalendermethode gebaseerd; dit vervangt geen anticonceptie of medisch advies.",
+            "import": {
+                "button": "Importeren",
+                "title": "Menstruatiegeschiedenis importeren",
+                "explainer": "CSV-bestand of geplakte tekst: één regel per menstruatie als „start_date,end_date” (einddatum optioneel), datums in JJJJ-MM-DD of DD-MM-JJJJ, gescheiden door komma of puntkomma.",
+                "fileLabel": "CSV-bestand kiezen",
+                "pasteLabel": "Of CSV-tekst plakken",
+                "submit": "Importeren",
+                "resultToast": "{{imported}} geïmporteerd, {{skipped}} overgeslagen.",
+                "errorsTitle": "Deze regels konden niet worden geïmporteerd:",
+                "emptyError": "Kies een CSV-bestand of plak tekst.",
+                "error": "Importeren mislukt."
+            },
+            "discoveryHint": "Tip: abonneer je op de voorspelde cyclus als ICS-feed onder <a href=\"/settings/personal/feeds\">Instellingen → Persoonlijk → Feeds</a>, of toon de cyclus-widget op het <a href=\"/\">Overzicht</a> via de aanpasmodus."
         },
         "duration": {
             "hm": "{{hours}} u {{minutes}} min",

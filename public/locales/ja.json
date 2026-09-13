@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "典型的な範囲:{{min}}~{{max}}日",
                 "likelihoodTitle": "症状パターン",
                 "likelihoodCaption": "症状を選ぶと、あなたの履歴に基づいてよく現れる日がわかります。",
-                "likelyToday": "{{symptom}}は周期のこの日の前後によく現れます。",
                 "symptomTracked": "記録済み",
                 "symptomPredicted": "ここでよく現れる",
                 "phaseOther": "その他",
@@ -4545,7 +4544,20 @@
                 "fertile": "妊娠可能期間は{{date}}まで",
                 "fertileConfirmed": "妊娠可能期間(排卵確認済み)は{{date}}まで"
             },
-            "fertilityDisclaimerConfirmed": "この周期の排卵は体温上昇によって確認されました。今後の周期は引き続きカレンダー法に基づきます。避妊や医師の助言の代わりにはなりません。"
+            "fertilityDisclaimerConfirmed": "この周期の排卵は体温上昇によって確認されました。今後の周期は引き続きカレンダー法に基づきます。避妊や医師の助言の代わりにはなりません。",
+            "import": {
+                "button": "インポート",
+                "title": "生理履歴をインポート",
+                "explainer": "CSVファイルまたは貼り付けたテキスト:1行につき1つの周期を「start_date,end_date」の形式で(終了日は任意)、日付はYYYY-MM-DDまたはDD.MM.YYYY形式、カンマまたはセミコロンで区切ります。",
+                "fileLabel": "CSVファイルを選択",
+                "pasteLabel": "またはCSVテキストを貼り付け",
+                "submit": "インポート",
+                "resultToast": "{{imported}}件をインポート、{{skipped}}件をスキップしました。",
+                "errorsTitle": "次の行はインポートできませんでした:",
+                "emptyError": "CSVファイルを選択するか、テキストを貼り付けてください。",
+                "error": "インポートに失敗しました。"
+            },
+            "discoveryHint": "ヒント:予測される周期は<a href=\"/settings/personal/feeds\">設定 → 個人 → フィード</a>でICSフィードとして購読できます。また、周期ウィジェットはカスタマイズモードから<a href=\"/\">ダッシュボード</a>に表示できます。"
         },
         "duration": {
             "hm": "{{hours}}時間{{minutes}}分",

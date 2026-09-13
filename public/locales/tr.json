@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Tipik aralık: {{min}}-{{max}} gün",
                 "likelihoodTitle": "Semptom örüntüleri",
                 "likelihoodCaption": "Geçmişine göre hangi günlerde sık görüldüğünü görmek için bir semptom seç.",
-                "likelyToday": "{{symptom}} döngünde genellikle bu günün civarında görülür.",
                 "symptomTracked": "Kaydedildi",
                 "symptomPredicted": "Genellikle burada görülür",
                 "phaseOther": "Diğer",
@@ -4545,7 +4544,20 @@
                 "fertile": "Doğurgan pencere {{date}} tarihine kadar",
                 "fertileConfirmed": "Doğurgan pencere (yumurtlama doğrulandı) {{date}} tarihine kadar"
             },
-            "fertilityDisclaimerConfirmed": "Bu döngüdeki yumurtlama bir sıcaklık artışıyla doğrulandı. Gelecekteki döngüler yine takvim yöntemine dayanır; bu doğum kontrolünün veya tıbbi tavsiyenin yerini tutmaz."
+            "fertilityDisclaimerConfirmed": "Bu döngüdeki yumurtlama bir sıcaklık artışıyla doğrulandı. Gelecekteki döngüler yine takvim yöntemine dayanır; bu doğum kontrolünün veya tıbbi tavsiyenin yerini tutmaz.",
+            "import": {
+                "button": "İçe Aktar",
+                "title": "Adet geçmişini içe aktar",
+                "explainer": "CSV dosyası veya yapıştırılan metin: her satır bir döngü için „start_date,end_date” biçiminde (bitiş tarihi isteğe bağlı), tarihler YYYY-AA-GG veya GG.AA.YYYY biçiminde, virgül veya noktalı virgülle ayrılmış.",
+                "fileLabel": "CSV dosyası seç",
+                "pasteLabel": "Veya CSV metnini yapıştır",
+                "submit": "İçe Aktar",
+                "resultToast": "{{imported}} içe aktarıldı, {{skipped}} atlandı.",
+                "errorsTitle": "Bu satırlar içe aktarılamadı:",
+                "emptyError": "Lütfen bir CSV dosyası seçin veya metin yapıştırın.",
+                "error": "İçe aktarma başarısız oldu."
+            },
+            "discoveryHint": "İpucu: tahmini döngüye <a href=\"/settings/personal/feeds\">Ayarlar → Kişisel → Beslemeler</a> altında ICS beslemesi olarak abone olabilirsin, ya da döngü widget'ını <a href=\"/\">Genel Bakış</a>'ta özelleştirme modundan gösterebilirsin."
         },
         "duration": {
             "hm": "{{hours}} sa {{minutes}} dk",

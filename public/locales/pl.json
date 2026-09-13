@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Typowy zakres: {{min}}-{{max}} dni",
                 "likelihoodTitle": "Wzorce objawów",
                 "likelihoodCaption": "Wybierz objaw, aby zobaczyć, w które dni najczęściej występuje, na podstawie Twojej historii.",
-                "likelyToday": "{{symptom}} często występuje w okolicach tego dnia Twojego cyklu.",
                 "symptomTracked": "Zarejestrowano",
                 "symptomPredicted": "Często występuje tutaj",
                 "phaseOther": "Inne",
@@ -4545,7 +4544,20 @@
                 "fertile": "Okno płodności do {{date}}",
                 "fertileConfirmed": "Okno płodności (owulacja potwierdzona) do {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "Owulacja w tym cyklu została potwierdzona wzrostem temperatury. Kolejne cykle nadal opierają się na metodzie kalendarzowej; to nie zastępuje antykoncepcji ani porady lekarskiej."
+            "fertilityDisclaimerConfirmed": "Owulacja w tym cyklu została potwierdzona wzrostem temperatury. Kolejne cykle nadal opierają się na metodzie kalendarzowej; to nie zastępuje antykoncepcji ani porady lekarskiej.",
+            "import": {
+                "button": "Importuj",
+                "title": "Importuj historię cykli",
+                "explainer": "Plik CSV lub wklejony tekst: jeden wiersz na okres w formacie „start_date,end_date” (data końcowa opcjonalna), daty w formacie RRRR-MM-DD lub DD.MM.RRRR, oddzielone przecinkiem lub średnikiem.",
+                "fileLabel": "Wybierz plik CSV",
+                "pasteLabel": "Lub wklej tekst CSV",
+                "submit": "Importuj",
+                "resultToast": "Zaimportowano: {{imported}}, pominięto: {{skipped}}.",
+                "errorsTitle": "Tych wierszy nie udało się zaimportować:",
+                "emptyError": "Wybierz plik CSV lub wklej tekst.",
+                "error": "Import nie powiódł się."
+            },
+            "discoveryHint": "Wskazówka: przewidywany cykl można subskrybować jako kanał ICS w <a href=\"/settings/personal/feeds\">Ustawienia → Osobiste → Kanały</a>, a widżet cyklu można pokazać na <a href=\"/\">Pulpicie</a> w trybie dostosowywania."
         },
         "duration": {
             "hm": "{{hours}} godz. {{minutes}} min",

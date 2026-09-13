@@ -3613,6 +3613,12 @@ const overview = {
   meds: [],
   schedulesByMed: {},
   logsByMed: {},
+  // D-12: Zyklus-Kachel - dieselben drei Ressourcen wie der Zyklus-Tab
+  // (cycle.periods/logs/settings), nur unter eigenem Namen, weil Uebersicht
+  // und Zyklus-Tab getrennte Personen-Umschalter/State fuehren.
+  cyclePeriods: [],
+  cycleLogs: [],
+  cycleSettings: null,
   exportRange: { from: null, to: null },
   loaded: false,
   error: false,
@@ -3673,6 +3679,31 @@ async function loadOverview() {
   overview.meds = mRes.data || [];
   overview.schedulesByMed = {};
   overview.logsByMed = {};
+
+  // D-12: nur laden, wenn der Zyklus-Tab fuer DIESEN Betrachter ueberhaupt
+  // erreichbar waere (cycleEnabled, siehe Dateikopf) - sonst zwei zusaetzliche
+  // Anfragen fuer eine Kachel, die renderOverviewShell() ohnehin nie zeigt.
+  // Einstellungen (privat) nur in der eigenen Ansicht, exakt wie loadCycle()
+  // im Zyklus-Tab selbst - fuer eine fremde Person bleibt es bei der aus
+  // ihrer Perioden-Historie abgeleiteten Standardvorhersage.
+  if (cycleEnabled) {
+    const [cpRes, clRes] = await Promise.all([
+      api.get(`/health/cycle/periods${query}`),
+      api.get(`/health/cycle/logs${query}`),
+    ]);
+    overview.cyclePeriods = cpRes.data || [];
+    overview.cycleLogs = clRes.data || [];
+    if (overview.personId === overview.meId) {
+      try { overview.cycleSettings = (await api.get('/health/cycle/settings')).data || {}; }
+      catch { overview.cycleSettings = {}; }
+    } else {
+      overview.cycleSettings = null;
+    }
+  } else {
+    overview.cyclePeriods = [];
+    overview.cycleLogs = [];
+    overview.cycleSettings = null;
+  }
 
   const today = todayKey();
   await Promise.all(overview.meds.map(async (m) => {
@@ -3750,6 +3781,7 @@ function renderOverviewShell() {
       ${prnMeds('overview').length ? overviewCard('pill', 'health.meds.prn.title', prnListMarkup('overview')) : ''}
       ${overviewCard('trending-up', 'health.overview.adherence.title', overviewAdherenceMarkup())}
       ${overviewCard('activity', 'health.overview.vitals.title', overviewVitalsMarkup())}
+      ${overviewCycleTileMarkup()}
       ${canEditFor(overview.personId, overview.meId) ? overviewCard('plus-circle', 'health.overview.quick.title', quickCaptureMarkup()) : ''}
       ${overviewCard('bell', 'health.overview.reminders.title', overviewUpcomingMarkup())}
       ${overviewCard('download', 'health.export.title', overviewExportMarkup())}
@@ -3769,6 +3801,66 @@ function overviewCard(icon, titleKey, body) {
       </header>
       <div class="health-overview__card-body">${body}</div>
     </section>`;
+}
+
+// --- D-12: Zyklus-Kachel ("Nächste Periode") ---
+//
+// Dieselbe predictCycle()-Funktion wie der Zyklus-Tab, keine zweite Rechnung -
+// nur mit den unter eigenem Namen geladenen Ressourcen (overview.cyclePeriods/
+// -Logs/-Settings, siehe loadOverview()). Sichtbarkeit ergibt sich allein aus
+// den Daten: cycleEnabled blendet die Kachel fuer einen Betrachter aus, dem
+// der Zyklus-Tab selbst schon verborgen waere, und `hasData` blendet sie aus,
+// wenn die gezeigte Person (eigene oder Familienperson) keine auswertbare
+// Perioden-Historie hat - die API filtert dabei schon nach Sichtbarkeit
+// (visibilityClause), hier ist keine zweite Pruefung noetig.
+function overviewCyclePrediction() {
+  if (!cycleEnabled) return null;
+  const settings = (overview.personId === overview.meId && overview.cycleSettings) ? overview.cycleSettings : {};
+  return predictCycle(overview.cyclePeriods, settings, todayKey(), overview.cycleLogs);
+}
+
+function overviewCycleTileMarkup() {
+  const prediction = overviewCyclePrediction();
+  if (!prediction || !prediction.hasData) return '';
+
+  let titleKey;
+  let value;
+  let sub = '';
+  if (prediction.isPregnant) {
+    // Schwangerschaft: SSW-Zeile statt Vorhersage (cyclePregnancyWeekText(),
+    // dieselbe Funktion wie cycleBubbleMarkup() - nicht zweimal ausrechnen).
+    // Ohne Entbindungstermin bleibt nur der Titel selbst, exakt wie dort.
+    const p = prediction.pregnancy || {};
+    titleKey = 'health.cycle.pregnancy.title';
+    value = p.hasDue ? cyclePregnancyWeekText(p) : t('health.cycle.pregnancy.title');
+  } else {
+    titleKey = 'health.cycle.status.nextPeriod';
+    // D-14 (Perimenopause): Spanne statt Einzeldatum, mit dem Mittelwert als
+    // Unterzeile - dieselbe Fallunterscheidung wie cycleStatsMarkup() im
+    // Zyklus-Tab selbst (siehe dort für die ausführliche Begründung).
+    const range = (prediction.perimenopause && prediction.nextStartRange) ? prediction.nextStartRange : null;
+    value = range
+      ? `${formatDate(range.min)} – ${formatDate(range.max)}`
+      : formatDate(prediction.nextStart);
+    sub = range
+      ? t('health.cycle.status.nextPeriodRangeSub', { date: formatDate(prediction.nextStart) })
+      : cycleCountdownText(prediction);
+  }
+
+  // Ganze Kachel klickbar (button statt section) - deshalb Ueberschrift als
+  // <span>, kein <h3>: ein Button darf laut Inhaltsmodell keine
+  // Ueberschriften-Kindelemente tragen, nur Phrasing Content.
+  return `
+    <button type="button" class="health-overview__card health-overview__card--link" data-action="ov-go-cycle">
+      <span class="health-overview__card-head">
+        <i data-lucide="droplet" class="health-overview__card-icon" aria-hidden="true"></i>
+        <span class="health-overview__card-title u-section-title">${esc(t(titleKey))}</span>
+      </span>
+      <span class="health-overview__card-body">
+        <span class="health-overview__cycle-value">${esc(value)}</span>
+        ${sub ? `<span class="health-overview__cycle-sub">${esc(sub)}</span>` : ''}
+      </span>
+    </button>`;
 }
 
 // --- Heute fällig (identische Logik wie dueTodayMarkup im Meds-Tab) ---
@@ -4072,6 +4164,8 @@ function wireOverview() {
     ?.addEventListener('click', () => openActivityModal(null, { onSaved: () => reloadOverview() }));
   overview.root.querySelector('[data-action="ov-go-meds"]')
     ?.addEventListener('click', () => window.yuvomi?.navigate('/health/meds'));
+  overview.root.querySelector('[data-action="ov-go-cycle"]')
+    ?.addEventListener('click', () => window.yuvomi?.navigate('/health/cycle'));
 
   const fromEl = overview.root.querySelector('#ov-export-from');
   const toEl = overview.root.querySelector('#ov-export-to');
@@ -5476,22 +5570,15 @@ function symptomLikelihoodMarkup() {
   const chips = candidates.map((s) => `
     <button type="button" class="health-choice" data-likelihood-symptom="${esc(s.value)}" aria-pressed="${s.value === selected}">${esc(t(s.labelKey))}</button>`).join('');
 
-  let callout = '';
-  if (selected) {
-    const result = predictSymptomLikelihood(cycle.logs, cycle.periods, settings, selected);
-    if (result.isLikelyToday) {
-      const label = t(symptomType(selected)?.labelKey || selected);
-      callout = `
-        <p class="cycle-likelihood__callout"><i data-lucide="sparkles" aria-hidden="true"></i>${esc(t('health.cycle.trends.likelyToday', { symptom: label }))}</p>`;
-    }
-  }
-
+  // Der fruehere "heute wahrscheinlich"-Callout hier ist entfallen: die
+  // Today-Bubble (cycleBubbleMarkup()) sagt das bereits automatisch und
+  // prominenter, ohne dass hier erst ein Chip gewaehlt werden muesste - Chip-
+  // Auswahl und Kalender-Overlay bleiben unveraendert.
   return `
     <div class="health-chart-section cycle-likelihood">
       <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(t('health.cycle.trends.likelihoodTitle'))}</div></div>
       <p class="health-chart-section__caption">${esc(t('health.cycle.trends.likelihoodCaption'))}</p>
       <div class="cycle-likelihood__picker" role="group" aria-label="${esc(t('health.cycle.trends.likelihoodTitle'))}">${chips}</div>
-      ${callout}
     </div>`;
 }
 
@@ -5601,8 +5688,10 @@ function cycleFooterMarkup(own) {
       <a class="btn btn--ghost btn--sm" href="/api/v1/health/export/cycle${q}" download>
         <i data-lucide="download" aria-hidden="true"></i>${esc(t('health.cycle.export.csv'))}
       </a>
+      ${own ? `<button class="btn btn--ghost btn--sm" data-action="cycle-import"><i data-lucide="upload" aria-hidden="true"></i>${esc(t('health.cycle.import.button'))}</button>` : ''}
       ${own ? `<button class="btn btn--ghost btn--sm" data-action="cycle-settings"><i data-lucide="settings-2" aria-hidden="true"></i>${esc(t('health.cycle.settings.open'))}</button>` : ''}
     </div>
+    ${own ? `<p class="cycle-hint cycle-discovery-hint">${t('health.cycle.discoveryHint')}</p>` : ''}
     ${disclaimerMarkup()}`;
 }
 
@@ -5632,6 +5721,7 @@ function wireCycle() {
   cycle.root.querySelector('[data-action="cycle-end-period"]')?.addEventListener('click', () => cycleEndPeriodToday());
   cycle.root.querySelector('[data-action="cycle-log-today"]')?.addEventListener('click', () => openDayLogModal(todayKey()));
   cycle.root.querySelector('[data-action="cycle-settings"]')?.addEventListener('click', () => openCycleSettingsModal());
+  cycle.root.querySelector('[data-action="cycle-import"]')?.addEventListener('click', () => openCycleImportModal());
 
   // C-1: "Heute"-Einblendung - eigene data-action-Namen (siehe cycleBubbleMarkup()),
   // ruft aber dieselben Funktionen wie die bestehende Aktionsleiste auf, keine
@@ -5782,6 +5872,97 @@ async function deletePeriod(period) {
     console.error('[Health] cycle period delete error:', err);
     window.yuvomi?.showToast(err?.data?.error || t('health.cycle.deleteError'), 'danger');
   }
+}
+
+// --------------------------------------------------------
+// D-13-UI: Perioden-Historie-Import (CSV) - server/routes/health/cycle.js
+// (POST /cycle/import) liefert bereits alles: Alles-oder-nichts-Import mit
+// bis zu zehn Zeilen-Fehlern auf 400, sonst { imported, skipped }. Die Datei-
+// Auswahl fuellt nur das Einfuege-Feld - EIN Textinhalt speist den Import,
+// unabhaengig davon, ob er getippt oder aus einer Datei gelesen wurde.
+// --------------------------------------------------------
+
+function openCycleImportModal() {
+  openModal({
+    title: t('health.cycle.import.title'),
+    size: 'sm',
+    content: `
+      <form id="cycle-import-form" class="form-stack">
+        <p class="cycle-hint">${esc(t('health.cycle.import.explainer'))}</p>
+        <div class="form-field">
+          <label class="label" for="cycle-import-file">${esc(t('health.cycle.import.fileLabel'))}</label>
+          <input class="input" id="cycle-import-file" type="file" accept=".csv,text/csv">
+        </div>
+        <div class="form-field">
+          <label class="label" for="cycle-import-paste">${esc(t('health.cycle.import.pasteLabel'))}</label>
+          <textarea class="input" id="cycle-import-paste" rows="6" placeholder="start_date,end_date"></textarea>
+        </div>
+        <div id="cycle-import-errors" class="form-error cycle-import-errors" role="alert" hidden></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn--ghost" data-action="cancel">${esc(t('common.cancel'))}</button>
+          <button type="submit" class="btn btn--primary">${esc(t('health.cycle.import.submit'))}</button>
+        </div>
+      </form>`,
+    onSave(panel) {
+      panel.querySelector('[data-action="cancel"]')?.addEventListener('click', () => closeModal({ force: true }));
+
+      const fileInput = panel.querySelector('#cycle-import-file');
+      const pasteInput = panel.querySelector('#cycle-import-paste');
+      const errorsBox = panel.querySelector('#cycle-import-errors');
+
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        pasteInput.value = await file.text();
+      });
+
+      panel.querySelector('#cycle-import-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = panel.querySelector('[type="submit"]');
+        const csv = pasteInput.value.trim();
+        errorsBox.hidden = true;
+        errorsBox.replaceChildren();
+
+        if (!csv) {
+          window.yuvomi?.showToast(t('health.cycle.import.emptyError'), 'danger');
+          return;
+        }
+
+        submitBtn.disabled = true;
+        try {
+          const { data } = await api.post('/health/cycle/import', { csv });
+          closeModal({ force: true });
+          window.yuvomi?.showToast(
+            t('health.cycle.import.resultToast', { imported: data.imported, skipped: data.skipped }),
+            'success',
+          );
+          await reloadCycle();
+          refocusAfterRender();
+        } catch (err) {
+          submitBtn.disabled = false;
+          const rowErrors = err?.status === 400 ? err?.data?.errors : null;
+          if (Array.isArray(rowErrors) && rowErrors.length) {
+            // Server-Meldungen sind technische Zeilenfehler (Zeile/Spaltenwert),
+            // keine uebersetzten UI-Strings - dieselbe Konvention wie ueberall
+            // sonst in dieser App (die Titelzeile davor ist es).
+            const title = document.createElement('p');
+            title.textContent = t('health.cycle.import.errorsTitle');
+            const list = document.createElement('ul');
+            for (const line of rowErrors) {
+              const li = document.createElement('li');
+              li.textContent = line;
+              list.appendChild(li);
+            }
+            errorsBox.replaceChildren(title, list);
+            errorsBox.hidden = false;
+          } else {
+            console.error('[Health] cycle import error:', err);
+            window.yuvomi?.showToast(err?.data?.error || t('health.cycle.import.error'), 'danger');
+          }
+        }
+      });
+    },
+  });
 }
 
 // --------------------------------------------------------

@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "일반적 범위: {{min}}-{{max}}일",
                 "likelihoodTitle": "증상 패턴",
                 "likelihoodCaption": "이력에 따라 자주 나타나는 날짜를 확인하려면 증상을 선택하세요.",
-                "likelyToday": "{{symptom}}은(는) 주기의 이 날 즈음에 자주 나타납니다.",
                 "symptomTracked": "기록됨",
                 "symptomPredicted": "여기서 자주 나타남",
                 "phaseOther": "기타",
@@ -4545,7 +4544,20 @@
                 "fertile": "가임기는 {{date}}까지",
                 "fertileConfirmed": "가임기(배란 확인됨)는 {{date}}까지"
             },
-            "fertilityDisclaimerConfirmed": "이번 주기의 배란은 체온 상승으로 확인되었습니다. 앞으로의 주기는 여전히 달력 방식에 기반하며, 이는 피임이나 의학적 조언을 대체하지 않습니다."
+            "fertilityDisclaimerConfirmed": "이번 주기의 배란은 체온 상승으로 확인되었습니다. 앞으로의 주기는 여전히 달력 방식에 기반하며, 이는 피임이나 의학적 조언을 대체하지 않습니다.",
+            "import": {
+                "button": "가져오기",
+                "title": "생리 기록 가져오기",
+                "explainer": "CSV 파일 또는 붙여넣은 텍스트: 주기당 한 줄, 「start_date,end_date」 형식(종료일은 선택 사항), 날짜는 YYYY-MM-DD 또는 DD.MM.YYYY 형식이며 쉼표나 세미콜론으로 구분합니다.",
+                "fileLabel": "CSV 파일 선택",
+                "pasteLabel": "또는 CSV 텍스트 붙여넣기",
+                "submit": "가져오기",
+                "resultToast": "{{imported}}개 가져옴, {{skipped}}개 건너뜀.",
+                "errorsTitle": "다음 행은 가져올 수 없습니다:",
+                "emptyError": "CSV 파일을 선택하거나 텍스트를 붙여넣으세요.",
+                "error": "가져오기에 실패했습니다."
+            },
+            "discoveryHint": "팁: 예측된 주기는 <a href=\"/settings/personal/feeds\">설정 → 개인 → 피드</a>에서 ICS 피드로 구독할 수 있으며, 주기 위젯은 <a href=\"/\">개요</a>에서 사용자 지정 모드를 통해 표시할 수 있습니다."
         },
         "duration": {
             "hm": "{{hours}}시간 {{minutes}}분",

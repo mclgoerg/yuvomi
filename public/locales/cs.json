@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Typický rozsah: {{min}}-{{max}} dní",
                 "likelihoodTitle": "Vzorce symptomů",
                 "likelihoodCaption": "Vyberte symptom a zjistěte, ve které dny se podle vaší historie často objevuje.",
-                "likelyToday": "{{symptom}} se často objevuje kolem tohoto dne vašeho cyklu.",
                 "symptomTracked": "Zaznamenáno",
                 "symptomPredicted": "Zde se často objevuje",
                 "phaseOther": "Ostatní",
@@ -4545,7 +4544,20 @@
                 "fertile": "Plodné okno do {{date}}",
                 "fertileConfirmed": "Plodné okno (ovulace potvrzena) do {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "Ovulace v tomto cyklu byla potvrzena vzestupem teploty. Budoucí cykly nadále vycházejí z kalendářní metody; to nenahrazuje antikoncepci ani lékařskou radu."
+            "fertilityDisclaimerConfirmed": "Ovulace v tomto cyklu byla potvrzena vzestupem teploty. Budoucí cykly nadále vycházejí z kalendářní metody; to nenahrazuje antikoncepci ani lékařskou radu.",
+            "import": {
+                "button": "Importovat",
+                "title": "Importovat historii menstruace",
+                "explainer": "Soubor CSV nebo vložený text: jeden řádek na periodu ve tvaru „start_date,end_date“ (koncové datum volitelné), data ve formátu RRRR-MM-DD nebo DD.MM.RRRR, oddělená čárkou nebo středníkem.",
+                "fileLabel": "Vybrat soubor CSV",
+                "pasteLabel": "Nebo vložit text CSV",
+                "submit": "Importovat",
+                "resultToast": "Importováno: {{imported}}, přeskočeno: {{skipped}}.",
+                "errorsTitle": "Tyto řádky se nepodařilo importovat:",
+                "emptyError": "Vyberte soubor CSV nebo vložte text.",
+                "error": "Import se nezdařil."
+            },
+            "discoveryHint": "Tip: předpovězený cyklus si můžete odebírat jako ICS kanál v <a href=\"/settings/personal/feeds\">Nastavení → Osobní → Kanály</a>, nebo zobrazit widget cyklu na <a href=\"/\">Přehledu</a> v režimu úprav."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

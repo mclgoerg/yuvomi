@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Allgemein üblicher Bereich: {{min}}-{{max}} Tage",
                 "likelihoodTitle": "Symptom-Muster",
                 "likelihoodCaption": "Wähle ein Symptom, um zu sehen, an welchen Tagen es laut deiner Historie häufig auftritt.",
-                "likelyToday": "{{symptom}} tritt an diesem Zyklustag häufig auf.",
                 "symptomTracked": "Eingetragen",
                 "symptomPredicted": "Tritt hier häufig auf",
                 "phaseOther": "Sonstige",
@@ -4545,7 +4544,20 @@
                 "fertile": "Fruchtbares Fenster bis {{date}}",
                 "fertileConfirmed": "Fruchtbares Fenster (Eisprung bestätigt) bis {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "Der Eisprung dieses Zyklus wurde durch einen Temperaturanstieg bestätigt. Künftige Zyklen beruhen weiterhin auf der Kalendermethode; das ersetzt keine Verhütung und keine ärztliche Beratung."
+            "fertilityDisclaimerConfirmed": "Der Eisprung dieses Zyklus wurde durch einen Temperaturanstieg bestätigt. Künftige Zyklen beruhen weiterhin auf der Kalendermethode; das ersetzt keine Verhütung und keine ärztliche Beratung.",
+            "import": {
+                "button": "Importieren",
+                "title": "Perioden-Historie importieren",
+                "explainer": "CSV-Datei oder eingefügter Text: eine Zeile je Periode als „start_date,end_date“ (Enddatum optional), Datum im Format JJJJ-MM-TT oder TT.MM.JJJJ, getrennt durch Komma oder Semikolon.",
+                "fileLabel": "CSV-Datei auswählen",
+                "pasteLabel": "Oder CSV-Text einfügen",
+                "submit": "Importieren",
+                "resultToast": "{{imported}} importiert, {{skipped}} übersprungen.",
+                "errorsTitle": "Diese Zeilen konnten nicht importiert werden:",
+                "emptyError": "Bitte eine CSV-Datei auswählen oder Text einfügen.",
+                "error": "Import fehlgeschlagen."
+            },
+            "discoveryHint": "Tipp: Der vorhergesagte Zyklus lässt sich als ICS-Feed unter <a href=\"/settings/personal/feeds\">Einstellungen → Persönlich → Feeds</a> abonnieren; das Zyklus-Widget lässt sich in der <a href=\"/\">Übersicht</a> über „Anpassen“ einblenden."
         },
         "duration": {
             "hm": "{{hours}} Std. {{minutes}} Min.",

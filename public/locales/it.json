@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Intervallo tipico: {{min}}-{{max}} giorni",
                 "likelihoodTitle": "Andamenti dei sintomi",
                 "likelihoodCaption": "Scegli un sintomo per vedere in quali giorni si presenta più spesso, in base alla tua cronologia.",
-                "likelyToday": "{{symptom}} si presenta spesso intorno a questo giorno del ciclo.",
                 "symptomTracked": "Registrato",
                 "symptomPredicted": "Si presenta spesso qui",
                 "phaseOther": "Altro",
@@ -4545,7 +4544,20 @@
                 "fertile": "Finestra fertile fino al {{date}}",
                 "fertileConfirmed": "Finestra fertile (ovulazione confermata) fino al {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "L'ovulazione di questo ciclo è stata confermata da un aumento della temperatura. I cicli futuri continuano a basarsi sul metodo del calendario; questo non sostituisce la contraccezione né un consulto medico."
+            "fertilityDisclaimerConfirmed": "L'ovulazione di questo ciclo è stata confermata da un aumento della temperatura. I cicli futuri continuano a basarsi sul metodo del calendario; questo non sostituisce la contraccezione né un consulto medico.",
+            "import": {
+                "button": "Importa",
+                "title": "Importa cronologia dei cicli",
+                "explainer": "File CSV o testo incollato: una riga per ciclo nel formato «start_date,end_date» (data di fine facoltativa), date in formato AAAA-MM-GG o GG.MM.AAAA, separate da virgola o punto e virgola.",
+                "fileLabel": "Scegli file CSV",
+                "pasteLabel": "Oppure incolla il testo CSV",
+                "submit": "Importa",
+                "resultToast": "{{imported}} importati, {{skipped}} saltati.",
+                "errorsTitle": "Queste righe non possono essere importate:",
+                "emptyError": "Scegli un file CSV o incolla del testo.",
+                "error": "Importazione non riuscita."
+            },
+            "discoveryHint": "Suggerimento: puoi abbonarti al ciclo previsto come feed ICS in <a href=\"/settings/personal/feeds\">Impostazioni → Personale → Feed</a>, oppure mostrare il widget del ciclo nella <a href=\"/\">Panoramica</a> tramite la modalità di personalizzazione."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

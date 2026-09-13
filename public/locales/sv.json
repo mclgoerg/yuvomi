@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Typiskt intervall: {{min}}-{{max}} dagar",
                 "likelihoodTitle": "Symtommönster",
                 "likelihoodCaption": "Välj ett symtom för att se vilka dagar det ofta inträffar, baserat på din historik.",
-                "likelyToday": "{{symptom}} inträffar ofta kring denna dag i din cykel.",
                 "symptomTracked": "Loggat",
                 "symptomPredicted": "Inträffar ofta här",
                 "phaseOther": "Annat",
@@ -4545,7 +4544,20 @@
                 "fertile": "Fertilt fönster till {{date}}",
                 "fertileConfirmed": "Fertilt fönster (ägglossning bekräftad) till {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "Ägglossningen den här cykeln bekräftades av en temperaturhöjning. Kommande cykler bygger fortfarande på kalendermetoden; det ersätter inte preventivmedel eller medicinsk rådgivning."
+            "fertilityDisclaimerConfirmed": "Ägglossningen den här cykeln bekräftades av en temperaturhöjning. Kommande cykler bygger fortfarande på kalendermetoden; det ersätter inte preventivmedel eller medicinsk rådgivning.",
+            "import": {
+                "button": "Importera",
+                "title": "Importera menscykelhistorik",
+                "explainer": "CSV-fil eller inklistrad text: en rad per mens som ”start_date,end_date” (slutdatum valfritt), datum i formatet ÅÅÅÅ-MM-DD eller DD.MM.ÅÅÅÅ, separerade med kommatecken eller semikolon.",
+                "fileLabel": "Välj CSV-fil",
+                "pasteLabel": "Eller klistra in CSV-text",
+                "submit": "Importera",
+                "resultToast": "{{imported}} importerade, {{skipped}} överhoppade.",
+                "errorsTitle": "Dessa rader kunde inte importeras:",
+                "emptyError": "Välj en CSV-fil eller klistra in text.",
+                "error": "Importen misslyckades."
+            },
+            "discoveryHint": "Tips: prenumerera på den förutspådda cykeln som ICS-flöde under <a href=\"/settings/personal/feeds\">Inställningar → Personligt → Flöden</a>, eller visa cykel-widgeten på <a href=\"/\">Översikt</a> via dess anpassningsläge."
         },
         "duration": {
             "hm": "{{hours}} tim {{minutes}} min",

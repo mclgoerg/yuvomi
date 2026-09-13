@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "典型范围:{{min}}-{{max}} 天",
                 "likelihoodTitle": "症状模式",
                 "likelihoodCaption": "选择一个症状,查看根据你的历史记录它常出现在哪些天。",
-                "likelyToday": "{{symptom}}通常在你周期的这一天前后出现。",
                 "symptomTracked": "已记录",
                 "symptomPredicted": "常在此处出现",
                 "phaseOther": "其他",
@@ -4545,7 +4544,20 @@
                 "fertile": "易孕期至{{date}}",
                 "fertileConfirmed": "易孕期（排卵已确认）至{{date}}"
             },
-            "fertilityDisclaimerConfirmed": "本周期的排卵已通过体温上升得到确认。未来的周期仍基于日历法；这不能替代避孕措施或医生建议。"
+            "fertilityDisclaimerConfirmed": "本周期的排卵已通过体温上升得到确认。未来的周期仍基于日历法；这不能替代避孕措施或医生建议。",
+            "import": {
+                "button": "导入",
+                "title": "导入周期历史记录",
+                "explainer": "CSV 文件或粘贴的文本:每行一个周期,格式为「start_date,end_date」(结束日期可选),日期格式为 YYYY-MM-DD 或 DD.MM.YYYY,以逗号或分号分隔。",
+                "fileLabel": "选择 CSV 文件",
+                "pasteLabel": "或粘贴 CSV 文本",
+                "submit": "导入",
+                "resultToast": "已导入 {{imported}} 条,已跳过 {{skipped}} 条。",
+                "errorsTitle": "以下行无法导入:",
+                "emptyError": "请选择 CSV 文件或粘贴文本。",
+                "error": "导入失败。"
+            },
+            "discoveryHint": "提示:可以在<a href=\"/settings/personal/feeds\">设置 → 个人 → 订阅源</a>中以 ICS 订阅源的形式订阅预测周期,也可以通过自定义模式在<a href=\"/\">概览</a>中显示周期小组件。"
         },
         "duration": {
             "hm": "{{hours}} 小时 {{minutes}} 分钟",

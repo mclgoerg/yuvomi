@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Typical range: {{min}}-{{max}} days",
                 "likelihoodTitle": "Symptom patterns",
                 "likelihoodCaption": "Pick a symptom to see which days it often occurs on, based on your history.",
-                "likelyToday": "{{symptom}} often occurs around this day in your cycle.",
                 "symptomTracked": "Logged",
                 "symptomPredicted": "Often occurs here",
                 "phaseOther": "Other",
@@ -4545,7 +4544,20 @@
                 "fertile": "Fertile window until {{date}}",
                 "fertileConfirmed": "Fertile window (ovulation confirmed) until {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "This cycle's ovulation was confirmed by a temperature rise. Future cycles still rely on the calendar method; this does not replace contraception or medical advice."
+            "fertilityDisclaimerConfirmed": "This cycle's ovulation was confirmed by a temperature rise. Future cycles still rely on the calendar method; this does not replace contraception or medical advice.",
+            "import": {
+                "button": "Import",
+                "title": "Import period history",
+                "explainer": "CSV file or pasted text: one row per period as \"start_date,end_date\" (end date optional), dates as YYYY-MM-DD or DD.MM.YYYY, separated by comma or semicolon.",
+                "fileLabel": "Choose CSV file",
+                "pasteLabel": "Or paste CSV text",
+                "submit": "Import",
+                "resultToast": "{{imported}} imported, {{skipped}} skipped.",
+                "errorsTitle": "These rows could not be imported:",
+                "emptyError": "Please choose a CSV file or paste text.",
+                "error": "Import failed."
+            },
+            "discoveryHint": "Tip: subscribe to the predicted cycle as an ICS feed under <a href=\"/settings/personal/feeds\">Settings → Personal → Feeds</a>, or show the cycle widget on the <a href=\"/\">Overview</a> via its customize mode."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

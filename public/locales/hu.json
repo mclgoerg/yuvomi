@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Jellemző tartomány: {{min}}-{{max}} nap",
                 "likelihoodTitle": "Tünetminták",
                 "likelihoodCaption": "Válassz egy tünetet, hogy lásd, mely napokon jelentkezik gyakran, az előzményeid alapján.",
-                "likelyToday": "{{symptom}} gyakran ez körül a ciklusnap körül jelentkezik.",
                 "symptomTracked": "Rögzítve",
                 "symptomPredicted": "Gyakran itt jelentkezik",
                 "phaseOther": "Egyéb",
@@ -4545,7 +4544,20 @@
                 "fertile": "Termékeny időszak eddig: {{date}}",
                 "fertileConfirmed": "Termékeny időszak (megerősített ovuláció) eddig: {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "Ennek a ciklusnak az ovulációját hőmérséklet-emelkedés igazolta. A jövőbeli ciklusok továbbra is a naptári módszeren alapulnak; ez nem helyettesíti a fogamzásgátlást vagy az orvosi tanácsot."
+            "fertilityDisclaimerConfirmed": "Ennek a ciklusnak az ovulációját hőmérséklet-emelkedés igazolta. A jövőbeli ciklusok továbbra is a naptári módszeren alapulnak; ez nem helyettesíti a fogamzásgátlást vagy az orvosi tanácsot.",
+            "import": {
+                "button": "Importálás",
+                "title": "Ciklustörténet importálása",
+                "explainer": "CSV-fájl vagy beillesztett szöveg: soronként egy időszak „start_date,end_date” formában (a végdátum opcionális), dátumok ÉÉÉÉ-HH-NN vagy NN.HH.ÉÉÉÉ formátumban, vesszővel vagy pontosvesszővel elválasztva.",
+                "fileLabel": "CSV-fájl kiválasztása",
+                "pasteLabel": "Vagy CSV-szöveg beillesztése",
+                "submit": "Importálás",
+                "resultToast": "{{imported}} importálva, {{skipped}} kihagyva.",
+                "errorsTitle": "Ezeket a sorokat nem sikerült importálni:",
+                "emptyError": "Válassz egy CSV-fájlt, vagy illessz be szöveget.",
+                "error": "Az importálás nem sikerült."
+            },
+            "discoveryHint": "Tipp: a becsült ciklusra ICS-hírcsatornaként iratkozhatsz fel a <a href=\"/settings/personal/feeds\">Beállítások → Személyes → Hírcsatornák</a> alatt, vagy megjelenítheted a ciklus-widgetet az <a href=\"/\">Áttekintésen</a> a testreszabás módban."
         },
         "duration": {
             "hm": "{{hours}} ó {{minutes}} p",

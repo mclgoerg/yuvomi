@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Plage typique : {{min}}-{{max}} jours",
                 "likelihoodTitle": "Schémas de symptômes",
                 "likelihoodCaption": "Choisissez un symptôme pour voir les jours où il survient souvent, d'après votre historique.",
-                "likelyToday": "{{symptom}} survient souvent vers ce jour de votre cycle.",
                 "symptomTracked": "Enregistré",
                 "symptomPredicted": "Survient souvent ici",
                 "phaseOther": "Autre",
@@ -4545,7 +4544,20 @@
                 "fertile": "Fenêtre fertile jusqu'au {{date}}",
                 "fertileConfirmed": "Fenêtre fertile (ovulation confirmée) jusqu'au {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "L'ovulation de ce cycle a été confirmée par une hausse de température. Les cycles à venir restent basés sur la méthode du calendrier ; cela ne remplace ni une contraception ni un avis médical."
+            "fertilityDisclaimerConfirmed": "L'ovulation de ce cycle a été confirmée par une hausse de température. Les cycles à venir restent basés sur la méthode du calendrier ; cela ne remplace ni une contraception ni un avis médical.",
+            "import": {
+                "button": "Importer",
+                "title": "Importer l'historique des règles",
+                "explainer": "Fichier CSV ou texte collé : une ligne par cycle sous la forme « start_date,end_date » (date de fin facultative), dates au format AAAA-MM-JJ ou JJ.MM.AAAA, séparées par une virgule ou un point-virgule.",
+                "fileLabel": "Choisir un fichier CSV",
+                "pasteLabel": "Ou coller le texte CSV",
+                "submit": "Importer",
+                "resultToast": "{{imported}} importées, {{skipped}} ignorées.",
+                "errorsTitle": "Ces lignes n'ont pas pu être importées :",
+                "emptyError": "Choisissez un fichier CSV ou collez du texte.",
+                "error": "Échec de l'import."
+            },
+            "discoveryHint": "Astuce : abonnez-vous au cycle prévu via un flux ICS dans <a href=\"/settings/personal/feeds\">Paramètres → Personnel → Flux</a>, ou affichez le widget du cycle sur l'<a href=\"/\">Accueil</a> via son mode de personnalisation."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

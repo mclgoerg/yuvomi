@@ -1290,6 +1290,39 @@ button.health-med-card:hover {
   min-width: 0;
 }
 
+/* D-12: die Zyklus-Kachel ist ein <button>, keine <section> - die ganze
+ * Kachel klickt zum Zyklus-Tab durch (Aufgabenvorgabe), statt nur eine
+ * Detailzeile darin wie bei den Vitalwerte-Karten. Rest der Optik bleibt
+ * identisch zu den Nachbarn (.health-overview__card): nur die Button-
+ * Grundformatierung wird zurückgesetzt, Ausrichtung bleibt linksbündig wie
+ * eine gewöhnliche Karte. */
+.health-overview__card--link {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  transition: box-shadow 0.15s ease;
+}
+
+.health-overview__card--link:hover,
+.health-overview__card--link:focus-visible {
+  box-shadow: var(--shadow-md);
+}
+
+.health-overview__cycle-value {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.health-overview__cycle-sub {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
 /* Adherence + Streak */
 .health-overview__adherence {
   display: grid;
@@ -1815,9 +1848,8 @@ button.health-med-card:hover {
 }
 
 /* D-9: Hinweiskachel, wenn hormonelle Verhuetung das fruchtbare Fenster
- * pausiert - reine Meldung (Ton in Schrift/Icon, KEINE getoente Flaeche,
- * siehe .cycle-likelihood__callout weiter unten fuer dieselbe Regel), damit
- * die freigewordene Kachel-Luecke nicht wie ein Fehler wirkt. */
+ * pausiert - reine Meldung (Ton in Schrift/Icon, KEINE getoente Flaeche),
+ * damit die freigewordene Kachel-Luecke nicht wie ein Fehler wirkt. */
 .cycle-stat--note {
   grid-column: 1 / -1;
   flex-direction: row;
@@ -2333,25 +2365,14 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   box-shadow: inset 0 0 0 2px var(--color-text-primary);
 }
 
-/* Symptom-Wahrscheinlichkeits-Chips + "heute wahrscheinlich"-Hinweis (Phase 4e). */
+/* Symptom-Wahrscheinlichkeits-Chips (Phase 4e) - der fruehere "heute
+ * wahrscheinlich"-Callout daneben ist entfallen (siehe symptomLikelihoodMarkup()
+ * in health.js: die Today-Bubble sagt dasselbe bereits automatisch). */
 .cycle-likelihood__picker {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
-
-/* Meldung, keine Zuordnung (Struktur-Audit): Ton in Schrift+Icon, keine
- * getoente Flaeche daneben - sonst zaehlt --module-health zweimal blass. */
-.cycle-likelihood__callout {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--module-health);
-}
-.cycle-likelihood__callout svg { width: var(--icon-md); height: var(--icon-md); flex-shrink: 0; }
 
 /* D-1: kleines Gefuehls-Icon vor dem Zeilennamen (MOOD_TYPES-Icon) - Symptome
  * tragen an derselben Stelle keins, hier eins, weil MOOD_TYPES.icon ohnehin
@@ -2444,6 +2465,25 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   gap: var(--space-2);
   flex-wrap: wrap;
   margin-top: var(--space-4);
+}
+
+/* D-18: eine ruhige Hinweiszeile unter der Fußleiste - trägt .cycle-hint
+ * (dieselbe leise, tertiäre Textfarbe wie überall im Zyklus-Tab), nur mit
+ * etwas Abstand nach oben, weil sie zwischen zwei Blöcken (Fußleiste,
+ * Disclaimer) ohne eigenes Flex-Gap steht. Ihr Textinhalt kommt roh (nicht
+ * escaped) aus der Übersetzung selbst, dieselbe Konvention wie
+ * settings.applePasswordHint - zwei feste Links gehören zum Satz, nicht zu
+ * variablen Daten. */
+.cycle-discovery-hint {
+  margin-top: var(--space-2);
+}
+
+/* D-13-UI: Server-Fehlerliste beim CSV-Import (bis zu zehn Zeilen, siehe
+ * server/routes/health/cycle.js) - schlichte Liste in der bestehenden
+ * .form-error-Box statt einer neuen Fehlerkomponente. */
+.cycle-import-errors ul {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
 }
 
 /* ---- Modal-Auswahlchips (Flow/Symptome/Stimmung) ----

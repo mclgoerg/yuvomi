@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Karaniwang saklaw: {{min}}-{{max}} araw",
                 "likelihoodTitle": "Mga pattern ng sintomas",
                 "likelihoodCaption": "Pumili ng sintomas para makita kung anong mga araw ito madalas lumitaw, base sa iyong kasaysayan.",
-                "likelyToday": "Madalas lumitaw ang {{symptom}} sa palibot ng araw na ito ng iyong siklo.",
                 "symptomTracked": "Naitala",
                 "symptomPredicted": "Madalas lumitaw dito",
                 "phaseOther": "Iba pa",
@@ -4545,7 +4544,20 @@
                 "fertile": "Fertile window hanggang {{date}}",
                 "fertileConfirmed": "Fertile window (nakumpirmang obulasyon) hanggang {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "Nakumpirma ang obulasyon ng cycle na ito sa pamamagitan ng pagtaas ng temperatura. Ang mga susunod na cycle ay nakabatay pa rin sa calendar method; hindi ito kapalit ng contraception o medical na payo."
+            "fertilityDisclaimerConfirmed": "Nakumpirma ang obulasyon ng cycle na ito sa pamamagitan ng pagtaas ng temperatura. Ang mga susunod na cycle ay nakabatay pa rin sa calendar method; hindi ito kapalit ng contraception o medical na payo.",
+            "import": {
+                "button": "I-import",
+                "title": "I-import ang kasaysayan ng regla",
+                "explainer": "CSV file o na-paste na teksto: isang linya bawat regla sa anyong „start_date,end_date” (opsyonal ang end date), mga petsa sa YYYY-MM-DD o DD.MM.YYYY, pinaghihiwalay ng kuwit o tuldok-kuwit.",
+                "fileLabel": "Pumili ng CSV file",
+                "pasteLabel": "O i-paste ang CSV text",
+                "submit": "I-import",
+                "resultToast": "{{imported}} na-import, {{skipped}} nilaktawan.",
+                "errorsTitle": "Hindi na-import ang mga linyang ito:",
+                "emptyError": "Pumili ng CSV file o mag-paste ng teksto.",
+                "error": "Nabigo ang pag-import."
+            },
+            "discoveryHint": "Tip: mag-subscribe sa hinulaang cycle bilang ICS feed sa <a href=\"/settings/personal/feeds\">Mga Setting → Personal → Mga Feed</a>, o ipakita ang cycle widget sa <a href=\"/\">Pangkalahatang-tanaw</a> gamit ang customize mode nito."
         },
         "duration": {
             "hm": "{{hours}} oras {{minutes}} min",

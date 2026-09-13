@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Rentang umum: {{min}}-{{max}} hari",
                 "likelihoodTitle": "Pola gejala",
                 "likelihoodCaption": "Pilih gejala untuk melihat hari-hari kemunculannya, berdasarkan riwayatmu.",
-                "likelyToday": "{{symptom}} sering muncul di sekitar hari ini dalam siklusmu.",
                 "symptomTracked": "Tercatat",
                 "symptomPredicted": "Sering muncul di sini",
                 "phaseOther": "Lainnya",
@@ -4545,7 +4544,20 @@
                 "fertile": "Masa subur hingga {{date}}",
                 "fertileConfirmed": "Masa subur (ovulasi terkonfirmasi) hingga {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "Ovulasi pada siklus ini dikonfirmasi oleh kenaikan suhu. Siklus mendatang tetap menggunakan metode kalender; ini tidak menggantikan kontrasepsi atau saran medis."
+            "fertilityDisclaimerConfirmed": "Ovulasi pada siklus ini dikonfirmasi oleh kenaikan suhu. Siklus mendatang tetap menggunakan metode kalender; ini tidak menggantikan kontrasepsi atau saran medis.",
+            "import": {
+                "button": "Impor",
+                "title": "Impor riwayat menstruasi",
+                "explainer": "File CSV atau teks yang ditempel: satu baris per periode dalam format „start_date,end_date” (tanggal akhir opsional), tanggal dalam format YYYY-MM-DD atau DD.MM.YYYY, dipisahkan koma atau titik koma.",
+                "fileLabel": "Pilih file CSV",
+                "pasteLabel": "Atau tempel teks CSV",
+                "submit": "Impor",
+                "resultToast": "{{imported}} diimpor, {{skipped}} dilewati.",
+                "errorsTitle": "Baris berikut tidak dapat diimpor:",
+                "emptyError": "Pilih file CSV atau tempel teks.",
+                "error": "Impor gagal."
+            },
+            "discoveryHint": "Tips: berlangganan siklus yang diprediksi sebagai feed ICS di <a href=\"/settings/personal/feeds\">Pengaturan → Pribadi → Feed</a>, atau tampilkan widget siklus di <a href=\"/\">Ringkasan</a> melalui mode kustomisasi."
         },
         "duration": {
             "hm": "{{hours}} j {{minutes}} mnt",

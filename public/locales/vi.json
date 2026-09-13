@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Phạm vi điển hình: {{min}}-{{max}} ngày",
                 "likelihoodTitle": "Mẫu hình triệu chứng",
                 "likelihoodCaption": "Chọn một triệu chứng để xem nó thường xuất hiện vào những ngày nào, dựa trên lịch sử của bạn.",
-                "likelyToday": "{{symptom}} thường xuất hiện quanh ngày này trong chu kỳ của bạn.",
                 "symptomTracked": "Đã ghi",
                 "symptomPredicted": "Thường xuất hiện ở đây",
                 "phaseOther": "Khác",
@@ -4545,7 +4544,20 @@
                 "fertile": "Cửa sổ thụ thai đến {{date}}",
                 "fertileConfirmed": "Cửa sổ thụ thai (đã xác nhận rụng trứng) đến {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "Sự rụng trứng của chu kỳ này đã được xác nhận bằng mức tăng nhiệt độ. Các chu kỳ tương lai vẫn dựa trên phương pháp lịch; điều này không thay thế biện pháp tránh thai hay tư vấn y tế."
+            "fertilityDisclaimerConfirmed": "Sự rụng trứng của chu kỳ này đã được xác nhận bằng mức tăng nhiệt độ. Các chu kỳ tương lai vẫn dựa trên phương pháp lịch; điều này không thay thế biện pháp tránh thai hay tư vấn y tế.",
+            "import": {
+                "button": "Nhập",
+                "title": "Nhập lịch sử chu kỳ",
+                "explainer": "Tệp CSV hoặc văn bản dán vào: mỗi dòng một kỳ kinh theo dạng „start_date,end_date” (ngày kết thúc là tùy chọn), ngày theo định dạng YYYY-MM-DD hoặc DD.MM.YYYY, phân tách bằng dấu phẩy hoặc dấu chấm phẩy.",
+                "fileLabel": "Chọn tệp CSV",
+                "pasteLabel": "Hoặc dán văn bản CSV",
+                "submit": "Nhập",
+                "resultToast": "Đã nhập {{imported}}, đã bỏ qua {{skipped}}.",
+                "errorsTitle": "Những dòng sau không thể nhập:",
+                "emptyError": "Vui lòng chọn tệp CSV hoặc dán văn bản.",
+                "error": "Nhập không thành công."
+            },
+            "discoveryHint": "Mẹo: bạn có thể đăng ký chu kỳ dự đoán dưới dạng feed ICS tại <a href=\"/settings/personal/feeds\">Cài đặt → Cá nhân → Feed</a>, hoặc hiển thị tiện ích chu kỳ trên <a href=\"/\">Tổng quan</a> qua chế độ tùy chỉnh."
         },
         "duration": {
             "hm": "{{hours}} giờ {{minutes}} phút",

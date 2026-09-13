@@ -4352,7 +4352,6 @@
                 "typicalRangeLabel": "Intervalo típico: {{min}}-{{max}} dias",
                 "likelihoodTitle": "Padrões de sintomas",
                 "likelihoodCaption": "Escolhe um sintoma para ver em que dias costuma ocorrer, com base no teu histórico.",
-                "likelyToday": "{{symptom}} costuma ocorrer perto deste dia do teu ciclo.",
                 "symptomTracked": "Registado",
                 "symptomPredicted": "Costuma ocorrer aqui",
                 "phaseOther": "Outro",
@@ -4545,7 +4544,20 @@
                 "fertile": "Janela fértil até {{date}}",
                 "fertileConfirmed": "Janela fértil (ovulação confirmada) até {{date}}"
             },
-            "fertilityDisclaimerConfirmed": "A ovulação deste ciclo foi confirmada por um aumento de temperatura. Os próximos ciclos continuam a basear-se no método do calendário; isto não substitui a contraceção nem o aconselhamento médico."
+            "fertilityDisclaimerConfirmed": "A ovulação deste ciclo foi confirmada por um aumento de temperatura. Os próximos ciclos continuam a basear-se no método do calendário; isto não substitui a contraceção nem o aconselhamento médico.",
+            "import": {
+                "button": "Importar",
+                "title": "Importar histórico de períodos",
+                "explainer": "Arquivo CSV ou texto colado: uma linha por período no formato «start_date,end_date» (data final opcional), datas em AAAA-MM-DD ou DD.MM.AAAA, separadas por vírgula ou ponto e vírgula.",
+                "fileLabel": "Escolher arquivo CSV",
+                "pasteLabel": "Ou colar texto CSV",
+                "submit": "Importar",
+                "resultToast": "{{imported}} importados, {{skipped}} ignorados.",
+                "errorsTitle": "Estas linhas não puderam ser importadas:",
+                "emptyError": "Escolha um arquivo CSV ou cole um texto.",
+                "error": "Falha na importação."
+            },
+            "discoveryHint": "Dica: assine o ciclo previsto como feed ICS em <a href=\"/settings/personal/feeds\">Configurações → Pessoal → Feeds</a>, ou exiba o widget do ciclo no <a href=\"/\">Painel</a> pelo modo de personalização."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
