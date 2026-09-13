@@ -204,6 +204,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now gets the same restrained red treatment used for a destructive action elsewhere in the app,
   instead of looking identical to editing or archiving it.
 
+- **The demo data's birthday reminders now come days ahead, not minutes before noon on the day.**
+  The demo seed wrote reminder lead times as `1d`, `3d` and `1w`, while Yuvomi stores them as
+  minutes and reads only the leading digits, so they became one minute, three minutes and one
+  minute again: every demo birthday reminded shortly before noon on the birthday itself, and the
+  birthday form showed a lead time it does not offer.
+  The seed now uses the form's own values (a day, two days, a week - the former three days became
+  two), and a guard keeps it to those. Only a database filled by `scripts/seed-demo.js` is
+  affected.
+
+- **A dismissed birthday reminder stays dismissed.** Dismissing a due birthday reminder only lasted
+  until the next check: the sync that keeps a birthday's reminder in step looked for an active row,
+  found none, removed the dismissed one and created the same reminder again - so it was back within
+  a minute, and could be pushed a second time. The reminder now stays dismissed until its time
+  actually changes: a different lead time, a changed date, or next year's birthday.
+
 - **A housekeeper can check out again, and work a second session on the same day** (#1133, #1138).
   The one button that carries both directions was disabled while someone was checked in, and it is
   the only thing that triggers the check-out path - so that path was unreachable: a household could
