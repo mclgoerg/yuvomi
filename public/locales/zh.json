@@ -4284,11 +4284,14 @@
                     "history_one": "基于你上一个周期",
                     "insufficientHistory": "暂用默认值 - 再记录 {{count}} 个周期以获得个性化预测",
                     "insufficientHistory_one": "暂用默认值 - 再记录 {{count}} 个周期以获得个性化预测",
-                    "default": "默认假设(尚未记录历史数据)"
+                    "default": "默认假设(尚未记录历史数据)",
+                    "historyOther": "基于最近 {{count}} 个周期",
+                    "historyOther_one": "基于上一个周期"
                 }
             },
             "unit": {
-                "days": "{{value}} 天"
+                "days": "{{value}} 天",
+                "days_one": "{{value}} 天"
             },
             "today": {
                 "title": "今天",
@@ -4325,7 +4328,8 @@
                 "title": "趋势",
                 "ongoing": "进行中",
                 "empty": "尚未记录任何月经。",
-                "cycleLength": "周期 {{value}} 天"
+                "cycleLength": "周期 {{value}} 天",
+                "cycleLength_one": "周期 {{value}} 天"
             },
             "trends": {
                 "title": "趋势",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "记录月经",
-                "edit": "编辑月经"
+                "edit": "编辑月经",
+                "warningFuture": "开始日期在未来 — 预测仅基于过去的周期。",
+                "warningOverlap": "与已记录的周期重叠。"
             },
             "dayLog": {
                 "title": "记录当天",
@@ -4455,6 +4461,39 @@
                 "dueDate": "预产期",
                 "pregnancyHint": "在怀孕模式下，月经和排卵预测将暂停。每日记录仍可使用。",
                 "saved": "设置已保存。"
+            },
+            "mucus": {
+                "label": "宫颈粘液",
+                "hint": "可选。质地变化有助于缩小易孕期范围。",
+                "none": "无",
+                "dry": "干燥",
+                "sticky": "粘稠",
+                "creamy": "乳状",
+                "watery": "水状",
+                "eggwhite": "蛋清状"
+            },
+            "test": {
+                "label": "检测",
+                "lhLabel": "LH 检测",
+                "pregnancyLabel": "验孕检测",
+                "unset": "未检测",
+                "negative": "阴性",
+                "positive": "阳性"
+            },
+            "feelings": {
+                "label": "情绪"
+            },
+            "intimacy": {
+                "label": "亲密关系",
+                "hint": "即使这一天与家人共享,该记录仍保持私密。",
+                "none": "未指定",
+                "protected": "有防护",
+                "unprotected": "无防护",
+                "solo": "独自"
+            },
+            "quickLink": {
+                "painkiller": "记录止痛药",
+                "weight": "记录体重"
             }
         },
         "duration": {

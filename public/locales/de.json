@@ -4284,11 +4284,14 @@
                     "history_one": "Basierend auf deiner letzten Periode",
                     "insufficientHistory": "Vorerst ein Standardwert - noch {{count}} weitere Perioden für eine persönliche Vorhersage",
                     "insufficientHistory_one": "Vorerst ein Standardwert - noch {{count}} weitere Periode für eine persönliche Vorhersage",
-                    "default": "Standardannahme (noch keine Historie erfasst)"
+                    "default": "Standardannahme (noch keine Historie erfasst)",
+                    "historyOther": "Basierend auf den letzten {{count}} Perioden",
+                    "historyOther_one": "Basierend auf der letzten Periode"
                 }
             },
             "unit": {
-                "days": "{{value}} Tage"
+                "days": "{{value}} Tage",
+                "days_one": "{{value}} Tag"
             },
             "today": {
                 "title": "Heute",
@@ -4325,7 +4328,8 @@
                 "title": "Verlauf",
                 "ongoing": "laufend",
                 "empty": "Noch keine Perioden erfasst.",
-                "cycleLength": "Zyklus {{value}} Tage"
+                "cycleLength": "Zyklus {{value}} Tage",
+                "cycleLength_one": "Zyklus {{value}} Tag"
             },
             "trends": {
                 "title": "Trends",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Periode erfassen",
-                "edit": "Periode bearbeiten"
+                "edit": "Periode bearbeiten",
+                "warningFuture": "Startdatum liegt in der Zukunft — Vorhersagen basieren nur auf vergangenen Perioden.",
+                "warningOverlap": "Überschneidet sich mit einer bereits erfassten Periode."
             },
             "dayLog": {
                 "title": "Tag protokollieren",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Errechneter Entbindungstermin",
                 "pregnancyHint": "Im Schwangerschafts-Modus werden Perioden- und Eisprung-Vorhersagen angehalten. Tages-Logging bleibt möglich.",
                 "saved": "Einstellungen gespeichert."
+            },
+            "mucus": {
+                "label": "Zervixschleim",
+                "hint": "Optional. Veränderungen der Konsistenz können helfen, das fruchtbare Fenster einzugrenzen.",
+                "none": "Keine",
+                "dry": "Trocken",
+                "sticky": "Zäh",
+                "creamy": "Cremig",
+                "watery": "Wässrig",
+                "eggwhite": "Eiklar"
+            },
+            "test": {
+                "label": "Tests",
+                "lhLabel": "LH-Test",
+                "pregnancyLabel": "Schwangerschaftstest",
+                "unset": "Nicht getestet",
+                "negative": "Negativ",
+                "positive": "Positiv"
+            },
+            "feelings": {
+                "label": "Gefühle"
+            },
+            "intimacy": {
+                "label": "Intimität",
+                "hint": "Bleibt privat, auch wenn dieser Tag mit der Familie geteilt wird.",
+                "none": "Keine Angabe",
+                "protected": "Geschützt",
+                "unprotected": "Ungeschützt",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Schmerzmittel erfassen",
+                "weight": "Gewicht erfassen"
             }
         },
         "duration": {

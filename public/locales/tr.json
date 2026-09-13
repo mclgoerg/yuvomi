@@ -4284,11 +4284,14 @@
                     "history_one": "Son döngüne göre",
                     "insufficientHistory": "Şimdilik varsayılan değer - kişiselleştirilmiş tahmin için {{count}} döngü daha kaydet",
                     "insufficientHistory_one": "Şimdilik varsayılan değer - kişiselleştirilmiş tahmin için {{count}} döngü daha kaydet",
-                    "default": "Varsayılan kabul (henüz geçmiş kaydı yok)"
+                    "default": "Varsayılan kabul (henüz geçmiş kaydı yok)",
+                    "historyOther": "Son {{count}} döngüye göre",
+                    "historyOther_one": "Son döngüye göre"
                 }
             },
             "unit": {
-                "days": "{{value}} gün"
+                "days": "{{value}} gün",
+                "days_one": "{{value}} gün"
             },
             "today": {
                 "title": "Bugün",
@@ -4325,7 +4328,8 @@
                 "title": "Eğilim",
                 "ongoing": "devam ediyor",
                 "empty": "Henüz adet dönemi kaydedilmedi.",
-                "cycleLength": "Döngü {{value}} gün"
+                "cycleLength": "Döngü {{value}} gün",
+                "cycleLength_one": "Döngü {{value}} gün"
             },
             "trends": {
                 "title": "Eğilimler",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Adeti kaydet",
-                "edit": "Adeti düzenle"
+                "edit": "Adeti düzenle",
+                "warningFuture": "Başlangıç tarihi gelecekte — tahminler yalnızca geçmiş döngülere dayanır.",
+                "warningOverlap": "Zaten kaydedilmiş bir döngüyle çakışıyor."
             },
             "dayLog": {
                 "title": "Günü kaydet",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Tahmini doğum tarihi",
                 "pregnancyHint": "Gebelik modunda regl ve yumurtlama tahminleri duraklatılır. Günlük kayıt kullanılmaya devam eder.",
                 "saved": "Ayarlar kaydedildi."
+            },
+            "mucus": {
+                "label": "Serviks mukusu",
+                "hint": "İsteğe bağlı. Kıvamdaki değişiklikler doğurgan pencereyi daraltmaya yardımcı olabilir.",
+                "none": "Yok",
+                "dry": "Kuru",
+                "sticky": "Yapışkan",
+                "creamy": "Kremsi",
+                "watery": "Sulu",
+                "eggwhite": "Yumurta akı gibi"
+            },
+            "test": {
+                "label": "Testler",
+                "lhLabel": "LH testi",
+                "pregnancyLabel": "Gebelik testi",
+                "unset": "Test yapılmadı",
+                "negative": "Negatif",
+                "positive": "Pozitif"
+            },
+            "feelings": {
+                "label": "Duygular"
+            },
+            "intimacy": {
+                "label": "Mahremiyet",
+                "hint": "Bu gün aileyle paylaşılsa bile özel kalır.",
+                "none": "Belirtilmedi",
+                "protected": "Korunmalı",
+                "unprotected": "Korunmasız",
+                "solo": "Tek başına"
+            },
+            "quickLink": {
+                "painkiller": "Ağrı kesici kaydet",
+                "weight": "Kilo kaydet"
             }
         },
         "duration": {

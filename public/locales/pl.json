@@ -4284,11 +4284,14 @@
                     "history_one": "Na podstawie ostatniego cyklu",
                     "insufficientHistory": "Na razie wartość domyślna - zarejestruj jeszcze {{count}} cykli, aby uzyskać spersonalizowaną prognozę",
                     "insufficientHistory_one": "Na razie wartość domyślna - zarejestruj jeszcze {{count}} cykl, aby uzyskać spersonalizowaną prognozę",
-                    "default": "Domyślne założenie (brak jeszcze zarejestrowanej historii)"
+                    "default": "Domyślne założenie (brak jeszcze zarejestrowanej historii)",
+                    "historyOther": "Na podstawie ostatnich {{count}} cykli",
+                    "historyOther_one": "Na podstawie ostatniego cyklu"
                 }
             },
             "unit": {
-                "days": "{{value}} dni"
+                "days": "{{value}} dni",
+                "days_one": "{{value}} dzień"
             },
             "today": {
                 "title": "Dzisiaj",
@@ -4325,7 +4328,8 @@
                 "title": "Trend",
                 "ongoing": "w toku",
                 "empty": "Nie zapisano jeszcze miesiączek.",
-                "cycleLength": "Cykl {{value}} dni"
+                "cycleLength": "Cykl {{value}} dni",
+                "cycleLength_one": "Cykl {{value}} dzień"
             },
             "trends": {
                 "title": "Trendy",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Zapisz miesiączkę",
-                "edit": "Edytuj miesiączkę"
+                "edit": "Edytuj miesiączkę",
+                "warningFuture": "Data rozpoczęcia jest w przyszłości — prognozy opierają się tylko na minionych cyklach.",
+                "warningOverlap": "Nakłada się na już zapisany cykl."
             },
             "dayLog": {
                 "title": "Zapisz dzień",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Przewidywany termin porodu",
                 "pregnancyHint": "W trybie ciąży prognozy miesiączki i owulacji są wstrzymane. Codzienne zapisy pozostają dostępne.",
                 "saved": "Ustawienia zapisane."
+            },
+            "mucus": {
+                "label": "Śluz szyjkowy",
+                "hint": "Opcjonalnie. Zmiany konsystencji mogą pomóc określić okno płodności.",
+                "none": "Brak",
+                "dry": "Suchy",
+                "sticky": "Lepki",
+                "creamy": "Kremowy",
+                "watery": "Wodnisty",
+                "eggwhite": "Jak białko jaja"
+            },
+            "test": {
+                "label": "Testy",
+                "lhLabel": "Test LH",
+                "pregnancyLabel": "Test ciążowy",
+                "unset": "Nie testowano",
+                "negative": "Ujemny",
+                "positive": "Dodatni"
+            },
+            "feelings": {
+                "label": "Emocje"
+            },
+            "intimacy": {
+                "label": "Intymność",
+                "hint": "Pozostaje prywatne, nawet jeśli ten dzień jest udostępniony rodzinie.",
+                "none": "Nie podano",
+                "protected": "Zabezpieczony",
+                "unprotected": "Niezabezpieczony",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Zapisz środek przeciwbólowy",
+                "weight": "Zapisz wagę"
             }
         },
         "duration": {

@@ -4284,11 +4284,14 @@
                     "history_one": "直近の周期に基づく",
                     "insufficientHistory": "現時点では既定値です - 個人に合わせた予測には、あと{{count}}周期分の記録が必要です",
                     "insufficientHistory_one": "現時点では既定値です - 個人に合わせた予測には、あと{{count}}周期分の記録が必要です",
-                    "default": "既定の想定値(履歴がまだ記録されていません)"
+                    "default": "既定の想定値(履歴がまだ記録されていません)",
+                    "historyOther": "直近{{count}}周期に基づく",
+                    "historyOther_one": "直近の周期に基づく"
                 }
             },
             "unit": {
-                "days": "{{value}}日"
+                "days": "{{value}}日",
+                "days_one": "{{value}}日"
             },
             "today": {
                 "title": "今日",
@@ -4325,7 +4328,8 @@
                 "title": "推移",
                 "ongoing": "進行中",
                 "empty": "まだ生理が記録されていません。",
-                "cycleLength": "周期{{value}}日"
+                "cycleLength": "周期{{value}}日",
+                "cycleLength_one": "周期{{value}}日"
             },
             "trends": {
                 "title": "傾向",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "生理を記録",
-                "edit": "生理を編集"
+                "edit": "生理を編集",
+                "warningFuture": "開始日が未来の日付です — 予測は過去の周期のみに基づきます。",
+                "warningOverlap": "すでに記録済みの周期と重なっています。"
             },
             "dayLog": {
                 "title": "その日を記録",
@@ -4455,6 +4461,39 @@
                 "dueDate": "出産予定日",
                 "pregnancyHint": "妊娠モードでは生理と排卵の予測が一時停止します。毎日の記録は引き続き利用できます。",
                 "saved": "設定を保存しました。"
+            },
+            "mucus": {
+                "label": "頸管粘液",
+                "hint": "任意項目です。粘液の状態の変化は、妊娠可能期間を絞り込むのに役立ちます。",
+                "none": "なし",
+                "dry": "乾燥",
+                "sticky": "粘り気",
+                "creamy": "クリーム状",
+                "watery": "水っぽい",
+                "eggwhite": "卵白状"
+            },
+            "test": {
+                "label": "検査",
+                "lhLabel": "LH検査",
+                "pregnancyLabel": "妊娠検査",
+                "unset": "未検査",
+                "negative": "陰性",
+                "positive": "陽性"
+            },
+            "feelings": {
+                "label": "気持ち"
+            },
+            "intimacy": {
+                "label": "親密な関係",
+                "hint": "この日を家族と共有していても、非公開のままです。",
+                "none": "未指定",
+                "protected": "避妊あり",
+                "unprotected": "避妊なし",
+                "solo": "ひとり"
+            },
+            "quickLink": {
+                "painkiller": "鎮痛剤を記録",
+                "weight": "体重を記録"
             }
         },
         "duration": {

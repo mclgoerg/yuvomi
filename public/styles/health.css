@@ -2270,6 +2270,25 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 
 .cycle-hint { font-size: var(--text-xs); color: var(--color-text-secondary); margin: 0; }
 
+/* A-3: weiche Warnung im Perioden-Modal (Zukunftsdatum/Ueberschneidung) - Ton
+ * wie eine Warn-Kachel, nicht wie `.form-error` (das waere Gefahr/blockierend,
+ * hier bleibt Speichern bewusst erlaubt). Getrennt von `.cycle-hint`, weil sie
+ * per [hidden] ein- und ausgeblendet wird statt immer sichtbar zu stehen. */
+.cycle-hint--warning {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-warning-light);
+  color: var(--color-warning-ink);
+  border-radius: var(--radius-sm);
+}
+
+/* Schloss-Symbol vor dem Intimitaets-Label (D-6): `.label` ist block, das Icon
+ * soll aber in derselben Zeile wie der Text stehen. */
+.cycle-intimacy-label { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+/* D-5/D-16: Schnellzugriffs-Links unter der Symptome-Gruppe im Tages-Log -
+ * bewusst leise (btn--ghost btn--sm), keine zweite Aktionsebene neben Speichern. */
+.cycle-quick-links { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
 /* Bulk-Sichtbarkeit: Sekundär-Button plus ausklappbare Inline-Bestätigung. */
 .cycle-bulk { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
 .cycle-bulk__confirm {

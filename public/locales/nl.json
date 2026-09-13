@@ -4284,11 +4284,14 @@
                     "history_one": "Gebaseerd op je laatste cyclus",
                     "insufficientHistory": "Voorlopig een standaardwaarde - registreer nog {{count}} cycli voor een persoonlijke voorspelling",
                     "insufficientHistory_one": "Voorlopig een standaardwaarde - registreer nog {{count}} cyclus voor een persoonlijke voorspelling",
-                    "default": "Standaardaanname (nog geen geschiedenis geregistreerd)"
+                    "default": "Standaardaanname (nog geen geschiedenis geregistreerd)",
+                    "historyOther": "Gebaseerd op je laatste {{count}} cycli",
+                    "historyOther_one": "Gebaseerd op je laatste cyclus"
                 }
             },
             "unit": {
-                "days": "{{value}} dagen"
+                "days": "{{value}} dagen",
+                "days_one": "{{value}} dag"
             },
             "today": {
                 "title": "Vandaag",
@@ -4325,7 +4328,8 @@
                 "title": "Verloop",
                 "ongoing": "lopend",
                 "empty": "Nog geen menstruaties geregistreerd.",
-                "cycleLength": "Cyclus {{value}} dagen"
+                "cycleLength": "Cyclus {{value}} dagen",
+                "cycleLength_one": "Cyclus {{value}} dag"
             },
             "trends": {
                 "title": "Trends",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Menstruatie registreren",
-                "edit": "Menstruatie bewerken"
+                "edit": "Menstruatie bewerken",
+                "warningFuture": "Startdatum ligt in de toekomst — voorspellingen zijn alleen gebaseerd op eerdere cycli.",
+                "warningOverlap": "Overlapt met een al geregistreerde cyclus."
             },
             "dayLog": {
                 "title": "Dag registreren",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Uitgerekende datum",
                 "pregnancyHint": "In de zwangerschapsmodus worden voorspellingen voor menstruatie en eisprong gepauzeerd. Dagelijks loggen blijft mogelijk.",
                 "saved": "Instellingen opgeslagen."
+            },
+            "mucus": {
+                "label": "Baarmoederhalsslijm",
+                "hint": "Optioneel. Veranderingen in de substantie kunnen helpen de vruchtbare periode af te bakenen.",
+                "none": "Geen",
+                "dry": "Droog",
+                "sticky": "Plakkerig",
+                "creamy": "Romig",
+                "watery": "Waterig",
+                "eggwhite": "Eiwit-achtig"
+            },
+            "test": {
+                "label": "Tests",
+                "lhLabel": "LH-test",
+                "pregnancyLabel": "Zwangerschapstest",
+                "unset": "Niet getest",
+                "negative": "Negatief",
+                "positive": "Positief"
+            },
+            "feelings": {
+                "label": "Gevoelens"
+            },
+            "intimacy": {
+                "label": "Intimiteit",
+                "hint": "Blijft privé, ook als deze dag met het gezin wordt gedeeld.",
+                "none": "Niet opgegeven",
+                "protected": "Beschermd",
+                "unprotected": "Onbeschermd",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Pijnstiller registreren",
+                "weight": "Gewicht registreren"
             }
         },
         "duration": {

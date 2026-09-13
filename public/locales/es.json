@@ -4284,11 +4284,14 @@
                     "history_one": "Basado en tu último periodo",
                     "insufficientHistory": "Valor predeterminado por ahora - registra {{count}} periodos más para una predicción personalizada",
                     "insufficientHistory_one": "Valor predeterminado por ahora - registra {{count}} periodo más para una predicción personalizada",
-                    "default": "Suposición predeterminada (aún sin historial registrado)"
+                    "default": "Suposición predeterminada (aún sin historial registrado)",
+                    "historyOther": "Basado en los últimos {{count}} periodos",
+                    "historyOther_one": "Basado en el último periodo"
                 }
             },
             "unit": {
-                "days": "{{value}} días"
+                "days": "{{value}} días",
+                "days_one": "{{value}} día"
             },
             "today": {
                 "title": "Hoy",
@@ -4325,7 +4328,8 @@
                 "title": "Evolución",
                 "ongoing": "en curso",
                 "empty": "Aún no se han registrado periodos.",
-                "cycleLength": "Ciclo {{value}} días"
+                "cycleLength": "Ciclo {{value}} días",
+                "cycleLength_one": "Ciclo {{value}} día"
             },
             "trends": {
                 "title": "Tendencias",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Registrar periodo",
-                "edit": "Editar periodo"
+                "edit": "Editar periodo",
+                "warningFuture": "La fecha de inicio está en el futuro — las predicciones solo se basan en periodos pasados.",
+                "warningOverlap": "Se solapa con un periodo ya registrado."
             },
             "dayLog": {
                 "title": "Registrar día",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Fecha probable de parto",
                 "pregnancyHint": "En el modo embarazo se pausan las predicciones de periodo y ovulación. El registro diario sigue disponible.",
                 "saved": "Ajustes guardados."
+            },
+            "mucus": {
+                "label": "Moco cervical",
+                "hint": "Opcional. Los cambios de textura pueden ayudar a delimitar la ventana fértil.",
+                "none": "Ninguno",
+                "dry": "Seco",
+                "sticky": "Pegajoso",
+                "creamy": "Cremoso",
+                "watery": "Acuoso",
+                "eggwhite": "Clara de huevo"
+            },
+            "test": {
+                "label": "Pruebas",
+                "lhLabel": "Test de LH",
+                "pregnancyLabel": "Test de embarazo",
+                "unset": "Sin analizar",
+                "negative": "Negativo",
+                "positive": "Positivo"
+            },
+            "feelings": {
+                "label": "Emociones"
+            },
+            "intimacy": {
+                "label": "Intimidad",
+                "hint": "Se mantiene privado aunque este día se comparta con la familia.",
+                "none": "Sin especificar",
+                "protected": "Protegida",
+                "unprotected": "Sin protección",
+                "solo": "En solitario"
+            },
+            "quickLink": {
+                "painkiller": "Registrar analgésico",
+                "weight": "Registrar peso"
             }
         },
         "duration": {

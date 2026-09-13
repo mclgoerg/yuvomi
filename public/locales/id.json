@@ -4284,11 +4284,14 @@
                     "history_one": "Berdasarkan siklus terakhirmu",
                     "insufficientHistory": "Nilai bawaan untuk saat ini - catat {{count}} siklus lagi untuk prediksi yang dipersonalisasi",
                     "insufficientHistory_one": "Nilai bawaan untuk saat ini - catat {{count}} siklus lagi untuk prediksi yang dipersonalisasi",
-                    "default": "Asumsi bawaan (belum ada riwayat tercatat)"
+                    "default": "Asumsi bawaan (belum ada riwayat tercatat)",
+                    "historyOther": "Berdasarkan {{count}} siklus terakhir",
+                    "historyOther_one": "Berdasarkan siklus terakhir"
                 }
             },
             "unit": {
-                "days": "{{value}} hari"
+                "days": "{{value}} hari",
+                "days_one": "{{value}} hari"
             },
             "today": {
                 "title": "Hari ini",
@@ -4325,7 +4328,8 @@
                 "title": "Tren",
                 "ongoing": "berlangsung",
                 "empty": "Belum ada menstruasi yang dicatat.",
-                "cycleLength": "Siklus {{value}} hari"
+                "cycleLength": "Siklus {{value}} hari",
+                "cycleLength_one": "Siklus {{value}} hari"
             },
             "trends": {
                 "title": "Tren",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Catat menstruasi",
-                "edit": "Edit menstruasi"
+                "edit": "Edit menstruasi",
+                "warningFuture": "Tanggal mulai berada di masa depan — prediksi hanya didasarkan pada siklus sebelumnya.",
+                "warningOverlap": "Tumpang tindih dengan siklus yang sudah tercatat."
             },
             "dayLog": {
                 "title": "Catat hari",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Perkiraan tanggal lahir",
                 "pregnancyHint": "Dalam mode kehamilan, prediksi menstruasi dan ovulasi dijeda. Pencatatan harian tetap tersedia.",
                 "saved": "Pengaturan disimpan."
+            },
+            "mucus": {
+                "label": "Lendir serviks",
+                "hint": "Opsional. Perubahan tekstur dapat membantu mempersempit masa subur.",
+                "none": "Tidak ada",
+                "dry": "Kering",
+                "sticky": "Lengket",
+                "creamy": "Krim",
+                "watery": "Encer",
+                "eggwhite": "Seperti putih telur"
+            },
+            "test": {
+                "label": "Tes",
+                "lhLabel": "Tes LH",
+                "pregnancyLabel": "Tes kehamilan",
+                "unset": "Belum dites",
+                "negative": "Negatif",
+                "positive": "Positif"
+            },
+            "feelings": {
+                "label": "Perasaan"
+            },
+            "intimacy": {
+                "label": "Keintiman",
+                "hint": "Tetap pribadi meskipun hari ini dibagikan ke keluarga.",
+                "none": "Tidak ditentukan",
+                "protected": "Terlindungi",
+                "unprotected": "Tidak terlindungi",
+                "solo": "Sendiri"
+            },
+            "quickLink": {
+                "painkiller": "Catat pereda nyeri",
+                "weight": "Catat berat badan"
             }
         },
         "duration": {

@@ -4284,11 +4284,14 @@
                     "history_one": "Baserat på din senaste cykel",
                     "insufficientHistory": "Standardvärde tills vidare - logga {{count}} cykler till för en personlig prognos",
                     "insufficientHistory_one": "Standardvärde tills vidare - logga {{count}} cykel till för en personlig prognos",
-                    "default": "Standardantagande (ingen historik loggad än)"
+                    "default": "Standardantagande (ingen historik loggad än)",
+                    "historyOther": "Baserat på de senaste {{count}} cyklerna",
+                    "historyOther_one": "Baserat på den senaste cykeln"
                 }
             },
             "unit": {
-                "days": "{{value}} dagar"
+                "days": "{{value}} dagar",
+                "days_one": "{{value}} dag"
             },
             "today": {
                 "title": "I dag",
@@ -4325,7 +4328,8 @@
                 "title": "Trend",
                 "ongoing": "pågående",
                 "empty": "Inga menstruationer registrerade ännu.",
-                "cycleLength": "Cykel {{value}} dagar"
+                "cycleLength": "Cykel {{value}} dagar",
+                "cycleLength_one": "Cykel {{value}} dag"
             },
             "trends": {
                 "title": "Trender",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Registrera mens",
-                "edit": "Redigera mens"
+                "edit": "Redigera mens",
+                "warningFuture": "Startdatumet ligger i framtiden — prognoser baseras endast på tidigare cykler.",
+                "warningOverlap": "Överlappar en redan loggad cykel."
             },
             "dayLog": {
                 "title": "Logga dag",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Beräknat förlossningsdatum",
                 "pregnancyHint": "I graviditetsläge pausas prognoser för mens och ägglossning. Daglig loggning är fortfarande tillgänglig.",
                 "saved": "Inställningarna sparades."
+            },
+            "mucus": {
+                "label": "Cervixslem",
+                "hint": "Valfritt. Förändringar i konsistens kan hjälpa till att avgränsa den fertila perioden.",
+                "none": "Ingen",
+                "dry": "Torr",
+                "sticky": "Klibbig",
+                "creamy": "Krämig",
+                "watery": "Vattnig",
+                "eggwhite": "Äggvita"
+            },
+            "test": {
+                "label": "Tester",
+                "lhLabel": "LH-test",
+                "pregnancyLabel": "Graviditetstest",
+                "unset": "Inte testat",
+                "negative": "Negativt",
+                "positive": "Positivt"
+            },
+            "feelings": {
+                "label": "Känslor"
+            },
+            "intimacy": {
+                "label": "Intimitet",
+                "hint": "Förblir privat även om den här dagen delas med familjen.",
+                "none": "Inte angivet",
+                "protected": "Skyddat",
+                "unprotected": "Oskyddat",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Logga smärtstillande",
+                "weight": "Logga vikt"
             }
         },
         "duration": {

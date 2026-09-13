@@ -4284,11 +4284,14 @@
                     "history_one": "가장 최근 주기를 기준으로",
                     "insufficientHistory": "현재는 기본값입니다 - 맞춤 예측을 위해 {{count}}개 주기를 더 기록하세요",
                     "insufficientHistory_one": "현재는 기본값입니다 - 맞춤 예측을 위해 {{count}}개 주기를 더 기록하세요",
-                    "default": "기본 가정값(아직 기록된 이력 없음)"
+                    "default": "기본 가정값(아직 기록된 이력 없음)",
+                    "historyOther": "최근 {{count}}개 주기를 기준으로",
+                    "historyOther_one": "가장 최근 주기를 기준으로"
                 }
             },
             "unit": {
-                "days": "{{value}}일"
+                "days": "{{value}}일",
+                "days_one": "{{value}}일"
             },
             "today": {
                 "title": "오늘",
@@ -4325,7 +4328,8 @@
                 "title": "추이",
                 "ongoing": "진행 중",
                 "empty": "아직 기록된 생리가 없습니다.",
-                "cycleLength": "주기 {{value}}일"
+                "cycleLength": "주기 {{value}}일",
+                "cycleLength_one": "주기 {{value}}일"
             },
             "trends": {
                 "title": "추세",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "생리 기록",
-                "edit": "생리 편집"
+                "edit": "생리 편집",
+                "warningFuture": "시작일이 미래입니다 — 예측은 과거 주기만을 기준으로 합니다.",
+                "warningOverlap": "이미 기록된 주기와 겹칩니다."
             },
             "dayLog": {
                 "title": "하루 기록",
@@ -4455,6 +4461,39 @@
                 "dueDate": "출산 예정일",
                 "pregnancyHint": "임신 모드에서는 생리와 배란 예측이 일시 중지됩니다. 매일 기록은 계속 사용할 수 있습니다.",
                 "saved": "설정이 저장되었습니다."
+            },
+            "mucus": {
+                "label": "자궁경부 점액",
+                "hint": "선택 사항입니다. 점액의 상태 변화는 가임기를 좁히는 데 도움이 될 수 있습니다.",
+                "none": "없음",
+                "dry": "건조함",
+                "sticky": "끈적임",
+                "creamy": "크림 같음",
+                "watery": "묽음",
+                "eggwhite": "흰자 같음"
+            },
+            "test": {
+                "label": "검사",
+                "lhLabel": "LH 검사",
+                "pregnancyLabel": "임신 검사",
+                "unset": "검사 안 함",
+                "negative": "음성",
+                "positive": "양성"
+            },
+            "feelings": {
+                "label": "감정"
+            },
+            "intimacy": {
+                "label": "친밀감",
+                "hint": "이 날을 가족과 공유해도 비공개로 유지됩니다.",
+                "none": "지정 안 함",
+                "protected": "피임함",
+                "unprotected": "피임 안 함",
+                "solo": "혼자"
+            },
+            "quickLink": {
+                "painkiller": "진통제 기록",
+                "weight": "체중 기록"
             }
         },
         "duration": {

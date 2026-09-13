@@ -4284,11 +4284,14 @@
                     "history_one": "Base sa huling siklo mo",
                     "insufficientHistory": "Default na halaga sa ngayon - mag-log pa ng {{count}} siklo para sa personalized na hula",
                     "insufficientHistory_one": "Default na halaga sa ngayon - mag-log pa ng {{count}} siklo para sa personalized na hula",
-                    "default": "Default na palagay (wala pang naitalang kasaysayan)"
+                    "default": "Default na palagay (wala pang naitalang kasaysayan)",
+                    "historyOther": "Batay sa huling {{count}} siklo",
+                    "historyOther_one": "Batay sa huling siklo"
                 }
             },
             "unit": {
-                "days": "{{value}} araw"
+                "days": "{{value}} araw",
+                "days_one": "{{value}} araw"
             },
             "today": {
                 "title": "Ngayon",
@@ -4325,7 +4328,8 @@
                 "title": "Kasaysayan",
                 "ongoing": "kasalukuyan",
                 "empty": "Wala pang naitalang regla.",
-                "cycleLength": "Siklo {{value}} araw"
+                "cycleLength": "Siklo {{value}} araw",
+                "cycleLength_one": "Siklo {{value}} araw"
             },
             "trends": {
                 "title": "Mga Trend",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Itala ang regla",
-                "edit": "I-edit ang regla"
+                "edit": "I-edit ang regla",
+                "warningFuture": "Ang petsa ng simula ay nasa hinaharap — batay lang ang hula sa nakaraang mga siklo.",
+                "warningOverlap": "Nagsasapawan sa isang siklo na naitala na."
             },
             "dayLog": {
                 "title": "Itala ang araw",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Tinatayang takdang petsa",
                 "pregnancyHint": "Sa mode ng pagbubuntis, nakahinto ang mga hula sa regla at obulasyon. Nananatiling available ang pang-araw-araw na pagtatala.",
                 "saved": "Na-save ang mga setting."
+            },
+            "mucus": {
+                "label": "Mucus sa cervix",
+                "hint": "Opsyonal. Ang pagbabago sa texture ay makakatulong para matukoy ang fertile window.",
+                "none": "Wala",
+                "dry": "Tuyo",
+                "sticky": "Malagkit",
+                "creamy": "Parang cream",
+                "watery": "Malabnaw",
+                "eggwhite": "Parang puti ng itlog"
+            },
+            "test": {
+                "label": "Mga Pagsusuri",
+                "lhLabel": "LH test",
+                "pregnancyLabel": "Pagsusuri sa pagbubuntis",
+                "unset": "Hindi pa nasusuri",
+                "negative": "Negatibo",
+                "positive": "Positibo"
+            },
+            "feelings": {
+                "label": "Mga Nararamdaman"
+            },
+            "intimacy": {
+                "label": "Pagiging Malapit",
+                "hint": "Mananatiling pribado kahit ibahagi ang araw na ito sa pamilya.",
+                "none": "Hindi tinukoy",
+                "protected": "May proteksyon",
+                "unprotected": "Walang proteksyon",
+                "solo": "Mag-isa"
+            },
+            "quickLink": {
+                "painkiller": "Itala ang gamot sa sakit",
+                "weight": "Itala ang timbang"
             }
         },
         "duration": {

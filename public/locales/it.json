@@ -4284,11 +4284,14 @@
                     "history_one": "Basato sul tuo ultimo ciclo",
                     "insufficientHistory": "Valore predefinito per ora - registra altri {{count}} cicli per una previsione personalizzata",
                     "insufficientHistory_one": "Valore predefinito per ora - registra ancora {{count}} ciclo per una previsione personalizzata",
-                    "default": "Ipotesi predefinita (nessuna cronologia registrata finora)"
+                    "default": "Ipotesi predefinita (nessuna cronologia registrata finora)",
+                    "historyOther": "Basato sugli ultimi {{count}} cicli",
+                    "historyOther_one": "Basato sull'ultimo ciclo"
                 }
             },
             "unit": {
-                "days": "{{value}} giorni"
+                "days": "{{value}} giorni",
+                "days_one": "{{value}} giorno"
             },
             "today": {
                 "title": "Oggi",
@@ -4325,7 +4328,8 @@
                 "title": "Andamento",
                 "ongoing": "in corso",
                 "empty": "Ancora nessun ciclo registrato.",
-                "cycleLength": "Ciclo {{value}} giorni"
+                "cycleLength": "Ciclo {{value}} giorni",
+                "cycleLength_one": "Ciclo {{value}} giorno"
             },
             "trends": {
                 "title": "Tendenze",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Registra ciclo",
-                "edit": "Modifica ciclo"
+                "edit": "Modifica ciclo",
+                "warningFuture": "La data di inizio è nel futuro — le previsioni si basano solo sui cicli passati.",
+                "warningOverlap": "Si sovrappone a un ciclo già registrato."
             },
             "dayLog": {
                 "title": "Registra giorno",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Data presunta del parto",
                 "pregnancyHint": "In modalità gravidanza le previsioni di mestruazioni e ovulazione sono in pausa. Il diario giornaliero resta disponibile.",
                 "saved": "Impostazioni salvate."
+            },
+            "mucus": {
+                "label": "Muco cervicale",
+                "hint": "Facoltativo. I cambiamenti di consistenza possono aiutare a individuare la finestra fertile.",
+                "none": "Nessuna",
+                "dry": "Secco",
+                "sticky": "Appiccicoso",
+                "creamy": "Cremoso",
+                "watery": "Acquoso",
+                "eggwhite": "Chiara d'uovo"
+            },
+            "test": {
+                "label": "Test",
+                "lhLabel": "Test LH",
+                "pregnancyLabel": "Test di gravidanza",
+                "unset": "Non testato",
+                "negative": "Negativo",
+                "positive": "Positivo"
+            },
+            "feelings": {
+                "label": "Emozioni"
+            },
+            "intimacy": {
+                "label": "Intimità",
+                "hint": "Resta privato anche se questo giorno viene condiviso con la famiglia.",
+                "none": "Non specificato",
+                "protected": "Protetto",
+                "unprotected": "Non protetto",
+                "solo": "Da solo"
+            },
+            "quickLink": {
+                "painkiller": "Registra antidolorifico",
+                "weight": "Registra peso"
             }
         },
         "duration": {

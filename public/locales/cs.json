@@ -4284,11 +4284,14 @@
                     "history_one": "Na základě posledního cyklu",
                     "insufficientHistory": "Zatím výchozí hodnota - zaznamenejte ještě {{count}} cyklů pro osobní předpověď",
                     "insufficientHistory_one": "Zatím výchozí hodnota - zaznamenejte ještě {{count}} cyklus pro osobní předpověď",
-                    "default": "Výchozí předpoklad (zatím nezaznamenána žádná historie)"
+                    "default": "Výchozí předpoklad (zatím nezaznamenána žádná historie)",
+                    "historyOther": "Na základě posledních {{count}} cyklů",
+                    "historyOther_one": "Na základě posledního cyklu"
                 }
             },
             "unit": {
-                "days": "{{value}} dní"
+                "days": "{{value}} dní",
+                "days_one": "{{value}} den"
             },
             "today": {
                 "title": "Dnes",
@@ -4325,7 +4328,8 @@
                 "title": "Vývoj",
                 "ongoing": "probíhá",
                 "empty": "Zatím nezaznamenána žádná menstruace.",
-                "cycleLength": "Cyklus {{value}} dní"
+                "cycleLength": "Cyklus {{value}} dní",
+                "cycleLength_one": "Cyklus {{value}} den"
             },
             "trends": {
                 "title": "Trendy",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Zaznamenat menstruaci",
-                "edit": "Upravit menstruaci"
+                "edit": "Upravit menstruaci",
+                "warningFuture": "Datum zahájení je v budoucnosti — předpovědi vycházejí jen z minulých cyklů.",
+                "warningOverlap": "Překrývá se s již zaznamenaným cyklem."
             },
             "dayLog": {
                 "title": "Zaznamenat den",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Předpokládaný termín porodu",
                 "pregnancyHint": "V režimu těhotenství jsou předpovědi menstruace a ovulace pozastaveny. Denní záznamy zůstávají dostupné.",
                 "saved": "Nastavení uloženo."
+            },
+            "mucus": {
+                "label": "Cervikální hlen",
+                "hint": "Volitelné. Změny konzistence mohou pomoci upřesnit plodné okno.",
+                "none": "Žádný",
+                "dry": "Suchý",
+                "sticky": "Lepkavý",
+                "creamy": "Krémový",
+                "watery": "Vodnatý",
+                "eggwhite": "Jako bílek"
+            },
+            "test": {
+                "label": "Testy",
+                "lhLabel": "LH test",
+                "pregnancyLabel": "Těhotenský test",
+                "unset": "Netestováno",
+                "negative": "Negativní",
+                "positive": "Pozitivní"
+            },
+            "feelings": {
+                "label": "Pocity"
+            },
+            "intimacy": {
+                "label": "Intimita",
+                "hint": "Zůstává soukromé, i když je tento den sdílen s rodinou.",
+                "none": "Neuvedeno",
+                "protected": "Chráněný",
+                "unprotected": "Nechráněný",
+                "solo": "Sólo"
+            },
+            "quickLink": {
+                "painkiller": "Zaznamenat lék proti bolesti",
+                "weight": "Zaznamenat váhu"
             }
         },
         "duration": {

@@ -4284,11 +4284,14 @@
                     "history_one": "Basé sur votre dernier cycle",
                     "insufficientHistory": "Valeur par défaut pour l'instant - enregistrez {{count}} cycles de plus pour une prédiction personnalisée",
                     "insufficientHistory_one": "Valeur par défaut pour l'instant - enregistrez {{count}} cycle de plus pour une prédiction personnalisée",
-                    "default": "Hypothèse par défaut (aucun historique enregistré pour l'instant)"
+                    "default": "Hypothèse par défaut (aucun historique enregistré pour l'instant)",
+                    "historyOther": "Basé sur les {{count}} derniers cycles",
+                    "historyOther_one": "Basé sur le dernier cycle"
                 }
             },
             "unit": {
-                "days": "{{value}} jours"
+                "days": "{{value}} jours",
+                "days_one": "{{value}} jour"
             },
             "today": {
                 "title": "Aujourd'hui",
@@ -4325,7 +4328,8 @@
                 "title": "Évolution",
                 "ongoing": "en cours",
                 "empty": "Aucune période enregistrée pour l’instant.",
-                "cycleLength": "Cycle {{value}} jours"
+                "cycleLength": "Cycle {{value}} jours",
+                "cycleLength_one": "Cycle {{value}} jour"
             },
             "trends": {
                 "title": "Tendances",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Enregistrer les règles",
-                "edit": "Modifier les règles"
+                "edit": "Modifier les règles",
+                "warningFuture": "La date de début est dans le futur — les prévisions ne se basent que sur les cycles passés.",
+                "warningOverlap": "Chevauche un cycle déjà enregistré."
             },
             "dayLog": {
                 "title": "Enregistrer le jour",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Date prévue d'accouchement",
                 "pregnancyHint": "En mode grossesse, les prévisions de règles et d'ovulation sont en pause. Le suivi quotidien reste disponible.",
                 "saved": "Paramètres enregistrés."
+            },
+            "mucus": {
+                "label": "Glaire cervicale",
+                "hint": "Facultatif. Les changements de texture peuvent aider à cerner la fenêtre de fertilité.",
+                "none": "Aucune",
+                "dry": "Sèche",
+                "sticky": "Collante",
+                "creamy": "Crémeuse",
+                "watery": "Aqueuse",
+                "eggwhite": "Blanc d'œuf"
+            },
+            "test": {
+                "label": "Tests",
+                "lhLabel": "Test LH",
+                "pregnancyLabel": "Test de grossesse",
+                "unset": "Non testé",
+                "negative": "Négatif",
+                "positive": "Positif"
+            },
+            "feelings": {
+                "label": "Émotions"
+            },
+            "intimacy": {
+                "label": "Intimité",
+                "hint": "Reste privé même si ce jour est partagé avec la famille.",
+                "none": "Non précisé",
+                "protected": "Protégé",
+                "unprotected": "Non protégé",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Enregistrer un antalgique",
+                "weight": "Enregistrer le poids"
             }
         },
         "duration": {

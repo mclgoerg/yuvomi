@@ -4284,11 +4284,14 @@
                     "history_one": "Com base no teu último ciclo",
                     "insufficientHistory": "Valor predefinido por agora - regista mais {{count}} ciclos para uma previsão personalizada",
                     "insufficientHistory_one": "Valor predefinido por agora - regista mais {{count}} ciclo para uma previsão personalizada",
-                    "default": "Suposição predefinida (ainda sem histórico registado)"
+                    "default": "Suposição predefinida (ainda sem histórico registado)",
+                    "historyOther": "Com base nos últimos {{count}} ciclos",
+                    "historyOther_one": "Com base no último ciclo"
                 }
             },
             "unit": {
-                "days": "{{value}} dias"
+                "days": "{{value}} dias",
+                "days_one": "{{value}} dia"
             },
             "today": {
                 "title": "Hoje",
@@ -4325,7 +4328,8 @@
                 "title": "Evolução",
                 "ongoing": "em curso",
                 "empty": "Ainda não há períodos registados.",
-                "cycleLength": "Ciclo {{value}} dias"
+                "cycleLength": "Ciclo {{value}} dias",
+                "cycleLength_one": "Ciclo {{value}} dia"
             },
             "trends": {
                 "title": "Tendências",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Registar período",
-                "edit": "Editar período"
+                "edit": "Editar período",
+                "warningFuture": "A data de início está no futuro — as previsões baseiam-se apenas em ciclos passados.",
+                "warningOverlap": "Sobrepõe-se a um ciclo já registado."
             },
             "dayLog": {
                 "title": "Registar dia",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Data provável do parto",
                 "pregnancyHint": "No modo gravidez, as previsões de menstruação e ovulação ficam pausadas. O registro diário continua disponível.",
                 "saved": "Configurações salvas."
+            },
+            "mucus": {
+                "label": "Muco cervical",
+                "hint": "Opcional. As alterações de textura podem ajudar a delimitar a janela fértil.",
+                "none": "Nenhum",
+                "dry": "Seco",
+                "sticky": "Pegajoso",
+                "creamy": "Cremoso",
+                "watery": "Aquoso",
+                "eggwhite": "Clara de ovo"
+            },
+            "test": {
+                "label": "Testes",
+                "lhLabel": "Teste de LH",
+                "pregnancyLabel": "Teste de gravidez",
+                "unset": "Não testado",
+                "negative": "Negativo",
+                "positive": "Positivo"
+            },
+            "feelings": {
+                "label": "Emoções"
+            },
+            "intimacy": {
+                "label": "Intimidade",
+                "hint": "Mantém-se privado mesmo que este dia seja partilhado com a família.",
+                "none": "Não especificado",
+                "protected": "Protegida",
+                "unprotected": "Desprotegida",
+                "solo": "A sós"
+            },
+            "quickLink": {
+                "painkiller": "Registar analgésico",
+                "weight": "Registar peso"
             }
         },
         "duration": {

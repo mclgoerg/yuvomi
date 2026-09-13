@@ -4284,11 +4284,14 @@
                     "history_one": "Az utolsó ciklusod alapján",
                     "insufficientHistory": "Egyelőre alapértelmezett érték - rögzíts még {{count}} ciklust a személyre szabott előrejelzéshez",
                     "insufficientHistory_one": "Egyelőre alapértelmezett érték - rögzíts még {{count}} ciklust a személyre szabott előrejelzéshez",
-                    "default": "Alapértelmezett feltételezés (még nincs rögzített előzmény)"
+                    "default": "Alapértelmezett feltételezés (még nincs rögzített előzmény)",
+                    "historyOther": "Az utolsó {{count}} ciklus alapján",
+                    "historyOther_one": "Az utolsó ciklus alapján"
                 }
             },
             "unit": {
-                "days": "{{value}} nap"
+                "days": "{{value}} nap",
+                "days_one": "{{value}} nap"
             },
             "today": {
                 "title": "Ma",
@@ -4325,7 +4328,8 @@
                 "title": "Tendencia",
                 "ongoing": "folyamatban",
                 "empty": "Még nincs rögzített menstruáció.",
-                "cycleLength": "Ciklus {{value}} nap"
+                "cycleLength": "Ciklus {{value}} nap",
+                "cycleLength_one": "Ciklus {{value}} nap"
             },
             "trends": {
                 "title": "Trendek",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Menstruáció rögzítése",
-                "edit": "Menstruáció szerkesztése"
+                "edit": "Menstruáció szerkesztése",
+                "warningFuture": "A kezdő dátum a jövőben van — az előrejelzések csak a korábbi ciklusokon alapulnak.",
+                "warningOverlap": "Átfedésben van egy már rögzített ciklussal."
             },
             "dayLog": {
                 "title": "Nap rögzítése",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Várható szülési időpont",
                 "pregnancyHint": "Terhesség módban a menstruáció- és ovulációs előrejelzések szünetelnek. A napi naplózás továbbra is elérhető.",
                 "saved": "Beállítások mentve."
+            },
+            "mucus": {
+                "label": "Méhnyaknyák",
+                "hint": "Nem kötelező. Az állag változásai segíthetnek szűkíteni a termékeny időszakot.",
+                "none": "Nincs",
+                "dry": "Száraz",
+                "sticky": "Ragadós",
+                "creamy": "Krémes",
+                "watery": "Vizes",
+                "eggwhite": "Tojásfehérje-szerű"
+            },
+            "test": {
+                "label": "Tesztek",
+                "lhLabel": "LH-teszt",
+                "pregnancyLabel": "Terhességi teszt",
+                "unset": "Nincs tesztelve",
+                "negative": "Negatív",
+                "positive": "Pozitív"
+            },
+            "feelings": {
+                "label": "Érzések"
+            },
+            "intimacy": {
+                "label": "Intimitás",
+                "hint": "Privát marad akkor is, ha ezt a napot megosztod a családdal.",
+                "none": "Nincs megadva",
+                "protected": "Védekezéssel",
+                "unprotected": "Védekezés nélkül",
+                "solo": "Egyedül"
+            },
+            "quickLink": {
+                "painkiller": "Fájdalomcsillapító rögzítése",
+                "weight": "Testsúly rögzítése"
             }
         },
         "duration": {

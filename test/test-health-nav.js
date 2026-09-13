@@ -8,6 +8,9 @@
  *  - Router-Registrierung (Routen, ROUTE_ORDER, topLevelSection, Shortcut, Nav)
  *  - Modul abschaltbar (Server-Allowlist + Settings-Toggle-Definition)
  *  - i18n-Parität der neuen Keys über ALLE Locales
+ *  - Zyklus-Tagebuch-Modal (health.js): Quelltext-Guards ohne DOM/Browser fuer
+ *    den A-2/A-3/A-4/A-5-Fixblock und die D-5/D-6/D-10/D-11/D-16-Felder -
+ *    siehe Abschnitt am Dateiende.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -199,4 +202,87 @@ test('i18n: nav.health, shortcuts.goHealth und health.* in allen Locales', () =>
       assert.ok(data.health?.[panel]?.emptyDesc, `${file}: health.${panel}.emptyDesc fehlt`);
     }
   }
+});
+
+// --------------------------------------------------------
+// Zyklus-Tagebuch-Modal (health.js): Quelltext-Guards, kein DOM/Browser
+// --------------------------------------------------------
+// Dieselbe Technik wie oben (Regex gegen den rohen Quelltext), diesmal gegen
+// public/pages/health.js. Das eigentliche Verhalten wurde manuell im Browser
+// verifiziert (siehe Arbeitsauftrag) - diese Guards verhindern nur, dass eine
+// spaetere, unbeabsichtigte Aenderung den jeweiligen Fix wieder einreisst,
+// ohne dass eine gruene Suite das meldet.
+
+const HEALTH_JS = read('public/pages/health.js');
+
+/** Text einer Top-Level-Funktion (`function name(...) { ... }\n`), ausgehend vom Namen. */
+function functionSource(name) {
+  return HEALTH_JS.match(new RegExp(`function ${name}[\\s\\S]*?\\n}\\n`))?.[0];
+}
+
+test('A-2: Tages-Log-Modal fokussiert beim Oeffnen nicht automatisch das erste Feld', () => {
+  const fn = functionSource('openDayLogModal');
+  assert.ok(fn, 'openDayLogModal() nicht gefunden');
+  // 'none' unterdrueckt modal.js' eigenen Default (erstes <input>/<select>,
+  // hier die Basaltemperatur weiter unten im Formular) - dessen Fokus liess
+  // den Browser sonst zu ihr scrollen und die Blutungsstaerke-Gruppe (das
+  // meistgenutzte Feld, ganz oben) aus dem sichtbaren Bereich rutschen.
+  assert.match(fn, /initialFocus:\s*'none'/, "initialFocus muss auf 'none' stehen");
+  assert.match(fn, /\[data-group="flow"\]\s*\.health-choice/,
+    'onSave() muss den Fokus stattdessen manuell auf den ersten Flow-Chip setzen');
+});
+
+test('A-3: Perioden-Modal warnt weich bei Zukunftsdatum/Ueberschneidung, ohne das Speichern zu blockieren', () => {
+  assert.match(HEALTH_JS, /health\.cycle\.period\.warningFuture/, 'Zukunfts-Warnung fehlt');
+  assert.match(HEALTH_JS, /health\.cycle\.period\.warningOverlap/, 'Ueberschneidungs-Warnung fehlt');
+  assert.match(HEALTH_JS, /function periodOverlapsExisting/, 'Ueberschneidungs-Pruefung fehlt');
+  const fn = functionSource('openPeriodModal');
+  assert.ok(fn, 'openPeriodModal() nicht gefunden');
+  assert.match(fn, /periodOverlapsExisting\(/, 'openPeriodModal() muss die Ueberschneidungs-Pruefung nutzen');
+});
+
+test('A-4: health.cycle.unit.days/history.cycleLength werden immer mit `count` aufgerufen', () => {
+  // t() waehlt die `_one`-Variante ausschliesslich ueber einen numerischen
+  // `count`-Parameter (siehe public/i18n.js) - `value` allein (der fertig
+  // formatierte Anzeigetext) reicht nicht, das war genau A-4s "1 Tage"-Fehler.
+  const callsites = [...HEALTH_JS.matchAll(/t\('health\.cycle\.unit\.days',\s*\{([^}]*)\}\)/g)];
+  assert.ok(callsites.length >= 6, `erwartet mindestens 6 Aufrufstellen, gefunden ${callsites.length}`);
+  for (const [, args] of callsites) {
+    assert.match(args, /count:/, `Aufruf ohne count: t('health.cycle.unit.days', { ${args.trim()} })`);
+  }
+  const cycleLengthCall = HEALTH_JS.match(/t\('health\.cycle\.history\.cycleLength',\s*\{([^}]*)\}\)/);
+  assert.ok(cycleLengthCall, 'health.cycle.history.cycleLength-Aufruf nicht gefunden');
+  assert.match(cycleLengthCall[1], /count:/, 'history.cycleLength-Aufruf ohne count');
+});
+
+test('A-5: cycleStatsSourceText() unterscheidet Eigen- und Fremdansicht fuer die Historie-Quelle', () => {
+  const fn = functionSource('cycleStatsSourceText');
+  assert.ok(fn, 'cycleStatsSourceText() nicht gefunden');
+  assert.match(fn, /isOwnCycleView\(\)/, 'muss zwischen eigener und fremder Ansicht unterscheiden');
+  assert.match(fn, /health\.cycle\.stats\.source\.historyOther/, 'Person-neutrale Variante fehlt');
+});
+
+test('D-6/D-10/D-11: der Tages-Log-Submit sendet cervix_mucus, lh_test, pregnancy_test, feelings, intimacy - nicht mehr mood', () => {
+  const fn = functionSource('openDayLogModal');
+  assert.ok(fn, 'openDayLogModal() nicht gefunden');
+  for (const field of ['cervix_mucus', 'lh_test', 'pregnancy_test', 'feelings', 'intimacy']) {
+    assert.match(fn, new RegExp(`${field}[,:]`), `Feld ${field} fehlt im Submit-Body`);
+  }
+  // `mood` ist seit Migration 196 nur noch ein Lesewert (siehe DECISIONS.md,
+  // "Feelings become multi-select") - der neue Body darf ihn nicht mehr
+  // schreiben, `feelings` ersetzt ihn vollstaendig.
+  assert.ok(!/body\s*=\s*\{[\s\S]*?mood:/.test(fn), 'mood darf im Submit-Body nicht mehr geschrieben werden');
+});
+
+test('D-5/D-16: die Schnellzugriffs-Links schliessen ueber den regulaeren (Dirty-Check-)Pfad, bevor sie navigieren', () => {
+  const fn = functionSource('openDayLogModal');
+  assert.ok(fn, 'openDayLogModal() nicht gefunden');
+  // Ein erzwungenes closeModal({ force: true }) vor der Navigation wuerde den
+  // eingebauten Dirty-Check umgehen (ungespeicherte Eingaben giengen
+  // stillschweigend verloren) - deshalb explizit das NICHT erzwungene
+  // closeModal(), das bei ungespeicherten Aenderungen selbst nachfragt.
+  assert.match(fn, /cycle-log-painkiller[\s\S]{0,200}await closeModal\(\)[\s\S]{0,80}navigate\('\/health\/medications'\)/,
+    'painkiller-Link muss vor der Navigation ein nicht erzwungenes closeModal() abwarten');
+  assert.match(fn, /cycle-log-weight[\s\S]{0,200}await closeModal\(\)[\s\S]{0,80}navigate\('\/health\/vitals'\)/,
+    'weight-Link muss vor der Navigation ein nicht erzwungenes closeModal() abwarten');
 });

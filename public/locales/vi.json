@@ -4284,11 +4284,14 @@
                     "history_one": "Dựa trên chu kỳ gần nhất của bạn",
                     "insufficientHistory": "Hiện đang dùng giá trị mặc định - hãy ghi thêm {{count}} chu kỳ để có dự đoán cá nhân hóa",
                     "insufficientHistory_one": "Hiện đang dùng giá trị mặc định - hãy ghi thêm {{count}} chu kỳ để có dự đoán cá nhân hóa",
-                    "default": "Giả định mặc định (chưa có lịch sử được ghi)"
+                    "default": "Giả định mặc định (chưa có lịch sử được ghi)",
+                    "historyOther": "Dựa trên {{count}} chu kỳ gần nhất",
+                    "historyOther_one": "Dựa trên chu kỳ gần nhất"
                 }
             },
             "unit": {
-                "days": "{{value}} ngày"
+                "days": "{{value}} ngày",
+                "days_one": "{{value}} ngày"
             },
             "today": {
                 "title": "Hôm nay",
@@ -4325,7 +4328,8 @@
                 "title": "Xu hướng",
                 "ongoing": "đang diễn ra",
                 "empty": "Chưa ghi kỳ kinh nào.",
-                "cycleLength": "Chu kỳ {{value}} ngày"
+                "cycleLength": "Chu kỳ {{value}} ngày",
+                "cycleLength_one": "Chu kỳ {{value}} ngày"
             },
             "trends": {
                 "title": "Xu hướng",
@@ -4415,7 +4419,9 @@
             },
             "period": {
                 "add": "Ghi kỳ kinh",
-                "edit": "Sửa kỳ kinh"
+                "edit": "Sửa kỳ kinh",
+                "warningFuture": "Ngày bắt đầu nằm trong tương lai — dự đoán chỉ dựa trên các chu kỳ trong quá khứ.",
+                "warningOverlap": "Trùng với một chu kỳ đã được ghi lại."
             },
             "dayLog": {
                 "title": "Ghi lại ngày",
@@ -4455,6 +4461,39 @@
                 "dueDate": "Ngày dự sinh",
                 "pregnancyHint": "Ở chế độ thai kỳ, dự đoán kinh nguyệt và rụng trứng được tạm dừng. Ghi nhật ký hằng ngày vẫn khả dụng.",
                 "saved": "Đã lưu cài đặt."
+            },
+            "mucus": {
+                "label": "Dịch nhầy cổ tử cung",
+                "hint": "Tùy chọn. Thay đổi kết cấu có thể giúp xác định cửa sổ dễ thụ thai.",
+                "none": "Không có",
+                "dry": "Khô",
+                "sticky": "Dính",
+                "creamy": "Như kem",
+                "watery": "Loãng",
+                "eggwhite": "Như lòng trắng trứng"
+            },
+            "test": {
+                "label": "Xét nghiệm",
+                "lhLabel": "Xét nghiệm LH",
+                "pregnancyLabel": "Que thử thai",
+                "unset": "Chưa xét nghiệm",
+                "negative": "Âm tính",
+                "positive": "Dương tính"
+            },
+            "feelings": {
+                "label": "Cảm xúc"
+            },
+            "intimacy": {
+                "label": "Sự thân mật",
+                "hint": "Vẫn ở chế độ riêng tư ngay cả khi ngày này được chia sẻ với gia đình.",
+                "none": "Chưa xác định",
+                "protected": "Có bảo vệ",
+                "unprotected": "Không bảo vệ",
+                "solo": "Một mình"
+            },
+            "quickLink": {
+                "painkiller": "Ghi lại thuốc giảm đau",
+                "weight": "Ghi lại cân nặng"
             }
         },
         "duration": {
