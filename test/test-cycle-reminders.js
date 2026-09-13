@@ -345,6 +345,40 @@ test('Partner-Erinnerung ist idempotent: ein zweiter Lauf ohne Aenderung laesst 
   assert.equal(after.dismissed, 1);
 });
 
+test('Partner-Wechsel bei gleichem Vorlauf: die Erinnerung geht auf den NEUEN Empfaenger ueber (Privatsphaere, Befund 1)', () => {
+  const owner = makeUser();
+  const partnerA = makeUser();
+  const partnerB = makeUser();
+  seedFourPeriods(owner);
+  upsertSettings(owner, { notify_partner_user_id: partnerA, notify_partner_days_before: 2 });
+  syncCycleRemindersForUser(db, owner, NOW);
+
+  // Ausgangslage: A traegt die Zeile.
+  const beforeA = remindersFor(partnerA, 'cycle_period');
+  assert.equal(beforeA.length, 1);
+  assert.equal(beforeA[0].created_by, partnerA);
+
+  // Wechsel auf B, Vorlauf bleibt UNVERAENDERT (2 Tage) - genau der Fall, in
+  // dem die alte Fassung von upsertCycleReminder() nur remind_at verglich und
+  // deshalb frueh zurueckkehrte, ohne created_by je anzusehen: die Zeile blieb
+  // bei A stehen, B bekam nie eine.
+  upsertSettings(owner, { notify_partner_user_id: partnerB, notify_partner_days_before: 2 });
+  syncCycleRemindersForUser(db, owner, NOW);
+
+  // Nur GENAU EINE Zeile insgesamt, und die gehoert B - A darf nichts mehr
+  // tragen (sonst bekaeme eine Ex-Partnerperson weiter den Perioden-Push).
+  assert.deepEqual(remindersFor(partnerA, 'cycle_period'), [], 'die alte Empfaengerin A traegt keine Zeile mehr');
+  const afterB = remindersFor(partnerB, 'cycle_period');
+  assert.equal(afterB.length, 1, 'genau eine Zeile fuer die neue Empfaengerin B');
+  assert.equal(afterB[0].created_by, partnerB);
+
+  // Derselbe Anker (Eigentuemer-Datum unveraendert) - nur der Empfaenger der
+  // reminders-Zeile hat sich geaendert, kein zweiter Anker ist entstanden.
+  const anchors = anchorsFor(owner).filter((a) => a.kind === 'partner_period');
+  assert.equal(anchors.length, 1);
+  assert.equal(afterB[0].entity_id, anchors[0].id);
+});
+
 test('syncAllCycleReminders erreicht einen Eigentuemer, der nur eine Partner-Einstellung traegt (kein eigener Vorlauf)', () => {
   const owner = makeUser();
   const partner = makeUser();

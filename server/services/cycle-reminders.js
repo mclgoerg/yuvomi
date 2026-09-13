@@ -104,13 +104,17 @@ function upsertCycleReminder(database, userId, kind, entityType, targetDate, off
   `).get(userId, targetDate, kind).id;
 
   const existingReminder = database.prepare(
-    'SELECT id, remind_at FROM reminders WHERE entity_type = ? AND entity_id = ?'
+    'SELECT id, remind_at, created_by FROM reminders WHERE entity_type = ? AND entity_id = ?'
   ).get(entityType, anchorId);
   if (existingReminder) {
-    // UNANGETASTET, wenn der Zeitpunkt gleich bleibt - sonst risse ein Lauf
-    // alle paar Minuten pushed_at/dismissed zurück und dieselbe Meldung ginge
-    // immer wieder raus.
-    if (existingReminder.remind_at === remindAt) return;
+    // UNANGETASTET, wenn Zeitpunkt UND Empfänger gleich bleiben - sonst risse
+    // ein Lauf alle paar Minuten pushed_at/dismissed zurück und dieselbe
+    // Meldung ginge immer wieder raus. Ein Empfängerwechsel (notify_partner_
+    // user_id wechselt von A zu B bei unverändertem Vorlauf, oder umgekehrt)
+    // ist dabei KEIN unveränderter Lauf: der Anker bleibt derselbe, also griffe
+    // kein Abräum-Pfad - ohne diesen Vergleich bliebe die Zeile bei A stehen,
+    // A bekäme die fremde Meldung weiter, und B nie eine.
+    if (existingReminder.remind_at === remindAt && existingReminder.created_by === recipientUserId) return;
     database.prepare('DELETE FROM reminders WHERE id = ?').run(existingReminder.id);
   }
   database.prepare(`
@@ -123,16 +127,18 @@ function upsertCycleReminder(database, userId, kind, entityType, targetDate, off
  * vorher. Rechnet mit derselben predictCycle()-Mathematik wie der Zyklus-Tab
  * selbst (inklusive der Vertrauensschwelle aus Phase 0 -
  * MIN_HISTORY_GAPS - und dem Schwangerschafts-Stopp).
+ *
+ * `prediction` kommt fertig vom Aufrufer (syncCycleRemindersForUser) - dieselbe
+ * Vorhersage, mit der auch syncPartnerReminder() rechnet: EIN Periods-Query,
+ * EIN predictCycle()-Aufruf je Sync-Durchlauf statt zweier identischer.
  */
-function syncPeriodReminder(database, userId, settings, today) {
+function syncPeriodReminder(database, userId, settings, today, prediction) {
   const daysBefore = settings?.remind_period_days_before;
   if (daysBefore == null) {
     dropAnchorAndReminder(database, userId, 'period_predicted', 'cycle_period');
     return;
   }
 
-  const periods = database.prepare('SELECT * FROM cycle_periods WHERE user_id = ? ORDER BY start_date ASC').all(userId);
-  const prediction = predictCycle(periods, settings, today);
   if (!prediction.hasData || prediction.isPregnant || !prediction.nextStart) {
     dropAnchorAndReminder(database, userId, 'period_predicted', 'cycle_period');
     return;
@@ -161,6 +167,10 @@ function syncPeriodReminder(database, userId, settings, today) {
  * Herkunfts-Registern (server/routes/reminders.js, public/reminders.js,
  * server/services/notifications.js) - siehe DECISIONS.md.
  *
+ * `prediction` kommt fertig vom Aufrufer (syncCycleRemindersForUser) - dieselbe
+ * Vorhersage wie syncPeriodReminder() oben, EIN Periods-Query/predictCycle()-
+ * Aufruf je Durchlauf statt zweier identischer.
+ *
  * "BEIDE SEITEN" (Abraeum-Regel): die Partnerperson muss weiterhin ein
  * echtes Haushaltsmitglied mit Zugriff auf das Health-Modul UND
  * freigeschaltetem Zyklus-Tab sein - verliert SIE eines davon (nicht nur der
@@ -175,7 +185,7 @@ function syncPeriodReminder(database, userId, settings, today) {
  * Lese-Recht auf die Zyklus-Daten des Eigentuemers: keine Route aendert sich,
  * es entsteht nur diese eine datumsscharfe Meldung.
  */
-function syncPartnerReminder(database, userId, settings, today) {
+function syncPartnerReminder(database, userId, settings, today, prediction) {
   const partnerId = settings?.notify_partner_user_id;
   const daysBefore = settings?.notify_partner_days_before;
   if (!partnerId || daysBefore == null) {
@@ -188,8 +198,6 @@ function syncPartnerReminder(database, userId, settings, today) {
     return;
   }
 
-  const periods = database.prepare('SELECT * FROM cycle_periods WHERE user_id = ? ORDER BY start_date ASC').all(userId);
-  const prediction = predictCycle(periods, settings, today);
   if (!prediction.hasData || prediction.isPregnant || !prediction.nextStart) {
     dropAnchorAndReminder(database, userId, 'partner_period', 'cycle_period');
     return;
@@ -244,9 +252,15 @@ export function syncCycleRemindersForUser(database, userId, now = new Date()) {
 
     const today = todayKey(database, now);
     const settings = database.prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(userId) || {};
-    syncPeriodReminder(database, userId, settings, today);
+    // EIN Query, EINE Vorhersage fuer beide Perioden-Erinnerungsarten (eigene
+    // und Partner) - syncPeriodReminder() und syncPartnerReminder() rechneten
+    // vorher je einmal identisch mit denselben cycle_periods und derselben
+    // predictCycle()-Basis nach.
+    const periods = database.prepare('SELECT * FROM cycle_periods WHERE user_id = ? ORDER BY start_date ASC').all(userId);
+    const prediction = predictCycle(periods, settings, today);
+    syncPeriodReminder(database, userId, settings, today, prediction);
     syncLogNudgeReminder(database, userId, settings, today);
-    syncPartnerReminder(database, userId, settings, today);
+    syncPartnerReminder(database, userId, settings, today, prediction);
   })();
 }
 
