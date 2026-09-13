@@ -42,7 +42,13 @@ const userB = db.prepare(`INSERT INTO users (username, display_name, password_ha
 
 let session = { userId: userA, role: 'member' };
 const app = express();
-app.use(express.json());
+// Grosszuegiger als der express.json()-Standard (100kb): sonst wuerde
+// body-parser einen ueberlangen Cycle-Import-Body schon VOR der Route mit
+// einem HTML-413 abweisen, statt der Route ihre eigene 100-KB-Grenze mit
+// einem JSON-400 pruefen zu lassen - genau wie in server/index.js, wo
+// BODY_LIMIT (server/utils/upload-limit.js) aus demselben Grund groesser ist
+// als jede einzelne Feature-Obergrenze.
+app.use(express.json({ limit: '10mb' }));
 app.use((req, _res, next) => {
   req.authUserId = session.userId;
   req.authRole = session.role;
@@ -842,6 +848,133 @@ test('Export cycle: CSV mit Perioden- und Zykluslänge', async () => {
   assert.ok(res.text.includes('"start_date","end_date","period_length_days","cycle_length_days"'));
   assert.ok(res.text.includes('exp-cyc-1'));
   assert.ok(res.text.includes('"28"')); // Abstand 05.01 → 02.02
+});
+
+// ========================================================
+// ZYKLUS: Perioden-Historie-Import (D-13)
+// ========================================================
+
+test('Cycle-Import: ohne csv-Feld -> 400', async () => {
+  asA();
+  const res = await call('POST', '/cycle/import', {});
+  assert.equal(res.status, 400);
+});
+
+test('Cycle-Import: CSV mit Kopfzeile importiert alle gültigen Zeilen', async () => {
+  asA();
+  const csv = 'start_date,end_date\n2027-01-01,2027-01-05\n2027-02-01,2027-02-06\n';
+  const res = await call('POST', '/cycle/import', { csv });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.imported, 2);
+  assert.equal(res.body.data.skipped, 0);
+  assert.deepEqual(res.body.data.errors, []);
+
+  const list = await call('GET', '/cycle/periods?from=2027-01-01&to=2027-02-01');
+  assert.ok(list.body.data.some((p) => p.start_date === '2027-01-01' && p.end_date === '2027-01-05'));
+  assert.ok(list.body.data.some((p) => p.start_date === '2027-02-01' && p.end_date === '2027-02-06'));
+});
+
+test('Cycle-Import: eine Zeile mit vorhandenem start_date wird übersprungen (gezählt, kein Fehler)', async () => {
+  asA();
+  const csv = 'start_date,end_date\n2027-01-01,2027-01-04\n2027-03-01,2027-03-05\n';
+  const res = await call('POST', '/cycle/import', { csv });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.imported, 1);
+  assert.equal(res.body.data.skipped, 1);
+
+  // Die vorhandene Periode (aus dem Test darüber) behält ihr eigenes end_date -
+  // ein Duplikat wird übersprungen, nicht überschrieben.
+  const list = await call('GET', '/cycle/periods?from=2027-01-01&to=2027-01-02');
+  assert.equal(list.body.data.find((p) => p.start_date === '2027-01-01').end_date, '2027-01-05');
+});
+
+test('Cycle-Import: Semikolon-Trennzeichen und DD.MM.YYYY (deutscher Excel-Export), ohne Kopfzeile', async () => {
+  asA();
+  const csv = '01.04.2027;05.04.2027\n15.04.2027;';
+  const res = await call('POST', '/cycle/import', { csv });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.imported, 2);
+
+  const list = await call('GET', '/cycle/periods?from=2027-04-01&to=2027-04-30');
+  assert.ok(list.body.data.some((p) => p.start_date === '2027-04-01' && p.end_date === '2027-04-05'));
+  assert.ok(list.body.data.some((p) => p.start_date === '2027-04-15' && p.end_date === null));
+});
+
+test('Cycle-Import: eine ungültige Zeile verwirft den gesamten Import (Transaktion, nichts wird eingefügt)', async () => {
+  asA();
+  const before = await call('GET', '/cycle/periods');
+  const beforeCount = before.body.data.length;
+
+  const csv = 'start_date,end_date\n2027-05-01,2027-05-05\n2027-06-99,\n';
+  const res = await call('POST', '/cycle/import', { csv });
+  assert.equal(res.status, 400);
+  assert.ok(Array.isArray(res.body.errors));
+  assert.equal(res.body.errors.length, 1);
+  assert.match(res.body.errors[0], /Row 2/);
+
+  const after = await call('GET', '/cycle/periods');
+  assert.equal(after.body.data.length, beforeCount, 'nichts darf eingefügt worden sein');
+});
+
+test('Cycle-Import: end_date vor start_date ist ein Zeilenfehler (400, nichts eingefügt)', async () => {
+  asA();
+  const before = await call('GET', '/cycle/periods');
+  const csv = 'start_date,end_date\n2033-01-10,2033-01-01\n';
+  const res = await call('POST', '/cycle/import', { csv });
+  assert.equal(res.status, 400);
+  assert.match(res.body.errors[0], /end_date must not be before start_date/);
+  const after = await call('GET', '/cycle/periods');
+  assert.equal(after.body.data.length, before.body.data.length);
+});
+
+test('Cycle-Import: Fehlerliste ist auf die ersten 10 Zeilen begrenzt', async () => {
+  asA();
+  const rows = Array.from({ length: 15 }, () => '2034-99-99,').join('\n');
+  const csv = `start_date,end_date\n${rows}`;
+  const res = await call('POST', '/cycle/import', { csv });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.errors.length, 10);
+});
+
+test('Cycle-Import: mehr als 500 Datenzeilen werden abgelehnt (400)', async () => {
+  asA();
+  const rows = Array.from({ length: 501 }, () => '2030-01-01,').join('\n');
+  const csv = `start_date,end_date\n${rows}`;
+  const res = await call('POST', '/cycle/import', { csv });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /500/);
+});
+
+test('Cycle-Import: CSV über 100 KB wird abgelehnt (400)', async () => {
+  asA();
+  const csv = 'start_date,end_date\n' + '2030-02-01,2030-02-05\n'.repeat(6000);
+  const res = await call('POST', '/cycle/import', { csv });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /102400 bytes/);
+});
+
+test('Cycle-Import: übernimmt die eigene default_visibility aus den Cycle-Settings', async () => {
+  asA();
+  await call('PUT', '/cycle/settings', { default_visibility: 'family' });
+  const csv = 'start_date,end_date\n2031-01-01,2031-01-05\n';
+  const res = await call('POST', '/cycle/import', { csv });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.imported, 1);
+
+  const list = await call('GET', '/cycle/periods?from=2031-01-01&to=2031-01-02');
+  assert.equal(list.body.data.find((p) => p.start_date === '2031-01-01').visibility, 'family');
+
+  await call('PUT', '/cycle/settings', { default_visibility: 'private' });
+});
+
+test('Cycle-Import: importierte Perioden bleiben scoped wie jede andere - Bob sieht Alices Import nicht', async () => {
+  asA();
+  const csv = 'start_date,end_date\n2032-01-01,2032-01-05\n';
+  await call('POST', '/cycle/import', { csv });
+
+  asB();
+  const list = await call('GET', '/cycle/periods?from=2032-01-01&to=2032-01-02');
+  assert.equal(list.body.data.length, 0);
 });
 
 // ========================================================

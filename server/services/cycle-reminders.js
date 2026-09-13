@@ -4,7 +4,12 @@
  *        EINEN Nutzer herstellen - höchstens eine Zeile je Art, nicht ein
  *        rollierendes Fenster wie beim Schichtplan: der Zyklus hat je Nutzer
  *        immer nur EINEN nächsten vorhergesagten Periodenbeginn und EIN
- *        "heute", nicht viele Tage mit je eigenem Inhalt.
+ *        "heute", nicht viele Tage mit je eigenem Inhalt. Seit D-15 gehört
+ *        dazu auch eine optionale VIERTE Zeilen-Art ('partner_period', teilt
+ *        sich `entity_type` mit 'period_predicted' - siehe
+ *        syncPartnerReminder()): eine Benachrichtigung für eine andere Person
+ *        (`cycle_settings.notify_partner_user_id`), die der Eigentümer
+ *        veröffentlicht, ohne dass die Partnerperson selbst etwas einräumt.
  * Abhängigkeiten: server/utils/reminder-schedule.js, public/utils/health-cycle.js
  *                 (dieselbe Vorhersage-Mathematik wie der Zyklus-Tab selbst -
  *                 ein zweites Rechenmodell hier wäre eine zweite Wahrheit).
@@ -12,10 +17,10 @@
  * WARUM EIN ANKER NÖTIG IST: weder der vorhergesagte nächste Periodenbeginn
  * (predictCycle(), rein berechnet) noch "heute noch nicht geloggt" (die
  * Abwesenheit einer cycle_day_logs-Zeile) ist eine gespeicherte Zeile mit
- * eigener Id. `cycle_reminder_anchors` (Migration 177) gibt beiden einen
- * stabilen Ankerpunkt je (Nutzer, Datum, Art), an den reminders.entity_id
- * zeigen kann - gleicher Grund wie schedule_reminder_entries für
- * Musterzyklus-Tage (Schedule v3).
+ * eigener Id. `cycle_reminder_anchors` (Migration 177, `kind` seit Migration
+ * 198 auch 'partner_period') gibt beiden einen stabilen Ankerpunkt je
+ * (Nutzer, Datum, Art), an den reminders.entity_id zeigen kann - gleicher
+ * Grund wie schedule_reminder_entries für Musterzyklus-Tage (Schedule v3).
  *
  * GLEICHE GRUNDFORM WIE server/services/pantry-reminders.js: löschen, was
  * gegenstandslos wurde, ergänzen, was fehlt, bestehende Zeilen mit gleichem
@@ -34,6 +39,7 @@ import { resolvePermissions } from '../permissions.js';
 import { createLogger } from '../logger.js';
 import { predictCycle } from '../../public/utils/health-cycle.js';
 import { healthCycleViews } from '../routes/preferences.js';
+import { isHouseholdMember } from './member-email.js';
 
 const log = createLogger('CycleReminders');
 
@@ -67,8 +73,15 @@ function dropAnchorAndReminder(database, userId, kind, entityType) {
  * Soll-Zustand für EINE Erinnerungsart herstellen: Anker auf `targetDate`
  * bringen (alten abräumen, wenn sich das Zieldatum verschoben hat) und die
  * `reminders`-Zeile nachziehen.
+ *
+ * `recipientUserId` (Standard: `userId`) ist, wer die Meldung EMPFAENGT
+ * (reminders.created_by - siehe notifications.js#processDueNotifications,
+ * das darüber Push-Ziel/Kanäle auflöst). Der Anker selbst bleibt immer bei
+ * `userId` verankert, weil `anchor_date` dessen Datum ist (D-15, Partner-
+ * Erinnerung: der Anker gehört weiter dem Eigentümer, empfangen tut sie die
+ * Partnerperson).
  */
-function upsertCycleReminder(database, userId, kind, entityType, targetDate, offsetDays, today) {
+function upsertCycleReminder(database, userId, kind, entityType, targetDate, offsetDays, today, recipientUserId = userId) {
   const remindAt = reminderDateBefore(targetDate, offsetDays);
 
   const existingAnchor = database.prepare(
@@ -102,7 +115,7 @@ function upsertCycleReminder(database, userId, kind, entityType, targetDate, off
   }
   database.prepare(`
     INSERT INTO reminders (entity_type, entity_id, remind_at, created_by) VALUES (?, ?, ?, ?)
-  `).run(entityType, anchorId, remindAt, userId);
+  `).run(entityType, anchorId, remindAt, recipientUserId);
 }
 
 /**
@@ -126,6 +139,63 @@ function syncPeriodReminder(database, userId, settings, today) {
   }
 
   upsertCycleReminder(database, userId, 'period_predicted', 'cycle_period', prediction.nextStart, daysBefore, today);
+}
+
+/**
+ * Partner-Benachrichtigung (D-15, Eigentümer-Opt-in): EINE zusätzliche
+ * Erinnerungs-Zeile FÜR DIE PARTNERPERSON (`notify_partner_user_id`), sofern
+ * der Eigentümer sie in den eigenen cycle_settings eingetragen hat. Rechnet
+ * mit derselben predictCycle()-Basis wie die eigene Perioden-Erinnerung oben -
+ * kein zweites Vorhersagemodell für dieselbe Frage.
+ *
+ * EIGENE ANKER-ART ('partner_period', Migration 198): der Anker gehört
+ * weiterhin dem EIGENTÜMER (anchor_date ist dessen vorhergesagter
+ * Periodenbeginn) - anders waeren zwei verschiedene reminders-Zeilen (die
+ * eigene und die der Partnerperson) nicht sauber auseinanderzuhalten, wenn
+ * beide auf denselben Anker zeigen wuerden. `recipientUserId` an
+ * upsertCycleReminder() sorgt dafuer, dass `reminders.created_by` - und damit
+ * das Push-Ziel, siehe notifications.js - die Partnerperson ist, nicht der
+ * Eigentümer. `entity_type` bleibt bewusst 'cycle_period': eine Erinnerung
+ * für einen fremden Periodenbeginn ist inhaltlich dieselbe Herkunft wie die
+ * eigene, und die Wiederverwendung braucht keinen dritten Eintrag in den drei
+ * Herkunfts-Registern (server/routes/reminders.js, public/reminders.js,
+ * server/services/notifications.js) - siehe DECISIONS.md.
+ *
+ * "BEIDE SEITEN" (Abraeum-Regel): die Partnerperson muss weiterhin ein
+ * echtes Haushaltsmitglied mit Zugriff auf das Health-Modul UND
+ * freigeschaltetem Zyklus-Tab sein - verliert SIE eines davon (nicht nur der
+ * Eigentuemer), faellt die Meldung weg, auch wenn die Einstellung des
+ * Eigentuemers selbst unangetastet blieb. Ein voller periodischer Durchlauf
+ * (syncAllCycleReminders) faengt eine Aenderung auf der Partnerseite auf,
+ * genau wie er das fuer jede andere entzogene Berechtigung schon tut.
+ *
+ * PRIVATSPHAERE: `entity_title` (siehe notifications.js/reminders.js) ist bei
+ * dieser Art wie bei der eigenen dasselbe rohe `anchor_date` - nie Flow,
+ * Symptome oder sonstiger Log-Inhalt. Die Partnerperson bekommt dadurch kein
+ * Lese-Recht auf die Zyklus-Daten des Eigentuemers: keine Route aendert sich,
+ * es entsteht nur diese eine datumsscharfe Meldung.
+ */
+function syncPartnerReminder(database, userId, settings, today) {
+  const partnerId = settings?.notify_partner_user_id;
+  const daysBefore = settings?.notify_partner_days_before;
+  if (!partnerId || daysBefore == null) {
+    dropAnchorAndReminder(database, userId, 'partner_period', 'cycle_period');
+    return;
+  }
+
+  if (!isHouseholdMember(partnerId, { db: database }) || lacksHealth(database, partnerId) || !cycleTabEnabled(database, partnerId)) {
+    dropAnchorAndReminder(database, userId, 'partner_period', 'cycle_period');
+    return;
+  }
+
+  const periods = database.prepare('SELECT * FROM cycle_periods WHERE user_id = ? ORDER BY start_date ASC').all(userId);
+  const prediction = predictCycle(periods, settings, today);
+  if (!prediction.hasData || prediction.isPregnant || !prediction.nextStart) {
+    dropAnchorAndReminder(database, userId, 'partner_period', 'cycle_period');
+    return;
+  }
+
+  upsertCycleReminder(database, userId, 'partner_period', 'cycle_period', prediction.nextStart, daysBefore, today, partnerId);
 }
 
 /**
@@ -168,6 +238,7 @@ export function syncCycleRemindersForUser(database, userId, now = new Date()) {
     if (lacksHealth(database, userId) || !cycleTabEnabled(database, userId)) {
       dropAnchorAndReminder(database, userId, 'period_predicted', 'cycle_period');
       dropAnchorAndReminder(database, userId, 'log_nudge', 'cycle_log_nudge');
+      dropAnchorAndReminder(database, userId, 'partner_period', 'cycle_period');
       return;
     }
 
@@ -175,6 +246,7 @@ export function syncCycleRemindersForUser(database, userId, now = new Date()) {
     const settings = database.prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(userId) || {};
     syncPeriodReminder(database, userId, settings, today);
     syncLogNudgeReminder(database, userId, settings, today);
+    syncPartnerReminder(database, userId, settings, today);
   })();
 }
 
@@ -189,7 +261,8 @@ export function syncCycleRemindersForUser(database, userId, now = new Date()) {
  */
 export function syncAllCycleReminders(database, now = new Date()) {
   const withSettings = database.prepare(`
-    SELECT user_id FROM cycle_settings WHERE remind_period_days_before IS NOT NULL OR remind_log_daily = 1
+    SELECT user_id FROM cycle_settings
+    WHERE remind_period_days_before IS NOT NULL OR remind_log_daily = 1 OR notify_partner_user_id IS NOT NULL
   `).all();
   // Bereits abgeschaltete Konten können trotzdem noch Anker/Erinnerungen von
   // einer früheren Einstellung tragen (Zyklus-Tab zwischenzeitlich gesperrt,

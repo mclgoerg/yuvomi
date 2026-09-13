@@ -137,6 +137,15 @@ export function healthPaths() {
     '/api/v1/health/export/cycle': {
       get: op({ summary: 'Export period history as CSV', tag: 'Health', description: 'Scoped to the viewer; `?user_id=`, `from`, `to` filters supported. Returns `text/csv`.' }),
     },
+    '/api/v1/health/cycle/import': {
+      post: op({
+        summary: 'Import period history from CSV (D-13)',
+        tag: 'Health',
+        stateChanging: true,
+        requestBody: jsonBody(null),
+        description: 'Body: { csv: string }. Header-tolerant CSV in the export\'s own column order (`start_date`, `end_date` first - see GET /export/cycle); extra columns are ignored. Accepts both comma and semicolon separators (German Excel exports use `;`) and both `YYYY-MM-DD` and `DD.MM.YYYY` dates (again a German-export accommodation). All-or-nothing: any invalid row rejects the whole import with 400 and up to the first 10 row errors, nothing is inserted. A row whose `start_date` matches an existing period of the caller is skipped (counted, not an error); other overlaps are allowed. Rejects with 400 if the payload exceeds 100 KB or 500 data rows. New periods take the caller\'s `default_visibility` from `/cycle/settings` (falls back to `private`). Response: `{ imported, skipped, errors: [] }`. Re-syncs the caller\'s cycle reminders once after commit.',
+      }),
+    },
     '/api/v1/health/caregivers/me': {
       get: op({ summary: 'List who the caller may record health data for', tag: 'Health', description: 'Open to every member: it is the answer about their own rights, not about anyone else\'s data.' }),
     },

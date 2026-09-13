@@ -4,7 +4,9 @@
  *        optional 'family' für den Personen-Umschalter): Perioden-Episoden
  *        (cycle_periods), Tages-Logs (cycle_day_logs, genau ein Eintrag je
  *        Person/Tag → Upsert) und die per-Person-Einstellungen (cycle_settings,
- *        nur der Eigentümer selbst) plus der Perioden-CSV-Export. Die
+ *        nur der Eigentümer selbst) plus der Perioden-CSV-Export/-Import
+ *        (D-13, POST /cycle/import - Alles-oder-nichts, siehe dortiger
+ *        Kommentar). Die
  *        Vorhersage-Logik (nächste Periode, Eisprung, fruchtbares Fenster) liegt
  *        bewusst in EINER Datei, public/utils/health-cycle.js, absichtlich
  *        DOM-frei geschrieben, damit sie auch außerhalb des Browsers läuft.
@@ -594,6 +596,202 @@ router.get('/export/cycle', (req, res) => {
     sendCsv(res, exportFilename('cycle', from, to), cycleToCsv(rows));
   } catch (err) {
     log.error('Error exporting cycle:', err.message);
+    res.status(500).json({ error: 'Internal error.', code: 500 });
+  }
+});
+
+// ---- Perioden-Historie-Import (D-13) ----
+// Wer von Flo/Clue/Papier umzieht, hat seine Historie meist als CSV - dieselbe
+// Spaltenreihenfolge wie der eigene Export (CYCLE_HEADER, health-export.js:
+// start_date zuerst, end_date zweitens), damit ein Export dieser App selbst
+// klaglos re-importierbar ist. Zusaetzliche Spalten (period_length_days,
+// cycle_length_days, note, visibility) werden absichtlich ignoriert - sie
+// sind beim Export abgeleitet bzw. gehoeren zu einer einzelnen Periode, nicht
+// zu diesem Massenimport.
+
+const IMPORT_MAX_BYTES = 100 * 1024; // 100 KB
+const IMPORT_MAX_ROWS = 500; // Datenzeilen, ohne Kopfzeile
+const IMPORT_MAX_ERRORS = 10; // siehe Task-Vorgabe: nur die ersten zehn Fehler
+
+/**
+ * Trennzeichen erkennen: ein deutscher Excel-Export trennt mit Semikolon
+ * (das Komma ist dort das Dezimaltrennzeichen), ein Export dieser App selbst
+ * (health-export.js#toCsv) mit Komma. Ausgezaehlt an der ersten Zeile statt
+ * fest auf eines der beiden gesetzt, sonst waere die Haelfte der beiden
+ * angekuendigten Formate gar nicht lesbar.
+ */
+function detectCsvDelimiter(firstLine) {
+  const semicolons = (firstLine.match(/;/g) || []).length;
+  const commas = (firstLine.match(/,/g) || []).length;
+  return semicolons > commas ? ';' : ',';
+}
+
+/**
+ * Zerlegt eine CSV-Zeile in Zellen - schlanke RFC4180-Untermenge (Anfuehrungs-
+ * zeichen quoten, doppelte Anfuehrungszeichen escapen), reicht fuer die zwei
+ * schlichten Datumsspalten, die dieser Import wirklich liest.
+ */
+function splitCsvLine(line, delimiter) {
+  const cells = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; } else { inQuotes = false; }
+      } else {
+        cur += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === delimiter) {
+      cells.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  cells.push(cur);
+  return cells.map((c) => c.trim());
+}
+
+/**
+ * Datum eines Import-Feldes normalisieren: YYYY-MM-DD bleibt, wie es ist;
+ * DD.MM.YYYY (deutscher Excel-Export, wie schon beim Trennzeichen) wird
+ * umgestellt. Alles andere ist kein Datum, das dieser Import kennt.
+ * @returns {string|null}
+ */
+function normalizeImportDate(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return null;
+}
+
+// POST /cycle/import  (Perioden-Historie aus CSV, D-13)
+// Body: { csv: string }. Alles-oder-nichts: eine einzige ungueltige Zeile
+// verwirft den gesamten Import (Transaktion), mit einer Fehlerliste (max.
+// IMPORT_MAX_ERRORS Eintraege) statt eines pauschalen Fehlertexts - passend
+// zum bestehenden Import-Grundsatz dieser App (siehe z. B. den ICS-Import,
+// calendar/subscriptions.js): entweder der Nutzer bekommt genau das, was die
+// Datei versprach, oder gar nichts, nie eine stille Teilmenge.
+router.post('/cycle/import', (req, res) => {
+  try {
+    const viewer = viewerId(req);
+    const csv = req.body?.csv;
+    if (typeof csv !== 'string' || !csv.trim()) {
+      return badRequest(res, ['csv is required.']);
+    }
+    if (Buffer.byteLength(csv, 'utf8') > IMPORT_MAX_BYTES) {
+      return badRequest(res, [`csv must be at most ${IMPORT_MAX_BYTES} bytes.`]);
+    }
+
+    const lines = csv.split(/\r\n|\r|\n/).filter((line) => line.trim() !== '');
+    if (!lines.length) return badRequest(res, ['csv contains no rows.']);
+
+    const delimiter = detectCsvDelimiter(lines[0]);
+    // Kopfzeilen-tolerant: eine erste Zelle "start_date" (Gross-/Kleinschreibung
+    // egal) wird als Kopfzeile erkannt und uebersprungen - der eigene Export
+    // (CYCLE_HEADER) traegt genau diesen Namen an erster Stelle.
+    const firstCells = splitCsvLine(lines[0], delimiter);
+    const hasHeader = String(firstCells[0] || '').toLowerCase() === 'start_date';
+    const dataLines = hasHeader ? lines.slice(1) : lines;
+
+    if (!dataLines.length) return badRequest(res, ['csv contains no data rows.']);
+    if (dataLines.length > IMPORT_MAX_ROWS) {
+      return badRequest(res, [`csv may contain at most ${IMPORT_MAX_ROWS} data rows.`]);
+    }
+
+    const parsedRows = [];
+    const rowErrors = [];
+    dataLines.forEach((line, i) => {
+      const rowNum = i + 1;
+      const cells = splitCsvLine(line, delimiter);
+      const rawStart = cells[0];
+      const rawEnd = cells[1];
+
+      const startDate = normalizeImportDate(rawStart);
+      if (!startDate) {
+        rowErrors.push(`Row ${rowNum}: start_date "${rawStart || ''}" is not a valid date (expected YYYY-MM-DD or DD.MM.YYYY).`);
+        return;
+      }
+      // v.date() prueft zusaetzlich Kalendergueltigkeit (kein 2026-02-30) -
+      // dieselbe Pruefung wie POST /cycle/periods, kein zweiter Massstab hier.
+      if (v.date(startDate, 'start_date', true).error) {
+        rowErrors.push(`Row ${rowNum}: start_date "${rawStart}" is not a valid calendar date.`);
+        return;
+      }
+
+      let endDate = null;
+      if (rawEnd && String(rawEnd).trim()) {
+        endDate = normalizeImportDate(rawEnd);
+        if (!endDate || v.date(endDate, 'end_date').error) {
+          rowErrors.push(`Row ${rowNum}: end_date "${rawEnd}" is not a valid date (expected YYYY-MM-DD or DD.MM.YYYY).`);
+          return;
+        }
+        if (endDate < startDate) {
+          rowErrors.push(`Row ${rowNum}: end_date must not be before start_date.`);
+          return;
+        }
+      }
+
+      parsedRows.push({ startDate, endDate });
+    });
+
+    if (rowErrors.length) {
+      return res.status(400).json({
+        error: 'CSV contains invalid rows; nothing was imported.',
+        code: 400,
+        errors: rowErrors.slice(0, IMPORT_MAX_ERRORS),
+      });
+    }
+
+    const database = db.get();
+    const cycleSettingsRow = database.prepare('SELECT default_visibility FROM cycle_settings WHERE user_id = ?').get(viewer);
+    const visibility = cycleSettingsRow?.default_visibility || 'private';
+
+    // Duplikat-Regel: eine Zeile, deren start_date einer bereits vorhandenen
+    // Periode DIESES Nutzers entspricht, wird ÜBERSPRUNGEN (gezählt), nicht
+    // als Fehler behandelt - Ueberlappungen darueber hinaus sind erlaubt
+    // (weiche Warnung, keine Ablehnung; dieselbe Haltung wie beim manuellen
+    // Eintragen, das Ueberlappungen ebenfalls nicht prueft). Zwei Zeilen der
+    // Importdatei mit demselben start_date treffen dieselbe Regel: die erste
+    // zaehlt, jede weitere gilt als "schon vorhanden" und wird ebenfalls
+    // uebersprungen.
+    const { imported, skipped } = database.transaction(() => {
+      const existingStarts = new Set(
+        database.prepare('SELECT start_date FROM cycle_periods WHERE user_id = ?').all(viewer).map((r) => r.start_date)
+      );
+      const insert = database.prepare(
+        'INSERT INTO cycle_periods (user_id, start_date, end_date, visibility) VALUES (?, ?, ?, ?)'
+      );
+      let importedCount = 0;
+      let skippedCount = 0;
+      for (const row of parsedRows) {
+        if (existingStarts.has(row.startDate)) { skippedCount++; continue; }
+        insert.run(viewer, row.startDate, row.endDate, visibility);
+        existingStarts.add(row.startDate);
+        importedCount++;
+      }
+      return { imported: importedCount, skipped: skippedCount };
+    })();
+
+    // Sofort wirksam statt erst beim naechsten periodischen Lauf - gleiche
+    // Erwartung wie nach jeder anderen Aenderung an cycle_periods in dieser
+    // Datei (POST/PATCH/DELETE oben): ein Import verschiebt predictCycle()s
+    // naechsten Periodenbeginn sofort.
+    try {
+      syncCycleRemindersForUser(database, viewer);
+    } catch (err) {
+      log.error('Error syncing cycle reminders after import:', err.message);
+    }
+
+    res.status(201).json({ data: { imported, skipped, errors: [] } });
+  } catch (err) {
+    log.error('Error importing cycle history:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
   }
 });
