@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A calendar's default assignee can now be applied to the events it already imported** (#1154).
+  Until now the mapping only reached events that arrived after it was set, so the first thing
+  anyone saw after mapping a calendar was a list of unassigned events. Settings → Sync gains a
+  one-off "Apply to existing appointments" action for admins: it runs over the calendars of all
+  accounts that have a default assignee, names how many events it will touch, and fills only
+  events that are not assigned to anyone yet. An assignment made by hand is left alone. ICS
+  subscriptions are not included.
+
+- **The Housekeeping Reports tab can step through past months** (#1137). Until now it only ever
+  showed the current month, and older reports were reachable only through a single worker in the
+  Staff tab. A previous/next stepper with a jump back to the current month now sits next to the
+  title, in the same order as Budget. The chosen month stays put while you work in it: marking a
+  visit paid or editing one reloads that month instead of jumping back, and an empty month says
+  which month it is.
+
 ### Fixed
+
+- **Housekeeping only offers visit actions you are allowed to take** (#1135). A paid visit is
+  settled, and only an admin can change or delete it - but the Staff log and the recent visits on
+  the Overview showed edit and delete on every visit, so a member found out at save. The server now
+  sends per visit whether the current user may edit or delete it. Where that is not allowed, the row
+  offers the visit report instead and says that only an admin can change it. A calendar link to
+  such a visit opens the report rather than a form that cannot be saved.
 
 - **Household members and guests created as contacts now show the translated "Other" category
   instead of the German "Sonstiges"** (#1140). The contact that is mirrored when a household member
