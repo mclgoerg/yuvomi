@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Calendrier",
                 "prevMonth": "Mois précédent",
-                "nextMonth": "Mois suivant"
+                "nextMonth": "Mois suivant",
+                "likelihoodTitle": "Schémas de symptômes",
+                "likelihoodCaption": "Choisissez un symptôme pour voir les jours où il survient souvent, d'après votre historique."
             },
             "weekday": {
                 "mon": "Lu",
@@ -4350,8 +4352,6 @@
                 "typical": "Typique",
                 "atypical": "Atypique",
                 "typicalRangeLabel": "Plage typique : {{min}}-{{max}} jours",
-                "likelihoodTitle": "Schémas de symptômes",
-                "likelihoodCaption": "Choisissez un symptôme pour voir les jours où il survient souvent, d'après votre historique.",
                 "symptomTracked": "Enregistré",
                 "symptomPredicted": "Survient souvent ici",
                 "phaseOther": "Autre",
@@ -4538,6 +4538,7 @@
                 "periodToday": "Règles attendues aujourd'hui — les commencer maintenant ?",
                 "periodOverdue": "Règles en retard de {{count}} jours — les commencer maintenant ?",
                 "periodOverdue_one": "Règles en retard de {{count}} jour — les commencer maintenant ?",
+                "peakPainDay": "D'après votre historique, aujourd'hui est souvent votre jour de douleur le plus intense ({{symptom}}).",
                 "likelySymptomsToday": "Probable aujourd'hui : {{symptoms}}",
                 "pmsWindow": "Fenêtre prémenstruelle probable à partir de {{weekday}}",
                 "upcomingSymptom": "Probable à partir de {{weekday}} : {{symptom}}",

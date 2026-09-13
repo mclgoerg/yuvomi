@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Kalender",
                 "prevMonth": "Bulan sebelumnya",
-                "nextMonth": "Bulan berikutnya"
+                "nextMonth": "Bulan berikutnya",
+                "likelihoodTitle": "Pola gejala",
+                "likelihoodCaption": "Pilih gejala untuk melihat hari-hari kemunculannya, berdasarkan riwayatmu."
             },
             "weekday": {
                 "mon": "Sen",
@@ -4350,8 +4352,6 @@
                 "typical": "Umum",
                 "atypical": "Tidak umum",
                 "typicalRangeLabel": "Rentang umum: {{min}}-{{max}} hari",
-                "likelihoodTitle": "Pola gejala",
-                "likelihoodCaption": "Pilih gejala untuk melihat hari-hari kemunculannya, berdasarkan riwayatmu.",
                 "symptomTracked": "Tercatat",
                 "symptomPredicted": "Sering muncul di sini",
                 "phaseOther": "Lainnya",
@@ -4538,6 +4538,7 @@
                 "periodToday": "Menstruasi diperkirakan hari ini — mulai sekarang?",
                 "periodOverdue": "Menstruasi terlambat {{count}} hari — mulai sekarang?",
                 "periodOverdue_one": "Menstruasi terlambat {{count}} hari — mulai sekarang?",
+                "peakPainDay": "Berdasarkan polamu, hari ini sering menjadi hari nyeri paling parah ({{symptom}}).",
                 "likelySymptomsToday": "Kemungkinan hari ini: {{symptoms}}",
                 "pmsWindow": "Jendela PMS kemungkinan mulai {{weekday}}",
                 "upcomingSymptom": "Kemungkinan mulai {{weekday}}: {{symptom}}",

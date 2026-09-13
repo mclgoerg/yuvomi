@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Calendar",
                 "prevMonth": "Previous month",
-                "nextMonth": "Next month"
+                "nextMonth": "Next month",
+                "likelihoodTitle": "Symptom patterns",
+                "likelihoodCaption": "Pick a symptom to see which days it often occurs on, based on your history."
             },
             "weekday": {
                 "mon": "Mon",
@@ -4350,8 +4352,6 @@
                 "typical": "Typical",
                 "atypical": "Atypical",
                 "typicalRangeLabel": "Typical range: {{min}}-{{max}} days",
-                "likelihoodTitle": "Symptom patterns",
-                "likelihoodCaption": "Pick a symptom to see which days it often occurs on, based on your history.",
                 "symptomTracked": "Logged",
                 "symptomPredicted": "Often occurs here",
                 "phaseOther": "Other",
@@ -4538,6 +4538,7 @@
                 "periodToday": "Period expected today — start it now?",
                 "periodOverdue": "Period is {{count}} days overdue — start it now?",
                 "periodOverdue_one": "Period is {{count}} day overdue — start it now?",
+                "peakPainDay": "Today is often your strongest pain day ({{symptom}}), based on your pattern.",
                 "likelySymptomsToday": "Likely today: {{symptoms}}",
                 "pmsWindow": "PMS window likely from {{weekday}}",
                 "upcomingSymptom": "Likely from {{weekday}}: {{symptom}}",

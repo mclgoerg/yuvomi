@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "التقويم",
                 "prevMonth": "الشهر السابق",
-                "nextMonth": "الشهر التالي"
+                "nextMonth": "الشهر التالي",
+                "likelihoodTitle": "أنماط الأعراض",
+                "likelihoodCaption": "اختاري عرضًا لمعرفة الأيام التي يظهر فيها غالبًا، استنادًا إلى سجلّك."
             },
             "weekday": {
                 "mon": "إث",
@@ -4350,8 +4352,6 @@
                 "typical": "معتاد",
                 "atypical": "غير معتاد",
                 "typicalRangeLabel": "النطاق المعتاد: {{min}}-{{max}} أيام",
-                "likelihoodTitle": "أنماط الأعراض",
-                "likelihoodCaption": "اختاري عرضًا لمعرفة الأيام التي يظهر فيها غالبًا، استنادًا إلى سجلّك.",
                 "symptomTracked": "مسجَّل",
                 "symptomPredicted": "يظهر غالبًا هنا",
                 "phaseOther": "أخرى",
@@ -4538,6 +4538,7 @@
                 "periodToday": "من المتوقع أن تبدأ الدورة اليوم — هل تبدأ الآن؟",
                 "periodOverdue": "تأخرت الدورة {{count}} يوم — هل تبدأ الآن؟",
                 "periodOverdue_one": "تأخرت الدورة {{count}} يوم — هل تبدأ الآن؟",
+                "peakPainDay": "وفق نمطك، غالبًا ما يكون اليوم يوم الألم الأشد ({{symptom}}).",
                 "likelySymptomsToday": "محتمل اليوم: {{symptoms}}",
                 "pmsWindow": "نافذة ما قبل الدورة محتملة ابتداءً من {{weekday}}",
                 "upcomingSymptom": "محتمل ابتداءً من {{weekday}}: {{symptom}}",

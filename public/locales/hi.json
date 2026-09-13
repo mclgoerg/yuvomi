@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "कैलेंडर",
                 "prevMonth": "पिछला माह",
-                "nextMonth": "अगला माह"
+                "nextMonth": "अगला माह",
+                "likelihoodTitle": "लक्षण पैटर्न",
+                "likelihoodCaption": "अपने इतिहास के आधार पर यह देखने के लिए एक लक्षण चुनें कि वह किन दिनों में अक्सर होता है।"
             },
             "weekday": {
                 "mon": "सोम",
@@ -4350,8 +4352,6 @@
                 "typical": "सामान्य",
                 "atypical": "असामान्य",
                 "typicalRangeLabel": "सामान्य सीमा: {{min}}-{{max}} दिन",
-                "likelihoodTitle": "लक्षण पैटर्न",
-                "likelihoodCaption": "अपने इतिहास के आधार पर यह देखने के लिए एक लक्षण चुनें कि वह किन दिनों में अक्सर होता है।",
                 "symptomTracked": "दर्ज किया गया",
                 "symptomPredicted": "अक्सर यहाँ होता है",
                 "phaseOther": "अन्य",
@@ -4538,6 +4538,7 @@
                 "periodToday": "आज पीरियड आने की उम्मीद है — अभी शुरू करें?",
                 "periodOverdue": "पीरियड {{count}} दिन देर से है — अभी शुरू करें?",
                 "periodOverdue_one": "पीरियड {{count}} दिन देर से है — अभी शुरू करें?",
+                "peakPainDay": "तुम्हारे पैटर्न के अनुसार, आज अक्सर सबसे तेज़ दर्द वाला दिन होता है ({{symptom}}).",
                 "likelySymptomsToday": "आज संभावित: {{symptoms}}",
                 "pmsWindow": "PMS विंडो संभवतः {{weekday}} से",
                 "upcomingSymptom": "{{weekday}} से संभावित: {{symptom}}",

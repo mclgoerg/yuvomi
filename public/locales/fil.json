@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Kalendaryo",
                 "prevMonth": "Nakaraang buwan",
-                "nextMonth": "Susunod na buwan"
+                "nextMonth": "Susunod na buwan",
+                "likelihoodTitle": "Mga pattern ng sintomas",
+                "likelihoodCaption": "Pumili ng sintomas para makita kung anong mga araw ito madalas lumitaw, base sa iyong kasaysayan."
             },
             "weekday": {
                 "mon": "Lun",
@@ -4350,8 +4352,6 @@
                 "typical": "Karaniwan",
                 "atypical": "Hindi karaniwan",
                 "typicalRangeLabel": "Karaniwang saklaw: {{min}}-{{max}} araw",
-                "likelihoodTitle": "Mga pattern ng sintomas",
-                "likelihoodCaption": "Pumili ng sintomas para makita kung anong mga araw ito madalas lumitaw, base sa iyong kasaysayan.",
                 "symptomTracked": "Naitala",
                 "symptomPredicted": "Madalas lumitaw dito",
                 "phaseOther": "Iba pa",
@@ -4538,6 +4538,7 @@
                 "periodToday": "Inaasahan ang regla ngayon — simulan na?",
                 "periodOverdue": "Naantala na ng {{count}} araw ang regla — simulan na?",
                 "periodOverdue_one": "Naantala na ng {{count}} araw ang regla — simulan na?",
+                "peakPainDay": "Ayon sa iyong pattern, madalas na ngayon ang pinakamatinding araw ng sakit ({{symptom}}).",
                 "likelySymptomsToday": "Malamang ngayon: {{symptoms}}",
                 "pmsWindow": "Malamang magkaroon ng PMS window simula {{weekday}}",
                 "upcomingSymptom": "Malamang simula {{weekday}}: {{symptom}}",

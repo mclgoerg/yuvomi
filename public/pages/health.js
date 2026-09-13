@@ -47,7 +47,7 @@ import {
   bbtSeries, symptomIntensityTrend,
   symptomCyclePattern, TYPICAL_CYCLE_RANGE, isTypicalCycleLength,
   predictSymptomLikelihood, pmsWindow, periodFlowSummary,
-  sortPeriodsAsc, periodFlowLoad, heavyBleedingSignal, painSummary, daysBetween,
+  sortPeriodsAsc, periodFlowLoad, heavyBleedingSignal, painSummary, peakPainDay, daysBetween,
 } from '/utils/health-cycle.js';
 import { HEALTH_ROUTES, renderHealthTabsBar } from '/utils/health-tabs.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
@@ -4394,13 +4394,15 @@ function renderCycleShell() {
 // --------------------------------------------------------
 // "Heute"-Einblendung (C-1): EIN kompaktes Banner statt einer Kartenexplosion -
 // Zyklustag + Phase (immer) plus HOECHSTENS eine zweite Zeile nach fester
-// Prioritaet (ueberfaellige Periode > heute wahrscheinliche Symptome > PMS-
-// Fenster > kommendes wahrscheinliches Symptom > fruchtbares Fenster >
-// nichts - NIE eine Fuellphrase). Nur in der eigenen Ansicht
-// (isOwnCycleView(), siehe Aufrufstellen in renderCycleShell()) - Vorhersagen
-// einer fremden Person zu einer "heute"-Aussage zu verdichten waere anmassend.
-// Der alte, im Trends-Bereich vergrabene likelyToday-Callout (symptomLikelihood
-// Markup()) bleibt unangetastet - Trends gehoert nicht zu diesem Arbeitspaket.
+// Prioritaet (ueberfaellige Periode > staerkster Schmerztag laut Muster >
+// heute wahrscheinliche Symptome > PMS-Fenster > kommendes wahrscheinliches
+// Symptom > fruchtbares Fenster > nichts - NIE eine Fuellphrase). Nur in der
+// eigenen Ansicht (isOwnCycleView(), siehe Aufrufstellen in renderCycleShell())
+// - Vorhersagen einer fremden Person zu einer "heute"-Aussage zu verdichten
+// waere anmassend.
+// v2 Nutzer-Feedback: symptomLikelihoodMarkup() (die Symptom-Muster-Chips)
+// lebt inzwischen im Kalenderabschnitt (cycleCalendarMarkup()), nicht mehr in
+// den Trends - der frühere, dort vergrabene Callout war praktisch unsichtbar.
 // --------------------------------------------------------
 
 /** SSW-Zeile einer Schwangerschaft - von cyclePregnancyMarkup() UND der
@@ -4441,6 +4443,7 @@ function cycleBubbleMarkup(prediction) {
 
   const phaseLabel = t(CYCLE_PHASE_LABEL_KEYS[prediction.phase] || CYCLE_PHASE_LABEL_KEYS[PHASE.FOLLICULAR]);
   const line1 = t('health.cycle.bubble.line1', { day: prediction.cycleDay, phase: phaseLabel });
+  const settings = cycleSettings();
 
   // Prioritaet 1: Periode heute/ueberfaellig erwartet - derselbe Handlungsaufruf
   // wie die "Heute"-Aktionsleiste (cycleStartPeriodToday(), keine zweite
@@ -4459,6 +4462,25 @@ function cycleBubbleMarkup(prediction) {
       </div>`);
   }
 
+  // Prioritaet 2 (v2, Nutzer-Feedback): heute der laut Historie staerkste
+  // Schmerztag - VOR der generischen "heute wahrscheinlich"-Zeile (Prioritaet
+  // 3), weil ein konkreter Schmerz-Spitzentag mehr Handlungswert traegt als
+  // eine blosse Symptom-Liste. peakPainDay() rechnet rein aus der Historie
+  // (siehe dort); der Vergleich gegen den AKTUELLEN Zyklustag passiert hier.
+  // Musterformulierung ("laut deinem Muster"/"oft"), bewusst keine Prognose
+  // ("du wirst") und keine Ratschlagszeile - dieselbe Zurueckhaltung wie die
+  // uebrigen Bubble-Zeilen. Tippen oeffnet, wie Prioritaet 3, das heutige
+  // Tages-Log (derselbe data-action, keine zweite Logging-Route).
+  const peakPain = peakPainDay(cycle.logs, cycle.periods, settings);
+  if (peakPain && peakPain.cycleDay === prediction.cycleDay) {
+    const symptomLabel = t(symptomType(peakPain.symptomKey).labelKey);
+    return cycleBubbleShell(line1, `
+      <button type="button" class="cycle-bubble__line2 cycle-bubble__line2--action" data-action="cycle-bubble-log-today">
+        <span>${esc(t('health.cycle.bubble.peakPainDay', { symptom: symptomLabel }))}</span>
+        <i data-lucide="chevron-right" aria-hidden="true"></i>
+      </button>`);
+  }
+
   // Die verbleibenden Prioritaeten brauchen dieselbe Symptom-Wahrscheinlichkeit
   // ueber ALLE SYMPTOM_TYPES (nicht nur das im Trends-Bereich gewaehlte) - EIN
   // Durchlauf fuer diesen Render, nicht pro Fall neu. predictSymptomLikelihood()
@@ -4468,13 +4490,12 @@ function cycleBubbleMarkup(prediction) {
   // Tages-Logs) unkritisch, aber unnoetig oefter als einmal wiederholt -
   // dasselbe Muster wie pmsWindow() dort, das ebenfalls ueber alle Symptome
   // iteriert.
-  const settings = cycleSettings();
   const likelihoods = SYMPTOM_TYPES.map((s) => ({
     symptom: s,
     result: predictSymptomLikelihood(cycle.logs, cycle.periods, settings, s.value, today),
   }));
 
-  // Prioritaet 2: heute wahrscheinliche Symptome (bis zu drei, in SYMPTOM_TYPES-
+  // Prioritaet 3: heute wahrscheinliche Symptome (bis zu drei, in SYMPTOM_TYPES-
   // Reihenfolge - keine weitere Gewichtung noetig).
   const likelyToday = likelihoods.filter((l) => l.result.isLikelyToday).slice(0, 3);
   if (likelyToday.length) {
@@ -4486,7 +4507,7 @@ function cycleBubbleMarkup(prediction) {
       </button>`);
   }
 
-  // Prioritaet 3: PMS-Fenster (D-8) - enthaelt "heute" oder beginnt innerhalb
+  // Prioritaet 4: PMS-Fenster (D-8) - enthaelt "heute" oder beginnt innerhalb
   // der naechsten drei Tage.
   const pms = pmsWindow(cycle.logs, cycle.periods, settings, today);
   if (pms) {
@@ -4498,7 +4519,7 @@ function cycleBubbleMarkup(prediction) {
     }
   }
 
-  // Prioritaet 4: naechstes wahrscheinliches Symptom - ueber alle Symptome
+  // Prioritaet 5: naechstes wahrscheinliches Symptom - ueber alle Symptome
   // hinweg das fruehste `nextLikelyDate` innerhalb der naechsten 7 Tage.
   const upcoming = likelihoods
     .filter((l) => l.result.nextLikelyDate && daysBetween(today, l.result.nextLikelyDate) >= 0 && daysBetween(today, l.result.nextLikelyDate) <= 7)
@@ -4509,14 +4530,14 @@ function cycleBubbleMarkup(prediction) {
     return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t('health.cycle.bubble.upcomingSymptom', { weekday, symptom }))}</p>`);
   }
 
-  // Prioritaet 5: fruchtbares Fenster (nur wenn ueberhaupt verfolgt - D-9
+  // Prioritaet 6: fruchtbares Fenster (nur wenn ueberhaupt verfolgt - D-9
   // schaltet trackFertility unter hormoneller Verhuetung bereits ab).
   if (prediction.trackFertility && prediction.fertileStart && today >= prediction.fertileStart && today <= prediction.fertileEnd) {
     const key = prediction.ovulationConfirmed ? 'health.cycle.bubble.fertileConfirmed' : 'health.cycle.bubble.fertile';
     return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t(key, { date: formatDate(prediction.fertileEnd) }))}</p>`);
   }
 
-  // Prioritaet 6: nichts Passendes - NIE eine Fuellphrase, nur Zeile 1.
+  // Prioritaet 7: nichts Passendes - NIE eine Fuellphrase, nur Zeile 1.
   return cycleBubbleShell(line1, '');
 }
 
@@ -4948,6 +4969,7 @@ function cycleCalendarMarkup(own) {
            sind eigenstaendige Buttons mit Datums-Label. -->
       <div class="cycle-cal__grid">${cells}</div>
       ${cycleLegendMarkup({ hasConfirmedOvulation, showPms: pmsVisibleInMonth, own })}
+      ${symptomLikelihoodMarkup()}
     </section>`;
 }
 
@@ -5308,6 +5330,30 @@ function symptomIntensityTrendChartMarkup(trend, symptomLabel) {
 }
 
 /**
+ * Der Satz eines Zyklustag-Musters, OHNE das Raster - eigene Funktion, damit
+ * die Symptom-Chips im Kalenderabschnitt (symptomLikelihoodMarkup()) denselben
+ * Satz wie das Trends-Aufklappelement (symptomCyclePatternMarkup()) zeigen
+ * koennen, statt einer zweiten, parallel gepflegten Formulierung.
+ *
+ * "N Tage vor der Periode" ist konkreter als "in der Lutealphase" und gewinnt
+ * deshalb, wenn typicalDaysBeforePeriod ein echtes Muster gefunden hat (mind.
+ * 2 Zyklen mit demselben Wert - siehe symptomCyclePattern()). Sonst faellt es
+ * auf die grobe Phasen-Aussage zurueck, die immer verfuegbar ist, sobald das
+ * Symptom ueberhaupt einmal vorkam; ganz ohne Vorkommen (totalCount>=2, aber
+ * kein Treffer) bleibt die "kam nicht wieder vor"-Aussage der einzige Fall
+ * ohne echtes Muster.
+ */
+function symptomCyclePatternSentence(pattern, symptomLabel) {
+  if (pattern.totalCount < 2) return '';
+  const phaseLabel = pattern.mostCommonPhase ? t(SYMPTOM_PHASE_LABEL_KEYS[pattern.mostCommonPhase]) : null;
+  return pattern.typicalDaysBeforePeriod != null
+    ? t('health.cycle.trends.cyclePatternDaysBefore', { symptom: symptomLabel, days: pattern.typicalDaysBeforePeriod })
+    : phaseLabel
+      ? t('health.cycle.trends.cyclePatternSentence', { symptom: symptomLabel, phase: phaseLabel, occurred: pattern.occurredCount, total: pattern.totalCount })
+      : t('health.cycle.trends.cyclePatternNone', { symptom: symptomLabel, total: pattern.totalCount });
+}
+
+/**
  * Zyklustag-Muster eines Symptoms (Phase 4c) - Satz + kompaktes Raster (ein
  * Balken je Zyklus, Tageszellen phasengefaerbt, Ring um die Zelle markiert
  * ein tatsaechliches Vorkommen). Kein eigener Farbcode fuer "Treffer" - eine
@@ -5316,17 +5362,7 @@ function symptomIntensityTrendChartMarkup(trend, symptomLabel) {
  */
 function symptomCyclePatternMarkup(pattern, symptomLabel) {
   if (pattern.totalCount < 2) return '';
-  const phaseLabel = pattern.mostCommonPhase ? t(SYMPTOM_PHASE_LABEL_KEYS[pattern.mostCommonPhase]) : null;
-  // "N Tage vor der Periode" ist konkreter als "in der Lutealphase" und
-  // gewinnt deshalb, wenn typicalDaysBeforePeriod ein echtes Muster gefunden
-  // hat (mind. 2 Zyklen mit demselben Wert - siehe symptomCyclePattern()).
-  // Sonst faellt es auf die grobe Phasen-Aussage zurueck, die immer verfuegbar
-  // ist, sobald das Symptom ueberhaupt einmal vorkam.
-  const sentence = pattern.typicalDaysBeforePeriod != null
-    ? t('health.cycle.trends.cyclePatternDaysBefore', { symptom: symptomLabel, days: pattern.typicalDaysBeforePeriod })
-    : phaseLabel
-      ? t('health.cycle.trends.cyclePatternSentence', { symptom: symptomLabel, phase: phaseLabel, occurred: pattern.occurredCount, total: pattern.totalCount })
-      : t('health.cycle.trends.cyclePatternNone', { symptom: symptomLabel, total: pattern.totalCount });
+  const sentence = symptomCyclePatternSentence(pattern, symptomLabel);
 
   const rows = pattern.cycles.map((c) => {
     const cells = c.phaseByDay.map((phase, i) => {
@@ -5547,16 +5583,24 @@ function painSummaryTileMarkup(summary) {
 }
 
 /**
- * Symptom-Wahrscheinlichkeit (Phase 4e) - Symptom-Wahl treibt einen "heute
- * wahrscheinlich"-Hinweis und das Overlay auf dem Monatskalender (siehe
- * cycleCalendarMarkup). Die Auswahl selbst ist EIN globaler UI-Zustand
- * (cycle.likelihoodSymptom), kein Prop dieser Funktion, weil sie den
- * Kalender an anderer Stelle auf der Seite mitbestimmt.
+ * Symptom-Wahrscheinlichkeit (Phase 4e; v2 Nutzer-Feedback: aus den Trends IN
+ * den Kalenderabschnitt umgezogen - direkt unter der Kalender-Legende, statt
+ * ganz unten auf der Seite, wo die einzige sichtbare Wirkung (die Marker) weit
+ * oben passierte und ein Chip-Tap wie ein No-op wirkte). Symptom-Wahl treibt
+ * weiterhin einen "heute wahrscheinlich"-Hinweis und das Overlay auf dem
+ * Monatskalender (siehe cycleCalendarMarkup). Die Auswahl selbst ist EIN
+ * globaler UI-Zustand (cycle.likelihoodSymptom), kein Prop dieser Funktion,
+ * weil sie den Kalender an anderer Stelle auf der Seite mitbestimmt.
  *
  * Nur Symptome mit genug betrachtbarer Zyklus-Historie (dieselbe
  * MIN_HISTORY_GAPS-Schwelle wie Phase 0/4e) UND mindestens einem
  * tatsaechlichen Vorkommen erscheinen im Wahl-Chips - ein Chip, der immer
  * "zu wenig Daten" sagt, waere kein nuetzlicher Chip.
+ *
+ * Direkt unter den Chips: derselbe Muster-Satz wie im Trends-Aufklapper
+ * (symptomCyclePatternSentence(), keine zweite Formulierung) - das macht eine
+ * Auswahl endlich sichtbar wirksam, auch ohne erst zum Kalender hochzuscrollen.
+ * candidates garantiert bereits totalCount>=2, der Satz ist also nie leer.
  */
 function symptomLikelihoodMarkup() {
   const settings = cycleSettings();
@@ -5570,15 +5614,16 @@ function symptomLikelihoodMarkup() {
   const chips = candidates.map((s) => `
     <button type="button" class="health-choice" data-likelihood-symptom="${esc(s.value)}" aria-pressed="${s.value === selected}">${esc(t(s.labelKey))}</button>`).join('');
 
-  // Der fruehere "heute wahrscheinlich"-Callout hier ist entfallen: die
-  // Today-Bubble (cycleBubbleMarkup()) sagt das bereits automatisch und
-  // prominenter, ohne dass hier erst ein Chip gewaehlt werden muesste - Chip-
-  // Auswahl und Kalender-Overlay bleiben unveraendert.
+  const selectedType = selected ? symptomType(selected) : null;
+  const sentence = selectedType
+    ? symptomCyclePatternSentence(symptomCyclePattern(cycle.logs, cycle.periods, settings, selected), t(selectedType.labelKey))
+    : '';
+
   return `
-    <div class="health-chart-section cycle-likelihood">
-      <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(t('health.cycle.trends.likelihoodTitle'))}</div></div>
-      <p class="health-chart-section__caption">${esc(t('health.cycle.trends.likelihoodCaption'))}</p>
-      <div class="cycle-likelihood__picker" role="group" aria-label="${esc(t('health.cycle.trends.likelihoodTitle'))}">${chips}</div>
+    <div class="cycle-likelihood">
+      <p class="cycle-likelihood__caption">${esc(t('health.cycle.calendar.likelihoodCaption'))}</p>
+      <div class="cycle-likelihood__picker" role="group" aria-label="${esc(t('health.cycle.calendar.likelihoodTitle'))}">${chips}</div>
+      ${sentence ? `<p class="cycle-pattern__sentence cycle-likelihood__sentence">${esc(sentence)}</p>` : ''}
     </div>`;
 }
 
@@ -5613,7 +5658,6 @@ function cycleTrendsMarkup() {
     symptomFreq.length ? symptomFrequencyChartMarkup(symptomFreq, cycle.logs, cycle.periods, settings) : '',
     feelingFreq.length ? feelingFrequencyChartMarkup(feelingFreq) : '',
     bbt.length >= 2 ? bbtTrendChartMarkup(bbt) : '',
-    symptomLikelihoodMarkup(),
   ].filter(Boolean);
 
   // Kein leerer Abschnitt: ohne genug Historie für auch nur EINEN Trend

@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Kalendarz",
                 "prevMonth": "Poprzedni miesiąc",
-                "nextMonth": "Następny miesiąc"
+                "nextMonth": "Następny miesiąc",
+                "likelihoodTitle": "Wzorce objawów",
+                "likelihoodCaption": "Wybierz objaw, aby zobaczyć, w które dni najczęściej występuje, na podstawie Twojej historii."
             },
             "weekday": {
                 "mon": "Pn",
@@ -4350,8 +4352,6 @@
                 "typical": "Typowy",
                 "atypical": "Nietypowy",
                 "typicalRangeLabel": "Typowy zakres: {{min}}-{{max}} dni",
-                "likelihoodTitle": "Wzorce objawów",
-                "likelihoodCaption": "Wybierz objaw, aby zobaczyć, w które dni najczęściej występuje, na podstawie Twojej historii.",
                 "symptomTracked": "Zarejestrowano",
                 "symptomPredicted": "Często występuje tutaj",
                 "phaseOther": "Inne",
@@ -4538,6 +4538,7 @@
                 "periodToday": "Okres oczekiwany dziś — rozpocząć teraz?",
                 "periodOverdue": "Okres jest opóźniony o {{count}} dni — rozpocząć teraz?",
                 "periodOverdue_one": "Okres jest opóźniony o {{count}} dzień — rozpocząć teraz?",
+                "peakPainDay": "Według Twojego wzorca dzisiaj często występuje najsilniejszy ból ({{symptom}}).",
                 "likelySymptomsToday": "Dziś prawdopodobnie: {{symptoms}}",
                 "pmsWindow": "Okno PMS prawdopodobnie od {{weekday}}",
                 "upcomingSymptom": "Od {{weekday}} prawdopodobnie: {{symptom}}",

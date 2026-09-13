@@ -2283,6 +2283,28 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 .cycle-legend__flow-dot[data-flow="heavy"] { width: 8.5px; height: 8.5px; }
 
+/* v2 Nutzer-Feedback: die Symptom-Muster-Chips (Phase 4e) sitzen jetzt direkt
+ * unter der Kalender-Legende statt ganz unten im Trends-Bereich - dort war die
+ * einzige sichtbare Wirkung (die Kalender-Marker) weit entfernt und ein Tap
+ * wirkte wie ein No-op. Kein eigenes Kachel-Gehaeuse (kein .health-chart-
+ * section) mehr - es reiht sich flach in den Kalenderabschnitt ein, genau wie
+ * die Legende selbst. */
+.cycle-likelihood { margin-top: var(--space-4); }
+.cycle-likelihood__caption {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.cycle-likelihood__picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+/* Der Muster-Satz einer Auswahl (symptomCyclePatternSentence()) - dieselbe
+ * .cycle-pattern__sentence-Optik wie im Trends-Aufklapper, hier zusaetzlich
+ * mit etwas Abstand nach oben statt dessen eigenem unteren Rand. */
+.cycle-likelihood__sentence { margin: var(--space-2) 0 0; }
+
 /* ---- Trends (Phase 4) ---- */
 
 .cycle-trends { margin-top: var(--space-6); }
@@ -2363,15 +2385,6 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 .cycle-pattern-grid__cell { flex: 1 1 0; }
 .cycle-pattern-grid__cell--hit {
   box-shadow: inset 0 0 0 2px var(--color-text-primary);
-}
-
-/* Symptom-Wahrscheinlichkeits-Chips (Phase 4e) - der fruehere "heute
- * wahrscheinlich"-Callout daneben ist entfallen (siehe symptomLikelihoodMarkup()
- * in health.js: die Today-Bubble sagt dasselbe bereits automatisch). */
-.cycle-likelihood__picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
 /* D-1: kleines Gefuehls-Icon vor dem Zeilennamen (MOOD_TYPES-Icon) - Symptome

@@ -23,7 +23,7 @@ const {
   symptomCyclePattern, TYPICAL_CYCLE_RANGE, isTypicalCycleLength,
   predictSymptomLikelihood, projectFutureCycles,
   pmsWindow, periodFlowSummary, periodFlowLoad, heavyBleedingSignal,
-  PAIN_SYMPTOM_VALUES, painSummary,
+  PAIN_SYMPTOM_VALUES, painSummary, peakPainDay,
 } = await import('../public/utils/health-cycle.js');
 
 const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
@@ -1486,4 +1486,62 @@ test('painSummary: der laufende Zyklus zählt Schmerztage nur bis `todayKey`', (
   const summary = painSummary(logs, hist, {}, '2026-01-10');
   assert.equal(summary.currentCyclePainDays, 1);
   assert.equal(summary.avgPainDaysPerCycle, null); // kein abgeschlossener Zyklus vorhanden
+});
+
+// --------------------------------------------------------
+// peakPainDay (v2, Nutzer-Feedback)
+// --------------------------------------------------------
+// Drei Perioden -> zwei ABGESCHLOSSENE Zyklen (2026-01-01..01-29, 01-29..02-26)
+// + ein laufender (ab 02-26), der wie bei painSummary()s avgPainDaysPerCycle
+// nie mitzählt. Zyklustag 2 ist damit 2026-01-02 im ersten, 2026-01-30 im
+// zweiten abgeschlossenen Zyklus.
+const peakPainHist = periods(['2026-01-01', '2026-01-29', '2026-02-26'], 5);
+
+test('peakPainDay: Muster gefunden - 2 Zyklen, Tag 2, Ø 2,5', () => {
+  const logs = [
+    { log_date: '2026-01-02', symptoms: [{ key: 'cramps', intensity: 2 }] },
+    { log_date: '2026-01-30', symptoms: [{ key: 'cramps', intensity: 3 }] },
+  ];
+  const result = peakPainDay(logs, peakPainHist, {});
+  assert.deepEqual(result, { cycleDay: 2, symptomKey: 'cramps', avgIntensity: 2.5, cycles: 2 });
+});
+
+test('peakPainDay: null unter der Mindest-Intensität (Ø 1,5 < 2)', () => {
+  const logs = [
+    { log_date: '2026-01-02', symptoms: [{ key: 'cramps', intensity: 1 }] },
+    { log_date: '2026-01-30', symptoms: [{ key: 'cramps', intensity: 2 }] },
+  ];
+  assert.equal(peakPainDay(logs, peakPainHist, {}), null);
+});
+
+test('peakPainDay: null mit nur einem abgeschlossenen Zyklus', () => {
+  // Nur zwei Perioden -> ein einziger abgeschlossener Zyklus, der laufende
+  // zählt nie mit - selbst eine hohe, wiederholte Intensität reicht nicht.
+  const hist = periods(['2026-01-01', '2026-01-29'], 5);
+  const logs = [
+    { log_date: '2026-01-02', symptoms: [{ key: 'cramps', intensity: 3 }] },
+  ];
+  assert.equal(peakPainDay(logs, hist, {}), null);
+});
+
+test('peakPainDay: bei Gleichstand gewinnt der frühere Zyklustag', () => {
+  const logs = [
+    // Tag 2: Ø (2+3)/2 = 2,5
+    { log_date: '2026-01-02', symptoms: [{ key: 'cramps', intensity: 2 }] },
+    { log_date: '2026-01-30', symptoms: [{ key: 'cramps', intensity: 3 }] },
+    // Tag 5: derselbe Ø 2,5, aber später - darf Tag 2 nicht verdrängen.
+    { log_date: '2026-01-05', symptoms: [{ key: 'cramps', intensity: 2 }] },
+    { log_date: '2026-02-02', symptoms: [{ key: 'cramps', intensity: 3 }] },
+  ];
+  const result = peakPainDay(logs, peakPainHist, {});
+  assert.equal(result.cycleDay, 2);
+  assert.equal(result.avgIntensity, 2.5);
+});
+
+test('peakPainDay: null, wenn Schmerz-Symptome nie gradiert wurden', () => {
+  const logs = [
+    { log_date: '2026-01-02', symptoms: [{ key: 'cramps' }] },
+    { log_date: '2026-01-30', symptoms: [{ key: 'cramps' }] },
+  ];
+  assert.equal(peakPainDay(logs, peakPainHist, {}), null);
 });

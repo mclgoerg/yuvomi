@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Kalender",
                 "prevMonth": "Föregående månad",
-                "nextMonth": "Nästa månad"
+                "nextMonth": "Nästa månad",
+                "likelihoodTitle": "Symtommönster",
+                "likelihoodCaption": "Välj ett symtom för att se vilka dagar det ofta inträffar, baserat på din historik."
             },
             "weekday": {
                 "mon": "Mån",
@@ -4350,8 +4352,6 @@
                 "typical": "Typisk",
                 "atypical": "Atypisk",
                 "typicalRangeLabel": "Typiskt intervall: {{min}}-{{max}} dagar",
-                "likelihoodTitle": "Symtommönster",
-                "likelihoodCaption": "Välj ett symtom för att se vilka dagar det ofta inträffar, baserat på din historik.",
                 "symptomTracked": "Loggat",
                 "symptomPredicted": "Inträffar ofta här",
                 "phaseOther": "Annat",
@@ -4538,6 +4538,7 @@
                 "periodToday": "Mens väntas idag — starta nu?",
                 "periodOverdue": "Mens är {{count}} dagar försenad — starta nu?",
                 "periodOverdue_one": "Mens är {{count}} dag försenad — starta nu?",
+                "peakPainDay": "Enligt ditt mönster är idag ofta din dag med starkast smärta ({{symptom}}).",
                 "likelySymptomsToday": "Troligt idag: {{symptoms}}",
                 "pmsWindow": "PMS-fönster troligt från {{weekday}}",
                 "upcomingSymptom": "Troligt från {{weekday}}: {{symptom}}",

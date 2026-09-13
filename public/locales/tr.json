@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Takvim",
                 "prevMonth": "Önceki ay",
-                "nextMonth": "Sonraki ay"
+                "nextMonth": "Sonraki ay",
+                "likelihoodTitle": "Semptom örüntüleri",
+                "likelihoodCaption": "Geçmişine göre hangi günlerde sık görüldüğünü görmek için bir semptom seç."
             },
             "weekday": {
                 "mon": "Pzt",
@@ -4350,8 +4352,6 @@
                 "typical": "Tipik",
                 "atypical": "Atipik",
                 "typicalRangeLabel": "Tipik aralık: {{min}}-{{max}} gün",
-                "likelihoodTitle": "Semptom örüntüleri",
-                "likelihoodCaption": "Geçmişine göre hangi günlerde sık görüldüğünü görmek için bir semptom seç.",
                 "symptomTracked": "Kaydedildi",
                 "symptomPredicted": "Genellikle burada görülür",
                 "phaseOther": "Diğer",
@@ -4538,6 +4538,7 @@
                 "periodToday": "Adet bugün bekleniyor — şimdi başlatılsın mı?",
                 "periodOverdue": "Adet {{count}} gündür gecikti — şimdi başlatılsın mı?",
                 "periodOverdue_one": "Adet {{count}} gündür gecikti — şimdi başlatılsın mı?",
+                "peakPainDay": "Örüntüne göre bugün genellikle en yoğun ağrı günün oluyor ({{symptom}}).",
                 "likelySymptomsToday": "Bugün muhtemel: {{symptoms}}",
                 "pmsWindow": "PMS penceresi muhtemelen {{weekday}} itibarıyla",
                 "upcomingSymptom": "{{weekday}} itibarıyla muhtemel: {{symptom}}",

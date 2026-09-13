@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Kalendář",
                 "prevMonth": "Předchozí měsíc",
-                "nextMonth": "Příští měsíc"
+                "nextMonth": "Příští měsíc",
+                "likelihoodTitle": "Vzorce symptomů",
+                "likelihoodCaption": "Vyberte symptom a zjistěte, ve které dny se podle vaší historie často objevuje."
             },
             "weekday": {
                 "mon": "Po",
@@ -4350,8 +4352,6 @@
                 "typical": "Typické",
                 "atypical": "Atypické",
                 "typicalRangeLabel": "Typický rozsah: {{min}}-{{max}} dní",
-                "likelihoodTitle": "Vzorce symptomů",
-                "likelihoodCaption": "Vyberte symptom a zjistěte, ve které dny se podle vaší historie často objevuje.",
                 "symptomTracked": "Zaznamenáno",
                 "symptomPredicted": "Zde se často objevuje",
                 "phaseOther": "Ostatní",
@@ -4538,6 +4538,7 @@
                 "periodToday": "Menstruace se dnes očekává — začít teď?",
                 "periodOverdue": "Menstruace mešká {{count}} dní — začít teď?",
                 "periodOverdue_one": "Menstruace mešká {{count}} den — začít teď?",
+                "peakPainDay": "Podle vašeho vzorce bývá dnešek často dnem s nejsilnější bolestí ({{symptom}}).",
                 "likelySymptomsToday": "Dnes pravděpodobně: {{symptoms}}",
                 "pmsWindow": "PMS okno pravděpodobně od {{weekday}}",
                 "upcomingSymptom": "Od {{weekday}} pravděpodobně: {{symptom}}",

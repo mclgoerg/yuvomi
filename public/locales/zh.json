@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "日历",
                 "prevMonth": "上个月",
-                "nextMonth": "下个月"
+                "nextMonth": "下个月",
+                "likelihoodTitle": "症状模式",
+                "likelihoodCaption": "选择一个症状,查看根据你的历史记录它常出现在哪些天。"
             },
             "weekday": {
                 "mon": "一",
@@ -4350,8 +4352,6 @@
                 "typical": "典型",
                 "atypical": "非典型",
                 "typicalRangeLabel": "典型范围:{{min}}-{{max}} 天",
-                "likelihoodTitle": "症状模式",
-                "likelihoodCaption": "选择一个症状,查看根据你的历史记录它常出现在哪些天。",
                 "symptomTracked": "已记录",
                 "symptomPredicted": "常在此处出现",
                 "phaseOther": "其他",
@@ -4538,6 +4538,7 @@
                 "periodToday": "预计今天来月经——现在开始记录？",
                 "periodOverdue": "月经已延迟{{count}}天——现在开始记录？",
                 "periodOverdue_one": "月经已延迟{{count}}天——现在开始记录？",
+                "peakPainDay": "根据你的规律,今天常常是疼痛最严重的一天({{symptom}})。",
                 "likelySymptomsToday": "今天可能出现：{{symptoms}}",
                 "pmsWindow": "PMS 窗口可能从{{weekday}}开始",
                 "upcomingSymptom": "从{{weekday}}起可能出现：{{symptom}}",

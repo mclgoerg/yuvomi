@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "カレンダー",
                 "prevMonth": "先月",
-                "nextMonth": "来月"
+                "nextMonth": "来月",
+                "likelihoodTitle": "症状パターン",
+                "likelihoodCaption": "症状を選ぶと、あなたの履歴に基づいてよく現れる日がわかります。"
             },
             "weekday": {
                 "mon": "月",
@@ -4350,8 +4352,6 @@
                 "typical": "典型的",
                 "atypical": "非典型的",
                 "typicalRangeLabel": "典型的な範囲:{{min}}~{{max}}日",
-                "likelihoodTitle": "症状パターン",
-                "likelihoodCaption": "症状を選ぶと、あなたの履歴に基づいてよく現れる日がわかります。",
                 "symptomTracked": "記録済み",
                 "symptomPredicted": "ここでよく現れる",
                 "phaseOther": "その他",
@@ -4538,6 +4538,7 @@
                 "periodToday": "今日生理が予測されています — 今すぐ開始しますか?",
                 "periodOverdue": "生理が{{count}}日遅れています — 今すぐ開始しますか?",
                 "periodOverdue_one": "生理が{{count}}日遅れています — 今すぐ開始しますか?",
+                "peakPainDay": "あなたのパターンによると、今日は痛みが最も強くなりやすい日です({{symptom}})。",
                 "likelySymptomsToday": "今日起こりやすい: {{symptoms}}",
                 "pmsWindow": "PMS期間はおそらく{{weekday}}から",
                 "upcomingSymptom": "{{weekday}}からおそらく: {{symptom}}",

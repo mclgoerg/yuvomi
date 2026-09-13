@@ -30,6 +30,9 @@
  *                          über `feelings` statt `symptoms`.
  *        - painSummary() (v2, D-4): Schmerztage aktueller Zyklus vs. Ø +
  *                          Ø-Intensität über die schmerzbezogenen Symptome.
+ *        - peakPainDay() (v2, Nutzer-Feedback): welcher Zyklustag laut
+ *                          Historie im Mittel am staerksten schmerzt, fuer die
+ *                          Today-Bubble.
  *        Bewusst KEINE i18n/DOM — in Node ohne Browser testbar (labelKeys liefern
  *        die Übersetzung erst im UI).
  * Abhängigkeiten: ./date.js (ebenfalls DOM-frei; relativer Import, siehe
@@ -1256,6 +1259,93 @@ export function painSummary(dayLogs, periods, settings = {}, todayKey = househol
   const avgPainDaysPerCycle = pastCounts.length ? mean(pastCounts) : null;
 
   return { currentCyclePainDays, avgPainDaysPerCycle, avgIntensity: mean(intensities) };
+}
+
+// Mindestanzahl VERSCHIEDENER abgeschlossener Zyklen mit einer gradierten
+// Auswahl an genau diesem Zyklustag, bevor "dein staerkster Schmerztag" als
+// Muster gilt - ein einzelner starker Nachmittag ist Zufall, kein Befund
+// (dieselbe Zurueckhaltung wie MIN_ELIGIBLE_CYCLES_FOR_DAY bei
+// predictSymptomLikelihood()).
+const MIN_CYCLES_FOR_PEAK_PAIN_DAY = 2;
+// Ab dieser Ø-Intensitaet (Skala 1-3, siehe INTENSITY_LEVELS) gilt ein Tag
+// ueberhaupt erst als schmerzhaft genug fuer die Aussage - "mild" (Ø < 2)
+// waere keine "staerkster Schmerztag"-Behauptung wert.
+const MIN_AVG_INTENSITY_FOR_PEAK_PAIN_DAY = 2;
+
+/**
+ * Der Zyklustag, an dem die Schmerz-Symptome (PAIN_SYMPTOM_VALUES) laut
+ * Historie im Mittel am staerksten ausfallen - fuer die Today-Bubble
+ * ("heute ist laut deinem Muster oft dein staerkster Schmerztag").
+ *
+ * Nur ABGESCHLOSSENE Zyklen zaehlen (reconstructCycles() ohne den letzten,
+ * laufenden Eintrag - derselbe Grund wie bei painSummary()s
+ * `avgPainDaysPerCycle`: ein noch nicht fertig beobachteter Zyklus wuerde das
+ * Mittel verzerren, nicht bestaetigen). Je Schmerz-Symptom UND Zyklustag wird
+ * ueber alle GRADIERTEN (1-3) Vorkommen der abgeschlossenen Zyklen gemittelt;
+ * eine ungradierte Auswahl traegt keine Intensitaet bei (dieselbe Regel wie
+ * `avgIntensity` in painSummary()/frequencyByPhase()). Der Tag mit dem
+ * hoechsten Mittel gewinnt, aber erst ab MIN_CYCLES_FOR_PEAK_PAIN_DAY
+ * verschiedenen Zyklen MIT gradierter Auswahl an genau diesem Tag und einem
+ * Mittel ab MIN_AVG_INTENSITY_FOR_PEAK_PAIN_DAY - sonst `null`.
+ *
+ * Bei Gleichstand gewinnt der FRUEHERE Zyklustag (aufsteigende Tagesschleife,
+ * nur ein STRENG hoeheres Mittel ersetzt den bisherigen Bestwert); bei einem
+ * Gleichstand zwischen zwei Symptomen am selben Tag gewinnt das Symptom, das
+ * zuerst in PAIN_SYMPTOM_VALUES steht - beides eine feste, willkuerliche, aber
+ * deterministische Regel statt eines unklaren "irgendeins".
+ *
+ * @param {Array<Object>} dayLogs
+ * @param {Array<Object>} periods
+ * @param {Object} [settings] - cycle_settings-Zeile (für luteal_length).
+ * @returns {{cycleDay: number, symptomKey: string, avgIntensity: number, cycles: number}|null}
+ */
+export function peakPainDay(dayLogs, periods, settings = {}) {
+  const allCycles = reconstructCycles(periods, settings);
+  // Der letzte Eintrag ist der laufende Zyklus (siehe Dokblock) - hier immer
+  // ausgeschlossen, unabhaengig von "heute", weil diese Funktion rein aus der
+  // Historie ableitet; der Aufrufer vergleicht das Ergebnis selbst gegen den
+  // aktuellen Zyklustag.
+  const pastCycles = allCycles.slice(0, -1);
+  if (pastCycles.length < MIN_CYCLES_FOR_PEAK_PAIN_DAY) return null;
+
+  // Eimer je (Symptom, Zyklustag): gradierte Intensitaeten + welche Zyklen
+  // (per Index) ueberhaupt beigetragen haben - Letzteres zaehlt VERSCHIEDENE
+  // Zyklen, nicht Einzel-Eintraege (ein Symptom kommt je Tag ohnehin nur
+  // einmal normalisiert vor, siehe normalizeSymptomEntries()).
+  const buckets = new Map();
+  let maxDay = 0;
+  for (const log of (dayLogs || [])) {
+    if (!log?.log_date) continue;
+    const dk = dayKey(log.log_date);
+    const cycIdx = pastCycles.findIndex((c) => daysBetween(c.cycleStart, dk) >= 0 && daysBetween(dk, c.nextStart) > 0);
+    if (cycIdx < 0) continue;
+    const day = daysBetween(pastCycles[cycIdx].cycleStart, dk) + 1;
+    if (day > maxDay) maxDay = day;
+    for (const entry of normalizeSymptomEntries(log.symptoms)) {
+      if (!PAIN_SYMPTOM_VALUES.includes(entry.key) || entry.intensity == null) continue;
+      const key = `${entry.key}|${day}`;
+      let b = buckets.get(key);
+      if (!b) { b = { intensities: [], cycleIdxs: new Set() }; buckets.set(key, b); }
+      b.intensities.push(entry.intensity);
+      b.cycleIdxs.add(cycIdx);
+    }
+  }
+
+  let best = null;
+  for (let day = 1; day <= maxDay; day += 1) {
+    for (const symptomKey of PAIN_SYMPTOM_VALUES) {
+      const b = buckets.get(`${symptomKey}|${day}`);
+      if (!b || b.cycleIdxs.size < MIN_CYCLES_FOR_PEAK_PAIN_DAY) continue;
+      const avgIntensity = mean(b.intensities);
+      if (avgIntensity < MIN_AVG_INTENSITY_FOR_PEAK_PAIN_DAY) continue;
+      // Strikt groesser statt >=: die aufsteigende Tagesschleife trifft den
+      // frueheren Tag zuerst, ein Gleichstand darf ihn deshalb nicht verdraengen.
+      if (!best || avgIntensity > best.avgIntensity) {
+        best = { cycleDay: day, symptomKey, avgIntensity, cycles: b.cycleIdxs.size };
+      }
+    }
+  }
+  return best;
 }
 
 /**

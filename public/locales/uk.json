@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Календар",
                 "prevMonth": "Попередній місяць",
-                "nextMonth": "Наступний місяць"
+                "nextMonth": "Наступний місяць",
+                "likelihoodTitle": "Патерни симптомів",
+                "likelihoodCaption": "Виберіть симптом, щоб побачити, у які дні він найчастіше виникає, за вашою історією."
             },
             "weekday": {
                 "mon": "Пн",
@@ -4350,8 +4352,6 @@
                 "typical": "Типово",
                 "atypical": "Нетипово",
                 "typicalRangeLabel": "Типовий діапазон: {{min}}-{{max}} дн.",
-                "likelihoodTitle": "Патерни симптомів",
-                "likelihoodCaption": "Виберіть симптом, щоб побачити, у які дні він найчастіше виникає, за вашою історією.",
                 "symptomTracked": "Записано",
                 "symptomPredicted": "Часто виникає тут",
                 "phaseOther": "Інше",
@@ -4538,6 +4538,7 @@
                 "periodToday": "Місячні очікуються сьогодні — розпочати зараз?",
                 "periodOverdue": "Місячні затримуються на {{count}} днів — розпочати зараз?",
                 "periodOverdue_one": "Місячні затримуються на {{count}} день — розпочати зараз?",
+                "peakPainDay": "За вашим патерном сьогодні часто буває день із найсильнішим болем ({{symptom}}).",
                 "likelySymptomsToday": "Сьогодні ймовірно: {{symptoms}}",
                 "pmsWindow": "Вікно ПМС ймовірно з {{weekday}}",
                 "upcomingSymptom": "З {{weekday}} ймовірно: {{symptom}}",

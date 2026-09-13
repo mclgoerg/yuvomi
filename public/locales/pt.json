@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Calendário",
                 "prevMonth": "Mês anterior",
-                "nextMonth": "Próximo mês"
+                "nextMonth": "Próximo mês",
+                "likelihoodTitle": "Padrões de sintomas",
+                "likelihoodCaption": "Escolhe um sintoma para ver em que dias costuma ocorrer, com base no teu histórico."
             },
             "weekday": {
                 "mon": "Seg",
@@ -4350,8 +4352,6 @@
                 "typical": "Típico",
                 "atypical": "Atípico",
                 "typicalRangeLabel": "Intervalo típico: {{min}}-{{max}} dias",
-                "likelihoodTitle": "Padrões de sintomas",
-                "likelihoodCaption": "Escolhe um sintoma para ver em que dias costuma ocorrer, com base no teu histórico.",
                 "symptomTracked": "Registado",
                 "symptomPredicted": "Costuma ocorrer aqui",
                 "phaseOther": "Outro",
@@ -4538,6 +4538,7 @@
                 "periodToday": "Período previsto para hoje — começar agora?",
                 "periodOverdue": "Período está atrasado há {{count}} dias — começar agora?",
                 "periodOverdue_one": "Período está atrasado há {{count}} dia — começar agora?",
+                "peakPainDay": "Segundo o teu padrão, hoje costuma ser o teu dia de dor mais intensa ({{symptom}}).",
                 "likelySymptomsToday": "Provável hoje: {{symptoms}}",
                 "pmsWindow": "Janela pré-menstrual provável a partir de {{weekday}}",
                 "upcomingSymptom": "Provável a partir de {{weekday}}: {{symptom}}",

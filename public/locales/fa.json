@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "تقویم",
                 "prevMonth": "ماه قبل",
-                "nextMonth": "ماه بعد"
+                "nextMonth": "ماه بعد",
+                "likelihoodTitle": "الگوهای علائم",
+                "likelihoodCaption": "علامتی را انتخاب کن تا بر اساس سابقه‌ات ببینی معمولاً در چه روزهایی رخ می‌دهد."
             },
             "weekday": {
                 "mon": "دوش",
@@ -4350,8 +4352,6 @@
                 "typical": "معمول",
                 "atypical": "غیرمعمول",
                 "typicalRangeLabel": "بازه معمول: {{min}}-{{max}} روز",
-                "likelihoodTitle": "الگوهای علائم",
-                "likelihoodCaption": "علامتی را انتخاب کن تا بر اساس سابقه‌ات ببینی معمولاً در چه روزهایی رخ می‌دهد.",
                 "symptomTracked": "ثبت‌شده",
                 "symptomPredicted": "اغلب اینجا رخ می‌دهد",
                 "phaseOther": "دیگر",
@@ -4538,6 +4538,7 @@
                 "periodToday": "امروز انتظار می‌رود پریود شروع شود — همین حالا شروع شود؟",
                 "periodOverdue": "پریود {{count}} روز به تأخیر افتاده — همین حالا شروع شود؟",
                 "periodOverdue_one": "پریود {{count}} روز به تأخیر افتاده — همین حالا شروع شود؟",
+                "peakPainDay": "بر اساس الگوی تو، امروز اغلب روز اوج درد توست ({{symptom}}).",
                 "likelySymptomsToday": "احتمال امروز: {{symptoms}}",
                 "pmsWindow": "پنجره PMS احتمالاً از {{weekday}}",
                 "upcomingSymptom": "احتمالاً از {{weekday}}: {{symptom}}",

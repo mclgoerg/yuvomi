@@ -4308,7 +4308,9 @@
             "calendar": {
                 "title": "Naptár",
                 "prevMonth": "Előző hónap",
-                "nextMonth": "Következő hónap"
+                "nextMonth": "Következő hónap",
+                "likelihoodTitle": "Tünetminták",
+                "likelihoodCaption": "Válassz egy tünetet, hogy lásd, mely napokon jelentkezik gyakran, az előzményeid alapján."
             },
             "weekday": {
                 "mon": "H",
@@ -4350,8 +4352,6 @@
                 "typical": "Jellemző",
                 "atypical": "Nem jellemző",
                 "typicalRangeLabel": "Jellemző tartomány: {{min}}-{{max}} nap",
-                "likelihoodTitle": "Tünetminták",
-                "likelihoodCaption": "Válassz egy tünetet, hogy lásd, mely napokon jelentkezik gyakran, az előzményeid alapján.",
                 "symptomTracked": "Rögzítve",
                 "symptomPredicted": "Gyakran itt jelentkezik",
                 "phaseOther": "Egyéb",
@@ -4538,6 +4538,7 @@
                 "periodToday": "A menstruáció ma várható — elindítod most?",
                 "periodOverdue": "A menstruáció {{count}} napja késik — elindítod most?",
                 "periodOverdue_one": "A menstruáció {{count}} napja késik — elindítod most?",
+                "peakPainDay": "A mintázatod szerint ma gyakran a legerősebb fájdalom napja van ({{symptom}}).",
                 "likelySymptomsToday": "Ma valószínű: {{symptoms}}",
                 "pmsWindow": "PMS-időszak valószínűleg {{weekday}}-tól",
                 "upcomingSymptom": "{{weekday}}-tól valószínű: {{symptom}}",
