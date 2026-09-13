@@ -110,6 +110,7 @@ const EXPECTED = [
   'GET /cycle/settings',
   'PUT /cycle/settings',
   'PATCH /cycle/visibility',
+  'POST /cycle/import',
   'GET /export/cycle',
   // Zyklus-ICS-Feed-Token (Migration 180)
   'GET /cycle/feed',
@@ -125,10 +126,10 @@ const EXPECTED = [
   'PATCH /visibility-defaults/apply',
 ];
 
-test('Orchestrator ergibt exakt die erwartete Routentabelle (53 Routen)', () => {
+test('Orchestrator ergibt exakt die erwartete Routentabelle (54 Routen)', () => {
   const actual = collectRoutes(healthRouter).sort();
   assert.deepEqual(actual, [...EXPECTED].sort());
-  assert.equal(actual.length, 53);
+  assert.equal(actual.length, 54);
 });
 
 test('die Cluster-Router zusammen ergeben genau die Orchestrator-Routen (keine verlorene/doppelte Route)', () => {
