@@ -2725,7 +2725,9 @@ string or plain string array (both yield `intensity: null`).
 of the legacy scalar `mood` column exactly like migration 178 did for symptoms: backfill copies
 every non-empty `mood` into one row, the column freezes. The API's `feelings` field is this table's
 keys (validated against the 7 `MOOD_TYPES` values — unlike symptom keys, an unknown feeling is a
-400); saving fully replaces a log's rows (delete + re-insert, no diffing).
+400); saving fully replaces a log's rows (delete + re-insert, no diffing) and actively sets the
+legacy `mood` column to NULL, so a cleared selection stays cleared on pre-migration rows; readers
+fall back to `mood` only when `feelings` is absent entirely, never when it is an empty array.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -2737,9 +2739,13 @@ keys (validated against the 7 `MOOD_TYPES` values — unlike symptom keys, an un
 maintains one additional `cycle_period` reminder row whose recipient is the partner while the
 anchor identity stays with the owner — no fourth reminder entity type, zero new registry entries.
 The partner receives the predicted **date only**, never any log content, and gains no read access;
-the notification body names the owner (`health.cycle.status.partnerNextPeriod`). The reminder is
-dropped when the opt-in is cleared, pregnancy mode turns on, or **either side** loses health-module
-access or disables the cycle tab for themselves.
+the notification body names the owner (`health.cycle.status.partnerNextPeriod`), and
+`GET /reminders/pending` carries `cycle_anchor_kind` (plus `cycle_owner_name` for
+`partner_period`) so the in-app list renders the partner case with the owner's name instead of
+claiming it as the recipient's own period. Switching the partner re-targets the existing reminder
+(the upsert compares the recipient, not only the date). The reminder is dropped when the opt-in is
+cleared, pregnancy mode turns on, or **either side** loses health-module access or disables the
+cycle tab for themselves.
 
 **Period-history import** — `POST /api/v1/health/cycle/import`, body `{ csv }` (≤100 KB, ≤500 data
 rows): header-tolerant CSV of `start_date,end_date` in the export's own column order, comma or
@@ -2908,18 +2914,24 @@ client-side in `public/utils/health-cycle.js` / rendered in `public/pages/health
   projection, so the two views can no longer contradict each other on one screen. Confirmed cells
   render solid where predictions render as outline/hatch (`confirmed: true`, same
   measured-vs-guessed grammar as the ring), with a legend row appended only when visible.
-- **Prediction inputs are gap-guarded**: cycle gaps under 10 or over 90 days, and gaps involving a
-  future-dated start, are excluded from the averages (`stats.excludedGaps` counts them) — one
-  typo'd or overlapping period no longer silently wrecks every statistic. The period modal warns
-  (non-blocking) on a future start date or an overlap.
+- **Prediction inputs are gap-guarded**: cycle gaps under 10 days, over 365 days, or involving a
+  future-dated start are always excluded from the averages (`stats.excludedGaps` counts them); gaps
+  of 90–365 days are excluded only when enough 10–90-day gaps exist on their own — a user with
+  consistently long cycles (oligomenorrhea) keeps a history-derived average instead of silently
+  falling back to the 28-day default. The period modal warns (non-blocking) on a future start date
+  or an overlap. `projectFutureCycles()` and `predictCycle()` share one anchor rule
+  (`latestNonFutureStart()`), so a future-dated period can no longer split the calendar between two
+  contradictory anchors.
 - **Symptom likelihood looks forward**: `predictSymptomLikelihood()` maps likely cycle days onto
   the next projected cycle too (`nextLikelyDate`), so an early-cycle symptom pattern is visible as
   an upcoming marker instead of only a past one.
 - **A "Today" insight bubble** tops the own-view cycle tab: always the cycle day + phase (SSW line
   in pregnancy mode), plus the single most relevant second line by fixed priority — period expected
-  today/overdue (with an inline start action), symptoms likely today, PMS window starting, upcoming
-  likely symptom within 7 days, or the fertile window — and deliberately nothing when there is
-  nothing to say.
+  today/overdue (with an inline start action — or, when a logged period is still open, an
+  "end it?" action instead, so the bubble can never suggest starting an overlapping period),
+  today often being the strongest pain day per the graded-intensity pattern, symptoms likely today,
+  PMS window starting, upcoming likely symptom within 7 days, or the fertile window — and
+  deliberately nothing when there is nothing to say.
 - **Flow is a first-class visual**: the calendar's log dot scales in size and tint with the
   4-step flow value (legend row included), History rows carry a heaviest-flow chip
   (`periodFlowSummary()`), Trends gains a per-episode flow-load bar chart (`periodFlowLoad()`,
@@ -2932,7 +2944,9 @@ client-side in `public/utils/health-cycle.js` / rendered in `public/pages/health
   (pattern + severity) instead of two stacked disclosures.
 - **PMS window** (`pmsWindow()`): derived from luteal symptom patterns
   (`typicalDaysBeforePeriod`), rendered as a subtle wash on otherwise-unphased calendar days and in
-  the Today bubble — pattern language only, never diagnostic, and off via `show_pms`.
+  the Today bubble — pattern language only, never diagnostic, off via `show_pms`, and **own view
+  only** (settings are private, so a family viewer can neither see the shading nor bypass the
+  owner's opt-out; computed once per render and passed to bubble + calendar).
 - The Health **Overview tab** gains a next-period tile (range-aware in perimenopause mode, SSW in
   pregnancy mode) linking to the cycle tab, and the cycle footer links the ICS feed and dashboard
   widget so the two opt-in surfaces are discoverable.
