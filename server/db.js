@@ -7698,6 +7698,88 @@ const MIGRATIONS = [
                THEN COALESCE(location, '') ELSE '' END)
       FROM calendar_events;    `,
   },
+  {
+    version: 195,
+    description: 'Health: cervical mucus, LH/pregnancy test results and intimacy as optional day-log scalars',
+    // Vier weitere Skalarwerte je Tag, gleiche Bauart wie Migration 179
+    // (basal_temp): ein ALTER TABLE kann - anders als das urspruengliche
+    // CREATE TABLE - keinen CHECK mehr an eine bestehende Tabelle anfuegen,
+    // ohne sie neu aufzubauen. Die Werte-Liste lebt deshalb in der Route,
+    // genau wie bei basal_temp_unit.
+    //
+    // `intimacy` ist bewusst KEIN sichtbarkeitsgesteuertes Feld wie die
+    // anderen drei: die Route liefert es nur an den Eigentuemer selbst zurueck,
+    // unabhaengig von `visibility` (siehe cycle.js GET /cycle/logs) - ein
+    // Sexualleben-Eintrag soll nicht ueber "family" fuer andere
+    // Haushaltsmitglieder mitlesbar werden, nur weil der restliche Tag geteilt
+    // ist.
+    up: `
+      ALTER TABLE cycle_day_logs ADD COLUMN cervix_mucus TEXT;
+      ALTER TABLE cycle_day_logs ADD COLUMN lh_test TEXT;
+      ALTER TABLE cycle_day_logs ADD COLUMN pregnancy_test TEXT;
+      ALTER TABLE cycle_day_logs ADD COLUMN intimacy TEXT;
+    `,
+  },
+  {
+    version: 196,
+    description: 'Health: multi-select feelings per day log - normalized cycle_day_log_feelings table, backfilled from the legacy mood column',
+    // Gleiches Muster wie Migration 178 (cycle_day_log_symptoms): die alte
+    // Skalar-Spalte (cycle_day_logs.mood) bleibt UNVERAENDERT stehen - kein
+    // DROP COLUMN, kein Rebuild. Sie ist ab hier nur noch historisch: neue
+    // Schreibvorgaenge (server/routes/health/cycle.js) fuellen sie nicht mehr.
+    // Die API liest sie zur Abwaertskompatibilitaet zwar noch zurueck, aber ihr
+    // Wert wandert nach dieser Migration nie wieder in die Datenbank. Ein
+    // rohes Backup von vor dieser Migration bleibt trotzdem lesbar, ohne einen
+    // zweiten Migrationspfad zu brauchen.
+    up: `
+      CREATE TABLE cycle_day_log_feelings (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        day_log_id  INTEGER NOT NULL REFERENCES cycle_day_logs(id) ON DELETE CASCADE,
+        feeling_key TEXT    NOT NULL,
+        UNIQUE(day_log_id, feeling_key)
+      );
+      CREATE INDEX idx_cycle_day_log_feelings_day_log ON cycle_day_log_feelings(day_log_id);
+
+      -- Rueckwirkend aus der alten Skalar-Spalte befuellen: genau eine Zeile
+      -- je Tages-Log mit gesetztem mood-Wert. Anders als bei Migration 178
+      -- (Komma-Liste, mehrere Symptome je Zeile) ist hier keine Zerlegung
+      -- noetig - mood trug schon immer genau einen Wert.
+      INSERT INTO cycle_day_log_feelings (day_log_id, feeling_key)
+      SELECT id, TRIM(mood) FROM cycle_day_logs WHERE mood IS NOT NULL AND TRIM(mood) <> '';
+    `,
+  },
+  {
+    version: 197,
+    description: 'Health: cycle_settings extensions - contraception, perimenopause mode, PMS toggle, opt-in partner notification',
+    up: `
+      -- Kein CHECK auf der Spalte: die Werte-Liste lebt in der Route (gleiche
+      -- Aufteilung wie basal_temp_unit/flow ueberall sonst in diesem Modul).
+      -- Eine Teilmenge dieser Werte (hormonell) schaltet clientseitig die
+      -- Eisprung-/Fruchtbarkeitsvorhersage ab - siehe DECISIONS.md.
+      ALTER TABLE cycle_settings ADD COLUMN contraception TEXT;
+
+      -- Standard 0 (aus): ein Bestandshaushalt sieht ohne aktives Zutun keine
+      -- geaenderte Vorhersage-Darstellung.
+      ALTER TABLE cycle_settings ADD COLUMN perimenopause_mode INTEGER NOT NULL DEFAULT 0
+        CHECK(perimenopause_mode IN (0, 1));
+
+      -- Standard 1 (an): die PMS-Einblendung ist rein abgeleitet (kein
+      -- gespeicherter Zeitraum, siehe DECISIONS.md) und rendert ohnehin nur
+      -- bei einem echten erkannten Muster - ein Bestandshaushalt sieht also
+      -- nur dann ueberhaupt etwas Neues, wenn die eigenen Daten es hergeben.
+      ALTER TABLE cycle_settings ADD COLUMN show_pms INTEGER NOT NULL DEFAULT 1
+        CHECK(show_pms IN (0, 1));
+
+      -- Opt-in-Benachrichtigung (D-15): der Eigentuemer veroeffentlicht, die
+      -- Partnerperson braucht keine eigene Freigabe (siehe DECISIONS.md) -
+      -- deshalb genuegt ein einfacher Verweis ohne Gegenzeichnung. SET NULL
+      -- statt CASCADE: verlaesst die verwiesene Person den Haushalt, verliert
+      -- die Einstellung nur ihr Ziel, nicht die eigene Zeile.
+      ALTER TABLE cycle_settings ADD COLUMN notify_partner_user_id INTEGER
+        REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE cycle_settings ADD COLUMN notify_partner_days_before INTEGER;
+    `,
+  },
 ];
 
 /**

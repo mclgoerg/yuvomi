@@ -27,9 +27,10 @@ import * as db from '../../db.js';
 import * as v from '../../middleware/validate.js';
 import { cycleToCsv } from '../../services/health-export.js';
 import { syncCycleRemindersForUser } from '../../services/cycle-reminders.js';
-import { normalizeSymptomEntries } from '../../../public/utils/health-cycle.js';
+import { isHouseholdMember } from '../../services/member-email.js';
+import { normalizeSymptomEntries, MOOD_VALUES } from '../../../public/utils/health-cycle.js';
 import {
-  log, VISIBILITIES, FLOW_LEVELS, MAX_UNIT,
+  log, VISIBILITIES, FLOW_LEVELS,
   viewerId, visibilityClause, toBit, applyUpdate, badRequest,
   exportFilename, sendCsv, exportRange,
 } from './helpers.js';
@@ -93,6 +94,73 @@ function replaceSymptoms(database, dayLogId, entries) {
     'INSERT INTO cycle_day_log_symptoms (day_log_id, symptom_key, intensity) VALUES (?, ?, ?)'
   );
   for (const entry of entries) insert.run(dayLogId, entry.key, entry.intensity);
+}
+
+// Geschlossene Werte-Listen fuer die seit Migration 195 nullbaren Spalten
+// (kein CHECK auf der Spalte selbst, siehe dortiger Kommentar) - dieselbe
+// Aufteilung wie basal_temp_unit: die Liste lebt hier, nicht im Schema.
+const CERVIX_MUCUS_VALUES = ['dry', 'sticky', 'creamy', 'watery', 'eggwhite'];
+const TEST_RESULT_VALUES  = ['negative', 'positive']; // LH- und Schwangerschaftstest (D-11)
+// D-6, hart privat (siehe GET /cycle/logs unten und DECISIONS.md).
+const INTIMACY_VALUES     = ['protected', 'unprotected', 'solo'];
+
+/**
+ * Gefuehle eines Tages (Mehrfachauswahl, seit Migration 196) validieren +
+ * normalisieren. Anders als normalizeSymptomEntries() (offenes Schema, nur
+ * eine Format-Regex) ist dies ein GESCHLOSSENES Set - MOOD_VALUES aus
+ * health-cycle.js, dieselbe Quelle wie das Frontend-Preset - und ein
+ * unbekannter Wert ist ein Fehler (400), kein still verworfener Eintrag:
+ * Gefuehle sind keine erweiterbare Presets-Liste wie Symptome, sondern eine
+ * feste kleine Auswahl.
+ *
+ * Nimmt `feelings` (Array) entgegen, oder - fehlt es - das alte Einzelfeld
+ * `mood` als Ein-Element-Liste (Abwaertskompatibilitaet, siehe POST-Handler).
+ * @returns {{ keys: string[]|null, error: string|null }}
+ */
+function normalizeFeelings(rawFeelings, rawMood) {
+  const list = rawFeelings !== undefined && rawFeelings !== null
+    ? rawFeelings
+    : (rawMood !== undefined && rawMood !== null && rawMood !== '' ? [rawMood] : []);
+  if (!Array.isArray(list)) return { keys: null, error: 'feelings must be an array.' };
+
+  const keys = [];
+  const seen = new Set();
+  for (const item of list) {
+    const key = String(item).trim().toLowerCase();
+    if (!MOOD_VALUES.includes(key)) {
+      return { keys: null, error: `feelings must contain only: ${MOOD_VALUES.join(', ')}.` };
+    }
+    if (!seen.has(key)) { seen.add(key); keys.push(key); }
+  }
+  return { keys, error: null };
+}
+
+/** Gefuehls-Schluessel eines Tages-Logs, in Einfuegereihenfolge. */
+function feelingsForLog(database, dayLogId) {
+  return database.prepare(
+    'SELECT feeling_key FROM cycle_day_log_feelings WHERE day_log_id = ? ORDER BY id'
+  ).all(dayLogId).map((r) => r.feeling_key);
+}
+
+/** Batch-Fassung von feelingsForLog() fuer GET /cycle/logs - EIN `IN (...)` statt einer Abfrage je Zeile. */
+function feelingsForLogs(database, dayLogIds) {
+  const byLog = new Map(dayLogIds.map((id) => [id, []]));
+  if (dayLogIds.length === 0) return byLog;
+  const placeholders = dayLogIds.map(() => '?').join(', ');
+  const rows = database.prepare(
+    `SELECT day_log_id, feeling_key FROM cycle_day_log_feelings WHERE day_log_id IN (${placeholders}) ORDER BY id`
+  ).all(...dayLogIds);
+  for (const { day_log_id, feeling_key } of rows) byLog.get(day_log_id).push(feeling_key);
+  return byLog;
+}
+
+/** Ersetzt die Gefuehls-Zeilen eines Tages-Logs vollstaendig (loeschen + neu anlegen). */
+function replaceFeelings(database, dayLogId, keys) {
+  database.prepare('DELETE FROM cycle_day_log_feelings WHERE day_log_id = ?').run(dayLogId);
+  const insert = database.prepare(
+    'INSERT INTO cycle_day_log_feelings (day_log_id, feeling_key) VALUES (?, ?)'
+  );
+  for (const key of keys) insert.run(dayLogId, key);
 }
 
 // ---- Perioden-Episoden ----
@@ -218,12 +286,27 @@ router.get('/cycle/logs', (req, res) => {
     sql += ' ORDER BY l.log_date DESC, l.id DESC';
     const database = db.get();
     const rows = database.prepare(sql).all(...params);
-    // `symptoms` kommt seit Migration 178 aus der eigenen Tabelle, nicht mehr
-    // aus der (nur noch historischen) Komma-Spalte - `SELECT l.*` liefert die
-    // alte Spalte zwar mit, der Überschreib unten ersetzt sie in der Antwort.
-    // Batch statt eine Abfrage je Zeile (symptomsForLogs(), ein IN (...)).
+    // `symptoms`/`feelings` kommen aus je einer eigenen Tabelle (Migration 178
+    // bzw. 196), nicht mehr aus den (nur noch historischen) Skalar-Spalten -
+    // `SELECT l.*` liefert die alten Spalten zwar mit, der Überschreib unten
+    // ersetzt `symptoms` in der Antwort und ergänzt `feelings`; `mood` bleibt
+    // als reiner Altlast-Lesewert stehen (siehe Migration 196). Batch statt
+    // einer Abfrage je Zeile (symptomsForLogs()/feelingsForLogs(), je ein
+    // `IN (...)`).
     const symptomsByLog = symptomsForLogs(database, rows.map((row) => row.id));
-    res.json({ data: rows.map((row) => ({ ...row, symptoms: symptomsByLog.get(row.id) })) });
+    const feelingsByLog = feelingsForLogs(database, rows.map((row) => row.id));
+    res.json({ data: rows.map((row) => {
+      // `intimacy` ist hart privat (D-6, siehe DECISIONS.md): unabhängig von
+      // `visibility` nur für den Eigentümer selbst sichtbar, auch wenn diese
+      // Zeile familienweit geteilt ist - siehe Migration 195's Kommentar.
+      const { intimacy, ...rest } = row;
+      return {
+        ...rest,
+        symptoms: symptomsByLog.get(row.id),
+        feelings: feelingsByLog.get(row.id),
+        ...(row.user_id === viewer ? { intimacy } : {}),
+      };
+    }) });
   } catch (err) {
     log.error('Error listing cycle logs:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
@@ -235,33 +318,50 @@ router.post('/cycle/logs', (req, res) => {
   try {
     const viewer = viewerId(req);
     const b = req.body || {};
-    const logDate    = v.date(b.log_date, 'log_date', true);
-    const flow       = v.oneOf(b.flow, FLOW_LEVELS, 'flow');
-    const mood       = v.str(b.mood, 'mood', { max: MAX_UNIT, required: false });
-    const note       = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
-    const visibility = v.oneOf(b.visibility, VISIBILITIES, 'visibility');
-    const symptoms   = normalizeSymptomEntries(b.symptoms);
-    const basalTemp  = validateBasalTemp(b.basal_temp, b.basal_temp_unit);
+    const logDate       = v.date(b.log_date, 'log_date', true);
+    const flow          = v.oneOf(b.flow, FLOW_LEVELS, 'flow');
+    const note          = v.str(b.note, 'note', { max: v.MAX_TEXT, required: false });
+    const visibility    = v.oneOf(b.visibility, VISIBILITIES, 'visibility');
+    const symptoms      = normalizeSymptomEntries(b.symptoms);
+    const basalTemp     = validateBasalTemp(b.basal_temp, b.basal_temp_unit);
+    const cervixMucus   = v.oneOf(b.cervix_mucus, CERVIX_MUCUS_VALUES, 'cervix_mucus');
+    const lhTest        = v.oneOf(b.lh_test, TEST_RESULT_VALUES, 'lh_test');
+    const pregnancyTest = v.oneOf(b.pregnancy_test, TEST_RESULT_VALUES, 'pregnancy_test');
+    const intimacy      = v.oneOf(b.intimacy, INTIMACY_VALUES, 'intimacy');
+    // Legacy `mood` (Einzelwert) wird, wenn `feelings` fehlt, als
+    // Ein-Element-Liste behandelt - siehe normalizeFeelings(). Die
+    // `mood`-Spalte selbst wird ab hier nicht mehr beschrieben (Migration 196).
+    const feelings      = normalizeFeelings(b.feelings, b.mood);
 
-    const errors = v.collectErrors([logDate, flow, mood, note, visibility]);
+    const errors = v.collectErrors([logDate, flow, note, visibility, cervixMucus, lhTest, pregnancyTest, intimacy]);
     if (symptoms.length > MAX_SYMPTOMS_COUNT) errors.push(`symptoms may include at most ${MAX_SYMPTOMS_COUNT} entries.`);
     if (basalTemp.error) errors.push(basalTemp.error);
+    if (feelings.error) errors.push(feelings.error);
     if (errors.length) return badRequest(res, errors);
 
     const database = db.get();
-    // Log-Zeile und ihre Symptome zusammen, sonst koennte ein Absturz
-    // dazwischen die eine ohne die andere zurücklassen.
+    // Log-Zeile, ihre Symptome und ihre Gefühle zusammen, sonst könnte ein
+    // Absturz dazwischen eine Teilmenge ohne die andere zurücklassen.
     const dayLogId = database.transaction(() => {
       database.prepare(`
-        INSERT INTO cycle_day_logs (user_id, log_date, flow, mood, note, visibility, basal_temp, basal_temp_unit)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO cycle_day_logs (
+          user_id, log_date, flow, note, visibility, basal_temp, basal_temp_unit,
+          cervix_mucus, lh_test, pregnancy_test, intimacy
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(user_id, log_date) DO UPDATE SET
-          flow = excluded.flow, mood = excluded.mood,
-          note = excluded.note, visibility = excluded.visibility,
-          basal_temp = excluded.basal_temp, basal_temp_unit = excluded.basal_temp_unit
-      `).run(viewer, logDate.value, flow.value, mood.value, note.value, visibility.value || 'private', basalTemp.temp, basalTemp.unit);
+          flow = excluded.flow, note = excluded.note, visibility = excluded.visibility,
+          basal_temp = excluded.basal_temp, basal_temp_unit = excluded.basal_temp_unit,
+          cervix_mucus = excluded.cervix_mucus, lh_test = excluded.lh_test,
+          pregnancy_test = excluded.pregnancy_test, intimacy = excluded.intimacy
+      `).run(
+        viewer, logDate.value, flow.value, note.value, visibility.value || 'private',
+        basalTemp.temp, basalTemp.unit,
+        cervixMucus.value, lhTest.value, pregnancyTest.value, intimacy.value,
+      );
       const id = database.prepare('SELECT id FROM cycle_day_logs WHERE user_id = ? AND log_date = ?').get(viewer, logDate.value).id;
       replaceSymptoms(database, id, symptoms);
+      replaceFeelings(database, id, feelings.keys);
       return id;
     })();
 
@@ -276,7 +376,12 @@ router.post('/cycle/logs', (req, res) => {
     }
 
     const row = database.prepare('SELECT * FROM cycle_day_logs WHERE id = ?').get(dayLogId);
-    res.status(201).json({ data: { ...row, symptoms: symptomsForLog(database, dayLogId) } });
+    // POST ist immer der eigene Eintrag des Aufrufers (der Zyklus-Tab kennt
+    // keine Betreuung, siehe Datei-Kopfkommentar) - `intimacy` braucht hier
+    // deshalb keinen Eigentümer-Check wie bei GET.
+    res.status(201).json({
+      data: { ...row, symptoms: symptomsForLog(database, dayLogId), feelings: feelingsForLog(database, dayLogId) },
+    });
   } catch (err) {
     log.error('Error saving cycle log:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
@@ -303,12 +408,25 @@ router.delete('/cycle/logs/:id', (req, res) => {
 
 // ---- Einstellungen (nur eigene) ----
 
+// Verhuetungsmethode (D-9): geschlossene Auswahl, NULL = nicht angegeben.
+// Kein CHECK auf der Spalte (siehe Migration 197) - dieselbe Aufteilung wie
+// ueberall sonst in diesem Modul. Die *hormonelle* Teilmenge (pill,
+// hormonal_iud, implant, injection, patch, ring) schaltet clientseitig die
+// Eisprung-/Fruchtbarkeitsvorhersage ab (siehe DECISIONS.md); Kupferspirale/
+// Kondom/keine aendern daran nichts - das entscheidet public/utils/health-cycle.js,
+// nicht diese Route.
+const CONTRACEPTION_VALUES = [
+  'none', 'pill', 'hormonal_iud', 'copper_iud', 'implant', 'injection', 'patch', 'ring', 'condom', 'other',
+];
+
 /** Voreinstellungen, falls die Person noch keine Zeile hat. */
 function defaultCycleSettings(userId) {
   return {
     user_id: userId, cycle_length_avg: null, period_length_avg: null, luteal_length: 14, track_fertility: 1,
     pregnancy_mode: 0, pregnancy_due_date: null, default_visibility: 'private',
     remind_period_days_before: null, remind_log_daily: 0,
+    contraception: null, perimenopause_mode: 0, show_pms: 1,
+    notify_partner_user_id: null, notify_partner_days_before: null,
   };
 }
 
@@ -348,16 +466,51 @@ router.put('/cycle/settings', (req, res) => {
     // typische Lutealphase waere keine Vorwarnung mehr, sondern Dauerlaerm.
     const remindDaysBefore = intInRange(b.remind_period_days_before, 'remind_period_days_before', 0, 14);
     const remindLogDaily   = toBit(b.remind_log_daily);
+    const contraception    = v.oneOf(b.contraception, CONTRACEPTION_VALUES, 'contraception');
+    const perimenopause    = toBit(b.perimenopause_mode);
+    const showPms          = toBit(b.show_pms);
+    const partnerDaysBefore = intInRange(b.notify_partner_days_before, 'notify_partner_days_before', 0, 14);
 
-    const errors = v.collectErrors([cycleLen, periodLen, luteal, dueDate, defVis, remindDaysBefore]);
+    // notify_partner_user_id: muss ein echtes Haushaltsmitglied sein (die eine
+    // gemeinsame Regel dafuer, isHouseholdMember() - siehe DECISIONS.md "eine
+    // Regel lebt an einem Ort", nicht als eigener Vergleich hier nachgebaut)
+    // und darf nicht die aufrufende Person selbst sein: der Eigentuemer
+    // veroeffentlicht, eine Benachrichtigung an sich selbst waere sinnlos
+    // (siehe DECISIONS.md, D-15). Leer/undefined loescht - gleiche
+    // Voll-Ersetzen-Semantik wie jedes andere Feld dieser Route.
+    let notifyPartnerUserId = null;
+    let notifyPartnerError = null;
+    if (b.notify_partner_user_id !== undefined && b.notify_partner_user_id !== null && b.notify_partner_user_id !== '') {
+      const candidate = parseInt(b.notify_partner_user_id, 10);
+      if (!candidate) {
+        notifyPartnerError = 'notify_partner_user_id must be a valid user id.';
+      } else if (candidate === viewer) {
+        notifyPartnerError = 'notify_partner_user_id must not be the caller themselves.';
+      } else if (!isHouseholdMember(candidate, { db: db.get() })) {
+        notifyPartnerError = 'notify_partner_user_id must be an existing household member.';
+      } else {
+        notifyPartnerUserId = candidate;
+      }
+    }
+
+    const errors = v.collectErrors([
+      cycleLen, periodLen, luteal, dueDate, defVis, remindDaysBefore, contraception, partnerDaysBefore,
+    ]);
     if (b.track_fertility !== undefined && track === undefined) errors.push('track_fertility must be a boolean.');
     if (b.pregnancy_mode !== undefined && pregnancy === undefined) errors.push('pregnancy_mode must be a boolean.');
     if (b.remind_log_daily !== undefined && remindLogDaily === undefined) errors.push('remind_log_daily must be a boolean.');
+    if (b.perimenopause_mode !== undefined && perimenopause === undefined) errors.push('perimenopause_mode must be a boolean.');
+    if (b.show_pms !== undefined && showPms === undefined) errors.push('show_pms must be a boolean.');
+    if (notifyPartnerError) errors.push(notifyPartnerError);
     if (errors.length) return badRequest(res, errors);
 
     db.get().prepare(`
-      INSERT INTO cycle_settings (user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility, pregnancy_mode, pregnancy_due_date, default_visibility, remind_period_days_before, remind_log_daily)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO cycle_settings (
+        user_id, cycle_length_avg, period_length_avg, luteal_length, track_fertility, pregnancy_mode,
+        pregnancy_due_date, default_visibility, remind_period_days_before, remind_log_daily,
+        contraception, perimenopause_mode, show_pms, notify_partner_user_id, notify_partner_days_before
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET
         cycle_length_avg = excluded.cycle_length_avg,
         period_length_avg = excluded.period_length_avg,
@@ -367,14 +520,24 @@ router.put('/cycle/settings', (req, res) => {
         pregnancy_due_date = excluded.pregnancy_due_date,
         default_visibility = excluded.default_visibility,
         remind_period_days_before = excluded.remind_period_days_before,
-        remind_log_daily = excluded.remind_log_daily
+        remind_log_daily = excluded.remind_log_daily,
+        contraception = excluded.contraception,
+        perimenopause_mode = excluded.perimenopause_mode,
+        show_pms = excluded.show_pms,
+        notify_partner_user_id = excluded.notify_partner_user_id,
+        notify_partner_days_before = excluded.notify_partner_days_before
     `).run(viewer, cycleLen.value, periodLen.value, luteal.value === null ? 14 : luteal.value,
            track === undefined ? 1 : track,
            pregnancy === undefined ? 0 : pregnancy,
            dueDate.value,
            defVis.value || 'private',
            remindDaysBefore.value,
-           remindLogDaily === undefined ? 0 : remindLogDaily);
+           remindLogDaily === undefined ? 0 : remindLogDaily,
+           contraception.value,
+           perimenopause === undefined ? 0 : perimenopause,
+           showPms === undefined ? 1 : showPms,
+           notifyPartnerUserId,
+           partnerDaysBefore.value);
 
     // Sofort wirksam statt erst beim naechsten periodischen Lauf - gleiche
     // Erwartung wie ueberall sonst (server/routes/schedule-preferences.js).

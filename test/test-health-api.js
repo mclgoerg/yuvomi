@@ -741,6 +741,67 @@ test('Cycle-Settings: default_visibility – Default privat, Upsert, Validierung
   assert.equal(bad.status, 400);
 });
 
+test('Cycle-Settings: neue Felder – Default, Upsert (Verhütung, Perimenopause, PMS)', async () => {
+  asB();
+  const def = await call('GET', '/cycle/settings');
+  assert.equal(def.body.data.contraception, null);
+  assert.equal(def.body.data.perimenopause_mode, 0);
+  assert.equal(def.body.data.show_pms, 1);
+  assert.equal(def.body.data.notify_partner_user_id, null);
+  assert.equal(def.body.data.notify_partner_days_before, null);
+
+  const saved = await call('PUT', '/cycle/settings', {
+    contraception: 'hormonal_iud', perimenopause_mode: true, show_pms: false,
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.data.contraception, 'hormonal_iud');
+  assert.equal(saved.body.data.perimenopause_mode, 1);
+  assert.equal(saved.body.data.show_pms, 0);
+
+  const reread = await call('GET', '/cycle/settings');
+  assert.equal(reread.body.data.contraception, 'hormonal_iud');
+});
+
+test('Cycle-Settings: ungültiger contraception-Wert wird abgelehnt', async () => {
+  asB();
+  const res = await call('PUT', '/cycle/settings', { contraception: 'herbal' });
+  assert.equal(res.status, 400);
+});
+
+test('Cycle-Settings: Partner-Benachrichtigung (D-15) – gültiges Haushaltsmitglied, dann per Voll-Ersetzen wieder gelöscht', async () => {
+  asA();
+  const saved = await call('PUT', '/cycle/settings', {
+    notify_partner_user_id: userB, notify_partner_days_before: 2,
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.data.notify_partner_user_id, userB);
+  assert.equal(saved.body.data.notify_partner_days_before, 2);
+
+  // Diese Route ersetzt vollständig (wie jedes andere Feld hier) - ein PUT
+  // ohne das Feld räumt es wieder ab, statt den Bestandswert zu erhalten.
+  const cleared = await call('PUT', '/cycle/settings', {});
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.body.data.notify_partner_user_id, null);
+});
+
+test('Cycle-Settings: notify_partner_user_id lehnt eine unbekannte Person ab (400)', async () => {
+  asA();
+  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: 999999 });
+  assert.equal(res.status, 400);
+});
+
+test('Cycle-Settings: notify_partner_user_id lehnt die aufrufende Person selbst ab (400)', async () => {
+  asA();
+  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: userA });
+  assert.equal(res.status, 400);
+});
+
+test('Cycle-Settings: notify_partner_days_before außerhalb 0-14 wird abgelehnt', async () => {
+  asA();
+  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: userB, notify_partner_days_before: 30 });
+  assert.equal(res.status, 400);
+});
+
 test('Cycle: Bulk-Sichtbarkeit flippt eigene Einträge, fremde bleiben unberührt (#550)', async () => {
   asA();
   const foreign = await call('POST', '/cycle/periods', { start_date: '2026-09-01', note: 'bulk-foreign-A' });
@@ -781,6 +842,99 @@ test('Export cycle: CSV mit Perioden- und Zykluslänge', async () => {
   assert.ok(res.text.includes('"start_date","end_date","period_length_days","cycle_length_days"'));
   assert.ok(res.text.includes('exp-cyc-1'));
   assert.ok(res.text.includes('"28"')); // Abstand 05.01 → 02.02
+});
+
+// ========================================================
+// ZYKLUS v2: Zervixschleim/Tests/Intimacy, Mehrfach-Gefühle (Migrationen 195-196)
+// ========================================================
+
+test('Cycle-Log: neue Skalarfelder + feelings im Round-Trip', async () => {
+  asA();
+  const created = await call('POST', '/cycle/logs', {
+    log_date: '2030-01-01', flow: 'light',
+    cervix_mucus: 'eggwhite', lh_test: 'positive', pregnancy_test: 'negative',
+    intimacy: 'protected', feelings: ['good', 'irritable'],
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.data.cervix_mucus, 'eggwhite');
+  assert.equal(created.body.data.lh_test, 'positive');
+  assert.equal(created.body.data.pregnancy_test, 'negative');
+  assert.equal(created.body.data.intimacy, 'protected');
+  assert.deepEqual(created.body.data.feelings, ['good', 'irritable']);
+  // Die mood-Spalte wird seit Migration 196 nie mehr beschrieben, auch nicht,
+  // wenn nur `feelings` gesendet wird.
+  assert.equal(created.body.data.mood, null);
+
+  const list = await call('GET', '/cycle/logs?from=2030-01-01&to=2030-01-01');
+  const row = list.body.data.find((l) => l.log_date === '2030-01-01');
+  assert.deepEqual(row.feelings, ['good', 'irritable']);
+  assert.equal(row.cervix_mucus, 'eggwhite');
+  assert.equal(row.intimacy, 'protected');
+});
+
+test('Cycle-Log: ungültige Werte für die neuen Enum-Felder werden je einzeln abgelehnt (400)', async () => {
+  asA();
+  const cases = [
+    { cervix_mucus: 'slippery' },
+    { lh_test: 'maybe' },
+    { pregnancy_test: 'unsure' },
+    { intimacy: 'yes' },
+  ];
+  for (const extra of cases) {
+    const res = await call('POST', '/cycle/logs', { log_date: '2030-01-02', ...extra });
+    assert.equal(res.status, 400, JSON.stringify(extra));
+  }
+});
+
+test('Cycle-Log: unbekannter feelings-Schlüssel wird abgelehnt (400)', async () => {
+  asA();
+  const res = await call('POST', '/cycle/logs', { log_date: '2030-01-03', feelings: ['ecstatic'] });
+  assert.equal(res.status, 400);
+});
+
+test('Cycle-Log: legacy mood ohne feelings wird zu feelings:[mood], mood-Spalte bleibt NULL', async () => {
+  asA();
+  const res = await call('POST', '/cycle/logs', { log_date: '2030-01-04', mood: 'sensitive' });
+  assert.equal(res.status, 201);
+  assert.deepEqual(res.body.data.feelings, ['sensitive']);
+  assert.equal(res.body.data.mood, null);
+});
+
+test('Cycle-Log: ungültiger legacy mood-Wert wird abgelehnt wie ein ungültiges feelings-Element', async () => {
+  asA();
+  const res = await call('POST', '/cycle/logs', { log_date: '2030-01-05', mood: 'furious' });
+  assert.equal(res.status, 400);
+});
+
+test('Cycle-Log: intimacy ist hart privat – Eigentümer sieht es, family-Mitglied nicht (D-6)', async () => {
+  asA();
+  const created = await call('POST', '/cycle/logs', {
+    log_date: '2030-01-06', flow: 'medium', intimacy: 'unprotected', visibility: 'family',
+  });
+  assert.equal(created.body.data.intimacy, 'unprotected');
+
+  asB();
+  const asBob = await call('GET', `/cycle/logs?user_id=${userA}&from=2030-01-06&to=2030-01-06`);
+  const bobRow = asBob.body.data.find((l) => l.log_date === '2030-01-06');
+  assert.ok(bobRow, 'Bob sollte die family-Zeile sehen');
+  assert.ok(!('intimacy' in bobRow), 'intimacy darf für Bob nicht einmal als Schlüssel auftauchen');
+
+  asA();
+  const asAlice = await call('GET', '/cycle/logs?from=2030-01-06&to=2030-01-06');
+  assert.equal(asAlice.body.data.find((l) => l.log_date === '2030-01-06').intimacy, 'unprotected');
+});
+
+test('Cycle: Bulk-Sichtbarkeit auf family lässt intimacy trotzdem verborgen', async () => {
+  asA();
+  await call('POST', '/cycle/logs', { log_date: '2030-01-07', intimacy: 'solo', visibility: 'private' });
+  const bulk = await call('PATCH', '/cycle/visibility', { visibility: 'family' });
+  assert.equal(bulk.status, 200);
+
+  asB();
+  const asBob = await call('GET', `/cycle/logs?user_id=${userA}&from=2030-01-07&to=2030-01-07`);
+  const bobRow = asBob.body.data.find((l) => l.log_date === '2030-01-07');
+  assert.ok(bobRow, 'nach dem Bulk-Umschalten sollte Bob die jetzt family-sichtbare Zeile sehen');
+  assert.ok(!('intimacy' in bobRow));
 });
 
 // ========================================================
