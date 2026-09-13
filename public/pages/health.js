@@ -5001,13 +5001,24 @@ function cycleCalendarMarkup(own, pms) {
           <button class="btn btn--icon" data-cycle-month="1" aria-label="${esc(t('health.cycle.calendar.nextMonth'))}"><i data-lucide="chevron-right" aria-hidden="true"></i></button>
         </div>
       </div>
-      <div class="cycle-cal__weekdays" aria-hidden="true">${weekdays}</div>
-      <!-- Bewusst OHNE role=grid: die Rolle verlangt row/gridcell-Struktur und
-           verspricht Pfeiltasten-Navigation, die es hier nicht gibt. Die Tage
-           sind eigenstaendige Buttons mit Datums-Label. -->
-      <div class="cycle-cal__grid">${cells}</div>
-      ${cycleLegendMarkup({ hasConfirmedOvulation, showPms: pmsVisibleInMonth, own })}
-      ${symptomLikelihoodMarkup()}
+      <!-- .cycle-cal__body ist reines CSS-Layout: ein breiter Container
+           rendert Gitter+Rail zweispaltig (siehe @container cycle-cal in
+           health.css), ein schmaler stapelt in DERSELBEN DOM-Reihenfolge
+           (Gitter, dann Legende, dann Muster-Satz) - Lese-/Tab-Reihenfolge
+           bleibt unveraendert, nur das Aussehen ist responsiv. -->
+      <div class="cycle-cal__body">
+        <div class="cycle-cal__main">
+          <div class="cycle-cal__weekdays" aria-hidden="true">${weekdays}</div>
+          <!-- Bewusst OHNE role=grid: die Rolle verlangt row/gridcell-Struktur und
+               verspricht Pfeiltasten-Navigation, die es hier nicht gibt. Die Tage
+               sind eigenstaendige Buttons mit Datums-Label. -->
+          <div class="cycle-cal__grid">${cells}</div>
+        </div>
+        <div class="cycle-cal__rail">
+          ${cycleLegendMarkup({ hasConfirmedOvulation, showPms: pmsVisibleInMonth, own })}
+          ${symptomLikelihoodMarkup()}
+        </div>
+      </div>
     </section>`;
 }
 

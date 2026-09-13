@@ -1902,7 +1902,29 @@ button.health-med-card:hover {
 
 /* ---- Monatskalender ---- */
 
-.cycle-cal { margin-top: var(--space-6); }
+.cycle-cal {
+  margin-top: var(--space-6);
+  /* Container Query statt neuer Viewport-Schwelle (DESIGN.md/tokens.css §11c:
+     komponenteninterne Responsivitaet fragt den eigenen Elternrahmen, keinen
+     neuen Seiten-Breakpoint) - der Kalender reagiert auf SEINE eigene
+     verfuegbare Breite, nicht auf die des Viewports. */
+  container: cycle-cal / inline-size;
+  /* Kompaktes Ziel (gemessen: 1200px Dashboard-Breite -> 160px-Zellen, 977px
+     hohes Gitter, hoeher als ein 900px-Viewport): Zellbreite 64px
+     (--space-16, oberes Ende des Zielkorridors 56-64px) mal 7 Spalten plus 6
+     Gaps a 4px (--space-1 - der Wert, auf den der fluide Gap unten ab knapp
+     380px Breite ohnehin saettigt, damit Mobile und Desktop dieselbe
+     Gap-Mathematik teilen): 7*64 + 6*4 = 472px. */
+  --cycle-cal-grid-max: calc(var(--space-16) * 7 + var(--space-1) * 6);
+  /* Rail-Untergrenze: 4 Zellbreiten + 1 Gap = 4*64 + 4 = 260px - der Punkt, ab
+     dem Legende/Chips zu schmal wuerden und lieber stapeln sollten (siehe
+     @container-Regel unten). */
+  --cycle-cal-rail-min: calc(var(--space-16) * 4 + var(--space-1));
+  /* Rail-Obergrenze: 5 Zellbreiten = 320px, verhindert, dass die schmale
+     Legenden-/Chip-Spalte bei sehr breiten Containern sinnlos in die Breite
+     gezogen wird. */
+  --cycle-cal-rail-max: calc(var(--space-16) * 5);
+}
 .cycle-section__title { margin: 0 0 var(--space-3); }
 
 .cycle-cal__head {
@@ -1932,6 +1954,43 @@ button.health-med-card:hover {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: clamp(var(--space-0h), 0.53vw, var(--space-1));
+}
+
+/* Default: gestapelt, exakt die heutige Reihenfolge (Gitter -> Legende ->
+   Muster-Satz); .cycle-cal__main/-rail existieren hier nur als Block-Wrapper
+   ohne Eigenwirkung - die Zwei-Spalten-Variante steckt allein in der
+   @container-Regel unten. */
+.cycle-cal__body { display: block; }
+.cycle-cal__main {
+  /* Das kompakte Ziel gilt IMMER, nicht erst ab der Zwei-Spalten-Schwelle:
+     ein 768px breiter Container soll das Gitter genauso auf ~472px begrenzen
+     wie ein 1440px breiter, statt es auf die volle Abschnittsbreite zu
+     strecken - das WAR der eigentliche Bug (160px-Zellen, 977px hohes
+     Gitter). Unterhalb von --cycle-cal-grid-max (z. B. Phone-Breite) greift
+     max-width ohnehin nicht, dort bleibt alles wie zuvor. */
+  max-width: var(--cycle-cal-grid-max);
+}
+
+/* Ab hier passt eine Zwei-Spalten-Variante (Gitter links, Legende+Chips
+   rechts) hinein, ohne die Rail unter ~260px zu quetschen: Schwelle =
+   Gitter-Max (472px) + Spaltenabstand (--space-6 = 24px) + Rail-Min (260px)
+   = 756px. Unterhalb dessen bleibt es bei der Stapel-Reihenfolge oben. */
+@container cycle-cal (min-width: 756px) {
+  .cycle-cal__body {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-6);
+  }
+  .cycle-cal__main { flex: 0 1 var(--cycle-cal-grid-max); }
+  .cycle-cal__rail {
+    flex: 1 1 var(--cycle-cal-rail-min);
+    min-width: var(--cycle-cal-rail-min);
+    max-width: var(--cycle-cal-rail-max);
+  }
+  /* Die Legende traegt ihren eigenen margin-top (Abstand zum Gitter im
+     gestapelten Fall) - daneben statt darunter soll sie stattdessen mit der
+     Wochentagszeile fluchten. */
+  .cycle-cal__rail > *:first-child { margin-top: 0; }
 }
 
 .cycle-cal__wd {
