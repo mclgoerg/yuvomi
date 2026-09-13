@@ -8,10 +8,18 @@
  *                          Periode, des Eisprungs und des fruchtbaren Fensters
  *                          (Kalendermethode: Eisprung ≈ Lutealphase vor der
  *                          nächsten Periode, fruchtbares Fenster = 6 Tage).
- *        - buildCycleCalendar(): Monatsraster mit farbcodierten Phasen je Tag.
+ *        - buildCycleCalendar(): Monatsraster mit farbcodierten Phasen je Tag
+ *                          (Eisprung/fruchtbares Fenster des AKTUELLEN Zyklus
+ *                          teilen sich seit v2 dieselbe Rechnung wie
+ *                          predictCycle(), inkl. BBT-Bestätigung - Details im
+ *                          Dokblock dort).
  *        - cycleRing(): Segment-Brüche (0..1) für das SVG-Ring-Widget.
  *        - normalizeSymptomEntries() (Phase 2): Symptom-Auswahl eines Tages zu
  *                          `{key, intensity}[]`, Intensität 1-3 optional.
+ *        - predictSymptomLikelihood() (v2): projiziert zusätzlich auf den
+ *                          NÄCHSTEN Zyklus, nicht nur den laufenden.
+ *        - pmsWindow() (v2, D-8): abgeleitetes PMS-Fenster aus dem
+ *                          Symptom-Zyklustag-Muster.
  *        Bewusst KEINE i18n/DOM — in Node ohne Browser testbar (labelKeys liefern
  *        die Übersetzung erst im UI).
  * Abhängigkeiten: ./date.js (ebenfalls DOM-frei; relativer Import, siehe
@@ -232,15 +240,62 @@ export function sortPeriodsAsc(periods) {
     });
 }
 
-/** Abstände (in Tagen) zwischen aufeinanderfolgenden Periodenstarts. */
-export function cycleGaps(periods) {
+// A-3: Grenzen einer PLAUSIBLEN Lücke zwischen zwei Periodenstarts. Unter 10
+// Tagen ist es praktisch nie ein neuer Zyklus (eher eine Zwischenblutung/
+// Doppel-Erfassung), über 90 Tagen sprengt es selbst großzügige Zyklen (siehe
+// TYPICAL_CYCLE_RANGE, die enger gefasste "üblich"-Spanne, die das NICHT
+// ersetzt). Eine einzelne solche Ausreißer-Lücke darf den gleitenden
+// Mittelwert/die Schwankung nicht verzerren (siehe cycleStats()) - sie
+// erscheint stattdessen in `excludedGaps`, damit die UI sie später erklären
+// statt still verschlucken kann.
+const PLAUSIBLE_GAP_MIN_DAYS = 10;
+const PLAUSIBLE_GAP_MAX_DAYS = 90;
+
+/**
+ * Zerlegt die Perioden-Historie in Lücken (Tage zwischen aufeinanderfolgenden
+ * Starts) und trennt PLAUSIBLE von ausgeschlossenen: eine Lücke fällt raus,
+ * wenn sie außerhalb von PLAUSIBLE_GAP_MIN_DAYS..PLAUSIBLE_GAP_MAX_DAYS liegt
+ * ODER einer der beiden beteiligten Starts in der Zukunft liegt (relativ zu
+ * `todayKey`) - ein noch nicht begonnener Zyklus ist keine abgeschlossene
+ * Lücke, weder die davor noch die danach (dieselbe Haltung wie predictCycle()s
+ * Anker-Filter: ein zukünftig datierter Eintrag zählt nicht als echte Historie).
+ * Gemeinsame Basis von cycleGaps() (nur die plausiblen Werte) und cycleStats()
+ * (das zusätzlich die Anzahl der Ausschlüsse braucht) - eine zweite Kopie
+ * derselben Iteration wäre die Alternative gewesen.
+ * @returns {{ plausible: number[], excludedCount: number, rawCount: number }}
+ */
+function classifyCycleGaps(periods, todayKey) {
   const asc = sortPeriodsAsc(periods);
-  const gaps = [];
+  const today = dayKey(todayKey);
+  const plausible = [];
+  let excludedCount = 0;
+  let rawCount = 0;
   for (let i = 1; i < asc.length; i += 1) {
-    const gap = daysBetween(asc[i - 1].start_date, asc[i].start_date);
-    if (Number.isFinite(gap) && gap > 0) gaps.push(gap);
+    const prevStart = dayKey(asc[i - 1].start_date);
+    const curStart = dayKey(asc[i].start_date);
+    const gap = daysBetween(prevStart, curStart);
+    if (!Number.isFinite(gap) || gap <= 0) continue;
+    rawCount += 1;
+    const eitherFuture = daysBetween(today, prevStart) > 0 || daysBetween(today, curStart) > 0;
+    const implausibleRange = gap < PLAUSIBLE_GAP_MIN_DAYS || gap > PLAUSIBLE_GAP_MAX_DAYS;
+    if (eitherFuture || implausibleRange) { excludedCount += 1; continue; }
+    plausible.push(gap);
   }
-  return gaps;
+  return { plausible, excludedCount, rawCount };
+}
+
+/**
+ * Abstände (in Tagen) zwischen aufeinanderfolgenden Periodenstarts - NUR die
+ * plausiblen (siehe classifyCycleGaps()). cycleLengthTrend() (Trend-Ansicht)
+ * nutzt bewusst NICHT diese gefilterte Liste, sondern rekonstruiert ihre
+ * eigenen Rohwerte: ein Trend-Chart soll einen Ausreißer SEHEN, nicht
+ * verschwinden lassen - nur der gleitende Mittelwert (cycleStats()) braucht
+ * den Schutz vor einer einzelnen verzerrenden Lücke.
+ * @param {Array<Object>} periods
+ * @param {string} [todayKey] - Referenz-„heute" für die Zukunfts-Prüfung.
+ */
+export function cycleGaps(periods, todayKey = householdToday()) {
+  return classifyCycleGaps(periods, todayKey).plausible;
 }
 
 /**
@@ -277,12 +332,16 @@ export function periodLengths(periods) {
  * Default. `source` unterscheidet die vier Fälle: 'settings' | 'history' |
  * 'insufficient_history' (Historie vorhanden, aber noch unter der Schwelle) |
  * 'default'.
+ * @param {string} [todayKey] - Referenz-„heute" für die Zukunfts-Prüfung der
+ *        Lücken (siehe classifyCycleGaps()); Default wie im Rest des Moduls.
  * @returns {{ count, avgCycle, avgPeriod, lutealLength, minCycle, maxCycle,
- *             variation, regular, trackFertility, source }}
+ *             variation, regular, trackFertility, excludedGaps,
+ *             plausibleGapCount, source }}
  */
-export function cycleStats(periods, settings = {}) {
+export function cycleStats(periods, settings = {}, todayKey = householdToday()) {
   const asc = sortPeriodsAsc(periods);
-  const gaps = cycleGaps(asc).slice(-MAX_HISTORY);
+  const { plausible: allGaps, excludedCount, rawCount } = classifyCycleGaps(asc, todayKey);
+  const gaps = allGaps.slice(-MAX_HISTORY);
   const lengths = periodLengths(asc).slice(-MAX_HISTORY);
 
   // Ein einzelner (oder zweiter) Zyklus kann ein Ausreißer sein - der abgeleitete
@@ -305,8 +364,16 @@ export function cycleStats(periods, settings = {}) {
   const minCycle = gaps.length ? Math.min(...gaps) : null;
   const maxCycle = gaps.length ? Math.max(...gaps) : null;
   const variation = minCycle != null ? maxCycle - minCycle : null;
-  // „Regelmäßig", wenn die Schwankung der letzten Zyklen ≤ 7 Tage liegt.
-  const regular = gaps.length >= 2 ? variation <= 7 : null;
+  // „Regelmäßig", wenn die Schwankung der letzten (plausiblen) Zyklen ≤ 7 Tage liegt.
+  const regularFromGaps = gaps.length >= 2 ? variation <= 7 : null;
+  // D-14: im Perimenopause-Modus ist Unregelmäßigkeit ERWARTET - das
+  // Regelmäßig/Unregelmäßig-Urteil wäre hier keine falsche Berechnung, aber
+  // eine irreführende Aussage, deshalb explizit unterdrückt (null) statt eines
+  // vermeidbaren "unregelmäßig"-Alarms. Ob/wie die UI stattdessen ein
+  // Typisch/Atypisch-Badge aus `nextStartRange` (predictCycle()) ableitet, ist
+  // bewusst NICHT Sache dieser Funktion.
+  const perimenopauseMode = !!(settings.perimenopause_mode === 1 || settings.perimenopause_mode === true);
+  const regular = perimenopauseMode ? null : regularFromGaps;
 
   return {
     count: asc.length,
@@ -318,7 +385,19 @@ export function cycleStats(periods, settings = {}) {
     variation,
     regular,
     trackFertility: settings.track_fertility === undefined ? true : !!settings.track_fertility,
-    source: settingCycle ? 'settings' : (derivedCycle ? 'history' : (gaps.length > 0 ? 'insufficient_history' : 'default')),
+    // A-3: wie viele Lücken (Zukunft ODER außerhalb PLAUSIBLE_GAP_MIN/MAX_DAYS)
+    // aus dem Mittelwert/der Schwankung ausgeschlossen wurden - 0, wenn keine.
+    excludedGaps: excludedCount,
+    // Anzahl der tatsächlich fürs Mittel verwendeten (plausiblen, auf
+    // MAX_HISTORY gedeckelten) Lücken - predictCycle() braucht denselben Wert
+    // für die MIN_HISTORY_GAPS-Schwelle des Perimenopause-Bereichs, ohne ihn
+    // ein zweites Mal zu berechnen.
+    plausibleGapCount: gaps.length,
+    // 'insufficient_history' bleibt an der ROHEN Lückenzahl (rawCount) hängen,
+    // nicht an der plausiblen: eine Historie aus lauter unplausiblen Lücken
+    // ("Historie vorhanden, aber Datenmüll") ist etwas anderes als ein echter
+    // Kaltstart ganz ohne geloggte zweite Periode.
+    source: settingCycle ? 'settings' : (derivedCycle ? 'history' : (rawCount > 0 ? 'insufficient_history' : 'default')),
   };
 }
 
@@ -670,23 +749,34 @@ const MIN_ELIGIBLE_CYCLES_FOR_DAY = 2;
  * klingende Prognose - dieselbe "kein Medizinprodukt"-Disziplin wie beim
  * bestehenden Fruchtbarkeitsfenster-Disclaimer.
  *
+ * C-2: die gefundenen Zyklustage werden zusätzlich auf den NÄCHSTEN
+ * projizierten Zyklus gemappt (nicht nur den laufenden) - sonst liegt bei
+ * einem Symptom, das typischerweise zur Zyklusmitte oder später auftritt,
+ * jeder Marker spätestens ab Zyklusmitte schon in der Vergangenheit (live
+ * beobachtet). Der nächste Start kommt bewusst aus der KALENDERMETHODE
+ * (projectFutureCycles()[0].start, derselbe Wert wie predictCycle().nextStart
+ * ohne BBT-Bestätigung) - ein per Temperaturanstieg bestätigter Eisprung
+ * bestätigt nur den EISPRUNG DIESES Zyklus, nie den Beginn des nächsten.
+ *
  * @param {Array<Object>} dayLogs
  * @param {Array<Object>} periods
  * @param {Object} settings - cycle_settings-Zeile.
  * @param {string} symptomKey
  * @param {string} [todayKey]
- * @returns {{likelyDates: string[], todayCycleDay: number, isLikelyToday: boolean}}
+ * @returns {{likelyDates: string[], todayCycleDay: number, isLikelyToday: boolean,
+ *            nextLikelyDate: string|null}}
  */
 export function predictSymptomLikelihood(dayLogs, periods, settings = {}, symptomKey, todayKey = householdToday()) {
   const asc = sortPeriodsAsc(periods);
-  if (!asc.length) return { likelyDates: [], todayCycleDay: 0, isLikelyToday: false };
+  if (!asc.length) return { likelyDates: [], todayCycleDay: 0, isLikelyToday: false, nextLikelyDate: null };
 
+  const today = dayKey(todayKey);
   const lastStart = dayKey(asc[asc.length - 1].start_date);
-  const todayCycleDay = daysBetween(lastStart, dayKey(todayKey)) + 1;
+  const todayCycleDay = daysBetween(lastStart, today) + 1;
 
   const pattern = symptomCyclePattern(dayLogs, periods, settings, symptomKey);
   if (pattern.totalCount < MIN_HISTORY_GAPS) {
-    return { likelyDates: [], todayCycleDay, isLikelyToday: false };
+    return { likelyDates: [], todayCycleDay, isLikelyToday: false, nextLikelyDate: null };
   }
 
   const maxDay = Math.max(...pattern.cycles.map((c) => c.cycleLength));
@@ -698,10 +788,18 @@ export function predictSymptomLikelihood(dayLogs, periods, settings = {}, sympto
     if (hits / eligible.length >= LIKELIHOOD_THRESHOLD) likelyDayNumbers.push(day);
   }
 
-  const likelyDates = likelyDayNumbers.map((day) => addLocalDays(lastStart, day - 1));
-  const isLikelyToday = likelyDayNumbers.includes(todayCycleDay);
+  const nextProjected = projectFutureCycles(asc, settings, today)[0] || null;
 
-  return { likelyDates, todayCycleDay, isLikelyToday };
+  const likelyDates = likelyDayNumbers.map((day) => addLocalDays(lastStart, day - 1));
+  if (nextProjected) {
+    for (const day of likelyDayNumbers) likelyDates.push(addLocalDays(nextProjected.start, day - 1));
+  }
+
+  const isLikelyToday = likelyDayNumbers.includes(todayCycleDay);
+  const futureDates = likelyDates.filter((d) => daysBetween(today, d) > 0).sort();
+  const nextLikelyDate = futureDates.length ? futureDates[0] : null;
+
+  return { likelyDates, todayCycleDay, isLikelyToday, nextLikelyDate };
 }
 
 /**
@@ -741,6 +839,20 @@ export function detectTemperatureShift(dayLogs, cycleStart) {
 // Vorhersage
 // --------------------------------------------------------
 
+// D-9: die HORMONELLE Teilmenge der Verhütungsmethoden (server/routes/health/
+// cycle.js führt die volle, geschlossene Auswahl inkl. 'none'/'copper_iud'/
+// 'condom'/'other') unterdrückt typischerweise den Eisprung - eine
+// Kupferspirale, Kondom, "keine" oder "andere" ändern am Zyklus selbst nichts.
+// `null`/unbekannt zählt nicht dazu.
+const HORMONAL_CONTRACEPTION_VALUES = Object.freeze([
+  'pill', 'hormonal_iud', 'implant', 'injection', 'patch', 'ring',
+]);
+
+/** Unterdrückt die eingestellte Verhütungsmethode die Fruchtbarkeits-Vorhersage? */
+function suppressesFertility(settings = {}) {
+  return HORMONAL_CONTRACEPTION_VALUES.includes(settings?.contraception);
+}
+
 /**
  * Leitet den aktuellen Zyklusstand + die Vorhersagen ab.
  * Kalendermethode: Eisprung = nächster Periodenstart − Lutealphase; fruchtbares
@@ -750,28 +862,50 @@ export function detectTemperatureShift(dayLogs, cycleStart) {
  * true`); künftige Zyklen bleiben Kalendermethode, da es für sie noch keine
  * Messwerte geben kann.
  *
+ * D-9 (Verhütung): eine HORMONELLE Verhütungsmethode (siehe
+ * HORMONAL_CONTRACEPTION_VALUES) schaltet Eisprung/fruchtbares Fenster genauso
+ * ab wie `track_fertility: 0` - `trackFertility` bleibt der EINE Schalter, den
+ * cycleRing()/buildCycleCalendar() schon abfragen, `fertilitySuppressed`
+ * dokumentiert zusätzlich WARUM ('contraception' oder `null`), damit das UI
+ * das nicht einfach kommentarlos verschwinden lässt.
+ *
+ * D-14 (Perimenopause): ist `settings.perimenopause_mode` gesetzt UND liegen
+ * mindestens MIN_HISTORY_GAPS plausible Lücken vor (cycleStats().
+ * plausibleGapCount - siehe dort), kommt zusätzlich `nextStartRange` dazu:
+ * eine Spanne aus dem TATSÄCHLICHEN Min/Max der jüngsten plausiblen Lücken
+ * (cycleStats().minCycle/maxCycle, keine zweite Berechnung) auf den Anker-
+ * Start angewendet. `nextStart` bleibt UNVERÄNDERT der Mittelwert-basierte Wert
+ * (Abwärtskompatibilität für bestehende Aufrufer). Die Typisch/Atypisch-Badge-
+ * Entscheidung aus dieser Spanne ist bewusst Sache des UI, nicht dieser Funktion.
+ *
  * @param {Array<Object>} periods - Perioden-Historie (start_date/end_date).
  * @param {Object} settings       - cycle_settings-Zeile (kann leer sein).
  * @param {string} [todayKey]     - Referenz-„heute" (YYYY-MM-DD), Default: heute.
  * @param {Array<Object>} [dayLogs] - Tages-Logs (fuer die BBT-Bestätigung; ohne sie bleibt es Kalendermethode).
- * @returns {Object} { hasData, ... }
+ * @returns {Object} { hasData, ..., fertilitySuppressed, perimenopause, nextStartRange }
  */
 export function predictCycle(periods, settings = {}, todayKey = householdToday(), dayLogs = []) {
   const asc = sortPeriodsAsc(periods);
-  const stats = cycleStats(asc, settings);
   const today = dayKey(todayKey);
+  const stats = cycleStats(asc, settings, today);
   const pregnancy = pregnancyInfo(settings, today);
+  const contraceptionSuppresses = suppressesFertility(settings);
+  const fertilitySuppressed = contraceptionSuppresses ? 'contraception' : null;
 
   // Schwangerschafts-Modus hält alle Vorhersagen an — es gibt keinen „nächsten
   // Periodenstart", keinen Eisprung und kein fruchtbares Fenster. Die Historie
   // bleibt erhalten (hasData spiegelt vorhandene Perioden), damit das UI nach
   // der Schwangerschaft nahtlos weiterrechnet.
   if (pregnancy.active) {
-    return { hasData: !!asc.length, isPregnant: true, pregnancy, stats, trackFertility: false };
+    return { hasData: !!asc.length, isPregnant: true, pregnancy, stats, trackFertility: false, fertilitySuppressed };
   }
 
   if (!asc.length) {
-    return { hasData: false, isPregnant: false, pregnancy, stats, trackFertility: stats.trackFertility };
+    return {
+      hasData: false, isPregnant: false, pregnancy, stats,
+      trackFertility: stats.trackFertility && !contraceptionSuppresses,
+      fertilitySuppressed,
+    };
   }
 
   // Jüngster Periodenstart, der nicht in der Zukunft liegt (sonst der jüngste).
@@ -793,7 +927,11 @@ export function predictCycle(periods, settings = {}, todayKey = householdToday()
     return daysBetween(s, today) >= 0 && daysBetween(today, e) >= 0;
   });
 
-  const trackFertility = stats.trackFertility;
+  // D-9: hormonelle Verhütung schaltet die Fruchtbarkeits-Ausgabe genauso ab
+  // wie track_fertility=0 - beide fließen in DENSELBEN Schalter ein, den
+  // cycleRing()/buildCycleCalendar() bereits abfragen (siehe HORMONAL_
+  // CONTRACEPTION_VALUES-Dokblock oben).
+  const trackFertility = stats.trackFertility && !contraceptionSuppresses;
   let ovulationDate = addLocalDays(nextStart, -lutealLength);
   let ovulationConfirmed = false;
   if (trackFertility) {
@@ -817,12 +955,26 @@ export function predictCycle(periods, settings = {}, todayKey = householdToday()
     phase = PHASE.FOLLICULAR;
   }
 
+  // D-14: Perimenopause-Bereich - zusätzlich zum mittelwert-basierten
+  // `nextStart` (unverändert, Abwärtskompatibilität) eine Spanne aus dem
+  // TATSÄCHLICHEN Min/Max der jüngsten plausiblen Lücken (cycleStats(), keine
+  // zweite Berechnung), erst ab MIN_HISTORY_GAPS plausiblen Lücken - sonst
+  // wäre die Spanne aus zu wenigen Datenpunkten geraten statt abgeleitet.
+  // `perimenopause` spiegelt dagegen NUR die Einstellung (auch ohne
+  // ausreichende Historie schon "an", damit das UI z.B. "sammle noch Daten"
+  // anzeigen kann statt den Modus fälschlich als aus zu behandeln).
+  const perimenopauseMode = !!(settings.perimenopause_mode === 1 || settings.perimenopause_mode === true);
+  const nextStartRange = (perimenopauseMode && stats.plausibleGapCount >= MIN_HISTORY_GAPS)
+    ? { min: addLocalDays(lastStart, stats.minCycle), max: addLocalDays(lastStart, stats.maxCycle) }
+    : null;
+
   return {
     hasData: true,
     isPregnant: false,
     pregnancy,
     stats,
     trackFertility,
+    fertilitySuppressed,
     lastStart,
     cycleDay,
     avgCycle,
@@ -838,6 +990,8 @@ export function predictCycle(periods, settings = {}, todayKey = householdToday()
     phase,
     inLoggedPeriod,
     isPredictedOverdue: daysUntilNext < 0,
+    perimenopause: perimenopauseMode,
+    nextStartRange,
   };
 }
 
@@ -874,7 +1028,7 @@ export function projectFutureCycles(periods, settings = {}, todayKey = household
   const asc = sortPeriodsAsc(periods);
   if (!asc.length || pregnancyInfo(settings, todayKey).active) return [];
 
-  const stats = cycleStats(asc, settings);
+  const stats = cycleStats(asc, settings, todayKey);
   const lastStart = dayKey(asc[asc.length - 1].start_date);
   const projected = [];
   for (let k = 1; k <= 3; k += 1) {
@@ -897,10 +1051,33 @@ export function projectFutureCycles(periods, settings = {}, todayKey = household
  * Vorhergesagte Perioden/Eisprünge werden über bis zu drei Folgezyklen projiziert,
  * damit ein Monat vollständig eingefärbt ist.
  *
+ * A-1: das Eisprung-/fruchtbare Fenster des AKTUELLEN Zyklus (des ersten, noch
+ * offenen Fensters nach der letzten geloggten Periode) kommt NICHT mehr aus
+ * der reinen Kalendermethode (projectFutureCycles()[0]), sondern aus
+ * predictCycle() - derselben Rechnung, die auch Hero/Ring (cycleRing())
+ * anzeigen, inklusive einer BBT-Bestätigung (detectTemperatureShift()). Ohne
+ * diese Angleichung widersprachen sich Kalender und Ring, sobald ein
+ * Temperaturanstieg den Eisprung bestätigte: beide Rechnungen liefern
+ * zufällig dasselbe Datum, solange NICHTS bestätigt ist (beide nutzen
+ * `nextStart − lutealLength`), aber predictCycle() ersetzt dieses Datum durch
+ * den Messwert, projectFutureCycles() kann das nicht (sie kennt nur die
+ * Kalendermethode). Cells des bestätigten Fensters tragen `confirmed: true,
+ * predicted: false` - sie sind ein MESSWERT, keine Vorhersage mehr. Ab dem
+ * ZWEITEN projizierten Zyklus (`k>=2`) bleibt es bei der reinen
+ * Kalendermethode, da es für die Zukunft naturgemäß noch keine Messwerte
+ * geben kann; die Periodenprojektion selbst (Blutung) bleibt für ALLE drei
+ * Folgezyklen unverändert Kalendermethode - ein bestätigter Eisprung bestätigt
+ * nur den Eisprung, nie den nächsten Periodenbeginn.
+ *
+ * D-9: eine hormonelle Verhütungsmethode unterdrückt die Fruchtbarkeits-
+ * Anzeige genauso wie im Ring/Hero (siehe predictCycle()) - dieselbe Prüfung
+ * gilt hier auch für die reine Kalender-Projektion der Folgezyklen, sonst
+ * widerspräche der Kalender dem Ring in genau demselben Fall.
+ *
  * @param {string} anchorKey - Datum im Zielmonat (YYYY-MM-DD).
  * @param {Object} opts
  * @param {Array}  opts.periods
- * @param {Array}  opts.logs      - cycle_day_logs (für Flow-Punkte).
+ * @param {Array}  opts.logs      - cycle_day_logs (für Flow-Punkte + BBT).
  * @param {Object} opts.settings
  * @param {string} [opts.todayKey]
  * @param {number} [opts.weekStartsOn=1]
@@ -908,8 +1085,8 @@ export function projectFutureCycles(periods, settings = {}, todayKey = household
  */
 export function buildCycleCalendar(anchorKey, { periods = [], logs = [], settings = {}, todayKey = householdToday(), weekStartsOn = 1 } = {}) {
   const asc = sortPeriodsAsc(periods);
-  const stats = cycleStats(asc, settings);
-  const { avgPeriod, trackFertility } = stats;
+  const stats = cycleStats(asc, settings, todayKey);
+  const { avgPeriod } = stats;
   const today = dayKey(todayKey);
 
   const logByDate = new Map();
@@ -920,7 +1097,15 @@ export function buildCycleCalendar(anchorKey, { periods = [], logs = [], setting
   // Projizierte Zyklen (nur zukünftige, ab dem letzten geloggten Start) -
   // dieselbe Projektion wie projectFutureCycles() (Phase 5 braucht denselben
   // Horizont fuer den ICS-Feed), hier nur aufgerufen statt inline wiederholt.
+  // Für die BLUTUNG gelten weiterhin ALLE drei (Kalendermethode, s.o.).
   const projected = projectFutureCycles(asc, settings, today);
+  // Eisprung/fruchtbares Fenster des ERSTEN (aktuellen) Fensters kommt aus
+  // predictCycle() (s. Dokblock); die übrigen (k>=2) bleiben reine Projektion.
+  const currentPrediction = predictCycle(asc, settings, today, logs);
+  const futureFertileWindows = projected.slice(1);
+  const trackFertility = currentPrediction.hasData
+    ? currentPrediction.trackFertility
+    : (stats.trackFertility && !suppressesFertility(settings));
 
   const anchor = dayKey(anchorKey);
   const monthStr = anchor.slice(0, 7); // YYYY-MM
@@ -933,13 +1118,34 @@ export function buildCycleCalendar(anchorKey, { periods = [], logs = [], setting
 
     let phase = null;
     let predicted = false;
+    let confirmed = false;
     if (loggedPeriodPhase(dateKey, asc, avgPeriod)) {
       phase = PHASE.MENSTRUATION;
     } else {
+      // Blutung: für ALLE projizierten Folgezyklen reine Kalendermethode - ein
+      // bestätigter Eisprung sagt nichts über den nächsten Periodenbeginn aus.
       for (const c of projected) {
         if (daysBetween(c.start, dateKey) >= 0 && daysBetween(dateKey, c.end) >= 0) { phase = PHASE.MENSTRUATION; predicted = true; break; }
-        if (trackFertility && daysBetween(c.ovulation, dateKey) === 0) { phase = PHASE.OVULATION; predicted = true; break; }
-        if (trackFertility && daysBetween(c.fertileStart, dateKey) >= 0 && daysBetween(dateKey, c.fertileEnd) >= 0) { phase = PHASE.FERTILE; predicted = true; break; }
+      }
+
+      if (!phase && trackFertility) {
+        if (
+          currentPrediction.fertileStart
+          && daysBetween(currentPrediction.fertileStart, dateKey) >= 0
+          && daysBetween(dateKey, currentPrediction.fertileEnd) >= 0
+        ) {
+          // Aktuelles Fenster: bestätigt ODER kalendarisch, je nachdem, was
+          // predictCycle() geliefert hat (siehe Dokblock oben).
+          phase = daysBetween(currentPrediction.ovulationDate, dateKey) === 0 ? PHASE.OVULATION : PHASE.FERTILE;
+          confirmed = !!currentPrediction.ovulationConfirmed;
+          predicted = !confirmed;
+        } else {
+          // Folgezyklen (k>=2): reine Kalendermethode, nie "confirmed".
+          for (const c of futureFertileWindows) {
+            if (daysBetween(c.ovulation, dateKey) === 0) { phase = PHASE.OVULATION; predicted = true; break; }
+            if (daysBetween(c.fertileStart, dateKey) >= 0 && daysBetween(dateKey, c.fertileEnd) >= 0) { phase = PHASE.FERTILE; predicted = true; break; }
+          }
+        }
       }
     }
 
@@ -951,6 +1157,10 @@ export function buildCycleCalendar(anchorKey, { periods = [], logs = [], setting
       isFuture: daysBetween(today, dateKey) > 0,
       phase,
       predicted,
+      // A-1: true nur für das per BBT bestätigte Fenster des aktuellen Zyklus -
+      // eine Vorhersage (`predicted`) und eine Bestätigung (`confirmed`)
+      // schließen sich für eine Zelle gegenseitig aus (siehe Dokblock oben).
+      confirmed,
       flow: log?.flow || null,
       // symptoms ist seit Phase 2 ein Array ({key, intensity}[], vom Server
       // aus cycle_day_log_symptoms zusammengesetzt) - ein LEERES Array ist in
@@ -1020,4 +1230,75 @@ export function cycleRing(prediction) {
   const currentFrac = (clampedDay - 0.5) / total;
 
   return { total, segments, ovulationFrac, currentFrac, ovulationConfirmed: !!prediction.ovulationConfirmed };
+}
+
+// --------------------------------------------------------
+// PMS-Fenster (D-8)
+// --------------------------------------------------------
+
+/**
+ * Leitet ein PMS-Fenster (praemenstruelle Tage) aus dem bisherigen Symptom-
+ * Zyklustag-Muster ab - dieselbe symptomCyclePattern()-Maschinerie
+ * (`typicalDaysBeforePeriod`) wie predictSymptomLikelihood(), hier aber über
+ * ALLE SYMPTOM_TYPES statt eines einzelnen Schlüssels, um die insgesamt
+ * beobachtete prämenstruelle Spanne zu finden statt nur die eines Symptoms.
+ *
+ * BEWUSST NUR SYMPTOME, KEINE GEFÜHLE: seit D-8 tragen Tages-Logs zusätzlich
+ * `feelings` (Array, dieselben Werte wie MOOD_VALUES) - negative Gefühle
+ * ('sad', 'irritable', 'anxious', 'sensitive') wären inhaltlich ein
+ * naheliegendes zweites Signal. symptomCyclePattern() prüft `normalize
+ * SymptomEntries(log.symptoms)` aber fest verdrahtet gegen EINEN Schlüssel;
+ * `feelings` dort einzubeziehen bräuchte entweder einen zweiten Parameter,
+ * der eine andere Log-Eigenschaft und ein anderes Matching abfragt (die
+ * Funktion ist bereits an mehreren Stellen getestet und referenziert - siehe
+ * predictSymptomLikelihood()), oder eine zweite, im Wesentlichen identische
+ * Kopie der Zyklustag-Rekonstruktion nur für Gefühle. Beides ist die
+ * Testdopplung, die dieses Modul an anderer Stelle (siehe reconstructCycles()-
+ * Dokblock) bewusst vermeidet - deshalb bleibt es hier bei Symptomen; eine
+ * spätere Erweiterung von symptomCyclePattern() um einen generischen
+ * "occurredOn(log)"-Prädikat-Parameter wäre der sauberere Ort dafür.
+ *
+ * Fensterberechnung: unter allen Symptomen mit einem echten Muster
+ * (`typicalDaysBeforePeriod != null`) die kleinste ("näher an der Periode")
+ * und größte ("am weitesten davor") Tageszahl - das Fenster deckt die ganze
+ * beobachtete Spanne ab, nicht nur den häufigsten Einzelwert. Die dem
+ * nächsten Periodenbeginn nähere Grenze wird auf mindestens 2 Tage davor
+ * geklemmt - ein "PMS-Fenster" von 0-1 Tagen vor der Periode wäre von der
+ * Menstruation selbst kaum unterscheidbar.
+ *
+ * `null`, wenn: Schwangerschafts-Modus aktiv, `settings.show_pms === 0`, keine
+ * Historie/Vorhersage möglich, oder kein einziges Symptom ein Muster zeigt.
+ *
+ * @param {Array<Object>} dayLogs
+ * @param {Array<Object>} periods
+ * @param {Object} [settings] - cycle_settings-Zeile.
+ * @param {string} [todayKey] - optionale Erweiterung über die Kern-Signatur
+ *        hinaus, für deterministische Aufrufe/Tests; Default wie im Rest des
+ *        Moduls das echte "heute" (predictCycle()s `nextStart` hängt bei
+ *        einer bereits vergangenen letzten Periode ohnehin nicht davon ab).
+ * @returns {{start: string, end: string, symptomKeys: string[]}|null}
+ */
+export function pmsWindow(dayLogs, periods, settings = {}, todayKey = householdToday()) {
+  if (settings.show_pms === 0) return null;
+  if (pregnancyInfo(settings, todayKey).active) return null;
+
+  const prediction = predictCycle(periods, settings, todayKey, dayLogs);
+  if (!prediction.hasData || !prediction.nextStart) return null;
+
+  const daysBeforeBySymptom = new Map();
+  for (const key of SYMPTOM_VALUES) {
+    const pattern = symptomCyclePattern(dayLogs, periods, settings, key);
+    if (pattern.typicalDaysBeforePeriod != null) daysBeforeBySymptom.set(key, pattern.typicalDaysBeforePeriod);
+  }
+  if (!daysBeforeBySymptom.size) return null;
+
+  const values = [...daysBeforeBySymptom.values()];
+  const minDaysBefore = Math.max(2, Math.min(...values));
+  const maxDaysBefore = Math.max(...values, minDaysBefore);
+
+  return {
+    start: addLocalDays(prediction.nextStart, -maxDaysBefore),
+    end: addLocalDays(prediction.nextStart, -minDaysBefore),
+    symptomKeys: [...daysBeforeBySymptom.keys()],
+  };
 }

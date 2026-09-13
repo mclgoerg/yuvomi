@@ -22,6 +22,7 @@ const {
   cycleLengthTrend, symptomFrequencyByPhase, bbtSeries, symptomIntensityTrend,
   symptomCyclePattern, TYPICAL_CYCLE_RANGE, isTypicalCycleLength,
   predictSymptomLikelihood, projectFutureCycles,
+  pmsWindow,
 } = await import('../public/utils/health-cycle.js');
 
 const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
@@ -239,6 +240,39 @@ test('cycleStats: explizite NULL-Einstellungen fallen auf Historie zurück (Numb
   assert.equal(s.source, 'history');
 });
 
+// A-3: eine implausible Lücke (Ueberlappung/Doppel-Erfassung ODER ein Start
+// in der Zukunft) darf den Mittelwert/die Schwankung nicht verzerren.
+// Historie (Starts): 01-01, 01-29 (Lücke 28, plausibel), 02-01 (Lücke zu
+// 01-29: 3 Tage - unplausibel, < 10), 03-01 (Lücke zu 02-01: 28, plausibel),
+// 03-29 (Lücke zu 03-01: 28, plausibel), 04-20 (Lücke zu 03-29: 22 Tage -
+// an sich plausibel, ABER 04-20 liegt NACH "heute" 04-01, zählt also nicht
+// als abgeschlossene Lücke). Bleiben 3 plausible Lücken: 28/28/28.
+test('cycleGaps/cycleStats: unplausible Lücken (Ueberlappung < 10 Tage, Start in der Zukunft) werden ausgeschlossen', () => {
+  const hist = periods([
+    '2026-01-01', '2026-01-29', '2026-02-01', '2026-03-01', '2026-03-29', '2026-04-20',
+  ], 3);
+  const today = '2026-04-01';
+
+  assert.deepEqual(cycleGaps(hist, today), [28, 28, 28]);
+
+  const s = cycleStats(hist, {}, today);
+  assert.equal(s.excludedGaps, 2);       // die 3-Tage- und die Zukunfts-Lücke
+  assert.equal(s.plausibleGapCount, 3);
+  assert.equal(s.avgCycle, 28);          // Mittel aus [28,28,28] - NICHT durch die 3-Tage-Lücke verzerrt
+  assert.equal(s.minCycle, 28);
+  assert.equal(s.maxCycle, 28);
+  assert.equal(s.variation, 0);
+  assert.equal(s.regular, true);
+  assert.equal(s.source, 'history');
+});
+
+test('cycleGaps: ohne todayKey-Argument Default "heute" - unplausible Lücken bleiben in beiden Fällen aussen vor', () => {
+  // Alle Test-Daten liegen (Stand des Depots) klar in der Vergangenheit -
+  // dieselbe 3-Tage-Lücke wird unabhängig vom Referenzdatum ausgeschlossen.
+  const hist = periods(['2026-01-01', '2026-01-29', '2026-02-01', '2026-03-01'], 3);
+  assert.deepEqual(cycleGaps(hist, '2026-06-01'), [28, 28]);
+});
+
 // --------------------------------------------------------
 // predictCycle
 // --------------------------------------------------------
@@ -290,6 +324,73 @@ test('predictCycle: überfällig, wenn heute nach vorhergesagtem Start', () => {
   const p = predictCycle(periods(['2026-06-01'], 5), {}, '2026-07-05'); // nextStart 06-29
   assert.equal(p.isPredictedOverdue, true);
   assert.ok(p.daysUntilNext < 0);
+});
+
+// D-9: hormonelle Verhütung (Untermenge, siehe server/routes/health/cycle.js
+// CONTRACEPTION_VALUES) schaltet Eisprung/fruchtbares Fenster ab wie
+// track_fertility=0, dokumentiert aber zusätzlich WARUM.
+test('predictCycle: hormonelle Verhütung unterdrückt die Fruchtbarkeits-Vorhersage, mit Grund-Flag', () => {
+  const hist = periods(['2026-06-01'], 5); // Ø-Zyklus 28 (Default), Luteal 14 -> kalendarisch Eisprung 2026-06-15
+  const pill = predictCycle(hist, { contraception: 'pill' }, '2026-06-10');
+  assert.equal(pill.trackFertility, false);
+  assert.equal(pill.ovulationDate, null);
+  assert.equal(pill.fertileStart, null);
+  assert.equal(pill.fertileEnd, null);
+  assert.equal(pill.fertilitySuppressed, 'contraception');
+  assert.notEqual(pill.phase, PHASE.FERTILE);
+});
+
+test('predictCycle: nicht-hormonelle/unbekannte Verhütung ändert nichts', () => {
+  const hist = periods(['2026-06-01'], 5);
+  const copper = predictCycle(hist, { contraception: 'copper_iud' }, '2026-06-10');
+  assert.equal(copper.trackFertility, true);
+  assert.equal(copper.fertilitySuppressed, null);
+  assert.equal(copper.ovulationDate, '2026-06-15');
+
+  const none = predictCycle(hist, { contraception: null }, '2026-06-10');
+  assert.equal(none.trackFertility, true);
+  assert.equal(none.fertilitySuppressed, null);
+
+  const unset = predictCycle(hist, {}, '2026-06-10');
+  assert.equal(unset.fertilitySuppressed, null);
+});
+
+test('cycleRing: hormonelle Verhütung - keine Eisprung-/Fruchtbarkeits-Segmente (dieselbe Route wie track_fertility)', () => {
+  const p = predictCycle(periods(['2026-06-01'], 5), { contraception: 'hormonal_iud' }, '2026-06-08');
+  const ring = cycleRing(p);
+  assert.ok(ring.segments.every((s) => s.phase === PHASE.MENSTRUATION));
+  assert.equal(ring.ovulationFrac, null);
+});
+
+// D-14: Perimenopause-Modus - eine Spanne aus dem TATSAECHLICHEN Min/Max der
+// juengsten plausiblen Lücken, zusätzlich zum unveränderten Mittelwert-
+// `nextStart`. Historie: Lücken 24 (01-01 -> 01-25), 32 (01-25 -> 02-26), 28
+// (02-26 -> 03-26) - Ø (24+32+28)/3 = 28, Variation 32-24=8 (> 7, wäre ohne
+// den Modus "unregelmäßig").
+test('predictCycle: Perimenopause-Modus liefert eine Min/Max-Spanne, regular wird unterdrückt', () => {
+  const hist = periods(['2026-01-01', '2026-01-25', '2026-02-26', '2026-03-26'], 5);
+  const p = predictCycle(hist, { perimenopause_mode: 1 }, '2026-04-01');
+  assert.equal(p.perimenopause, true);
+  assert.equal(p.stats.regular, null);
+  assert.equal(p.stats.minCycle, 24);
+  assert.equal(p.stats.maxCycle, 32);
+  assert.equal(p.nextStart, '2026-04-23');           // unverändert: Mittelwert-basiert (28 Tage)
+  assert.deepEqual(p.nextStartRange, { min: '2026-04-19', max: '2026-04-27' }); // lastStart 03-26 + 24 / + 32
+});
+
+test('predictCycle: Perimenopause-Modus ohne genug plausible Lücken - perimenopause=true, aber keine Spanne', () => {
+  const hist = periods(['2026-01-01', '2026-01-29'], 5); // nur 1 Lücke, < MIN_HISTORY_GAPS
+  const p = predictCycle(hist, { perimenopause_mode: 1 }, '2026-02-01');
+  assert.equal(p.perimenopause, true);
+  assert.equal(p.nextStartRange, null);
+});
+
+test('predictCycle: ohne Perimenopause-Modus bleibt regular normal berechnet', () => {
+  const hist = periods(['2026-01-01', '2026-01-25', '2026-02-26', '2026-03-26'], 5);
+  const p = predictCycle(hist, {}, '2026-04-01');
+  assert.equal(p.perimenopause, false);
+  assert.equal(p.nextStartRange, null);
+  assert.equal(p.stats.regular, false); // Variation 8 > 7
 });
 
 // --------------------------------------------------------
@@ -705,15 +806,25 @@ test('predictSymptomLikelihood: projiziert einen stabilen Zyklustag korrekt auf 
     { log_date: '2026-02-27', symptoms: [{ key: 'cramps' }] }, // Tag 2
     { log_date: '2026-03-27', symptoms: [{ key: 'cramps' }] }, // Tag 2
   ];
+  // C-2: Tag 2 wird zusaetzlich auf den naechsten projizierten Zyklus gemappt.
+  // Naechster Start (Kalendermethode): letzter Start 2026-03-26 + Ø-Zyklus 28
+  // (nur 3 Luecken, avgCycle bleibt beim Default 28) = 2026-04-23; Tag 2 davon
+  // ist 2026-04-24.
   const onDay = predictSymptomLikelihood(logs, hist, {}, 'cramps', '2026-03-27');
-  assert.deepEqual(onDay.likelyDates, ['2026-03-27']);
+  assert.deepEqual(onDay.likelyDates, ['2026-03-27', '2026-04-24']);
   assert.equal(onDay.todayCycleDay, 2);
   assert.equal(onDay.isLikelyToday, true);
+  // "heute" (2026-03-27) selbst zaehlt nicht als "danach" - der naechste
+  // wirklich zukuenftige Treffer ist der auf den Folgezyklus projizierte.
+  assert.equal(onDay.nextLikelyDate, '2026-04-24');
 
   const offDay = predictSymptomLikelihood(logs, hist, {}, 'cramps', '2026-04-01');
   assert.equal(offDay.todayCycleDay, 7);
   assert.equal(offDay.isLikelyToday, false);
-  assert.deepEqual(offDay.likelyDates, ['2026-03-27']); // dieselbe Vorhersage, unabhaengig vom Blickpunkt "heute"
+  // dieselbe Vorhersage, unabhaengig vom Blickpunkt "heute" - jetzt mit BEIDEN
+  // Zyklen (vorher waere um diesen Zeitpunkt jeder Marker schon Vergangenheit).
+  assert.deepEqual(offDay.likelyDates, ['2026-03-27', '2026-04-24']);
+  assert.equal(offDay.nextLikelyDate, '2026-04-24');
 });
 
 test('predictSymptomLikelihood: unter MIN_HISTORY_GAPS betrachteten Zyklen keine Vorhersage, todayCycleDay bleibt berechnet', () => {
@@ -749,7 +860,31 @@ test('predictSymptomLikelihood: ein einzelner eligibler Zyklus ist kein Muster, 
 });
 
 test('predictSymptomLikelihood: ohne jede Periode gibt es nichts vorherzusagen', () => {
-  assert.deepEqual(predictSymptomLikelihood([], [], {}, 'cramps', '2026-01-01'), { likelyDates: [], todayCycleDay: 0, isLikelyToday: false });
+  assert.deepEqual(predictSymptomLikelihood([], [], {}, 'cramps', '2026-01-01'),
+    { likelyDates: [], todayCycleDay: 0, isLikelyToday: false, nextLikelyDate: null });
+});
+
+// C-2: die alte Implementierung projizierte NUR auf den laufenden Zyklus -
+// ein Symptom, das frueh im Zyklus auftritt, waere ab Zyklusmitte bereits
+// vollstaendig in der Vergangenheit und liefert (vor dem Fix) KEIN einziges
+// zukuenftiges Datum. Regressionstest fuer genau dieses Szenario.
+test('predictSymptomLikelihood: Vorwaertsprojektion - ein frueher Zyklustag bleibt auch spaet im Zyklus als kommendes Datum sichtbar', () => {
+  const hist = periods(['2026-01-01', '2026-01-29', '2026-02-26', '2026-03-26'], 5); // 28/28/28
+  const logs = [
+    { log_date: '2026-01-02', symptoms: [{ key: 'cramps' }] }, // Tag 2
+    { log_date: '2026-01-30', symptoms: [{ key: 'cramps' }] }, // Tag 2
+    { log_date: '2026-02-27', symptoms: [{ key: 'cramps' }] }, // Tag 2
+    { log_date: '2026-03-27', symptoms: [{ key: 'cramps' }] }, // Tag 2
+  ];
+  // "Heute" liegt kurz vor dem Ende des laufenden Zyklus (Tag 26 von 28) -
+  // Tag 2 des LAUFENDEN Zyklus (2026-03-27) liegt damit klar in der
+  // Vergangenheit; nur die Projektion auf den naechsten Zyklus liefert ein
+  // Datum in der Zukunft.
+  const result = predictSymptomLikelihood(logs, hist, {}, 'cramps', '2026-04-20');
+  assert.equal(result.todayCycleDay, 26);
+  assert.ok(result.likelyDates.some((d) => daysBetween('2026-04-20', d) > 0),
+    'ohne Vorwaertsprojektion gäbe es hier kein einziges zukünftiges Datum');
+  assert.equal(result.nextLikelyDate, '2026-04-24'); // Tag 2 des Folgezyklus (Start 2026-04-23)
 });
 
 // --------------------------------------------------------
@@ -834,6 +969,84 @@ test('buildCycleCalendar: hasLog zählt ein leeres symptoms-Array nicht als Log'
   const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
   assert.equal(at('2026-06-05').hasLog, false);
   assert.equal(at('2026-06-06').hasLog, true);
+});
+
+// A-1: buildCycleCalendar() muss dieselbe BBT-Bestätigung wie predictCycle()
+// zeigen - sonst widersprechen sich Hero/Ring und Kalender (live beobachtet:
+// Hero "bestätigt 06-07", Kalender zeigte weiter das rein kalendarische
+// Fenster 06-10..06-15). Historie: 3 Perioden (2 Lücken, unter
+// MIN_HISTORY_GAPS) -> Ø-Zyklus bleibt Default 28, Luteal Default 14 ->
+// kalendarisch wäre der Eisprung 2026-06-01 + 28 - 14 = 2026-06-15.
+test('buildCycleCalendar: bestätigter Temperaturanstieg verschiebt Eisprung/fruchtbares Fenster des AKTUELLEN Zyklus', () => {
+  const hist = periods(['2026-04-06', '2026-05-04', '2026-06-01'], 5);
+  const logs = tempLogs([
+    ['2026-06-01', 36.30], ['2026-06-02', 36.30], ['2026-06-03', 36.30],
+    ['2026-06-04', 36.30], ['2026-06-05', 36.30], ['2026-06-06', 36.30],
+    ['2026-06-07', 36.55], ['2026-06-08', 36.60], ['2026-06-09', 36.58],
+  ]); // bestätigter Anstieg ab 2026-06-07 (siehe detectTemperatureShift()-Tests weiter oben)
+
+  const cal = buildCycleCalendar('2026-06-15', { periods: hist, logs, todayKey: '2026-06-10', weekStartsOn: 1 });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+
+  // Fruchtbares Fenster folgt jetzt 06-02..06-07 (bestätigt) statt 06-10..06-15
+  // (kalendarisch) - die ersten Tage davon (06-02..06-05) liegen aber noch in
+  // der geloggten Periode (2026-06-01..06-05) und bleiben deshalb Menstruation
+  // (höhere Priorität als jede Vorhersage/Bestätigung).
+  assert.equal(at('2026-06-05').phase, PHASE.MENSTRUATION);
+  assert.equal(at('2026-06-06').phase, PHASE.FERTILE);
+  assert.equal(at('2026-06-06').confirmed, true);
+  assert.equal(at('2026-06-06').predicted, false);
+  assert.equal(at('2026-06-07').phase, PHASE.OVULATION);
+  assert.equal(at('2026-06-07').confirmed, true);
+  assert.equal(at('2026-06-07').predicted, false);
+
+  // Das rein kalendarische Datum (06-15) erscheint NICHT mehr - genau der
+  // Widerspruch, den A-1 behebt.
+  assert.equal(at('2026-06-15').phase, null);
+  assert.equal(at('2026-06-15').confirmed, false);
+  assert.equal(at('2026-06-15').predicted, false);
+});
+
+test('buildCycleCalendar: Folgezyklen (k>=2) bleiben unverändert reine Kalendermethode, unberührt von der BBT-Bestätigung', () => {
+  const hist = periods(['2026-04-06', '2026-05-04', '2026-06-01'], 5);
+  const logs = tempLogs([
+    ['2026-06-01', 36.30], ['2026-06-02', 36.30], ['2026-06-03', 36.30],
+    ['2026-06-04', 36.30], ['2026-06-05', 36.30], ['2026-06-06', 36.30],
+    ['2026-06-07', 36.55], ['2026-06-08', 36.60], ['2026-06-09', 36.58],
+  ]);
+  // Zweiter Folgezyklus (k=2): Start 2026-06-01 + 2*28 = 2026-07-27, Eisprung
+  // 2026-07-27 - 14 = 2026-07-13 - reine Kalendermethode.
+  const cal = buildCycleCalendar('2026-07-15', { periods: hist, logs, todayKey: '2026-06-10', weekStartsOn: 1 });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(at('2026-07-13').phase, PHASE.OVULATION);
+  assert.equal(at('2026-07-13').predicted, true);
+  assert.equal(at('2026-07-13').confirmed, false);
+});
+
+test('buildCycleCalendar: ohne BBT-Bestätigung bleibt das aktuelle Fenster wie zuvor "predicted", nie "confirmed"', () => {
+  const cal = buildCycleCalendar('2026-06-15', {
+    periods: periods(['2026-06-01'], 5),
+    todayKey: '2026-06-15',
+    weekStartsOn: 1,
+  });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(at('2026-06-15').phase, PHASE.OVULATION);
+  assert.equal(at('2026-06-15').predicted, true);
+  assert.equal(at('2026-06-15').confirmed, false);
+});
+
+// D-9: hormonelle Verhütung muss auch im Kalender konsistent mit dem Ring
+// sein (siehe cycleRing()-Test) - sonst zeigt der Kalender ein Fenster, das
+// Hero/Ring bereits als unterdrückt behandeln.
+test('buildCycleCalendar: hormonelle Verhütung zeigt keine Eisprung-/Fruchtbarkeits-Zellen', () => {
+  const cal = buildCycleCalendar('2026-06-15', {
+    periods: periods(['2026-06-01'], 5),
+    settings: { contraception: 'pill' },
+    todayKey: '2026-06-15',
+    weekStartsOn: 1,
+  });
+  const any = cal.weeks.flat().some((c) => c.phase === PHASE.FERTILE || c.phase === PHASE.OVULATION);
+  assert.equal(any, false);
 });
 
 // --------------------------------------------------------
@@ -985,4 +1198,72 @@ test('die Wochentage im Zyklus-Kalender passen in sieben feste Spalten', () => {
       );
     }
   }
+});
+
+// --------------------------------------------------------
+// pmsWindow (D-8)
+// --------------------------------------------------------
+
+// Historie: 4 Perioden, Lücken 28/28/28 (Ø-Zyklus 28) -> letzter Start
+// 2026-03-26, nächster Start (Kalendermethode) 2026-03-26 + 28 = 2026-04-23.
+const PMS_HIST = periods(['2026-01-01', '2026-01-29', '2026-02-26', '2026-03-26'], 5);
+
+test('pmsWindow: Fenster aus mehreren Symptom-Mustern mit unterschiedlicher Vorlaufzeit', () => {
+  const logs = [
+    // bloating: Zyklus 1 (Start 01-01) Tag 26, Zyklus 2 (Start 01-29) Tag 26 ->
+    // je 28-26+1 = 3 Tage vor der nächsten Periode.
+    { log_date: '2026-01-26', symptoms: [{ key: 'bloating' }] },
+    { log_date: '2026-02-23', symptoms: [{ key: 'bloating' }] },
+    // headache: Zyklus 1 Tag 24, Zyklus 2 Tag 24 -> je 28-24+1 = 5 Tage vorher.
+    { log_date: '2026-01-24', symptoms: [{ key: 'headache' }] },
+    { log_date: '2026-02-21', symptoms: [{ key: 'headache' }] },
+  ];
+  const win = pmsWindow(logs, PMS_HIST, {}, '2026-04-01');
+  // Spanne über BEIDE Muster: 5 Tage vorher (weitester Wert) bis 3 Tage vorher
+  // (nächster Wert) -> 2026-04-23 - 5 = 2026-04-18 bis 2026-04-23 - 3 = 2026-04-20.
+  // symptomKeys in SYMPTOM_TYPES-Reihenfolge (headache steht vor bloating).
+  assert.deepEqual(win, { start: '2026-04-18', end: '2026-04-20', symptomKeys: ['headache', 'bloating'] });
+});
+
+test('pmsWindow: kein Symptom mit einem echten Muster -> null', () => {
+  assert.equal(pmsWindow([], PMS_HIST, {}, '2026-04-01'), null);
+  // Ein einzelner Treffer ist kein Muster (dieselbe Regel wie
+  // symptomCyclePattern().typicalDaysBeforePeriod).
+  const singleHit = [{ log_date: '2026-03-22', symptoms: [{ key: 'nausea' }] }];
+  assert.equal(pmsWindow(singleHit, PMS_HIST, {}, '2026-04-01'), null);
+});
+
+test('pmsWindow: settings.show_pms === 0 unterdrückt das Fenster', () => {
+  const logs = [
+    { log_date: '2026-01-26', symptoms: [{ key: 'bloating' }] },
+    { log_date: '2026-02-23', symptoms: [{ key: 'bloating' }] },
+  ];
+  assert.equal(pmsWindow(logs, PMS_HIST, { show_pms: 0 }, '2026-04-01'), null);
+  // show_pms fehlend/1 blendet dagegen nicht aus.
+  assert.notEqual(pmsWindow(logs, PMS_HIST, {}, '2026-04-01'), null);
+  assert.notEqual(pmsWindow(logs, PMS_HIST, { show_pms: 1 }, '2026-04-01'), null);
+});
+
+test('pmsWindow: Schwangerschafts-Modus unterdrückt das Fenster', () => {
+  const logs = [
+    { log_date: '2026-01-26', symptoms: [{ key: 'bloating' }] },
+    { log_date: '2026-02-23', symptoms: [{ key: 'bloating' }] },
+  ];
+  const settings = { pregnancy_mode: 1, pregnancy_due_date: '2026-12-01' };
+  assert.equal(pmsWindow(logs, PMS_HIST, settings, '2026-04-01'), null);
+});
+
+test('pmsWindow: ohne jede Periode gibt es kein Fenster', () => {
+  assert.equal(pmsWindow([], [], {}, '2026-04-01'), null);
+});
+
+test('pmsWindow: die dem nächsten Start nähere Grenze wird auf mindestens 2 Tage geklemmt', () => {
+  // fatigue: Zyklus 1 (Start 01-01) Tag 28, Zyklus 2 (Start 01-29) Tag 28 ->
+  // je 28-28+1 = 1 Tag vor der nächsten Periode (roh - wird auf 2 geklemmt).
+  const logs = [
+    { log_date: '2026-01-28', symptoms: [{ key: 'fatigue' }] },
+    { log_date: '2026-02-25', symptoms: [{ key: 'fatigue' }] },
+  ];
+  const win = pmsWindow(logs, PMS_HIST, {}, '2026-04-01');
+  assert.deepEqual(win, { start: '2026-04-21', end: '2026-04-21', symptomKeys: ['fatigue'] });
 });
