@@ -4538,6 +4538,7 @@
                 "periodToday": "预计今天来月经——现在开始记录？",
                 "periodOverdue": "月经已延迟{{count}}天——现在开始记录？",
                 "periodOverdue_one": "月经已延迟{{count}}天——现在开始记录？",
+                "periodStillOpen": "记录显示你的月经似乎还在进行中——现在结束吗？",
                 "peakPainDay": "根据你的规律,今天常常是疼痛最严重的一天({{symptom}})。",
                 "likelySymptomsToday": "今天可能出现：{{symptoms}}",
                 "pmsWindow": "PMS 窗口可能从{{weekday}}开始",

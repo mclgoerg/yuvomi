@@ -4538,6 +4538,7 @@
                 "periodToday": "Período previsto para hoje — começar agora?",
                 "periodOverdue": "Período está atrasado há {{count}} dias — começar agora?",
                 "periodOverdue_one": "Período está atrasado há {{count}} dia — começar agora?",
+                "periodStillOpen": "O período ainda consta como em curso — encerrá-lo agora?",
                 "peakPainDay": "Segundo o teu padrão, hoje costuma ser o teu dia de dor mais intensa ({{symptom}}).",
                 "likelySymptomsToday": "Provável hoje: {{symptoms}}",
                 "pmsWindow": "Janela pré-menstrual provável a partir de {{weekday}}",

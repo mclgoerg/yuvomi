@@ -171,6 +171,68 @@ export function moodType(value) {
   return MOOD_TYPES.find((m) => m.value === value) || null;
 }
 
+// --------------------------------------------------------
+// D-10/D-11/D-6/D-9 (Review-Runde Fix 6): geschlossene Wertelisten, EIN
+// Zuhause statt DREIER Kopien (server/routes/health/cycle.js +
+// public/pages/health.js hielten je eine eigene, plus die hormonelle
+// Teilmenge unten in dieser Datei) - dasselbe Vorbild wie FLOW_LEVELS/
+// MOOD_TYPES oben. server/routes/health/cycle.js importiert die *_VALUES
+// (dasselbe Muster wie sein bestehender MOOD_VALUES-Import), health.js
+// importiert die *_TYPES (labelKeys bleiben, wie sie waren).
+// --------------------------------------------------------
+
+export const CERVIX_MUCUS_TYPES = Object.freeze([
+  { value: 'dry',      labelKey: 'health.cycle.mucus.dry' },
+  { value: 'sticky',   labelKey: 'health.cycle.mucus.sticky' },
+  { value: 'creamy',   labelKey: 'health.cycle.mucus.creamy' },
+  { value: 'watery',   labelKey: 'health.cycle.mucus.watery' },
+  { value: 'eggwhite', labelKey: 'health.cycle.mucus.eggwhite' },
+]);
+export const CERVIX_MUCUS_VALUES = Object.freeze(CERVIX_MUCUS_TYPES.map((m) => m.value));
+
+// LH- UND Schwangerschaftstest (D-11) teilen sich dieselben zwei Ergebnisse
+// und denselben labelKey-Namensraum (health.cycle.test.<value>) - kein
+// eigenes _TYPES-Objekt noetig, der labelKey ist aus dem Wert selbst
+// ableitbar (siehe Aufrufstellen in health.js).
+export const TEST_RESULT_VALUES = Object.freeze(['negative', 'positive']);
+
+// D-6, hart privat (siehe server/routes/health/cycle.js GET /cycle/logs und
+// DECISIONS.md).
+export const INTIMACY_TYPES = Object.freeze([
+  { value: 'protected',   labelKey: 'health.cycle.intimacy.protected' },
+  { value: 'unprotected', labelKey: 'health.cycle.intimacy.unprotected' },
+  { value: 'solo',        labelKey: 'health.cycle.intimacy.solo' },
+]);
+export const INTIMACY_VALUES = Object.freeze(INTIMACY_TYPES.map((i) => i.value));
+
+// D-9: dieselbe geschlossene Auswahl wie zuvor server/routes/health/cycle.js#
+// CONTRACEPTION_VALUES (Quelle der Wahrheit fuer die Validierung bleibt hier) -
+// 'none' ist ein bewusst gewaehlter Wert ("keine Verhuetung", explizit
+// angegeben) und bleibt von der leeren Option ("nicht angegeben", `null` in
+// der DB) unterschieden. `hormonal` steht direkt an jedem Eintrag - die
+// hormonelle Teilmenge (HORMONAL_CONTRACEPTION_VALUES) leitet sich daraus ab,
+// statt eine zweite, von Hand synchron zu haltende Liste zu sein.
+export const CONTRACEPTION_TYPES = Object.freeze([
+  { value: 'none',         labelKey: 'health.cycle.settings.contraceptionOptions.none',         hormonal: false },
+  { value: 'pill',         labelKey: 'health.cycle.settings.contraceptionOptions.pill',         hormonal: true },
+  { value: 'hormonal_iud', labelKey: 'health.cycle.settings.contraceptionOptions.hormonal_iud', hormonal: true },
+  { value: 'copper_iud',   labelKey: 'health.cycle.settings.contraceptionOptions.copper_iud',   hormonal: false },
+  { value: 'implant',      labelKey: 'health.cycle.settings.contraceptionOptions.implant',      hormonal: true },
+  { value: 'injection',    labelKey: 'health.cycle.settings.contraceptionOptions.injection',    hormonal: true },
+  { value: 'patch',        labelKey: 'health.cycle.settings.contraceptionOptions.patch',        hormonal: true },
+  { value: 'ring',         labelKey: 'health.cycle.settings.contraceptionOptions.ring',         hormonal: true },
+  { value: 'condom',       labelKey: 'health.cycle.settings.contraceptionOptions.condom',       hormonal: false },
+  { value: 'other',        labelKey: 'health.cycle.settings.contraceptionOptions.other',        hormonal: false },
+]);
+export const CONTRACEPTION_VALUES = Object.freeze(CONTRACEPTION_TYPES.map((c) => c.value));
+// D-9: die HORMONELLE Teilmenge unterdrueckt typischerweise den Eisprung -
+// eine Kupferspirale, Kondom, "keine" oder "andere" aendern am Zyklus selbst
+// nichts. `null`/unbekannt zaehlt nicht dazu. suppressesFertility() (unten)
+// liest ausschliesslich diese abgeleitete Liste.
+export const HORMONAL_CONTRACEPTION_VALUES = Object.freeze(
+  CONTRACEPTION_TYPES.filter((c) => c.hormonal).map((c) => c.value),
+);
+
 // Phasen-Schlüssel (auch als Teil von i18n-Keys: health.cycle.phase.<key>).
 export const PHASE = Object.freeze({
   MENSTRUATION: 'menstruation',
@@ -263,25 +325,42 @@ export function sortPeriodsAsc(periods) {
 // statt still verschlucken kann.
 const PLAUSIBLE_GAP_MIN_DAYS = 10;
 const PLAUSIBLE_GAP_MAX_DAYS = 90;
+// Review-Runde Fix 4: eine harte 90-Tage-Obergrenze schnitt bislang JEDE Lücke
+// einer Person mit echten (PCOS-/oligomenorrhoe-typischen) ~95-100-Tage-
+// Zyklen weg - der Mittelwert fiel dann trotz konsistenter Historie auf den
+// 28-Tage-Default zurück (source 'insufficient_history' statt 'history'), und
+// Erinnerungen feuerten rund dreimal zu oft. Zwischen PLAUSIBLE_GAP_MAX_DAYS
+// (90) und dieser Obergrenze gilt eine Lücke als "lang, aber rettbar" (siehe
+// cycleStats()) - jenseits von 365 Tagen ist selbst das keine sinnvolle
+// Zyklusannahme mehr und bleibt IMMER ausgeschlossen, wie unter
+// PLAUSIBLE_GAP_MIN_DAYS.
+const LONG_GAP_MAX_DAYS = 365;
 
 /**
  * Zerlegt die Perioden-Historie in Lücken (Tage zwischen aufeinanderfolgenden
- * Starts) und trennt PLAUSIBLE von ausgeschlossenen: eine Lücke fällt raus,
- * wenn sie außerhalb von PLAUSIBLE_GAP_MIN_DAYS..PLAUSIBLE_GAP_MAX_DAYS liegt
- * ODER einer der beiden beteiligten Starts in der Zukunft liegt (relativ zu
- * `todayKey`) - ein noch nicht begonnener Zyklus ist keine abgeschlossene
- * Lücke, weder die davor noch die danach (dieselbe Haltung wie predictCycle()s
- * Anker-Filter: ein zukünftig datierter Eintrag zählt nicht als echte Historie).
- * Gemeinsame Basis von cycleGaps() (nur die plausiblen Werte) und cycleStats()
- * (das zusätzlich die Anzahl der Ausschlüsse braucht) - eine zweite Kopie
- * derselben Iteration wäre die Alternative gewesen.
- * @returns {{ plausible: number[], excludedCount: number, rawCount: number }}
+ * Starts) und trennt drei Gruppen: PLAUSIBLE (10-90 Tage), LANG-ABER-RETTBAR
+ * (>90 bis 365 Tage, Fix 4 - s.u. in cycleStats(), ob sie tatsächlich in den
+ * Mittelwert einfließen) und TATSAECHLICH ausgeschlossen (<10 Tage, >365 Tage,
+ * ODER einer der beiden beteiligten Starts liegt in der Zukunft relativ zu
+ * `todayKey` - ein noch nicht begonnener Zyklus ist keine abgeschlossene
+ * Lücke, weder die davor noch die danach; dieselbe Haltung wie predictCycle()s
+ * Anker-Filter). `chronological` behaelt beide rettbaren Gruppen in der
+ * urspruenglichen zeitlichen Reihenfolge (fuer MAX_HISTORY-Deckelung in
+ * cycleStats(), die die zeitlich JUENGSTEN Lücken braucht, egal aus welcher
+ * Gruppe). Gemeinsame Basis von cycleGaps() (nur `plausible`) und cycleStats()
+ * (das zusätzlich `long` und die Ausschluss-Anzahl braucht) - eine zweite
+ * Kopie derselben Iteration wäre die Alternative gewesen.
+ * @returns {{ plausible: number[], long: number[],
+ *             chronological: Array<{gap: number, long: boolean}>,
+ *             trulyExcludedCount: number, rawCount: number }}
  */
 function classifyCycleGaps(periods, todayKey) {
   const asc = sortPeriodsAsc(periods);
   const today = dayKey(todayKey);
   const plausible = [];
-  let excludedCount = 0;
+  const long = [];
+  const chronological = [];
+  let trulyExcludedCount = 0;
   let rawCount = 0;
   for (let i = 1; i < asc.length; i += 1) {
     const prevStart = dayKey(asc[i - 1].start_date);
@@ -290,11 +369,19 @@ function classifyCycleGaps(periods, todayKey) {
     if (!Number.isFinite(gap) || gap <= 0) continue;
     rawCount += 1;
     const eitherFuture = daysBetween(today, prevStart) > 0 || daysBetween(today, curStart) > 0;
-    const implausibleRange = gap < PLAUSIBLE_GAP_MIN_DAYS || gap > PLAUSIBLE_GAP_MAX_DAYS;
-    if (eitherFuture || implausibleRange) { excludedCount += 1; continue; }
-    plausible.push(gap);
+    if (eitherFuture || gap < PLAUSIBLE_GAP_MIN_DAYS || gap > LONG_GAP_MAX_DAYS) {
+      trulyExcludedCount += 1;
+      continue;
+    }
+    if (gap > PLAUSIBLE_GAP_MAX_DAYS) {
+      long.push(gap);
+      chronological.push({ gap, long: true });
+    } else {
+      plausible.push(gap);
+      chronological.push({ gap, long: false });
+    }
   }
-  return { plausible, excludedCount, rawCount };
+  return { plausible, long, chronological, trulyExcludedCount, rawCount };
 }
 
 /**
@@ -353,7 +440,28 @@ export function periodLengths(periods) {
  */
 export function cycleStats(periods, settings = {}, todayKey = householdToday()) {
   const asc = sortPeriodsAsc(periods);
-  const { plausible: allGaps, excludedCount, rawCount } = classifyCycleGaps(asc, todayKey);
+  const {
+    plausible: allPlausible, long: allLong, chronological, trulyExcludedCount, rawCount,
+  } = classifyCycleGaps(asc, todayKey);
+
+  // Review-Runde Fix 4: reichen die PLAUSIBLEN (10-90 Tage) Luecken allein
+  // schon fuer MIN_HISTORY_GAPS, bleibt es dabei - eine einzelne lange Luecke
+  // bei sonst normalen Zyklen ist weiterhin ein Ausreisser, kein Signal fuer
+  // einen generell langen Zyklus (Beispiel: drei 28-Tage-Luecken + eine
+  // 200-Tage-Luecke -> Mittel bleibt 28, die lange Luecke bleibt ausgeschlossen).
+  // Reicht die plausible Menge NICHT, aber PLAUSIBEL+LANG zusammen erreichen
+  // die Schwelle, werden auch die langen Luecken fuer den Mittelwert gerettet
+  // (konsistente ~95-100-Tage-Zyklen/PCOS-Oligomenorrhoe, deren Historie sonst
+  // komplett unter den 90-Tage-Deckel gefallen waere und faelschlich auf den
+  // 28-Tage-Default zurueckfiel). `chronological` haelt beide Gruppen in der
+  // urspruenglichen zeitlichen Reihenfolge, damit die MAX_HISTORY-Deckelung
+  // unten weiterhin die zeitlich JUENGSTEN Luecken waehlt. Das bestehende
+  // clampInt(...,15,60) weiter unten deckelt das Ergebnis ohnehin auf
+  // hoechstens 60 - reproduziert also denselben Wert, den ein solcher Zyklus
+  // schon vor Einfuehrung der 90-Tage-Obergrenze bekommen haette.
+  const rescueLong = allPlausible.length < MIN_HISTORY_GAPS
+    && (allPlausible.length + allLong.length) >= MIN_HISTORY_GAPS;
+  const allGaps = rescueLong ? chronological.map((c) => c.gap) : allPlausible;
   const gaps = allGaps.slice(-MAX_HISTORY);
   const lengths = periodLengths(asc).slice(-MAX_HISTORY);
 
@@ -398,13 +506,17 @@ export function cycleStats(periods, settings = {}, todayKey = householdToday()) 
     variation,
     regular,
     trackFertility: settings.track_fertility === undefined ? true : !!settings.track_fertility,
-    // A-3: wie viele Lücken (Zukunft ODER außerhalb PLAUSIBLE_GAP_MIN/MAX_DAYS)
-    // aus dem Mittelwert/der Schwankung ausgeschlossen wurden - 0, wenn keine.
-    excludedGaps: excludedCount,
-    // Anzahl der tatsächlich fürs Mittel verwendeten (plausiblen, auf
-    // MAX_HISTORY gedeckelten) Lücken - predictCycle() braucht denselben Wert
-    // für die MIN_HISTORY_GAPS-Schwelle des Perimenopause-Bereichs, ohne ihn
-    // ein zweites Mal zu berechnen.
+    // A-3/Fix 4: wie viele Lücken TATSAECHLICH ausgeschlossen blieben - immer
+    // die < 10 Tage/> 365 Tage/zukunftsbeteiligten (trulyExcludedCount), PLUS
+    // die langen (90-365 Tage) NUR, wenn sie NICHT gerettet wurden (siehe
+    // rescueLong oben) - eine gerettete lange Lücke ist Teil des Mittelwerts,
+    // keine ausgeschlossene mehr.
+    excludedGaps: trulyExcludedCount + (rescueLong ? 0 : allLong.length),
+    // Anzahl der tatsächlich fürs Mittel verwendeten (auf MAX_HISTORY
+    // gedeckelten) Lücken - plausibel allein, oder plausibel+lang, wenn Fix 4s
+    // Rettung gegriffen hat (siehe rescueLong oben). predictCycle() braucht
+    // denselben Wert für die MIN_HISTORY_GAPS-Schwelle des Perimenopause-
+    // Bereichs, ohne ihn ein zweites Mal zu berechnen.
     plausibleGapCount: gaps.length,
     // 'insufficient_history' bleibt an der ROHEN Lückenzahl (rawCount) hängen,
     // nicht an der plausiblen: eine Historie aus lauter unplausiblen Lücken
@@ -628,15 +740,21 @@ export function symptomFrequencyByPhase(dayLogs, periods, settings = {}) {
  * Gefuehls-Eintraege EINES Tages-Logs, normalisiert auf dieselbe
  * `{key, intensity}`-Form wie normalizeSymptomEntries() (intensity ist hier
  * immer `null` - Gefuehle kennen keine Staerke). `feelings` (Array, seit
- * Migration 196) hat Vorrang; ist es leer/fehlend, faellt es auf das alte
- * Einzelfeld `mood` als Ein-Element-Liste zurück (DECISIONS.md: "legacy mood
- * column stays readable"). Unbekannte/nicht in MOOD_VALUES enthaltene Werte
- * werden still verworfen, dieselbe Haltung wie normalizeSymptomEntries().
+ * Migration 196) hat Vorrang - und zwar auch als LEERES Array: ein bewusst
+ * geleertes `feelings: []` ist "keine Gefuehle mehr", nicht "keine Angabe",
+ * und darf NICHT auf das eingefrorene `mood` zurueckfallen (Review-Runde
+ * Fix 2 - vorher wurde ein geloeschtes Gefuehl beim naechsten Laden aus dem
+ * alten `mood`-Wert wiederbelebt, weil `[].length` falsy ist). Der Fallback
+ * auf das alte Einzelfeld `mood` als Ein-Element-Liste greift NUR, wenn
+ * `feelings` ueberhaupt fehlt (kein Array ist) - also fuer Zeilen aus der Zeit
+ * vor Migration 196, deren Formular `feelings` noch nie gesendet hat.
+ * Unbekannte/nicht in MOOD_VALUES enthaltene Werte werden still verworfen,
+ * dieselbe Haltung wie normalizeSymptomEntries().
  * @param {Object} log
  * @returns {Array<{key: string, intensity: null}>}
  */
-function normalizeFeelingEntries(log) {
-  const list = Array.isArray(log?.feelings) && log.feelings.length
+export function normalizeFeelingEntries(log) {
+  const list = Array.isArray(log?.feelings)
     ? log.feelings
     : (log?.mood ? [log.mood] : []);
   const seen = new Set();
@@ -912,18 +1030,34 @@ export function detectTemperatureShift(dayLogs, cycleStart) {
 // Vorhersage
 // --------------------------------------------------------
 
-// D-9: die HORMONELLE Teilmenge der Verhütungsmethoden (server/routes/health/
-// cycle.js führt die volle, geschlossene Auswahl inkl. 'none'/'copper_iud'/
-// 'condom'/'other') unterdrückt typischerweise den Eisprung - eine
-// Kupferspirale, Kondom, "keine" oder "andere" ändern am Zyklus selbst nichts.
-// `null`/unbekannt zählt nicht dazu.
-const HORMONAL_CONTRACEPTION_VALUES = Object.freeze([
-  'pill', 'hormonal_iud', 'implant', 'injection', 'patch', 'ring',
-]);
-
-/** Unterdrückt die eingestellte Verhütungsmethode die Fruchtbarkeits-Vorhersage? */
+/** Unterdrückt die eingestellte Verhütungsmethode die Fruchtbarkeits-Vorhersage?
+ * HORMONAL_CONTRACEPTION_VALUES (Fix 6, oben bei den Preset-Definitionen aus
+ * CONTRACEPTION_TYPES abgeleitet) ist die einzige Quelle dieser Teilmenge. */
 function suppressesFertility(settings = {}) {
   return HORMONAL_CONTRACEPTION_VALUES.includes(settings?.contraception);
+}
+
+/**
+ * Review-Runde Fix 5: EINE Regel für den Anker-Periodenstart, den sowohl
+ * predictCycle() als auch projectFutureCycles() brauchen - der jüngste
+ * Periodenstart, der NICHT in der Zukunft liegt (sonst, mangels eines
+ * vergangenen Starts, der jüngste überhaupt). Vorher hatte projectFutureCycles()
+ * eine zweite, einfachere Kopie (immer der allerletzte Eintrag, auch wenn er
+ * in der Zukunft lag), die bei einer bereits im Voraus geloggten Periode ein
+ * ANDERES Ankerdatum lieferte als predictCycle() - buildCycleCalendar()s
+ * `projected.slice(1)` verwarf dadurch ein echtes Fenster und malte
+ * stattdessen ein Fenster mit dem falschen (zukünftigen) Anker direkt neben
+ * die geloggte künftige Periode. Mit einer einzigen Regel liefert
+ * projectFutureCycles()[0] jetzt exakt denselben Start wie predictCycle()s
+ * `nextStart`.
+ * @param {Array<Object>} asc - aufsteigend sortierte Perioden (sortPeriodsAsc()).
+ * @param {string} today - Referenz-„heute" (YYYY-MM-DD, bereits normalisiert).
+ * @returns {string} YYYY-MM-DD
+ */
+function latestNonFutureStart(asc, today) {
+  const past = asc.filter((p) => daysBetween(p.start_date, today) >= 0);
+  const anchor = past.length ? past[past.length - 1] : asc[asc.length - 1];
+  return dayKey(anchor.start_date);
 }
 
 /**
@@ -981,10 +1115,9 @@ export function predictCycle(periods, settings = {}, todayKey = householdToday()
     };
   }
 
-  // Jüngster Periodenstart, der nicht in der Zukunft liegt (sonst der jüngste).
-  const past = asc.filter((p) => daysBetween(p.start_date, today) >= 0);
-  const anchor = (past.length ? past[past.length - 1] : asc[asc.length - 1]);
-  const lastStart = dayKey(anchor.start_date);
+  // Jüngster Periodenstart, der nicht in der Zukunft liegt (sonst der jüngste)
+  // - latestNonFutureStart() (Fix 5), dieselbe Regel wie projectFutureCycles().
+  const lastStart = latestNonFutureStart(asc, today);
 
   const { avgCycle, avgPeriod, lutealLength } = stats;
   const cycleDay = daysBetween(lastStart, today) + 1; // Tag 1 = Starttag
@@ -1093,52 +1226,29 @@ function loggedPeriodPhase(dateKey, periodsAsc, avgPeriod) {
 }
 
 /**
- * B-2: Blutungsstärke-Zusammenfassung EINER Periode für die Historie-Zeile -
- * stärkster geloggter Flow-Wert (FLOW_LEVELS-Rang) + Anzahl der Tage mit
- * einem Flow-Eintrag innerhalb ihrer Spanne (periodDateRange(), s.o. -
- * dieselbe "offene Episode laeuft avgPeriod Tage"-Regel wie loggedPeriodPhase(),
- * nicht zweimal implementiert).
+ * B-2/B-3 (Review-Runde Fix 8): Blutungsstärke-Kennzahlen EINER Periode in
+ * EINEM Durchlauf über ihre Log-Spanne (periodDateRange(), dieselbe "offene
+ * Episode laeuft avgPeriod Tage"-Regel wie loggedPeriodPhase()) - stärkster
+ * geloggter Flow-Wert (B-2, Historie-Chip) UND die Summe der FLOW_LEVELS-
+ * Ränge (B-3, Blutungslast-Trend: "insgesamt stärker/schwächer geworden" statt
+ * nur "stärkster Tag" - ein einzelner starker Tag in einer sonst leichten
+ * Periode soll die Last nicht wie einen durchgehend starken Zyklus aussehen
+ * lassen). periodFlowSummary()/periodFlowLoad() waren bislang zwei fast
+ * identische Schleifen über dieselbe Spanne; sie bleiben als dünne Wrapper
+ * bestehen (kleinerer Diff an den bestehenden Aufrufstellen in health.js).
  *
  * @param {Object} period - eine Zeile aus cycle.periods (start_date, end_date?).
  * @param {Array<Object>} logs - cycle_day_logs (log_date, flow).
  * @param {number} [avgPeriod=DEFAULT_PERIOD] - Fallback-Länge einer offenen
  *        Episode; Aufrufer sollten cycleStats(...).avgPeriod durchreichen,
  *        wenn bekannt (History kennt die echte Zyklushistorie).
- * @returns {{heaviest: string, loggedDays: number}|null} null, wenn im
- *          Zeitraum kein einziger Tag einen Flow-Wert trägt (kein Chip).
+ * @returns {{heaviest: string|null, load: number, loggedDays: number}|null}
+ *          null, wenn im Zeitraum kein einziger Tag einen Flow-Wert trägt.
  */
-export function periodFlowSummary(period, logs, avgPeriod = DEFAULT_PERIOD) {
+export function periodFlowStats(period, logs, avgPeriod = DEFAULT_PERIOD) {
   const { start, end } = periodDateRange(period, avgPeriod);
   let heaviestRank = 0;
   let heaviest = null;
-  let loggedDays = 0;
-  for (const log of (logs || [])) {
-    if (!log?.flow || !log.log_date) continue;
-    const d = dayKey(log.log_date);
-    if (daysBetween(start, d) < 0 || daysBetween(d, end) < 0) continue;
-    loggedDays += 1;
-    const level = flowLevel(log.flow);
-    if (level && level.rank > heaviestRank) { heaviestRank = level.rank; heaviest = level.value; }
-  }
-  return loggedDays ? { heaviest, loggedDays } : null;
-}
-
-/**
- * B-3: Blutungslast EINER Periode - Summe der FLOW_LEVELS-Ränge über alle
- * geloggten Tage ihrer Spanne (periodDateRange(), dieselbe "offene Episode
- * läuft avgPeriod Tage"-Regel wie periodFlowSummary()). Anders als dessen
- * "stärkster Tag" beantwortet die SUMME "insgesamt stärker/schwächer
- * geworden" (die eigentlich gefragte Frage) - ein einzelner starker Tag in
- * einer sonst leichten Periode soll die Last nicht wie einen durchgehend
- * starken Zyklus aussehen lassen.
- * @param {Object} period - eine Zeile aus cycle.periods (start_date, end_date?).
- * @param {Array<Object>} logs - cycle_day_logs (log_date, flow).
- * @param {number} [avgPeriod=DEFAULT_PERIOD] - wie periodFlowSummary().
- * @returns {{load: number, loggedDays: number}|null} null, wenn im Zeitraum
- *          kein einziger Tag einen Flow-Wert trägt (kein Balken ohne Basis).
- */
-export function periodFlowLoad(period, logs, avgPeriod = DEFAULT_PERIOD) {
-  const { start, end } = periodDateRange(period, avgPeriod);
   let load = 0;
   let loggedDays = 0;
   for (const log of (logs || [])) {
@@ -1147,9 +1257,24 @@ export function periodFlowLoad(period, logs, avgPeriod = DEFAULT_PERIOD) {
     if (daysBetween(start, d) < 0 || daysBetween(d, end) < 0) continue;
     loggedDays += 1;
     const level = flowLevel(log.flow);
-    if (level) load += level.rank;
+    if (level) {
+      load += level.rank;
+      if (level.rank > heaviestRank) { heaviestRank = level.rank; heaviest = level.value; }
+    }
   }
-  return loggedDays ? { load, loggedDays } : null;
+  return loggedDays ? { heaviest, load, loggedDays } : null;
+}
+
+/** Dünner Wrapper um periodFlowStats() - nur der stärkste Flow-Wert + Anzahl geloggter Tage (B-2, Historie-Chip). */
+export function periodFlowSummary(period, logs, avgPeriod = DEFAULT_PERIOD) {
+  const stats = periodFlowStats(period, logs, avgPeriod);
+  return stats ? { heaviest: stats.heaviest, loggedDays: stats.loggedDays } : null;
+}
+
+/** Dünner Wrapper um periodFlowStats() - nur die Blutungslast + Anzahl geloggter Tage (B-3, Trend). */
+export function periodFlowLoad(period, logs, avgPeriod = DEFAULT_PERIOD) {
+  const stats = periodFlowStats(period, logs, avgPeriod);
+  return stats ? { load: stats.load, loggedDays: stats.loggedDays } : null;
 }
 
 // Letzten wie vielen ABGESCHLOSSENEN Episoden das Blutungsstärke-Muster
@@ -1369,7 +1494,11 @@ export function projectFutureCycles(periods, settings = {}, todayKey = household
   if (!asc.length || pregnancyInfo(settings, todayKey).active) return [];
 
   const stats = cycleStats(asc, settings, todayKey);
-  const lastStart = dayKey(asc[asc.length - 1].start_date);
+  // Fix 5: derselbe Anker wie predictCycle() (latestNonFutureStart(), s.o.) -
+  // vorher war es hier immer der allerletzte Eintrag, auch wenn dessen Start
+  // in der Zukunft lag (siehe Dokblock dort für den dadurch entstandenen
+  // Kalender-Bug).
+  const lastStart = latestNonFutureStart(asc, dayKey(todayKey));
   const projected = [];
   for (let k = 1; k <= 3; k += 1) {
     const start = addLocalDays(lastStart, stats.avgCycle * k);
@@ -1443,9 +1572,11 @@ export function buildCycleCalendar(anchorKey, { periods = [], logs = [], setting
   // predictCycle() (s. Dokblock); die übrigen (k>=2) bleiben reine Projektion.
   const currentPrediction = predictCycle(asc, settings, today, logs);
   const futureFertileWindows = projected.slice(1);
-  const trackFertility = currentPrediction.hasData
-    ? currentPrediction.trackFertility
-    : (stats.trackFertility && !suppressesFertility(settings));
+  // Review-Runde Fix 8: predictCycle() liefert `trackFertility` bereits in
+  // JEDEM Zweig korrekt (auch hasData=false und Schwangerschaft, siehe dessen
+  // Dokblock/Rückgaben) - die vorige Ternary hier duplizierte dieselbe
+  // Umschaltung (Einstellung UND Verhütungs-Unterdrückung) ein zweites Mal.
+  const trackFertility = currentPrediction.trackFertility;
 
   const anchor = dayKey(anchorKey);
   const monthStr = anchor.slice(0, 7); // YYYY-MM

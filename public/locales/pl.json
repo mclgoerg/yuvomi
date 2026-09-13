@@ -4538,6 +4538,7 @@
                 "periodToday": "Okres oczekiwany dziś — rozpocząć teraz?",
                 "periodOverdue": "Okres jest opóźniony o {{count}} dni — rozpocząć teraz?",
                 "periodOverdue_one": "Okres jest opóźniony o {{count}} dzień — rozpocząć teraz?",
+                "periodStillOpen": "Twój okres nadal widnieje jako trwający — zakończyć teraz?",
                 "peakPainDay": "Według Twojego wzorca dzisiaj często występuje najsilniejszy ból ({{symptom}}).",
                 "likelySymptomsToday": "Dziś prawdopodobnie: {{symptoms}}",
                 "pmsWindow": "Okno PMS prawdopodobnie od {{weekday}}",

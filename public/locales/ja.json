@@ -4538,6 +4538,7 @@
                 "periodToday": "今日生理が予測されています — 今すぐ開始しますか?",
                 "periodOverdue": "生理が{{count}}日遅れています — 今すぐ開始しますか?",
                 "periodOverdue_one": "生理が{{count}}日遅れています — 今すぐ開始しますか?",
+                "periodStillOpen": "記録上、生理がまだ続いているようです — 今すぐ終了しますか?",
                 "peakPainDay": "あなたのパターンによると、今日は痛みが最も強くなりやすい日です({{symptom}})。",
                 "likelySymptomsToday": "今日起こりやすい: {{symptoms}}",
                 "pmsWindow": "PMS期間はおそらく{{weekday}}から",

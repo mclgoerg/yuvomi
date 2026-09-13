@@ -4538,6 +4538,7 @@
                 "periodToday": "Mens väntas idag — starta nu?",
                 "periodOverdue": "Mens är {{count}} dagar försenad — starta nu?",
                 "periodOverdue_one": "Mens är {{count}} dag försenad — starta nu?",
+                "periodStillOpen": "Din mens verkar fortfarande pågå enligt loggen — avsluta nu?",
                 "peakPainDay": "Enligt ditt mönster är idag ofta din dag med starkast smärta ({{symptom}}).",
                 "likelySymptomsToday": "Troligt idag: {{symptoms}}",
                 "pmsWindow": "PMS-fönster troligt från {{weekday}}",

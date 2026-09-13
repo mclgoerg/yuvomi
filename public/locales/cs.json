@@ -4538,6 +4538,7 @@
                 "periodToday": "Menstruace se dnes očekává — začít teď?",
                 "periodOverdue": "Menstruace mešká {{count}} dní — začít teď?",
                 "periodOverdue_one": "Menstruace mešká {{count}} den — začít teď?",
+                "periodStillOpen": "Podle záznamu tvoje menstruace stále probíhá — ukončit teď?",
                 "peakPainDay": "Podle vašeho vzorce bývá dnešek často dnem s nejsilnější bolestí ({{symptom}}).",
                 "likelySymptomsToday": "Dnes pravděpodobně: {{symptoms}}",
                 "pmsWindow": "PMS okno pravděpodobně od {{weekday}}",

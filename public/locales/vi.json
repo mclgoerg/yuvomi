@@ -4538,6 +4538,7 @@
                 "periodToday": "Dự kiến có kinh hôm nay — bắt đầu ngay?",
                 "periodOverdue": "Kinh nguyệt trễ {{count}} ngày — bắt đầu ngay?",
                 "periodOverdue_one": "Kinh nguyệt trễ {{count}} ngày — bắt đầu ngay?",
+                "periodStillOpen": "Kỳ kinh của bạn vẫn được ghi nhận là đang diễn ra — kết thúc ngay?",
                 "peakPainDay": "Theo mẫu hình của bạn, hôm nay thường là ngày đau nhiều nhất ({{symptom}}).",
                 "likelySymptomsToday": "Có khả năng hôm nay: {{symptoms}}",
                 "pmsWindow": "Khung PMS có khả năng bắt đầu từ {{weekday}}",

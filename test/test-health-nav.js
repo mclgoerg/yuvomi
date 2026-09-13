@@ -305,10 +305,24 @@ test('D-7: Intimitäts-Marker nur in der eigenen Ansicht, eigene Kalender-Ecke',
   assert.match(legendFn, /own\s*\n?\s*\?\s*`<span class="cycle-legend__item">.*heart/, 'Legendeneintrag muss own-gated sein');
 });
 
-test('D-8-UI: PMS-Fenster shadet nur unphasierte Tage, Legende nur wenn im Monat sichtbar', () => {
+// Review-Runde Fix 3: pmsWindow() wird nicht mehr INNERHALB von
+// cycleCalendarMarkup() aufgerufen - renderCycleShell() berechnet `pms`
+// EINMAL pro Render (own-gated) und reicht es als Parameter an Bubble UND
+// Kalender weiter (vorher zweimal berechnet, u.a. ohne Own-Gate im Kalender).
+test('D-8-UI/Fix3: PMS-Fenster wird EINMAL (own-gated) in renderCycleShell berechnet und an Bubble+Kalender weitergereicht', () => {
+  const shellFn = functionSource('renderCycleShell');
+  assert.ok(shellFn, 'renderCycleShell() nicht gefunden');
+  assert.match(shellFn, /const pms = own\s*\?\s*pmsWindow\(cycle\.logs,\s*cycle\.periods,\s*cycleSettings\(\),\s*todayKey\(\)\)\s*:\s*null;/,
+    'pms muss genau einmal, own-gated berechnet werden');
+  assert.match(shellFn, /cycleBubbleMarkup\(prediction,\s*pms\)/, 'die Bubble muss das vorberechnete pms erhalten');
+  assert.match(shellFn, /cycleCalendarMarkup\(own,\s*pms\)/, 'der Kalender muss das vorberechnete pms erhalten');
+
   const fn = functionSource('cycleCalendarMarkup');
   assert.ok(fn, 'cycleCalendarMarkup() nicht gefunden');
-  assert.match(fn, /pmsWindow\(cycle\.logs,\s*cycle\.periods,\s*cycleSettings\(\),\s*todayKey\(\)\)/, 'pmsWindow()-Aufruf fehlt/falsch parametrisiert');
+  // Nur der tatsächliche Funktionsaufruf ist verboten - der Dokblock darf
+  // "pmsWindow()" weiterhin als Prosa-Verweis erwähnen.
+  assert.ok(!/pmsWindow\(cycle\.logs/.test(fn), 'cycleCalendarMarkup() darf pmsWindow() nicht mehr selbst aufrufen');
+  assert.match(fn, /function cycleCalendarMarkup\(own,\s*pms\)/, 'pms muss Parameter sein');
   assert.match(fn, /!c\.phase[\s\S]{0,20}inPmsWindow/, 'PMS-Shading darf nur auf Zellen ohne eigene Phase greifen');
   assert.match(fn, /pmsVisibleInMonth/, 'Sichtbarkeits-Flag fuer die Legende fehlt');
   const legendFn = functionSource('cycleLegendMarkup');
@@ -326,4 +340,46 @@ test('D-5/D-16: die Schnellzugriffs-Links schliessen ueber den regulaeren (Dirty
     'painkiller-Link muss vor der Navigation ein nicht erzwungenes closeModal() abwarten');
   assert.match(fn, /cycle-log-weight[\s\S]{0,200}await closeModal\(\)[\s\S]{0,80}navigate\('\/health\/vitals'\)/,
     'weight-Link muss vor der Navigation ein nicht erzwungenes closeModal() abwarten');
+});
+
+// --------------------------------------------------------
+// Review-Runde: Fix 1 (offene Periode + fällige Vorhersage), Fix 7 (Partner-
+// Erinnerung im Client), Fix 8 (cycleBubbleShell-Icon-Param)
+// --------------------------------------------------------
+
+test('Fix 1: die Bubble bietet "Periode starten" NICHT an, solange eine Periode noch offen ist', () => {
+  const fn = functionSource('cycleBubbleMarkup');
+  assert.ok(fn, 'cycleBubbleMarkup() nicht gefunden');
+  assert.match(fn, /const openPeriod = cycleOpenPeriod\(\);/, 'muss cycleOpenPeriod() bei faelliger/ueberfaelliger Vorhersage abfragen');
+  assert.match(fn, /if \(openPeriod\)[\s\S]{0,300}cycle-bubble-end-period/,
+    'bei offener Periode muss die Bubble den Beenden-Knopf (eigener data-action) zeigen');
+  assert.match(fn, /health\.cycle\.bubble\.periodStillOpen/, 'die "laeuft die noch?"-Zeile fehlt');
+  // Die "Periode starten"-CTA darf danach (else-Zweig) weiterhin stehen -
+  // beide Knoepfe rufen dieselben Funktionen wie die Aktionsleiste auf, kein
+  // zweiter Speicherpfad.
+  assert.match(fn, /data-action="cycle-bubble-start-period"/, 'Start-CTA (fuer den Fall ohne offene Periode) fehlt');
+
+  const wireFn = functionSource('wireCycle');
+  assert.ok(wireFn, 'wireCycle() nicht gefunden');
+  assert.match(wireFn, /cycle-bubble-end-period[\s\S]{0,80}cycleEndPeriodToday\(\)/,
+    'der Bubble-Beenden-Knopf muss cycleEndPeriodToday() aufrufen (kein zweiter Codepfad)');
+});
+
+test('Fix 7: cycleReminderBody() erkennt eine Partner-Periodenerinnerung ueber cycle_anchor_kind/cycle_owner_name', () => {
+  const remindersJs = read('public/reminders.js');
+  const fn = remindersJs.match(/function cycleReminderBody[\s\S]*?\n}\n/)?.[0];
+  assert.ok(fn, 'cycleReminderBody() nicht gefunden');
+  assert.match(fn, /cycle_anchor_kind === 'partner_period'/, 'muss den Partner-Anker erkennen');
+  assert.match(fn, /health\.cycle\.status\.partnerNextPeriod/, 'muss die bestehende partnerNextPeriod-Übersetzung nutzen');
+  assert.match(fn, /cycle_owner_name/, 'muss den Namen des Zyklus-Eigentümers verwenden');
+});
+
+test('Fix 8: cycleBubbleShell() nimmt einen icon-Parameter, der Schwangerschafts-Zweig nutzt ihn statt eigener Wrapper-HTML', () => {
+  const shellSrc = HEALTH_JS.match(/function cycleBubbleShell[\s\S]*?\n}\n/)?.[0];
+  assert.ok(shellSrc, 'cycleBubbleShell() nicht gefunden');
+  assert.match(shellSrc, /icon\s*=\s*'sparkles'/, 'icon-Parameter mit Sparkles-Default fehlt');
+
+  const fn = functionSource('cycleBubbleMarkup');
+  assert.match(fn, /return cycleBubbleShell\(line1,\s*'',\s*'baby'\)/,
+    'der Schwangerschafts-Zweig muss cycleBubbleShell() mit icon="baby" statt eigener Wrapper-HTML nutzen');
 });

@@ -4538,6 +4538,7 @@
                 "periodToday": "A menstruáció ma várható — elindítod most?",
                 "periodOverdue": "A menstruáció {{count}} napja késik — elindítod most?",
                 "periodOverdue_one": "A menstruáció {{count}} napja késik — elindítod most?",
+                "periodStillOpen": "A bejegyzés szerint a menstruációd még mindig tart — befejezed most?",
                 "peakPainDay": "A mintázatod szerint ma gyakran a legerősebb fájdalom napja van ({{symptom}}).",
                 "likelySymptomsToday": "Ma valószínű: {{symptoms}}",
                 "pmsWindow": "PMS-időszak valószínűleg {{weekday}}-tól",

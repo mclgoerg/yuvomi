@@ -4538,6 +4538,7 @@
                 "periodToday": "Mestruazioni previste oggi — iniziarle ora?",
                 "periodOverdue": "Mestruazioni in ritardo di {{count}} giorni — iniziarle ora?",
                 "periodOverdue_one": "Mestruazioni in ritardo di {{count}} giorno — iniziarle ora?",
+                "periodStillOpen": "Il tuo ciclo risulta ancora in corso — terminarlo ora?",
                 "peakPainDay": "Secondo il tuo andamento, oggi è spesso il giorno con il dolore più intenso ({{symptom}}).",
                 "likelySymptomsToday": "Probabile oggi: {{symptoms}}",
                 "pmsWindow": "Finestra premestruale probabile da {{weekday}}",

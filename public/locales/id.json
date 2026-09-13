@@ -4538,6 +4538,7 @@
                 "periodToday": "Menstruasi diperkirakan hari ini — mulai sekarang?",
                 "periodOverdue": "Menstruasi terlambat {{count}} hari — mulai sekarang?",
                 "periodOverdue_one": "Menstruasi terlambat {{count}} hari — mulai sekarang?",
+                "periodStillOpen": "Menstruasimu masih tercatat sedang berlangsung — akhiri sekarang?",
                 "peakPainDay": "Berdasarkan polamu, hari ini sering menjadi hari nyeri paling parah ({{symptom}}).",
                 "likelySymptomsToday": "Kemungkinan hari ini: {{symptoms}}",
                 "pmsWindow": "Jendela PMS kemungkinan mulai {{weekday}}",

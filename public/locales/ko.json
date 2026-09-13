@@ -4538,6 +4538,7 @@
                 "periodToday": "오늘 생리가 예상됩니다 — 지금 시작할까요?",
                 "periodOverdue": "생리가 {{count}}일 지연되었습니다 — 지금 시작할까요?",
                 "periodOverdue_one": "생리가 {{count}}일 지연되었습니다 — 지금 시작할까요?",
+                "periodStillOpen": "기록상 생리가 아직 진행 중인 것 같아요 — 지금 종료할까요?",
                 "peakPainDay": "당신의 패턴에 따르면 오늘은 통증이 가장 심한 날인 경우가 많아요 ({{symptom}}).",
                 "likelySymptomsToday": "오늘 발생 가능성: {{symptoms}}",
                 "pmsWindow": "PMS 기간이 {{weekday}}부터 예상됩니다",

@@ -48,6 +48,7 @@ import {
   symptomCyclePattern, TYPICAL_CYCLE_RANGE, isTypicalCycleLength,
   predictSymptomLikelihood, pmsWindow, periodFlowSummary,
   sortPeriodsAsc, periodFlowLoad, heavyBleedingSignal, painSummary, peakPainDay, daysBetween,
+  CERVIX_MUCUS_TYPES, TEST_RESULT_VALUES, INTIMACY_TYPES, CONTRACEPTION_TYPES,
 } from '/utils/health-cycle.js';
 import { HEALTH_ROUTES, renderHealthTabsBar } from '/utils/health-tabs.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
@@ -4325,6 +4326,18 @@ function renderCycleShell() {
   // Zyklus ersetzt das kalendarische Eisprungdatum (siehe predictCycle()-Doku).
   const prediction = predictCycle(cycle.periods, cycleSettings(), todayKey(), cycle.logs);
 
+  // Review-Runde Fix 3: EINMAL pro Render berechnet (vorher zweimal - einmal
+  // in der Bubble, einmal im Kalender, macht zusammen ~21 redundante volle
+  // Symptom-Historie-Scans) UND NUR in der eigenen Ansicht. cycleSettings()
+  // liefert für eine fremde Person ohnehin {} zurück (s. dort) - der Opt-out
+  // (show_pms=0) und die luteal_length gehören aber der BEOBACHTETEN Person,
+  // nicht der betrachtenden; ohne diese Own-Gate wuerde die Fremdansicht ein
+  // PMS-Muster zeigen, dessen Opt-out gar nicht abgefragt werden konnte -
+  // dieselbe Konsens-/Datenschutz-Logik wie beim Intimitäts-Marker (own-gated
+  // in cycleCalendarMarkup()), hier nur zusätzlich vor der Berechnung selbst
+  // statt erst vor der Anzeige.
+  const pms = own ? pmsWindow(cycle.logs, cycle.periods, cycleSettings(), todayKey()) : null;
+
   const persons = `
     ${personSwitcherMarkup(cycle.members, cycle.personId, cycle.meId,
       { menuId: 'health-person-menu-cycle', label: t('health.cycle.personsLabel') })}
@@ -4336,10 +4349,10 @@ function renderCycleShell() {
   if (prediction.isPregnant) {
     cycle.root.insertAdjacentHTML('beforeend', `
       ${persons}
-      ${own ? cycleBubbleMarkup(prediction) : ''}
+      ${own ? cycleBubbleMarkup(prediction, pms) : ''}
       ${cyclePregnancyMarkup(prediction, own)}
       ${own ? cycleTodayActionsMarkup(true) : ''}
-      ${cycleCalendarMarkup(own)}
+      ${cycleCalendarMarkup(own, pms)}
       ${prediction.hasData ? cycleTrendsMarkup() : ''}
       ${prediction.hasData ? cycleHistoryMarkup(own) : ''}
       ${cycleFooterMarkup(own)}
@@ -4371,7 +4384,7 @@ function renderCycleShell() {
 
   cycle.root.insertAdjacentHTML('beforeend', `
     ${persons}
-    ${own ? cycleBubbleMarkup(prediction) : ''}
+    ${own ? cycleBubbleMarkup(prediction, pms) : ''}
     <div class="cycle-hero">
       ${cycleRingMarkup(prediction)}
       <div class="cycle-hero__side">
@@ -4381,7 +4394,7 @@ function renderCycleShell() {
     </div>
     ${cycleRingLegendMarkup(prediction)}
     ${own ? cycleTodayActionsMarkup() : ''}
-    ${cycleCalendarMarkup(own)}
+    ${cycleCalendarMarkup(own, pms)}
     ${cycleTrendsMarkup()}
     ${cycleHistoryMarkup(own)}
     ${cycleFooterMarkup(own)}
@@ -4412,10 +4425,14 @@ function cyclePregnancyWeekText(p) {
   return t('health.cycle.pregnancy.week', { weeks: p.gestWeeks, days: p.gestDays });
 }
 
-function cycleBubbleShell(line1Text, line2Html) {
+// Fix 8 (Review-Runde): `icon` parametrisiert, welches Lucide-Zeichen die
+// Bubble zeigt (Default 'sparkles', der bisherige einzige Wert) - der
+// Schwangerschafts-Zweig unten baut sein "baby"-Icon damit ueber DIESELBE
+// Huelle statt einer eigenen, fast identischen Wrapper-Kopie.
+function cycleBubbleShell(line1Text, line2Html, icon = 'sparkles') {
   return `
     <div class="cycle-bubble" role="region" aria-label="${esc(t('health.cycle.bubble.ariaLabel'))}">
-      <div class="cycle-bubble__icon" aria-hidden="true"><i data-lucide="sparkles"></i></div>
+      <div class="cycle-bubble__icon" aria-hidden="true"><i data-lucide="${esc(icon)}"></i></div>
       <div class="cycle-bubble__body">
         <p class="cycle-bubble__line1">${esc(line1Text)}</p>
         ${line2Html}
@@ -4423,7 +4440,10 @@ function cycleBubbleShell(line1Text, line2Html) {
     </div>`;
 }
 
-function cycleBubbleMarkup(prediction) {
+// `pms` (Fix 3): vorab in renderCycleShell() EINMAL berechnet (own-gated,
+// siehe dortiger Dokblock) und hier nur noch gelesen - kein zweiter
+// pmsWindow()-Aufruf mehr.
+function cycleBubbleMarkup(prediction, pms) {
   const today = todayKey();
 
   // Schwangerschaft: Zeile 1 ist die SSW-Zeile (cyclePregnancyWeekText(), s.o.)
@@ -4432,13 +4452,7 @@ function cycleBubbleMarkup(prediction) {
   if (prediction.isPregnant) {
     const p = prediction.pregnancy || {};
     const line1 = p.hasDue ? cyclePregnancyWeekText(p) : t('health.cycle.pregnancy.title');
-    return `
-      <div class="cycle-bubble" role="region" aria-label="${esc(t('health.cycle.bubble.ariaLabel'))}">
-        <div class="cycle-bubble__icon" aria-hidden="true"><i data-lucide="baby"></i></div>
-        <div class="cycle-bubble__body">
-          <p class="cycle-bubble__line1">${esc(line1)}</p>
-        </div>
-      </div>`;
+    return cycleBubbleShell(line1, '', 'baby');
   }
 
   const phaseLabel = t(CYCLE_PHASE_LABEL_KEYS[prediction.phase] || CYCLE_PHASE_LABEL_KEYS[PHASE.FOLLICULAR]);
@@ -4452,6 +4466,22 @@ function cycleBubbleMarkup(prediction) {
   // weiterhin genau den Knopf der Aktionsleiste trifft - zwei Elemente mit
   // demselben data-action wuerden sich sonst den einen Listener teilen.
   if (prediction.daysUntilNext <= 0) {
+    // Review-Runde Fix 1: eine faellige/ueberfaellige Vorhersage UND ein
+    // vergessener, noch offener Periodeneintrag (cycleOpenPeriod()) duerfen
+    // NICHT gleichzeitig "Periode starten" anbieten - der Server prueft
+    // Ueberschneidungen nicht, ein Tippen wuerde also eine zweite, sich
+    // ueberlappende Periode anlegen. Zeile 2 wird dann zur "laeuft die noch?"-
+    // Frage mit demselben Beenden-Knopf wie die Aktionsleiste darunter
+    // (cycleEndPeriodToday(), KEIN zweiter Speicherpfad) - die "Periode
+    // starten"-CTA erscheint nur, wenn KEINE Periode offen ist.
+    const openPeriod = cycleOpenPeriod();
+    if (openPeriod) {
+      return cycleBubbleShell(line1, `
+        <div class="cycle-bubble__line2 cycle-bubble__line2--row">
+          <span>${esc(t('health.cycle.bubble.periodStillOpen'))}</span>
+          <button type="button" class="btn btn--sm btn--secondary" data-action="cycle-bubble-end-period">${esc(t('health.cycle.today.endPeriod'))}</button>
+        </div>`);
+    }
     const line2Text = prediction.daysUntilNext === 0
       ? t('health.cycle.bubble.periodToday')
       : t('health.cycle.bubble.periodOverdue', { count: Math.abs(prediction.daysUntilNext) });
@@ -4508,8 +4538,8 @@ function cycleBubbleMarkup(prediction) {
   }
 
   // Prioritaet 4: PMS-Fenster (D-8) - enthaelt "heute" oder beginnt innerhalb
-  // der naechsten drei Tage.
-  const pms = pmsWindow(cycle.logs, cycle.periods, settings, today);
+  // der naechsten drei Tage. `pms` kommt als Parameter (Fix 3, s.o.), kein
+  // eigener pmsWindow()-Aufruf hier mehr.
   if (pms) {
     const startsWithinDays = daysBetween(today, pms.start);
     const containsToday = today >= pms.start && today <= pms.end;
@@ -4872,7 +4902,7 @@ function cycleMonthLabel(anchorKey) {
   }
 }
 
-function cycleCalendarMarkup(own) {
+function cycleCalendarMarkup(own, pms) {
   const cal = buildCycleCalendar(cycle.anchor, {
     periods: cycle.periods, logs: cycle.logs, settings: cycleSettings(), weekStartsOn: 1,
   });
@@ -4909,7 +4939,15 @@ function cycleCalendarMarkup(own) {
   // Unterlegung unter einer bereits getönten Phasenfläche würde entweder die
   // Phasenfarbe verwaschen oder unsichtbar bleiben; ein unphasierter Tag hat
   // dagegen nichts, das die Musterfarbe verdecken könnte.
-  const pms = pmsWindow(cycle.logs, cycle.periods, cycleSettings(), todayKey());
+  //
+  // Fix 3 (Review-Runde): `pms` kommt als Parameter aus renderCycleShell()
+  // (dort own-gated berechnet, EINMAL statt zweimal, siehe dortiger
+  // Dokblock) - in einer fremden Ansicht ist `pms` deshalb immer `null` und
+  // `inPmsWindow` faellt auf `() => false` zurueck. Damit shaded/erklaert
+  // die Fremdansicht kein PMS-Muster, dessen Opt-out (show_pms) und
+  // luteal_length der beobachtenden Person gar nicht zustehen - dieselbe
+  // Konsens-Gate wie beim Intimitäts-Marker oben (own-gated), nur schon eine
+  // Ebene frueher (Berechnung statt nur Anzeige).
   const inPmsWindow = pms ? (dateKey) => dateKey >= pms.start && dateKey <= pms.end : () => false;
 
   const weekdays = CYCLE_WEEKDAY_LABEL_KEYS
@@ -5771,6 +5809,10 @@ function wireCycle() {
   // ruft aber dieselben Funktionen wie die bestehende Aktionsleiste auf, keine
   // zweite Speicher-/Navigationslogik.
   cycle.root.querySelector('[data-action="cycle-bubble-start-period"]')?.addEventListener('click', () => cycleStartPeriodToday());
+  // Fix 1 (Review-Runde): dieselbe Funktion wie der "Periode beenden"-Knopf
+  // der Aktionsleiste, nur unter einem eigenen data-action-Namen (derselbe
+  // Grund wie bei cycle-bubble-start-period oben - kein geteilter Listener).
+  cycle.root.querySelector('[data-action="cycle-bubble-end-period"]')?.addEventListener('click', () => cycleEndPeriodToday());
   cycle.root.querySelector('[data-action="cycle-bubble-log-today"]')?.addEventListener('click', () => openDayLogModal(todayKey()));
 
   // Symptom-Wahrscheinlichkeits-Chip (Phase 4e): erneutes Antippen des schon
@@ -6014,27 +6056,14 @@ function openCycleImportModal() {
 // Tests, Intimitaet)
 // --------------------------------------------------------
 
-// D-10/D-11/D-6: Diese drei Wertelisten spiegeln die serverseitigen Enums aus
-// server/routes/health/cycle.js (CERVIX_MUCUS_VALUES / TEST_RESULT_VALUES /
-// INTIMACY_VALUES) - health-cycle.js selbst wird gerade parallel von einem
-// anderen Arbeitsschritt bearbeitet und bleibt deshalb aussen vor; eine
-// spaetere Aufraeumrunde kann sie dorthin konsolidieren.
-const CERVIX_MUCUS_TYPES = Object.freeze([
-  { value: 'dry',      labelKey: 'health.cycle.mucus.dry' },
-  { value: 'sticky',   labelKey: 'health.cycle.mucus.sticky' },
-  { value: 'creamy',   labelKey: 'health.cycle.mucus.creamy' },
-  { value: 'watery',   labelKey: 'health.cycle.mucus.watery' },
-  { value: 'eggwhite', labelKey: 'health.cycle.mucus.eggwhite' },
-]);
-const TEST_RESULT_TYPES = Object.freeze([
-  { value: 'negative', labelKey: 'health.cycle.test.negative' },
-  { value: 'positive', labelKey: 'health.cycle.test.positive' },
-]);
-const INTIMACY_TYPES = Object.freeze([
-  { value: 'protected',   labelKey: 'health.cycle.intimacy.protected' },
-  { value: 'unprotected', labelKey: 'health.cycle.intimacy.unprotected' },
-  { value: 'solo',        labelKey: 'health.cycle.intimacy.solo' },
-]);
+// D-10/D-11/D-6 (Review-Runde Fix 6): diese Wertelisten kommen jetzt aus
+// health-cycle.js (CERVIX_MUCUS_TYPES/TEST_RESULT_VALUES/INTIMACY_TYPES,
+// importiert oben) - EIN Zuhause statt einer dritten Kopie hier (die
+// vorherigen lokalen Listen standen dieser Konsolidierung nur im Weg, siehe
+// dortiger Dokblock). LH- und Schwangerschaftstest teilen sich denselben
+// labelKey-Namensraum (health.cycle.test.<value>), deshalb exportiert
+// health-cycle.js dafuer nur die Werte, kein eigenes _TYPES-Array.
+const TEST_RESULT_CHOICES = TEST_RESULT_VALUES.map((v) => ({ value: v, labelKey: `health.cycle.test.${v}` }));
 
 /**
  * Mehrfachauswahl-Variante von wireChoiceGroup(): jeder Chip schaltet nur
@@ -6095,8 +6124,15 @@ function openDayLogModal(dateKey) {
   // Migration (Abwaertskompatibilitaet, siehe DECISIONS.md). Dieselben
   // MOOD_TYPES-Presets wie zuvor das Einzelauswahl-<select> - nur die
   // Verdrahtung (wireMultiChoiceGroup statt eines <select>) ist neu.
+  //
+  // Review-Runde Fix 2: der Fallback auf `mood` greift NUR, wenn `feelings`
+  // ueberhaupt kein Array ist (Zeilen von vor Migration 196) - ein bewusst
+  // GELEERTES `feelings: []` ist "keine Gefuehle mehr", nicht "keine Angabe",
+  // und darf das laengst geleerte Gefuehl nicht aus dem eingefrorenen `mood`
+  // wiederbeleben (dieselbe Regel wie normalizeFeelingEntries() in
+  // health-cycle.js).
   const existingFeelings = new Set(
-    Array.isArray(existing?.feelings) && existing.feelings.length
+    Array.isArray(existing?.feelings)
       ? existing.feelings
       : (existing?.mood ? [existing.mood] : []),
   );
@@ -6110,8 +6146,8 @@ function openDayLogModal(dateKey) {
   // Einfachauswahl-mit-"keine Angabe"-Chip-Reihe wie Blutungsstaerke, ueber
   // singleChoiceButtons() einmal gebaut statt dreimal kopiert.
   const mucusButtons = singleChoiceButtons(CERVIX_MUCUS_TYPES, 'health.cycle.mucus.none', existing?.cervix_mucus, 'mucus');
-  const lhButtons = singleChoiceButtons(TEST_RESULT_TYPES, 'health.cycle.test.unset', existing?.lh_test, 'lh-test');
-  const pregButtons = singleChoiceButtons(TEST_RESULT_TYPES, 'health.cycle.test.unset', existing?.pregnancy_test, 'pregnancy-test');
+  const lhButtons = singleChoiceButtons(TEST_RESULT_CHOICES, 'health.cycle.test.unset', existing?.lh_test, 'lh-test');
+  const pregButtons = singleChoiceButtons(TEST_RESULT_CHOICES, 'health.cycle.test.unset', existing?.pregnancy_test, 'pregnancy-test');
   // D-6, hart privat (siehe server/routes/health/cycle.js): dieses Feld
   // bleibt beim GET fuer alle ausser dem Eigentuemer selbst unsichtbar,
   // unabhaengig von `visibility`. openDayLogModal() wird ohnehin nur in der
@@ -6306,23 +6342,12 @@ async function deleteDayLog(log) {
 // Einstellungs-Modal (persönliche Vorhersage-Parameter)
 // --------------------------------------------------------
 
-// D-9: dieselbe geschlossene Auswahl wie server/routes/health/cycle.js#
-// CONTRACEPTION_VALUES (dort die Quelle der Wahrheit für die Validierung) -
+// D-9 (Review-Runde Fix 6): CONTRACEPTION_TYPES kommt jetzt aus health-cycle.js
+// (importiert oben) - dieselbe geschlossene Auswahl, die server/routes/health/
+// cycle.js zur Validierung importiert (CONTRACEPTION_VALUES, davon abgeleitet).
 // 'none' ist ein bewusst gewaehlter Wert ("keine Verhuetung", explizit
 // angegeben) und bleibt von der leeren Option ("nicht angegeben", `null` in
 // der DB) unterschieden.
-const CONTRACEPTION_TYPES = Object.freeze([
-  { value: 'none',         labelKey: 'health.cycle.settings.contraceptionOptions.none' },
-  { value: 'pill',         labelKey: 'health.cycle.settings.contraceptionOptions.pill' },
-  { value: 'hormonal_iud', labelKey: 'health.cycle.settings.contraceptionOptions.hormonal_iud' },
-  { value: 'copper_iud',   labelKey: 'health.cycle.settings.contraceptionOptions.copper_iud' },
-  { value: 'implant',      labelKey: 'health.cycle.settings.contraceptionOptions.implant' },
-  { value: 'injection',    labelKey: 'health.cycle.settings.contraceptionOptions.injection' },
-  { value: 'patch',        labelKey: 'health.cycle.settings.contraceptionOptions.patch' },
-  { value: 'ring',         labelKey: 'health.cycle.settings.contraceptionOptions.ring' },
-  { value: 'condom',       labelKey: 'health.cycle.settings.contraceptionOptions.condom' },
-  { value: 'other',        labelKey: 'health.cycle.settings.contraceptionOptions.other' },
-]);
 
 // Dieselbe 0/1/2/3/5/7-Reihe wie die bestehende Perioden-Erinnerung
 // (cs-remind-days), hier fuer die Partner-Erinnerung - absichtlich OHNE

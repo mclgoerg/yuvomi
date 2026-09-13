@@ -1039,6 +1039,34 @@ test('Cycle-Log: ungültiger legacy mood-Wert wird abgelehnt wie ein ungültiges
   assert.equal(res.status, 400);
 });
 
+// Review-Runde Fix 2(a): der Upsert setzt `mood = NULL` jetzt auf BEIDEN
+// Pfaden (Insert und Conflict-Update) aktiv, statt die Spalte unangetastet zu
+// lassen - eine schon vor Migration 196 (oder direkt in der DB) eingefrorene
+// `mood` durfte sonst bei jedem weiteren Speichern desselben Tages bestehen
+// bleiben und im GET wieder auftauchen, sobald `feelings` geleert wurde
+// (siehe normalizeFeelingEntries()/`existingFeelings` in health-cycle.js/
+// health.js).
+test('Cycle-Log: ein direkt in der DB eingefrorener Legacy-mood-Wert wird beim naechsten Speichern aktiv genullt', async () => {
+  asA();
+  const created = await call('POST', '/cycle/logs', { log_date: '2030-01-06', flow: 'light' });
+  assert.equal(created.status, 201);
+  const id = created.body.data.id;
+
+  // Legacy-Zustand simulieren: `mood` direkt setzen, wie es eine Zeile von vor
+  // Migration 196 (oder ein alter Client) getragen haette - die API selbst
+  // schreibt `mood` nie mehr.
+  db.prepare('UPDATE cycle_day_logs SET mood = ? WHERE id = ?').run('sad', id);
+  assert.equal(db.prepare('SELECT mood FROM cycle_day_logs WHERE id = ?').get(id).mood, 'sad');
+
+  // Erneutes Speichern desselben Tages - auch ohne `feelings`/`mood` im Body -
+  // muss die Spalte jetzt aktiv leeren.
+  const updated = await call('POST', '/cycle/logs', { log_date: '2030-01-06', flow: 'heavy' });
+  assert.equal(updated.status, 201);
+  assert.equal(updated.body.data.id, id);
+  assert.equal(updated.body.data.mood, null);
+  assert.equal(db.prepare('SELECT mood FROM cycle_day_logs WHERE id = ?').get(id).mood, null);
+});
+
 test('Cycle-Log: intimacy ist hart privat – Eigentümer sieht es, family-Mitglied nicht (D-6)', async () => {
   asA();
   const created = await call('POST', '/cycle/logs', {

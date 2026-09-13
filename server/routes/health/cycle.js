@@ -30,7 +30,15 @@ import * as v from '../../middleware/validate.js';
 import { cycleToCsv } from '../../services/health-export.js';
 import { syncCycleRemindersForUser } from '../../services/cycle-reminders.js';
 import { isHouseholdMember } from '../../services/member-email.js';
-import { normalizeSymptomEntries, MOOD_VALUES } from '../../../public/utils/health-cycle.js';
+// Review-Runde Fix 6: die vier geschlossenen Wertelisten kommen jetzt aus
+// health-cycle.js (dasselbe Muster wie der bestehende MOOD_VALUES-Import) -
+// vorher hielt diese Datei drei eigene Kopien (CERVIX_MUCUS_VALUES/
+// TEST_RESULT_VALUES/INTIMACY_VALUES weiter unten, CONTRACEPTION_VALUES bei
+// den Einstellungen), health.js eine vierte.
+import {
+  normalizeSymptomEntries, MOOD_VALUES,
+  CERVIX_MUCUS_VALUES, TEST_RESULT_VALUES, INTIMACY_VALUES, CONTRACEPTION_VALUES,
+} from '../../../public/utils/health-cycle.js';
 import {
   log, VISIBILITIES, FLOW_LEVELS,
   viewerId, visibilityClause, toBit, applyUpdate, badRequest,
@@ -99,12 +107,10 @@ function replaceSymptoms(database, dayLogId, entries) {
 }
 
 // Geschlossene Werte-Listen fuer die seit Migration 195 nullbaren Spalten
-// (kein CHECK auf der Spalte selbst, siehe dortiger Kommentar) - dieselbe
-// Aufteilung wie basal_temp_unit: die Liste lebt hier, nicht im Schema.
-const CERVIX_MUCUS_VALUES = ['dry', 'sticky', 'creamy', 'watery', 'eggwhite'];
-const TEST_RESULT_VALUES  = ['negative', 'positive']; // LH- und Schwangerschaftstest (D-11)
-// D-6, hart privat (siehe GET /cycle/logs unten und DECISIONS.md).
-const INTIMACY_VALUES     = ['protected', 'unprotected', 'solo'];
+// (kein CHECK auf der Spalte selbst, siehe dortiger Kommentar) - kommen seit
+// Review-Runde Fix 6 als Import von oben (health-cycle.js, EIN Zuhause statt
+// dreier Kopien), nicht mehr als lokale Konstanten hier.
+// D-6, hart privat (siehe GET /cycle/logs unten und DECISIONS.md): INTIMACY_VALUES.
 
 /**
  * Gefuehle eines Tages (Mehrfachauswahl, seit Migration 196) validieren +
@@ -332,7 +338,16 @@ router.post('/cycle/logs', (req, res) => {
     const intimacy      = v.oneOf(b.intimacy, INTIMACY_VALUES, 'intimacy');
     // Legacy `mood` (Einzelwert) wird, wenn `feelings` fehlt, als
     // Ein-Element-Liste behandelt - siehe normalizeFeelings(). Die
-    // `mood`-Spalte selbst wird ab hier nicht mehr beschrieben (Migration 196).
+    // `mood`-Spalte selbst wird beim Speichern aktiv auf NULL gesetzt (Review-
+    // Runde Fix 2): Migration 196 liess sie beim Umstieg unangetastet stehen
+    // (die Migration selbst bleibt so - sie lief bereits auf Live-DBs), aber
+    // dieser Schreibpfad hier liess sie seither ebenfalls unberuehrt, egal wie
+    // oft ein Tag danach erneut gespeichert wurde. Dadurch konnte ein laengst
+    // im UI geleertes Gefuehl beim naechsten Laden aus dem eingefrorenen
+    // Altwert wieder auftauchen (siehe normalizeFeelingEntries() in
+    // health-cycle.js, das GENAU diesen Fall beheben musste). `feelings` ist
+    // ab hier die einzige Wahrheit; `mood` bleibt nur noch fuer Zeilen lesbar,
+    // die seit Migration 196 nie erneut gespeichert wurden.
     const feelings      = normalizeFeelings(b.feelings, b.mood);
 
     const errors = v.collectErrors([logDate, flow, note, visibility, cervixMucus, lhTest, pregnancyTest, intimacy]);
@@ -348,14 +363,15 @@ router.post('/cycle/logs', (req, res) => {
       database.prepare(`
         INSERT INTO cycle_day_logs (
           user_id, log_date, flow, note, visibility, basal_temp, basal_temp_unit,
-          cervix_mucus, lh_test, pregnancy_test, intimacy
+          cervix_mucus, lh_test, pregnancy_test, intimacy, mood
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         ON CONFLICT(user_id, log_date) DO UPDATE SET
           flow = excluded.flow, note = excluded.note, visibility = excluded.visibility,
           basal_temp = excluded.basal_temp, basal_temp_unit = excluded.basal_temp_unit,
           cervix_mucus = excluded.cervix_mucus, lh_test = excluded.lh_test,
-          pregnancy_test = excluded.pregnancy_test, intimacy = excluded.intimacy
+          pregnancy_test = excluded.pregnancy_test, intimacy = excluded.intimacy,
+          mood = NULL
       `).run(
         viewer, logDate.value, flow.value, note.value, visibility.value || 'private',
         basalTemp.temp, basalTemp.unit,
@@ -416,10 +432,9 @@ router.delete('/cycle/logs/:id', (req, res) => {
 // hormonal_iud, implant, injection, patch, ring) schaltet clientseitig die
 // Eisprung-/Fruchtbarkeitsvorhersage ab (siehe DECISIONS.md); Kupferspirale/
 // Kondom/keine aendern daran nichts - das entscheidet public/utils/health-cycle.js,
-// nicht diese Route.
-const CONTRACEPTION_VALUES = [
-  'none', 'pill', 'hormonal_iud', 'copper_iud', 'implant', 'injection', 'patch', 'ring', 'condom', 'other',
-];
+// nicht diese Route. CONTRACEPTION_VALUES kommt seit Review-Runde Fix 6 als
+// Import von oben (aus CONTRACEPTION_TYPES abgeleitet), nicht mehr als lokale
+// Kopie hier.
 
 /** Voreinstellungen, falls die Person noch keine Zeile hat. */
 function defaultCycleSettings(userId) {

@@ -19,11 +19,15 @@ const {
   daysBetween, sortPeriodsAsc, cycleGaps, periodLengths,
   cycleStats, predictCycle, buildCycleCalendar, cycleRing, pregnancyInfo,
   detectTemperatureShift,
-  cycleLengthTrend, symptomFrequencyByPhase, feelingFrequencyByPhase, bbtSeries, symptomIntensityTrend,
+  cycleLengthTrend, symptomFrequencyByPhase, feelingFrequencyByPhase, normalizeFeelingEntries,
+  bbtSeries, symptomIntensityTrend,
   symptomCyclePattern, TYPICAL_CYCLE_RANGE, isTypicalCycleLength,
   predictSymptomLikelihood, projectFutureCycles,
-  pmsWindow, periodFlowSummary, periodFlowLoad, heavyBleedingSignal,
+  pmsWindow, periodFlowSummary, periodFlowLoad, periodFlowStats, heavyBleedingSignal,
   PAIN_SYMPTOM_VALUES, painSummary, peakPainDay,
+  CERVIX_MUCUS_TYPES, CERVIX_MUCUS_VALUES, TEST_RESULT_VALUES,
+  INTIMACY_TYPES, INTIMACY_VALUES,
+  CONTRACEPTION_TYPES, CONTRACEPTION_VALUES, HORMONAL_CONTRACEPTION_VALUES,
 } = await import('../public/utils/health-cycle.js');
 
 const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
@@ -80,6 +84,58 @@ test('SYMPTOM_TYPES / MOOD_TYPES: vollständige labelKeys + icons', () => {
   }
   assert.equal(moodType('great').value, 'great');
   assert.equal(moodType('unknown'), null);
+});
+
+// Review-Runde Fix 6: CERVIX_MUCUS_TYPES/TEST_RESULT_VALUES/INTIMACY_TYPES/
+// CONTRACEPTION_TYPES sind jetzt EIN Zuhause hier statt dreier Kopien
+// (server/routes/health/cycle.js + public/pages/health.js importieren sie).
+test('CERVIX_MUCUS_TYPES/INTIMACY_TYPES: vollständige labelKeys, Werte einmalig', () => {
+  for (const m of CERVIX_MUCUS_TYPES) assert.ok(m.labelKey.startsWith('health.cycle.mucus.'));
+  assert.deepEqual(CERVIX_MUCUS_VALUES, CERVIX_MUCUS_TYPES.map((m) => m.value));
+  assert.equal(new Set(CERVIX_MUCUS_VALUES).size, CERVIX_MUCUS_VALUES.length);
+
+  for (const i of INTIMACY_TYPES) assert.ok(i.labelKey.startsWith('health.cycle.intimacy.'));
+  assert.deepEqual(INTIMACY_VALUES, INTIMACY_TYPES.map((i) => i.value));
+  assert.equal(new Set(INTIMACY_VALUES).size, INTIMACY_VALUES.length);
+});
+
+test('TEST_RESULT_VALUES: genau negative/positive', () => {
+  assert.deepEqual(TEST_RESULT_VALUES, ['negative', 'positive']);
+});
+
+test('CONTRACEPTION_TYPES: HORMONAL_CONTRACEPTION_VALUES ist eine Teilmenge von CONTRACEPTION_VALUES, hormonal-Flag konsistent', () => {
+  assert.deepEqual(CONTRACEPTION_VALUES, CONTRACEPTION_TYPES.map((c) => c.value));
+  assert.equal(new Set(CONTRACEPTION_VALUES).size, CONTRACEPTION_VALUES.length);
+  for (const c of CONTRACEPTION_TYPES) assert.ok(c.labelKey.startsWith('health.cycle.settings.contraceptionOptions.'));
+
+  // Teilmenge ⊆ Gesamtmenge.
+  for (const v of HORMONAL_CONTRACEPTION_VALUES) assert.ok(CONTRACEPTION_VALUES.includes(v));
+  // Die abgeleitete Teilmenge muss exakt den als hormonal:true markierten Einträgen entsprechen.
+  assert.deepEqual(
+    [...HORMONAL_CONTRACEPTION_VALUES].sort(),
+    CONTRACEPTION_TYPES.filter((c) => c.hormonal).map((c) => c.value).sort(),
+  );
+  assert.deepEqual([...HORMONAL_CONTRACEPTION_VALUES].sort(), ['hormonal_iud', 'implant', 'injection', 'patch', 'pill', 'ring'].sort());
+});
+
+// Quelltext-Guard (source-text check, wie andere Guards dieses Repos): weder
+// health.js noch server/routes/health/cycle.js dürfen die geschlossenen
+// Wertelisten noch selbst definieren - beide müssen sie aus health-cycle.js
+// importieren (EIN Zuhause statt dreier Kopien).
+test('Fix 6 Guard: health.js und server/routes/health/cycle.js definieren CERVIX_MUCUS/TEST_RESULT/INTIMACY/CONTRACEPTION-Listen nicht mehr selbst', () => {
+  const healthJs = readFileSync(new URL('../public/pages/health.js', import.meta.url), 'utf8');
+  const routeJs = readFileSync(new URL('../server/routes/health/cycle.js', import.meta.url), 'utf8');
+
+  assert.match(healthJs, /CERVIX_MUCUS_TYPES,\s*TEST_RESULT_VALUES,\s*INTIMACY_TYPES,\s*CONTRACEPTION_TYPES,/,
+    'health.js muss die Typen aus health-cycle.js importieren');
+  assert.ok(!/const CERVIX_MUCUS_TYPES = Object\.freeze/.test(healthJs), 'health.js darf CERVIX_MUCUS_TYPES nicht mehr selbst definieren');
+  assert.ok(!/const INTIMACY_TYPES = Object\.freeze/.test(healthJs), 'health.js darf INTIMACY_TYPES nicht mehr selbst definieren');
+  assert.ok(!/const CONTRACEPTION_TYPES = Object\.freeze/.test(healthJs), 'health.js darf CONTRACEPTION_TYPES nicht mehr selbst definieren');
+
+  assert.match(routeJs, /CERVIX_MUCUS_VALUES,\s*TEST_RESULT_VALUES,\s*INTIMACY_VALUES,\s*CONTRACEPTION_VALUES,/,
+    'server/routes/health/cycle.js muss die *_VALUES aus health-cycle.js importieren');
+  assert.ok(!/const CERVIX_MUCUS_VALUES = \[/.test(routeJs), 'server-Route darf CERVIX_MUCUS_VALUES nicht mehr selbst definieren');
+  assert.ok(!/const CONTRACEPTION_VALUES = \[/.test(routeJs), 'server-Route darf CONTRACEPTION_VALUES nicht mehr selbst definieren');
 });
 
 test('INTENSITY_LEVELS: drei Stufen, symptomIntensityLabelKey löst sie auf', () => {
@@ -272,6 +328,46 @@ test('cycleGaps: ohne todayKey-Argument Default "heute" - unplausible Lücken bl
   // dieselbe 3-Tage-Lücke wird unabhängig vom Referenzdatum ausgeschlossen.
   const hist = periods(['2026-01-01', '2026-01-29', '2026-02-01', '2026-03-01'], 3);
   assert.deepEqual(cycleGaps(hist, '2026-06-01'), [28, 28]);
+});
+
+// Review-Runde Fix 4: eine harte 90-Tage-Obergrenze schnitt bislang JEDE
+// Lücke einer Person mit konsistent langen (~95-100 Tage, PCOS-/oligomeno-
+// rrhoe-typischen) Zyklen weg - der Mittelwert fiel trotz konsistenter
+// Historie auf den 28-Tage-Default zurück. Reichen PLAUSIBEL (10-90 Tage)
+// allein die MIN_HISTORY_GAPS-Schwelle nicht, aber PLAUSIBEL+LANG (90-365
+// Tage) zusammen, werden auch die langen Lücken für den Mittelwert gerettet.
+test('cycleStats: konsistente 97-Tage-Zyklen werden gerettet (avgCycle 60 - Clamp-Obergrenze, source "history")', () => {
+  const hist = periods(['2020-01-01', '2020-04-07', '2020-07-13', '2020-10-18'], 5); // 3× 97 Tage
+  const today = '2020-10-28';
+  const s = cycleStats(hist, {}, today);
+  assert.equal(s.avgCycle, 60); // clampInt(97, 15, 60) - reproduziert denselben Wert wie vor der 90-Tage-Grenze
+  assert.equal(s.source, 'history');
+  assert.equal(s.excludedGaps, 0); // alle drei langen Lücken wurden gerettet, keine bleibt ausgeschlossen
+  assert.equal(s.plausibleGapCount, 3);
+});
+
+test('cycleStats: eine einzelne lange Lücke bleibt ausgeschlossen, wenn die plausiblen Lücken die Schwelle allein schon erreichen', () => {
+  // Drei 28-Tage-Lücken erreichen MIN_HISTORY_GAPS (3) bereits allein - die
+  // vierte, 200-Tage-Lücke ist dann weiterhin ein Ausreisser, kein Signal für
+  // einen generell langen Zyklus, und bleibt ausgeschlossen.
+  const hist = periods(['2020-01-01', '2020-01-29', '2020-02-26', '2020-03-25', '2020-10-11'], 5);
+  const today = '2020-10-21';
+  const s = cycleStats(hist, {}, today);
+  assert.equal(s.avgCycle, 28);
+  assert.equal(s.excludedGaps, 1); // die 200-Tage-Lücke - NICHT gerettet
+  assert.equal(s.plausibleGapCount, 3);
+});
+
+test('cycleStats: eine zu kurze (< 10 Tage) Lücke bleibt IMMER ausgeschlossen, auch wenn die Rettung für lange Lücken greift', () => {
+  // Lückenfolge 97/3/97/97: die drei langen Lücken reichen zusammen für die
+  // Rettung (MIN_HISTORY_GAPS=3) - die 3-Tage-Lücke dazwischen ist trotzdem
+  // NIE rettbar (Ueberlappung/Doppel-Erfassung, nicht "langer Zyklus").
+  const hist = periods(['2020-01-01', '2020-04-07', '2020-04-10', '2020-07-16', '2020-10-21'], 5);
+  const today = '2020-10-31';
+  const s = cycleStats(hist, {}, today);
+  assert.equal(s.avgCycle, 60); // Mittel aus den drei geretteten 97-Tage-Lücken, clamped
+  assert.equal(s.excludedGaps, 1); // nur die 3-Tage-Lücke - die drei langen wurden gerettet
+  assert.equal(s.plausibleGapCount, 3);
 });
 
 // --------------------------------------------------------
@@ -915,6 +1011,50 @@ test('projectFutureCycles: leer im Schwangerschafts-Modus (keine Prognose ohne B
   assert.deepEqual(projectFutureCycles(hist, settings, '2026-03-01'), []);
 });
 
+// Review-Runde Fix 5: projectFutureCycles() ankerte bisher IMMER auf den
+// allerletzten Periodenstart, auch wenn der in der Zukunft lag (eine bereits
+// im Voraus geloggte Periode) - predictCycle() ankert dagegen seit jeher auf
+// den jüngsten NICHT-zukünftigen Start. Mit zwei verschiedenen Ankern zeigte
+// buildCycleCalendar() (dessen `projected.slice(1)` genau EIN reales Fenster
+// verwerfen soll, weil predictCycle() dessen Nachfolger ersetzt) ein Fenster
+// mit dem FALSCHEN Anker direkt neben der geloggten künftigen Periode. Mit
+// derselben Anker-Regel (latestNonFutureStart(), health-cycle.js) liefert
+// projectFutureCycles()[0].start jetzt exakt denselben Wert wie
+// predictCycle().nextStart.
+test('projectFutureCycles/predictCycle: derselbe (nicht-zukünftige) Anker bei einer bereits geloggten künftigen Periode', () => {
+  // 3 plausible 28-Tage-Lücken (erreicht MIN_HISTORY_GAPS) + eine bereits
+  // geloggte künftige Periode (2026-05-01, nach "heute" 2026-04-01).
+  const hist = periods(['2026-01-01', '2026-01-29', '2026-02-26', '2026-03-26', '2026-05-01'], 5);
+  const today = '2026-04-01';
+
+  const prediction = predictCycle(hist, {}, today, []);
+  assert.equal(prediction.lastStart, '2026-03-26'); // NICHT der künftige Start 2026-05-01
+  assert.equal(prediction.nextStart, '2026-04-23');
+
+  const projected = projectFutureCycles(hist, {}, today);
+  assert.equal(projected[0].start, prediction.nextStart, 'projectFutureCycles()[0] muss denselben Anker wie predictCycle() nutzen');
+
+  // Kalenderfenster leiten sich vollstaendig vom (nicht-zukuenftigen) Anker ab:
+  // die vorhergesagte Periode UND das fruchtbare Fenster des ersten
+  // projizierten Zyklus sind sichtbar, exakt an den aus lastStart=2026-03-26
+  // abgeleiteten Daten.
+  const cal = buildCycleCalendar('2026-04-15', { periods: hist, logs: [], settings: {}, todayKey: today, weekStartsOn: 1 });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(at('2026-04-23').phase, PHASE.MENSTRUATION);
+  assert.equal(at('2026-04-23').predicted, true);
+  // Fruchtbares Fenster (Eisprung = 04-23 - 14 = 04-09, Fenster 04-04..04-09).
+  assert.equal(at('2026-04-06').phase, PHASE.FERTILE);
+  assert.equal(at('2026-04-09').phase, PHASE.OVULATION);
+
+  // Die bereits geloggte künftige Periode selbst rendert weiterhin als
+  // GELOGGTE (nicht vorhergesagte) Menstruation, über loggedPeriodPhase() -
+  // unveraendert von diesem Fix.
+  const calMay = buildCycleCalendar('2026-05-15', { periods: hist, logs: [], settings: {}, todayKey: today, weekStartsOn: 1 });
+  const atMay = (k) => calMay.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(atMay('2026-05-01').phase, PHASE.MENSTRUATION);
+  assert.equal(atMay('2026-05-01').predicted, false);
+});
+
 // --------------------------------------------------------
 // buildCycleCalendar
 // --------------------------------------------------------
@@ -1270,6 +1410,39 @@ test('pmsWindow: die dem nächsten Start nähere Grenze wird auf mindestens 2 Ta
 });
 
 // --------------------------------------------------------
+// periodFlowStats (Review-Runde Fix 8) — EIN Durchlauf statt zweier fast
+// identischer Schleifen (periodFlowSummary()/periodFlowLoad() bleiben als
+// dünne Wrapper bestehen, s. u.)
+// --------------------------------------------------------
+
+test('periodFlowStats: liefert heaviest, load UND loggedDays in einem Durchlauf', () => {
+  const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-05' };
+  const logs = [
+    { log_date: '2026-01-01', flow: 'spotting' },
+    { log_date: '2026-01-02', flow: 'medium' },
+    { log_date: '2026-01-03', flow: 'heavy' },
+    { log_date: '2026-01-04', flow: 'light' },
+  ];
+  assert.deepEqual(periodFlowStats(period, logs), { heaviest: 'heavy', load: 1 + 3 + 4 + 2, loggedDays: 4 });
+});
+
+test('periodFlowStats: null ohne einen einzigen Flow-Log im Zeitraum', () => {
+  const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-05' };
+  assert.equal(periodFlowStats(period, []), null);
+});
+
+test('periodFlowSummary/periodFlowLoad: dünne Wrapper um periodFlowStats() - konsistent zueinander', () => {
+  const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-05' };
+  const logs = [
+    { log_date: '2026-01-01', flow: 'heavy' },
+    { log_date: '2026-01-02', flow: 'light' },
+  ];
+  const stats = periodFlowStats(period, logs);
+  assert.deepEqual(periodFlowSummary(period, logs), { heaviest: stats.heaviest, loggedDays: stats.loggedDays });
+  assert.deepEqual(periodFlowLoad(period, logs), { load: stats.load, loggedDays: stats.loggedDays });
+});
+
+// --------------------------------------------------------
 // periodFlowSummary (v2, B-2) — Blutungsstärke-Zusammenfassung je Periode
 // --------------------------------------------------------
 
@@ -1341,15 +1514,26 @@ test('feelingFrequencyByPhase: klassifiziert Menstruation/Luteal/Sonstige wie sy
   ]);
 });
 
-test('feelingFrequencyByPhase: fällt auf das alte Einzelfeld `mood` zurück, wenn `feelings` fehlt oder leer ist', () => {
+// Review-Runde Fix 2: ein bewusst GELEERTES `feelings: []` ist "keine Gefühle
+// mehr" und darf NICHT auf das eingefrorene `mood` zurückfallen - nur wenn
+// `feelings` als Schlüssel ganz fehlt (kein Array ist), greift der Fallback.
+// Vorher machte `.length` das leere Array ununterscheidbar von "fehlt".
+test('feelingFrequencyByPhase: fällt auf das alte Einzelfeld `mood` NUR zurück, wenn `feelings` fehlt (nicht wenn es leer ist)', () => {
   const hist = periods(['2026-05-01'], 5);
   const logs = [
-    { log_date: '2026-05-02', mood: 'sad' }, // kein feelings-Array -> Fallback auf mood
-    { log_date: '2026-05-03', feelings: [], mood: 'irritable' }, // leeres feelings-Array -> ebenfalls Fallback
+    { log_date: '2026-05-02', mood: 'sad' }, // kein feelings-Schlüssel -> Fallback auf mood
+    { log_date: '2026-05-03', feelings: [], mood: 'irritable' }, // explizit geleert -> KEIN Fallback
     { log_date: '2026-05-04', feelings: ['great'], mood: 'sad' }, // feelings hat Vorrang vor mood
   ];
   const byKey = Object.fromEntries(feelingFrequencyByPhase(logs, hist, {}).map((f) => [f.key, f.total]));
-  assert.deepEqual(byKey, { sad: 1, irritable: 1, great: 1 });
+  assert.deepEqual(byKey, { sad: 1, great: 1 }); // 'irritable' erscheint NICHT - 05-03 hat keine Gefühle
+});
+
+test('normalizeFeelingEntries: leeres `feelings`-Array ist geleert (kein Fallback); fehlendes `feelings` fällt auf `mood` zurück', () => {
+  assert.deepEqual(normalizeFeelingEntries({ feelings: [], mood: 'sad' }), []);
+  assert.deepEqual(normalizeFeelingEntries({ mood: 'sad' }), [{ key: 'sad', intensity: null }]);
+  // Sanity: ein normales, nicht-leeres feelings-Array bleibt unverändert Vorrang.
+  assert.deepEqual(normalizeFeelingEntries({ feelings: ['good'], mood: 'sad' }), [{ key: 'good', intensity: null }]);
 });
 
 test('feelingFrequencyByPhase: unbekannte Gefühlswerte werden verworfen', () => {

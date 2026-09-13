@@ -4538,6 +4538,7 @@
                 "periodToday": "Adet bugün bekleniyor — şimdi başlatılsın mı?",
                 "periodOverdue": "Adet {{count}} gündür gecikti — şimdi başlatılsın mı?",
                 "periodOverdue_one": "Adet {{count}} gündür gecikti — şimdi başlatılsın mı?",
+                "periodStillOpen": "Kayda göre adetin hâlâ devam ediyor — şimdi bitirilsin mi?",
                 "peakPainDay": "Örüntüne göre bugün genellikle en yoğun ağrı günün oluyor ({{symptom}}).",
                 "likelySymptomsToday": "Bugün muhtemel: {{symptoms}}",
                 "pmsWindow": "PMS penceresi muhtemelen {{weekday}} itibarıyla",

@@ -4538,6 +4538,7 @@
                 "periodToday": "Inaasahan ang regla ngayon — simulan na?",
                 "periodOverdue": "Naantala na ng {{count}} araw ang regla — simulan na?",
                 "periodOverdue_one": "Naantala na ng {{count}} araw ang regla — simulan na?",
+                "periodStillOpen": "Naka-log pa rin ang iyong regla bilang kasalukuyan — tapusin na ngayon?",
                 "peakPainDay": "Ayon sa iyong pattern, madalas na ngayon ang pinakamatinding araw ng sakit ({{symptom}}).",
                 "likelySymptomsToday": "Malamang ngayon: {{symptoms}}",
                 "pmsWindow": "Malamang magkaroon ng PMS window simula {{weekday}}",

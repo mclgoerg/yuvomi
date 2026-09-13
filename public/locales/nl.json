@@ -4538,6 +4538,7 @@
                 "periodToday": "Menstruatie vandaag verwacht — nu starten?",
                 "periodOverdue": "Menstruatie is {{count}} dagen over tijd — nu starten?",
                 "periodOverdue_one": "Menstruatie is {{count}} dag over tijd — nu starten?",
+                "periodStillOpen": "Je menstruatie staat nog als lopend geregistreerd — nu beëindigen?",
                 "peakPainDay": "Volgens je patroon is vandaag vaak je dag met de sterkste pijn ({{symptom}}).",
                 "likelySymptomsToday": "Vandaag waarschijnlijk: {{symptoms}}",
                 "pmsWindow": "PMS-venster waarschijnlijk vanaf {{weekday}}",

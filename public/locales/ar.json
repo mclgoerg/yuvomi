@@ -4538,6 +4538,7 @@
                 "periodToday": "من المتوقع أن تبدأ الدورة اليوم — هل تبدأ الآن؟",
                 "periodOverdue": "تأخرت الدورة {{count}} يوم — هل تبدأ الآن؟",
                 "periodOverdue_one": "تأخرت الدورة {{count}} يوم — هل تبدأ الآن؟",
+                "periodStillOpen": "دورتك لا تزال مسجَّلة كجارية — إنهاؤها الآن؟",
                 "peakPainDay": "وفق نمطك، غالبًا ما يكون اليوم يوم الألم الأشد ({{symptom}}).",
                 "likelySymptomsToday": "محتمل اليوم: {{symptoms}}",
                 "pmsWindow": "نافذة ما قبل الدورة محتملة ابتداءً من {{weekday}}",

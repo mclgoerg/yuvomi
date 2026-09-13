@@ -4538,6 +4538,7 @@
                 "periodToday": "Period expected today — start it now?",
                 "periodOverdue": "Period is {{count}} days overdue — start it now?",
                 "periodOverdue_one": "Period is {{count}} day overdue — start it now?",
+                "periodStillOpen": "Your period is still logged as ongoing — end it now?",
                 "peakPainDay": "Today is often your strongest pain day ({{symptom}}), based on your pattern.",
                 "likelySymptomsToday": "Likely today: {{symptoms}}",
                 "pmsWindow": "PMS window likely from {{weekday}}",

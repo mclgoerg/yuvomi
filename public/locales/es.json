@@ -4538,6 +4538,7 @@
                 "periodToday": "Regla esperada hoy — ¿la iniciamos ahora?",
                 "periodOverdue": "La regla lleva {{count}} días de retraso — ¿la iniciamos ahora?",
                 "periodOverdue_one": "La regla lleva {{count}} día de retraso — ¿la iniciamos ahora?",
+                "periodStillOpen": "Tu periodo sigue registrado como en curso — ¿lo finalizamos ahora?",
                 "peakPainDay": "Según tu patrón, hoy suele ser tu día de dolor más intenso ({{symptom}}).",
                 "likelySymptomsToday": "Probable hoy: {{symptoms}}",
                 "pmsWindow": "Ventana premenstrual probable desde el {{weekday}}",

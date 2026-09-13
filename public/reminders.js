@@ -240,23 +240,27 @@ function processReminders(reminders) {
  * server/services/notifications.js#cycleBody für den Push-Body, hier mit der
  * Locale des Empfängers statt der Haushaltssprache, weil der Client sie kennt.
  *
- * D-15 (Partner-Erinnerung): server/services/notifications.js#cycleBody
- * unterscheidet dort den Partner-Fall ("Periode von {{name}}" statt "Nächste
- * Periode") über `reminder.cycle_anchor_kind === 'partner_period'` - dieses
- * Feld kommt hier NICHT an. `GET /reminders/pending`
- * (server/routes/reminders.js) selektiert nur `r.*` aus der `reminders`-
- * Tabelle plus das berechnete `entity_title`; `cycle_anchor_kind`/
- * `cycle_owner_name` werden dort nicht mitgejoint (nur im Push-Payload-Pfad
- * von notifications.js). Ein Erinnerungs-Objekt an dieser Stelle hat also
- * keine Möglichkeit, die eigene von einer Partner-Periode zu unterscheiden -
- * absichtlich unverändert gelassen (kein Rätselraten über `entity_id`), bis
- * der REST-Endpoint dasselbe Feld mitliefert. Das ist server/**-Gebiet und
- * damit außerhalb dieses Arbeitspakets.
+ * D-15/Review-Runde Fix 7 (Partner-Erinnerung): server/services/
+ * notifications.js#cycleBody unterscheidet den Partner-Fall ("Periode von
+ * {{name}}" statt "Nächste Periode") über `reminder.cycle_anchor_kind ===
+ * 'partner_period'`. `GET /reminders/pending` (server/routes/reminders.js,
+ * vom parallelen Server-Arbeitsschritt dieser Review-Runde erweitert) liefert
+ * dieselben zwei Felder inzwischen auch hier mit: `cycle_anchor_kind`
+ * (dieselben Anker-Arten wie server/services/cycle-reminders.js, der Partner-
+ * Anker heisst 'partner_period') und `cycle_owner_name` (nur bei
+ * 'partner_period' gesetzt). Ein aelterer Server ohne dieses Feld liefert
+ * schlicht `undefined` - dann bleibt es beim bisherigen (eigenen) Text, kein
+ * Absturz auf einen fehlenden Namen.
  * @returns {string|null} null für jede andere Erinnerungsart - Aufrufer fällt dann auf entity_title zurück.
  */
 function cycleReminderBody(reminder) {
   if (reminder.entity_type === 'cycle_log_nudge') return t('health.cycle.settings.remindLogDaily');
-  if (reminder.entity_type === 'cycle_period') return `${t('health.cycle.status.nextPeriod')} - ${reminder.entity_title}`;
+  if (reminder.entity_type === 'cycle_period') {
+    if (reminder.cycle_anchor_kind === 'partner_period' && reminder.cycle_owner_name) {
+      return `${t('health.cycle.status.partnerNextPeriod', { name: reminder.cycle_owner_name })} - ${reminder.entity_title}`;
+    }
+    return `${t('health.cycle.status.nextPeriod')} - ${reminder.entity_title}`;
+  }
   return null;
 }
 
