@@ -608,7 +608,7 @@
         "duplicateListLabel": "सूची डुप्लीकेट करें",
         "duplicateListTitle": "“{{name}}” डुप्लीकेट करें",
         "duplicateListNameLabel": "नई सूची का नाम",
-        "duplicateDefaultName": "{{name}} – प्रतिलिपि",
+        "duplicateDefaultName": "{{name}} - प्रतिलिपि",
         "duplicateResetChecked": "चेक किए गए आइटम रीसेट करें",
         "duplicateKeepQuantities": "मात्राएं बनाए रखें",
         "duplicateKeepNotes": "नोट्स और लिंक बनाए रखें",

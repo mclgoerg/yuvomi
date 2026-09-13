@@ -620,7 +620,7 @@
         "duplicateListLabel": "I-duplicate ang listahan",
         "duplicateListTitle": "I-duplicate ang \"{{name}}\"",
         "duplicateListNameLabel": "Pangalan ng bagong listahan",
-        "duplicateDefaultName": "{{name}} – Kopya",
+        "duplicateDefaultName": "{{name}} - Kopya",
         "duplicateResetChecked": "I-reset ang mga naka-check",
         "duplicateKeepQuantities": "Panatilihin ang dami",
         "duplicateKeepNotes": "Panatilihin ang mga tala at link",

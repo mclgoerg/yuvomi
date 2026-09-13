@@ -608,7 +608,7 @@
         "duplicateListLabel": "Dupliquer la liste",
         "duplicateListTitle": "Dupliquer « {{name}} »",
         "duplicateListNameLabel": "Nom de la nouvelle liste",
-        "duplicateDefaultName": "{{name}} – Copie",
+        "duplicateDefaultName": "{{name}} - Copie",
         "duplicateResetChecked": "Réinitialiser les cases cochées",
         "duplicateKeepQuantities": "Conserver les quantités",
         "duplicateKeepNotes": "Conserver notes et liens",

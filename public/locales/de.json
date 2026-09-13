@@ -620,7 +620,7 @@
         "duplicateListLabel": "Liste duplizieren",
         "duplicateListTitle": "„{{name}}“ duplizieren",
         "duplicateListNameLabel": "Name der neuen Liste",
-        "duplicateDefaultName": "{{name}} – Kopie",
+        "duplicateDefaultName": "{{name}} - Kopie",
         "duplicateResetChecked": "Häkchen zurücksetzen",
         "duplicateKeepQuantities": "Mengen übernehmen",
         "duplicateKeepNotes": "Notizen & Links übernehmen",

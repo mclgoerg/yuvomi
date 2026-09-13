@@ -608,7 +608,7 @@
         "duplicateListLabel": "Duplicate list",
         "duplicateListTitle": "Duplicate \"{{name}}\"",
         "duplicateListNameLabel": "New list name",
-        "duplicateDefaultName": "{{name}} – Copy",
+        "duplicateDefaultName": "{{name}} - Copy",
         "duplicateResetChecked": "Reset checked state",
         "duplicateKeepQuantities": "Keep quantities",
         "duplicateKeepNotes": "Keep notes & links",

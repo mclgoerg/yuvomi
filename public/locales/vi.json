@@ -608,7 +608,7 @@
         "duplicateListLabel": "Nhân bản danh sách",
         "duplicateListTitle": "Nhân bản “{{name}}”",
         "duplicateListNameLabel": "Tên danh sách mới",
-        "duplicateDefaultName": "{{name}} – Bản sao",
+        "duplicateDefaultName": "{{name}} - Bản sao",
         "duplicateResetChecked": "Đặt lại các mục đã đánh dấu",
         "duplicateKeepQuantities": "Giữ số lượng",
         "duplicateKeepNotes": "Giữ ghi chú & liên kết",

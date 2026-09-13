@@ -608,7 +608,7 @@
         "duplicateListLabel": "Duplikovat seznam",
         "duplicateListTitle": "Duplikovat „{{name}}“",
         "duplicateListNameLabel": "Název nového seznamu",
-        "duplicateDefaultName": "{{name}} – kopie",
+        "duplicateDefaultName": "{{name}} - kopie",
         "duplicateResetChecked": "Zrušit zaškrtnutí",
         "duplicateKeepQuantities": "Zachovat množství",
         "duplicateKeepNotes": "Zachovat poznámky a odkazy",

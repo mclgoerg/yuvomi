@@ -608,7 +608,7 @@
         "duplicateListLabel": "复制清单",
         "duplicateListTitle": "复制“{{name}}”",
         "duplicateListNameLabel": "新清单名称",
-        "duplicateDefaultName": "{{name}} – 副本",
+        "duplicateDefaultName": "{{name}} - 副本",
         "duplicateResetChecked": "重置勾选状态",
         "duplicateKeepQuantities": "保留数量",
         "duplicateKeepNotes": "保留备注和链接",

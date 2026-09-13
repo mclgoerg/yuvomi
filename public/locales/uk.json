@@ -608,7 +608,7 @@
         "duplicateListLabel": "Дублювати список",
         "duplicateListTitle": "Дублювати «{{name}}»",
         "duplicateListNameLabel": "Назва нового списку",
-        "duplicateDefaultName": "{{name}} — копія",
+        "duplicateDefaultName": "{{name}} - копія",
         "duplicateResetChecked": "Скинути позначки",
         "duplicateKeepQuantities": "Зберегти кількість",
         "duplicateKeepNotes": "Зберегти нотатки й посилання",

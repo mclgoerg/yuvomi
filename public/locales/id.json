@@ -620,7 +620,7 @@
         "duplicateListLabel": "Duplikat daftar",
         "duplicateListTitle": "Duplikat \"{{name}}\"",
         "duplicateListNameLabel": "Nama daftar baru",
-        "duplicateDefaultName": "{{name}} – Salinan",
+        "duplicateDefaultName": "{{name}} - Salinan",
         "duplicateResetChecked": "Setel ulang tanda centang",
         "duplicateKeepQuantities": "Pertahankan jumlah",
         "duplicateKeepNotes": "Pertahankan catatan & tautan",

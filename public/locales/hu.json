@@ -608,7 +608,7 @@
         "duplicateListLabel": "Lista duplikálása",
         "duplicateListTitle": "„{{name}}” duplikálása",
         "duplicateListNameLabel": "Az új lista neve",
-        "duplicateDefaultName": "{{name}} – másolat",
+        "duplicateDefaultName": "{{name}} - másolat",
         "duplicateResetChecked": "Pipák visszaállítása",
         "duplicateKeepQuantities": "Mennyiségek megtartása",
         "duplicateKeepNotes": "Jegyzetek és linkek megtartása",

@@ -620,7 +620,7 @@
         "duplicateListLabel": "목록 복제",
         "duplicateListTitle": "“{{name}}” 복제",
         "duplicateListNameLabel": "새 목록 이름",
-        "duplicateDefaultName": "{{name}} – 사본",
+        "duplicateDefaultName": "{{name}} - 사본",
         "duplicateResetChecked": "체크 상태 초기화",
         "duplicateKeepQuantities": "수량 유지",
         "duplicateKeepNotes": "메모 및 링크 유지",

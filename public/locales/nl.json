@@ -608,7 +608,7 @@
         "duplicateListLabel": "Lijst dupliceren",
         "duplicateListTitle": "„{{name}}” dupliceren",
         "duplicateListNameLabel": "Naam van de nieuwe lijst",
-        "duplicateDefaultName": "{{name}} – Kopie",
+        "duplicateDefaultName": "{{name}} - Kopie",
         "duplicateResetChecked": "Aangevinkte items resetten",
         "duplicateKeepQuantities": "Hoeveelheden behouden",
         "duplicateKeepNotes": "Notities en links behouden",

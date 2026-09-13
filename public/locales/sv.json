@@ -608,7 +608,7 @@
         "duplicateListLabel": "Duplicera listan",
         "duplicateListTitle": "Duplicera ”{{name}}”",
         "duplicateListNameLabel": "Namn på den nya listan",
-        "duplicateDefaultName": "{{name}} – Kopia",
+        "duplicateDefaultName": "{{name}} - Kopia",
         "duplicateResetChecked": "Återställ ibockade varor",
         "duplicateKeepQuantities": "Behåll mängder",
         "duplicateKeepNotes": "Behåll anteckningar och länkar",

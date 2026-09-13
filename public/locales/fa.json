@@ -620,7 +620,7 @@
         "duplicateListLabel": "کپی از فهرست",
         "duplicateListTitle": "کپی از «{{name}}»",
         "duplicateListNameLabel": "نام فهرست جدید",
-        "duplicateDefaultName": "{{name}} – کپی",
+        "duplicateDefaultName": "{{name}} - کپی",
         "duplicateResetChecked": "بازنشانی موارد علامت‌خورده",
         "duplicateKeepQuantities": "حفظ مقدارها",
         "duplicateKeepNotes": "حفظ یادداشت‌ها و لینک‌ها",

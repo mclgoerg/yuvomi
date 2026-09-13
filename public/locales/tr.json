@@ -608,7 +608,7 @@
         "duplicateListLabel": "Listeyi kopyala",
         "duplicateListTitle": "„{{name}}” kopyalansın",
         "duplicateListNameLabel": "Yeni listenin adı",
-        "duplicateDefaultName": "{{name}} – Kopya",
+        "duplicateDefaultName": "{{name}} - Kopya",
         "duplicateResetChecked": "İşaretlemeleri sıfırla",
         "duplicateKeepQuantities": "Miktarları koru",
         "duplicateKeepNotes": "Notları ve bağlantıları koru",

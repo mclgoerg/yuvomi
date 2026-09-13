@@ -608,7 +608,7 @@
         "duplicateListLabel": "Διπλασιασμός λίστας",
         "duplicateListTitle": "Διπλασιασμός «{{name}}»",
         "duplicateListNameLabel": "Όνομα νέας λίστας",
-        "duplicateDefaultName": "{{name}} – Αντίγραφο",
+        "duplicateDefaultName": "{{name}} - Αντίγραφο",
         "duplicateResetChecked": "Επαναφορά τσεκαρισμένων",
         "duplicateKeepQuantities": "Διατήρηση ποσοτήτων",
         "duplicateKeepNotes": "Διατήρηση σημειώσεων & συνδέσμων",
