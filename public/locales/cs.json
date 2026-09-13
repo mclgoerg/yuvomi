@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} se často objevuje kolem tohoto dne vašeho cyklu.",
                 "symptomTracked": "Zaznamenáno",
                 "symptomPredicted": "Zde se často objevuje",
-                "phaseOther": "Ostatní"
+                "phaseOther": "Ostatní",
+                "details": "Podrobnosti",
+                "feelingFrequency": "Četnost nálad",
+                "flowLoad": "Intenzita krvácení podle cyklu",
+                "flowLoadCaption": "Vychází z tvých záznamů o krvácení — čím úplnější záznamy, tím vypovídavější údaj.",
+                "flowLoadColumn": "Zátěž krvácení",
+                "flowLoadValue": "{{load}} ({{days}} zaznamenáno)",
+                "heavyBleedingHintHeavy": "Tvé poslední menstruace byly opakovaně označeny jako „silné“ — stojí za to to zmínit při lékařské konzultaci.",
+                "heavyBleedingHintLong": "Alespoň jedna z tvých posledních menstruací trvala déle než týden — stojí za to to zmínit při lékařské konzultaci.",
+                "painTitle": "Bolest",
+                "painCurrentCycleLabel": "Dny s bolestí v tomto cyklu",
+                "painAvgPerCycleLabel": "Prům. dnů s bolestí na cyklus",
+                "painAvgIntensityLabel": "Prům. intenzita"
             },
             "flow": {
                 "label": "Intenzita krvácení",

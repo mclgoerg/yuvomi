@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} often occurs around this day in your cycle.",
                 "symptomTracked": "Logged",
                 "symptomPredicted": "Often occurs here",
-                "phaseOther": "Other"
+                "phaseOther": "Other",
+                "details": "Details",
+                "feelingFrequency": "Feelings frequency",
+                "flowLoad": "Flow intensity per cycle",
+                "flowLoadCaption": "Based on your flow entries — the more complete your logging, the more meaningful this is.",
+                "flowLoadColumn": "Flow load",
+                "flowLoadValue": "{{load}} ({{days}} logged)",
+                "heavyBleedingHintHeavy": "Your recent periods were repeatedly logged as \"heavy\" — worth mentioning at your next medical check-up.",
+                "heavyBleedingHintLong": "At least one of your recent periods lasted longer than a week — worth mentioning at your next medical check-up.",
+                "painTitle": "Pain",
+                "painCurrentCycleLabel": "Pain days this cycle",
+                "painAvgPerCycleLabel": "Avg. pain days per cycle",
+                "painAvgIntensityLabel": "Avg. intensity"
             },
             "flow": {
                 "label": "Flow",

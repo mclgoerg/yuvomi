@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} często występuje w okolicach tego dnia Twojego cyklu.",
                 "symptomTracked": "Zarejestrowano",
                 "symptomPredicted": "Często występuje tutaj",
-                "phaseOther": "Inne"
+                "phaseOther": "Inne",
+                "details": "Szczegóły",
+                "feelingFrequency": "Częstość nastrojów",
+                "flowLoad": "Intensywność krwawienia w cyklu",
+                "flowLoadCaption": "Na podstawie Twoich wpisów o krwawieniu — im pełniejsze zapisy, tym bardziej miarodajny wynik.",
+                "flowLoadColumn": "Nasilenie krwawienia",
+                "flowLoadValue": "{{load}} ({{days}} odnotowanych)",
+                "heavyBleedingHintHeavy": "Twoje ostatnie okresy były wielokrotnie oznaczone jako „obfite” — warto o tym wspomnieć podczas wizyty lekarskiej.",
+                "heavyBleedingHintLong": "Co najmniej jeden z Twoich ostatnich okresów trwał dłużej niż tydzień — warto o tym wspomnieć podczas wizyty lekarskiej.",
+                "painTitle": "Ból",
+                "painCurrentCycleLabel": "Dni z bólem w tym cyklu",
+                "painAvgPerCycleLabel": "Śr. dni z bólem na cykl",
+                "painAvgIntensityLabel": "Śr. nasilenie"
             },
             "flow": {
                 "label": "Intensywność krwawienia",

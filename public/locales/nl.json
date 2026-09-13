@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} komt vaak rond deze dag van je cyclus voor.",
                 "symptomTracked": "Geregistreerd",
                 "symptomPredicted": "Komt hier vaak voor",
-                "phaseOther": "Overig"
+                "phaseOther": "Overig",
+                "details": "Details",
+                "feelingFrequency": "Gevoelens-frequentie",
+                "flowLoad": "Bloedingsintensiteit per cyclus",
+                "flowLoadCaption": "Gebaseerd op je bloedingsregistraties — hoe vollediger je bijhoudt, hoe zinvoller dit is.",
+                "flowLoadColumn": "Bloedingslast",
+                "flowLoadValue": "{{load}} ({{days}} geregistreerd)",
+                "heavyBleedingHintHeavy": "Je laatste menstruaties zijn herhaaldelijk als \"hevig\" geregistreerd — dit is het bespreken met een arts waard.",
+                "heavyBleedingHintLong": "Minstens één van je laatste menstruaties duurde langer dan een week — dit is het bespreken met een arts waard.",
+                "painTitle": "Pijn",
+                "painCurrentCycleLabel": "Pijndagen deze cyclus",
+                "painAvgPerCycleLabel": "Gem. pijndagen per cyclus",
+                "painAvgIntensityLabel": "Gem. intensiteit"
             },
             "flow": {
                 "label": "Bloedverlies",

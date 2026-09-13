@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} sering muncul di sekitar hari ini dalam siklusmu.",
                 "symptomTracked": "Tercatat",
                 "symptomPredicted": "Sering muncul di sini",
-                "phaseOther": "Lainnya"
+                "phaseOther": "Lainnya",
+                "details": "Detail",
+                "feelingFrequency": "Frekuensi perasaan",
+                "flowLoad": "Intensitas aliran per siklus",
+                "flowLoadCaption": "Berdasarkan catatan aliranmu — semakin lengkap pencatatanmu, semakin bermakna data ini.",
+                "flowLoadColumn": "Beban aliran",
+                "flowLoadValue": "{{load}} ({{days}} tercatat)",
+                "heavyBleedingHintHeavy": "Menstruasi terakhirmu berulang kali tercatat sebagai \"deras\" — ada baiknya disampaikan saat konsultasi medis.",
+                "heavyBleedingHintLong": "Setidaknya satu menstruasi terakhirmu berlangsung lebih dari seminggu — ada baiknya disampaikan saat konsultasi medis.",
+                "painTitle": "Nyeri",
+                "painCurrentCycleLabel": "Hari nyeri pada siklus ini",
+                "painAvgPerCycleLabel": "Rata-rata hari nyeri per siklus",
+                "painAvgIntensityLabel": "Rata-rata intensitas"
             },
             "flow": {
                 "label": "Volume darah",

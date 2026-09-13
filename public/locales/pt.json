@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} costuma ocorrer perto deste dia do teu ciclo.",
                 "symptomTracked": "Registado",
                 "symptomPredicted": "Costuma ocorrer aqui",
-                "phaseOther": "Outro"
+                "phaseOther": "Outro",
+                "details": "Detalhes",
+                "feelingFrequency": "Frequência de sentimentos",
+                "flowLoad": "Intensidade do fluxo por ciclo",
+                "flowLoadCaption": "Baseado nos teus registos de fluxo — quanto mais completo o registo, mais significativo isto é.",
+                "flowLoadColumn": "Carga de fluxo",
+                "flowLoadValue": "{{load}} ({{days}} registados)",
+                "heavyBleedingHintHeavy": "Os teus últimos períodos foram registados várias vezes como «intensos» — vale a pena falar sobre isso numa consulta médica.",
+                "heavyBleedingHintLong": "Pelo menos um dos teus últimos períodos durou mais de uma semana — vale a pena falar sobre isso numa consulta médica.",
+                "painTitle": "Dor",
+                "painCurrentCycleLabel": "Dias com dor neste ciclo",
+                "painAvgPerCycleLabel": "Méd. dias com dor por ciclo",
+                "painAvgIntensityLabel": "Intensidade média"
             },
             "flow": {
                 "label": "Intensidade do fluxo",

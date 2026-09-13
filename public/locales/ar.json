@@ -4352,7 +4352,19 @@
                 "likelyToday": "غالبًا ما يظهر {{symptom}} حول هذا اليوم من دورتك.",
                 "symptomTracked": "مسجَّل",
                 "symptomPredicted": "يظهر غالبًا هنا",
-                "phaseOther": "أخرى"
+                "phaseOther": "أخرى",
+                "details": "التفاصيل",
+                "feelingFrequency": "تكرار المشاعر",
+                "flowLoad": "شدة النزيف لكل دورة",
+                "flowLoadCaption": "استناداً إلى تسجيلاتك للنزيف — كلما كان تسجيلك أكثر اكتمالاً، كانت هذه البيانات أكثر دلالة.",
+                "flowLoadColumn": "حمل النزيف",
+                "flowLoadValue": "{{load}} (تم تسجيل {{days}})",
+                "heavyBleedingHintHeavy": "تم تسجيل دوراتك الأخيرة عدة مرات بأنها «غزيرة» — يستحق ذلك ذكره خلال استشارة طبية.",
+                "heavyBleedingHintLong": "استمرت واحدة على الأقل من دوراتك الأخيرة أكثر من أسبوع — يستحق ذلك ذكره خلال استشارة طبية.",
+                "painTitle": "الألم",
+                "painCurrentCycleLabel": "أيام الألم في هذه الدورة",
+                "painAvgPerCycleLabel": "متوسط أيام الألم لكل دورة",
+                "painAvgIntensityLabel": "متوسط الشدة"
             },
             "flow": {
                 "label": "شدة النزيف",

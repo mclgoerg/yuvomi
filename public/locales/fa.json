@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} اغلب حوالی همین روز از چرخه‌ات رخ می‌دهد.",
                 "symptomTracked": "ثبت‌شده",
                 "symptomPredicted": "اغلب اینجا رخ می‌دهد",
-                "phaseOther": "دیگر"
+                "phaseOther": "دیگر",
+                "details": "جزئیات",
+                "feelingFrequency": "بسامد احساسات",
+                "flowLoad": "شدت خونریزی در هر چرخه",
+                "flowLoadCaption": "بر پایه ثبت‌های خونریزی شما — هرچه ثبت شما کامل‌تر باشد، این داده معنادارتر است.",
+                "flowLoadColumn": "بار خونریزی",
+                "flowLoadValue": "{{load}} ({{days}} ثبت‌شده)",
+                "heavyBleedingHintHeavy": "پریودهای اخیر شما چندین بار «سنگین» ثبت شده‌اند — بهتر است این موضوع را در مشاوره پزشکی مطرح کنید.",
+                "heavyBleedingHintLong": "دست‌کم یکی از پریودهای اخیر شما بیش از یک هفته طول کشیده — بهتر است این موضوع را در مشاوره پزشکی مطرح کنید.",
+                "painTitle": "درد",
+                "painCurrentCycleLabel": "روزهای درد در این چرخه",
+                "painAvgPerCycleLabel": "میانگین روزهای درد در هر چرخه",
+                "painAvgIntensityLabel": "میانگین شدت"
             },
             "flow": {
                 "label": "شدت خونریزی",

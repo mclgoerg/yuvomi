@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} döngünde genellikle bu günün civarında görülür.",
                 "symptomTracked": "Kaydedildi",
                 "symptomPredicted": "Genellikle burada görülür",
-                "phaseOther": "Diğer"
+                "phaseOther": "Diğer",
+                "details": "Ayrıntılar",
+                "feelingFrequency": "Duygu sıklığı",
+                "flowLoad": "Döngü başına kanama yoğunluğu",
+                "flowLoadCaption": "Kanama kayıtlarına dayanır — kayıtların ne kadar eksiksiz olursa, bu o kadar anlamlı olur.",
+                "flowLoadColumn": "Kanama yükü",
+                "flowLoadValue": "{{load}} ({{days}} kaydedildi)",
+                "heavyBleedingHintHeavy": "Son adet dönemlerin tekrar tekrar \"yoğun\" olarak kaydedildi — bunu bir doktor görüşmesinde belirtmekte fayda var.",
+                "heavyBleedingHintLong": "Son adet dönemlerinden en az biri bir haftadan uzun sürdü — bunu bir doktor görüşmesinde belirtmekte fayda var.",
+                "painTitle": "Ağrı",
+                "painCurrentCycleLabel": "Bu döngüdeki ağrılı gün sayısı",
+                "painAvgPerCycleLabel": "Döngü başına ort. ağrılı gün",
+                "painAvgIntensityLabel": "Ort. yoğunluk"
             },
             "flow": {
                 "label": "Kanama yoğunluğu",

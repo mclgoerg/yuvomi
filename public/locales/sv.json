@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} inträffar ofta kring denna dag i din cykel.",
                 "symptomTracked": "Loggat",
                 "symptomPredicted": "Inträffar ofta här",
-                "phaseOther": "Annat"
+                "phaseOther": "Annat",
+                "details": "Detaljer",
+                "feelingFrequency": "Känslofrekvens",
+                "flowLoad": "Blödningsintensitet per cykel",
+                "flowLoadCaption": "Baserat på dina blödningsregistreringar — ju mer komplett din loggning är, desto mer meningsfullt är detta.",
+                "flowLoadColumn": "Blödningsbelastning",
+                "flowLoadValue": "{{load}} ({{days}} loggade)",
+                "heavyBleedingHintHeavy": "Dina senaste menscykler har upprepade gånger loggats som \"kraftiga\" — värt att nämna vid nästa läkarbesök.",
+                "heavyBleedingHintLong": "Minst en av dina senaste mensperioder varade längre än en vecka — värt att nämna vid nästa läkarbesök.",
+                "painTitle": "Smärta",
+                "painCurrentCycleLabel": "Smärtdagar denna cykel",
+                "painAvgPerCycleLabel": "Snitt smärtdagar per cykel",
+                "painAvgIntensityLabel": "Snittintensitet"
             },
             "flow": {
                 "label": "Flöde",

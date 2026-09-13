@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} gyakran ez körül a ciklusnap körül jelentkezik.",
                 "symptomTracked": "Rögzítve",
                 "symptomPredicted": "Gyakran itt jelentkezik",
-                "phaseOther": "Egyéb"
+                "phaseOther": "Egyéb",
+                "details": "Részletek",
+                "feelingFrequency": "Hangulat gyakorisága",
+                "flowLoad": "Vérzés intenzitása ciklusonként",
+                "flowLoadCaption": "A rögzített vérzésadatokon alapul — minél teljesebb a naplózás, annál informatívabb.",
+                "flowLoadColumn": "Vérzésterhelés",
+                "flowLoadValue": "{{load}} ({{days}} rögzítve)",
+                "heavyBleedingHintHeavy": "Az utóbbi ciklusaid ismétlődően „erős” vérzésként lettek rögzítve — érdemes ezt megemlíteni egy orvosi konzultáción.",
+                "heavyBleedingHintLong": "Legalább egy utóbbi ciklusod egy hétnél tovább tartott — érdemes ezt megemlíteni egy orvosi konzultáción.",
+                "painTitle": "Fájdalom",
+                "painCurrentCycleLabel": "Fájdalmas napok ebben a ciklusban",
+                "painAvgPerCycleLabel": "Átl. fájdalmas napok ciklusonként",
+                "painAvgIntensityLabel": "Átl. intenzitás"
             },
             "flow": {
                 "label": "Vérzés erőssége",

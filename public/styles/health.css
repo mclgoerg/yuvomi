@@ -2274,6 +2274,44 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 .cycle-likelihood__callout svg { width: var(--icon-md); height: var(--icon-md); flex-shrink: 0; }
 
+/* D-1: kleines Gefuehls-Icon vor dem Zeilennamen (MOOD_TYPES-Icon) - Symptome
+ * tragen an derselben Stelle keins, hier eins, weil MOOD_TYPES.icon ohnehin
+ * existiert und ein Gefuehl (anders als ein Textpreset) von einem
+ * wiedererkennbaren Icon profitiert (dieselben Icons wie im Tages-Log). */
+.cycle-symptom-row__icon {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  margin-right: var(--space-1);
+  vertical-align: -2px;
+  color: var(--color-text-tertiary);
+}
+
+/* D-4: Schmerz-Kachel am Kopf des Trends-Bereichs - drei Werte NEBENEINANDER
+ * statt als Chart, "eine Kachel, kein Diagramm" laut Vorgabe. Dieselbe
+ * .health-chart-section-Hülle wie jeder andere Trend-Block (ein-System-Optik),
+ * nur mit einer Statistik-Reihe statt eines SVG als Inhalt. */
+.cycle-pain-tile__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  text-align: center;
+}
+.cycle-pain-tile__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cycle-pain-tile__value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--module-health);
+  font-variant-numeric: tabular-nums;
+}
+.cycle-pain-tile__label {
+  font-size: var(--text-2xs);
+  color: var(--color-text-secondary);
+}
+
 /* ---- Verlauf ---- */
 
 .cycle-history { margin-top: var(--space-6); }

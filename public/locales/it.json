@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} si presenta spesso intorno a questo giorno del ciclo.",
                 "symptomTracked": "Registrato",
                 "symptomPredicted": "Si presenta spesso qui",
-                "phaseOther": "Altro"
+                "phaseOther": "Altro",
+                "details": "Dettagli",
+                "feelingFrequency": "Frequenza degli stati d'animo",
+                "flowLoad": "Intensità del flusso per ciclo",
+                "flowLoadCaption": "Si basa sulle tue registrazioni del flusso — più il tuo diario è completo, più questo dato è significativo.",
+                "flowLoadColumn": "Carico di flusso",
+                "flowLoadValue": "{{load}} ({{days}} registrati)",
+                "heavyBleedingHintHeavy": "Le tue ultime mestruazioni sono state segnate più volte come «abbondanti» — vale la pena parlarne con un medico.",
+                "heavyBleedingHintLong": "Almeno una delle tue ultime mestruazioni è durata più di una settimana — vale la pena parlarne con un medico.",
+                "painTitle": "Dolore",
+                "painCurrentCycleLabel": "Giorni di dolore in questo ciclo",
+                "painAvgPerCycleLabel": "Media giorni di dolore per ciclo",
+                "painAvgIntensityLabel": "Intensità media"
             },
             "flow": {
                 "label": "Intensità del flusso",

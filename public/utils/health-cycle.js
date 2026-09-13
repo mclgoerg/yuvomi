@@ -22,6 +22,14 @@
  *                          Symptom-Zyklustag-Muster.
  *        - periodFlowSummary() (v2, B-2): stärkster Flow-Wert + geloggte Tage
  *                          EINER Periode, für den Historie-Chip.
+ *        - periodFlowLoad() (v2, B-3): Summe der Flow-Ränge EINER Periode,
+ *                          für den Blutungslast-Trend.
+ *        - heavyBleedingSignal() (v2, B-4): Muster-Prädikat für den ruhigen
+ *                          "mit Ärztin/Arzt besprechen"-Hinweis.
+ *        - feelingFrequencyByPhase() (v2, D-1): wie symptomFrequencyByPhase(),
+ *                          über `feelings` statt `symptoms`.
+ *        - painSummary() (v2, D-4): Schmerztage aktueller Zyklus vs. Ø +
+ *                          Ø-Intensität über die schmerzbezogenen Symptome.
  *        Bewusst KEINE i18n/DOM — in Node ohne Browser testbar (labelKeys liefern
  *        die Übersetzung erst im UI).
  * Abhängigkeiten: ./date.js (ebenfalls DOM-frei; relativer Import, siehe
@@ -552,18 +560,22 @@ function classifyDayPhase(cyc, dateKey) {
 }
 
 /**
- * Symptom-Häufigkeit je Zyklus-Phase, für die Trend-Ansicht (Phase 4) -
- * beantwortet "häufen sich meine Symptome vor der Periode" statt nur "wie oft
- * kam Symptom X überhaupt vor". Tage vor der ersten geloggten Periode gehören
- * zu keinem bekannten Zyklus und werden übersprungen, nicht geraten.
+ * Generischer Kern von symptomFrequencyByPhase()/feelingFrequencyByPhase()
+ * (v2, D-1) - beide zaehlen Vorkommen einer Tages-Log-Eigenschaft
+ * (Symptome bzw. Gefuehle) je Zyklus-Phase; die einzige Abweichung ist, WELCHE
+ * Eintraege ein Log traegt. `extractEntries(log)` liefert dieselbe
+ * `{key, intensity}[]`-Form wie normalizeSymptomEntries() (intensity darf
+ * `null` sein). Tage vor der ersten geloggten Periode gehören zu keinem
+ * bekannten Zyklus und werden übersprungen, nicht geraten.
  *
  * @param {Array<Object>} dayLogs
  * @param {Array<Object>} periods
- * @param {Object} [settings] - cycle_settings-Zeile (für luteal_length).
- * @returns {Array<{key: string, menstruation: number, luteal: number, other: number, total: number}>}
+ * @param {Object} settings - cycle_settings-Zeile (für luteal_length).
+ * @param {(log: Object) => Array<{key: string, intensity: number|null}>} extractEntries
+ * @returns {Array<{key: string, menstruation: number, luteal: number, other: number, total: number, avgIntensity: number|null}>}
  *          absteigend nach total sortiert.
  */
-export function symptomFrequencyByPhase(dayLogs, periods, settings = {}) {
+function frequencyByPhase(dayLogs, periods, settings, extractEntries) {
   const cycles = reconstructCycles(periods, settings);
   if (!cycles.length) return [];
 
@@ -577,7 +589,7 @@ export function symptomFrequencyByPhase(dayLogs, periods, settings = {}) {
     if (!log?.log_date) continue;
     const phase = phaseFor(dayKey(log.log_date));
     if (!phase) continue;
-    for (const entry of normalizeSymptomEntries(log.symptoms)) {
+    for (const entry of extractEntries(log)) {
       const c = counts.get(entry.key) || { key: entry.key, [PHASE.MENSTRUATION]: 0, [PHASE.LUTEAL]: 0, other: 0, total: 0, _intensities: [] };
       c[phase] += 1;
       c.total += 1;
@@ -585,12 +597,68 @@ export function symptomFrequencyByPhase(dayLogs, periods, settings = {}) {
       counts.set(entry.key, c);
     }
   }
-  // avgIntensity (Phase 4b): Mittel der gradierten Vorkommen dieses Symptoms,
-  // oder null, wenn keine einzige Auswahl gradiert wurde - "nicht gradiert"
-  // bleibt von "mild" unterscheidbar.
+  // avgIntensity (Phase 4b): Mittel der gradierten Vorkommen, oder null, wenn
+  // keine einzige Auswahl gradiert wurde - "nicht gradiert" bleibt von "mild"
+  // unterscheidbar. Gefuehle liefern nie eine Intensitaet (s.u.), avgIntensity
+  // bleibt fuer sie deshalb immer null - kein erfundener Wert.
   return [...counts.values()]
     .map(({ _intensities, ...c }) => ({ ...c, avgIntensity: mean(_intensities) }))
     .sort((a, b) => b.total - a.total);
+}
+
+/**
+ * Symptom-Häufigkeit je Zyklus-Phase, für die Trend-Ansicht (Phase 4) -
+ * beantwortet "häufen sich meine Symptome vor der Periode" statt nur "wie oft
+ * kam Symptom X überhaupt vor".
+ *
+ * @param {Array<Object>} dayLogs
+ * @param {Array<Object>} periods
+ * @param {Object} [settings] - cycle_settings-Zeile (für luteal_length).
+ * @returns {Array<{key: string, menstruation: number, luteal: number, other: number, total: number}>}
+ *          absteigend nach total sortiert.
+ */
+export function symptomFrequencyByPhase(dayLogs, periods, settings = {}) {
+  return frequencyByPhase(dayLogs, periods, settings, (log) => normalizeSymptomEntries(log.symptoms));
+}
+
+/**
+ * Gefuehls-Eintraege EINES Tages-Logs, normalisiert auf dieselbe
+ * `{key, intensity}`-Form wie normalizeSymptomEntries() (intensity ist hier
+ * immer `null` - Gefuehle kennen keine Staerke). `feelings` (Array, seit
+ * Migration 196) hat Vorrang; ist es leer/fehlend, faellt es auf das alte
+ * Einzelfeld `mood` als Ein-Element-Liste zurück (DECISIONS.md: "legacy mood
+ * column stays readable"). Unbekannte/nicht in MOOD_VALUES enthaltene Werte
+ * werden still verworfen, dieselbe Haltung wie normalizeSymptomEntries().
+ * @param {Object} log
+ * @returns {Array<{key: string, intensity: null}>}
+ */
+function normalizeFeelingEntries(log) {
+  const list = Array.isArray(log?.feelings) && log.feelings.length
+    ? log.feelings
+    : (log?.mood ? [log.mood] : []);
+  const seen = new Set();
+  const out = [];
+  for (const raw of list) {
+    const key = String(raw ?? '').trim().toLowerCase();
+    if (!MOOD_VALUES.includes(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, intensity: null });
+  }
+  return out;
+}
+
+/**
+ * Gefühls-Häufigkeit je Zyklus-Phase (v2, D-1) - dieselbe Frage wie
+ * symptomFrequencyByPhase(), nur über `feelings` statt `symptoms` (siehe
+ * normalizeFeelingEntries() für die Legacy-`mood`-Rückfalllogik).
+ * @param {Array<Object>} dayLogs
+ * @param {Array<Object>} periods
+ * @param {Object} [settings] - cycle_settings-Zeile (für luteal_length).
+ * @returns {Array<{key: string, menstruation: number, luteal: number, other: number, total: number, avgIntensity: null}>}
+ *          absteigend nach total sortiert.
+ */
+export function feelingFrequencyByPhase(dayLogs, periods, settings = {}) {
+  return frequencyByPhase(dayLogs, periods, settings, normalizeFeelingEntries);
 }
 
 /**
@@ -1050,6 +1118,144 @@ export function periodFlowSummary(period, logs, avgPeriod = DEFAULT_PERIOD) {
     if (level && level.rank > heaviestRank) { heaviestRank = level.rank; heaviest = level.value; }
   }
   return loggedDays ? { heaviest, loggedDays } : null;
+}
+
+/**
+ * B-3: Blutungslast EINER Periode - Summe der FLOW_LEVELS-Ränge über alle
+ * geloggten Tage ihrer Spanne (periodDateRange(), dieselbe "offene Episode
+ * läuft avgPeriod Tage"-Regel wie periodFlowSummary()). Anders als dessen
+ * "stärkster Tag" beantwortet die SUMME "insgesamt stärker/schwächer
+ * geworden" (die eigentlich gefragte Frage) - ein einzelner starker Tag in
+ * einer sonst leichten Periode soll die Last nicht wie einen durchgehend
+ * starken Zyklus aussehen lassen.
+ * @param {Object} period - eine Zeile aus cycle.periods (start_date, end_date?).
+ * @param {Array<Object>} logs - cycle_day_logs (log_date, flow).
+ * @param {number} [avgPeriod=DEFAULT_PERIOD] - wie periodFlowSummary().
+ * @returns {{load: number, loggedDays: number}|null} null, wenn im Zeitraum
+ *          kein einziger Tag einen Flow-Wert trägt (kein Balken ohne Basis).
+ */
+export function periodFlowLoad(period, logs, avgPeriod = DEFAULT_PERIOD) {
+  const { start, end } = periodDateRange(period, avgPeriod);
+  let load = 0;
+  let loggedDays = 0;
+  for (const log of (logs || [])) {
+    if (!log?.flow || !log.log_date) continue;
+    const d = dayKey(log.log_date);
+    if (daysBetween(start, d) < 0 || daysBetween(d, end) < 0) continue;
+    loggedDays += 1;
+    const level = flowLevel(log.flow);
+    if (level) load += level.rank;
+  }
+  return loggedDays ? { load, loggedDays } : null;
+}
+
+// Letzten wie vielen ABGESCHLOSSENEN Episoden das Blutungsstärke-Muster
+// (heavyBleedingSignal()) betrachtet - 5 ist großzügig genug für ein Muster,
+// ohne uralte Historie mitzuziehen, die für die aktuelle Situation nichts
+// mehr aussagt.
+const HEAVY_BLEEDING_LOOKBACK = 5;
+// Ab wie vielen "schweren" Episoden unter den betrachteten das Muster gilt -
+// zwei von fünf wäre noch im Rahmen normaler Schwankung, drei ein wiederholter
+// Befund.
+const HEAVY_BLEEDING_MIN_HEAVY_COUNT = 3;
+// Eine Periode über 7 Tage gilt in gängiger Patientenaufklärung (z. B.
+// ACOG-nahe Quellen) als "verlängert" - dieselbe undogmatische Haltung wie
+// TYPICAL_CYCLE_RANGE, kein Anspruch auf einen klinisch validierten Wert.
+const LONG_PERIOD_THRESHOLD_DAYS = 7;
+
+/**
+ * B-4: ruhiges Muster-Prädikat für den ergänzenden Hinweis "das mit einem Arzt
+ * besprechen" - KEINE Diagnose, dieselbe Zurückhaltung wie der übrige
+ * "kein Medizinprodukt"-Disclaimer. Betrachtet nur ABGESCHLOSSENE Episoden
+ * (end_date gesetzt) - eine noch laufende Periode ist weder als "schwer" noch
+ * als "lang" fertig beobachtet. 'heavy' hat Vorrang vor 'long', wenn beides
+ * zuträfe - die UI zeigt ohnehin nur EINEN Hinweis, keine Rangfolge sonst nötig.
+ * @param {Array<Object>} periods
+ * @param {Array<Object>} logs
+ * @returns {false|'heavy'|'long'}
+ */
+export function heavyBleedingSignal(periods, logs) {
+  const completed = sortPeriodsAsc(periods).filter((p) => p.end_date).slice(-HEAVY_BLEEDING_LOOKBACK);
+  if (!completed.length) return false;
+
+  const heavyCount = completed.filter((p) => periodFlowSummary(p, logs)?.heaviest === 'heavy').length;
+  if (heavyCount >= HEAVY_BLEEDING_MIN_HEAVY_COUNT) return 'heavy';
+
+  const hasLongEpisode = completed.some((p) => daysBetween(p.start_date, p.end_date) + 1 > LONG_PERIOD_THRESHOLD_DAYS);
+  if (hasLongEpisode) return 'long';
+
+  return false;
+}
+
+// D-4: die vier schmerzbezogenen Symptom-Presets - eine feste, kleine Liste
+// (kein weiteres Preset-Feld auf SYMPTOM_TYPES, das jedes andere Symptom auch
+// bräuchte, nur um an EINER Stelle vier Werte auszuzeichnen).
+export const PAIN_SYMPTOM_VALUES = Object.freeze(['cramps', 'headache', 'backache', 'joint_pain']);
+
+/**
+ * D-4: Schmerz-Zusammenfassung über die vier schmerzbezogenen Symptome
+ * (PAIN_SYMPTOM_VALUES) - EIN kompaktes Feld statt vier Einzel-Trends.
+ * "Schmerztage" zählt TAGE, nicht Einzel-Einträge: ein Tag mit zwei
+ * Schmerz-Symptomen zählt trotzdem nur einmal (dieselbe Zählweise wie
+ * symptomCyclePattern()s `occurredOnDays`).
+ *
+ * `currentCyclePainDays`: Schmerztage seit Beginn des laufenden (jüngsten
+ * geloggten) Zyklus bis `todayKey`.
+ * `avgPainDaysPerCycle`: Mittel der Schmerztage über die ABGESCHLOSSENEN
+ * Zyklen (alle außer dem laufenden) - `null` ohne einen einzigen.
+ * `avgIntensity`: Mittel ALLER gradierten Schmerz-Vorkommen, unabhängig vom
+ * Zyklus - ein einzelner Zyklus hätte oft zu wenige gradierte Werte für ein
+ * aussagekräftiges Mittel.
+ *
+ * `null` als Ganzes, wenn noch nie ein Schmerz-Symptom geloggt wurde - keine
+ * Kachel ohne jede Grundlage.
+ *
+ * @param {Array<Object>} dayLogs
+ * @param {Array<Object>} periods
+ * @param {Object} [settings] - cycle_settings-Zeile (für luteal_length).
+ * @param {string} [todayKey]
+ * @returns {{currentCyclePainDays: number, avgPainDaysPerCycle: number|null, avgIntensity: number|null}|null}
+ */
+export function painSummary(dayLogs, periods, settings = {}, todayKey = householdToday()) {
+  const isPainEntry = (entry) => PAIN_SYMPTOM_VALUES.includes(entry.key);
+  const painEntriesOf = (log) => normalizeSymptomEntries(log?.symptoms).filter(isPainEntry);
+
+  const hasAnyPain = (dayLogs || []).some((log) => painEntriesOf(log).length > 0);
+  if (!hasAnyPain) return null;
+
+  const cycles = reconstructCycles(periods, settings);
+  const today = dayKey(todayKey);
+
+  // Schmerztage je rekonstruiertem Zyklus (ein Set aus Datumsschlüsseln - ein
+  // Tag mit mehreren Schmerz-Symptomen zählt trotzdem nur einmal).
+  const painDaysByCycle = cycles.map(() => new Set());
+  const intensities = [];
+  for (const log of (dayLogs || [])) {
+    if (!log?.log_date) continue;
+    const entries = painEntriesOf(log);
+    if (!entries.length) continue;
+    for (const e of entries) if (e.intensity != null) intensities.push(e.intensity);
+    const dk = dayKey(log.log_date);
+    const idx = cycles.findIndex((c) => daysBetween(c.cycleStart, dk) >= 0 && daysBetween(dk, c.nextStart) > 0);
+    if (idx >= 0) painDaysByCycle[idx].add(dk);
+  }
+
+  // Laufender Zyklus = der letzte rekonstruierte (dessen `nextStart` bei einer
+  // noch nicht begonnenen Folgeperiode aus dem Ø-Zyklus geschätzt ist, siehe
+  // reconstructCycles()) - Schmerztage darin nur bis heute zählen, ein "Tag"
+  // in der Zukunft hat ohnehin keinen Log.
+  const currentIdx = cycles.length - 1;
+  const currentCyclePainDays = currentIdx >= 0
+    ? [...painDaysByCycle[currentIdx]].filter((dk) => daysBetween(dk, today) >= 0).length
+    : 0;
+
+  // Ø nur über ABGESCHLOSSENE Zyklen (alle außer dem laufenden) - der laufende
+  // ist noch nicht fertig beobachtet und würde den Schnitt sonst systematisch
+  // nach unten ziehen.
+  const pastCounts = painDaysByCycle.slice(0, -1).map((s) => s.size);
+  const avgPainDaysPerCycle = pastCounts.length ? mean(pastCounts) : null;
+
+  return { currentCyclePainDays, avgPainDaysPerCycle, avgIntensity: mean(intensities) };
 }
 
 /**

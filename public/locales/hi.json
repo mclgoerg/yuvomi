@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} आपके चक्र में इस दिन के आसपास अक्सर होता है।",
                 "symptomTracked": "दर्ज किया गया",
                 "symptomPredicted": "अक्सर यहाँ होता है",
-                "phaseOther": "अन्य"
+                "phaseOther": "अन्य",
+                "details": "विवरण",
+                "feelingFrequency": "भावनाओं की आवृत्ति",
+                "flowLoad": "प्रति चक्र प्रवाह तीव्रता",
+                "flowLoadCaption": "आपकी प्रवाह प्रविष्टियों पर आधारित — जितना पूर्ण लॉगिंग होगा, यह उतना ही सार्थक होगा।",
+                "flowLoadColumn": "प्रवाह भार",
+                "flowLoadValue": "{{load}} ({{days}} दर्ज)",
+                "heavyBleedingHintHeavy": "आपके हाल के मासिक धर्म बार-बार \"भारी\" के रूप में दर्ज किए गए हैं — इसे चिकित्सकीय परामर्श में बताना उचित रहेगा।",
+                "heavyBleedingHintLong": "आपके हाल के मासिक धर्मों में से कम से कम एक, एक सप्ताह से अधिक समय तक चला — इसे चिकित्सकीय परामर्श में बताना उचित रहेगा।",
+                "painTitle": "दर्द",
+                "painCurrentCycleLabel": "इस चक्र में दर्द वाले दिन",
+                "painAvgPerCycleLabel": "प्रति चक्र औसत दर्द वाले दिन",
+                "painAvgIntensityLabel": "औसत तीव्रता"
             },
             "flow": {
                 "label": "रक्तस्राव की मात्रा",

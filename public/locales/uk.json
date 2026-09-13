@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} часто виникає приблизно в цей день циклу.",
                 "symptomTracked": "Записано",
                 "symptomPredicted": "Часто виникає тут",
-                "phaseOther": "Інше"
+                "phaseOther": "Інше",
+                "details": "Подробиці",
+                "feelingFrequency": "Частота настроїв",
+                "flowLoad": "Інтенсивність кровотечі за цикл",
+                "flowLoadCaption": "Ґрунтується на твоїх записах про кровотечу — що повніші записи, то показовіші ці дані.",
+                "flowLoadColumn": "Навантаження кровотечі",
+                "flowLoadValue": "{{load}} ({{days}} записано)",
+                "heavyBleedingHintHeavy": "Твої останні місячні кілька разів були позначені як «рясні» — варто обговорити це з лікарем.",
+                "heavyBleedingHintLong": "Принаймні одні з твоїх останніх місячних тривали довше за тиждень — варто обговорити це з лікарем.",
+                "painTitle": "Біль",
+                "painCurrentCycleLabel": "Дні болю в цьому циклі",
+                "painAvgPerCycleLabel": "Сер. днів болю за цикл",
+                "painAvgIntensityLabel": "Середня інтенсивність"
             },
             "flow": {
                 "label": "Інтенсивність виділень",

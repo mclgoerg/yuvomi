@@ -40,12 +40,14 @@ import {
 } from '/utils/health-activity.js';
 import { upcomingDoses, computeAdherenceStreak } from '/utils/health-overview.js';
 import {
-  FLOW_LEVELS, flowLevel, SYMPTOM_TYPES, symptomType, MOOD_TYPES, PHASE,
+  FLOW_LEVELS, flowLevel, SYMPTOM_TYPES, symptomType, MOOD_TYPES, moodType, PHASE,
   predictCycle, cycleStats, buildCycleCalendar, cycleRing, MIN_HISTORY_GAPS,
   normalizeSymptomEntries, symptomIntensityLabelKey,
-  cycleLengthTrend, symptomFrequencyByPhase, bbtSeries, symptomIntensityTrend,
+  cycleLengthTrend, symptomFrequencyByPhase, feelingFrequencyByPhase,
+  bbtSeries, symptomIntensityTrend,
   symptomCyclePattern, TYPICAL_CYCLE_RANGE, isTypicalCycleLength,
   predictSymptomLikelihood, pmsWindow, periodFlowSummary,
+  sortPeriodsAsc, periodFlowLoad, heavyBleedingSignal, painSummary, daysBetween,
 } from '/utils/health-cycle.js';
 import { HEALTH_ROUTES, renderHealthTabsBar } from '/utils/health-tabs.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
@@ -4782,34 +4784,116 @@ const SYMPTOM_PHASE_LABEL_KEYS = {
   other: 'health.cycle.trends.phaseOther',
 };
 
+// A-7: ab welcher Lücke (Tage) zwischen zwei aufeinanderfolgenden Messungen
+// die datumsskalierte Linie bricht statt durchzuzeichnen - eine 5+ Tage
+// Erfassungspause soll keine Steigung behaupten, die die Daten nicht zeigen.
+const DATE_SCALE_GAP_BREAK_DAYS = 5;
+
+/**
+ * A-7: eigene X-Beschriftung für `dateScaled`-Punkte - chartXLabelsMarkup()
+ * wählt per INDEX (erstes/mittleres/letztes Element), was bei sehr ungleich
+ * verteilten Daten ein Label weit von seiner tatsächlichen x-Position zeigen
+ * würde. Erstes/letztes Datum plus bis zu zwei echte Zwischendaten (keine
+ * erfundene "Mitte"), jedes an seiner TATSÄCHLICHEN x-Position.
+ * @param {Array<{date: string}>} points
+ * @param {(index: number) => number} xFor
+ */
+function dateScaledXLabelsMarkup(points, xFor) {
+  const n = points.length;
+  const y = CHART.H - 7;
+  const picks = n <= 4
+    ? points.map((_, i) => i)
+    : [...new Set([0, Math.floor((n - 1) / 3), Math.floor((2 * (n - 1)) / 3), n - 1])];
+  return picks.map((i) => {
+    const anchor = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle';
+    return `<text x="${xFor(i).toFixed(1)}" y="${y}" class="chart__axis" text-anchor="${anchor}">${esc(formatDate(points[i].date))}</text>`;
+  }).join('');
+}
+
 /**
  * Ein einzelnes, unaufgefülltes Liniendiagramm (Zykluslänge, BBT) - dieselbe
  * Geometrie wie die Vitalwerte-Charts (utils/chart.js), aber ohne deren
  * Mehrkanal-/Zeitraum-Maschinerie, die hier keine Entsprechung hat: ein Trend
  * zeigt die GESAMTE Historie, keinen gewählten Ausschnitt.
+ *
+ * A-7: `dateScaled: true` positioniert die Punkte nach ihrem TATSÄCHLICHEN
+ * Datum über die Zeitspanne der Reihe statt nach Index (chartX()) und bricht
+ * die Linie an Lücken > DATE_SCALE_GAP_BREAK_DAYS in mehrere <polyline>-
+ * Segmente - sonst zeichnete eine 30-Tage-Lücke zwischen zwei BBT-Messungen
+ * dieselbe Steigung wie ein Ein-Tage-Abstand (live verifiziert). Die
+ * Zykluslänge-/Schweregrad-Charts bleiben index-basiert (Standard) - dort ist
+ * jeder Punkt ein eigener Zyklus/Eintrag, keine Zeitreihe mit Lücken-Bedeutung.
+ * Die Flächenfüllung entfällt im datumsskalierten Modus (eine Fläche über eine
+ * gebrochene Linie hinweg würde auch die Lücke füllen und wäre irreführend;
+ * eine Basaltemperatur-Kurve ist ohnehin kein "Fläche unter der Linie"-Wert).
+ *
+ * `yDomain: [min, max]` fixiert die Werteachse statt sie aus den Datenwerten
+ * mit 10%-Polsterung abzuleiten (A-8: eine ordinale 1-3-Skala braucht ihre
+ * ECHTEN Grenzen, keine geglättete Spanne, die die Randwerte in die Polsterung
+ * schiebt).
  */
-function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTableValue, tableHeader, formatTick }) {
+function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTableValue, tableHeader, formatTick, dateScaled = false, yDomain = null }) {
   if (points.length < 2) return '';
   const { W, H } = CHART;
-  const { top, bottom } = chartScales();
+  const { top, bottom, left, right } = chartScales();
 
-  const values = points.map((p) => p.value);
-  let min = Math.min(...values);
-  let max = Math.max(...values);
-  if (min === max) { min -= 1; max += 1; }
-  const pad = (max - min) * 0.1;
-  min -= pad; max += pad;
+  let min, max;
+  if (yDomain) {
+    [min, max] = yDomain;
+  } else {
+    const values = points.map((p) => p.value);
+    min = Math.min(...values);
+    max = Math.max(...values);
+    if (min === max) { min -= 1; max += 1; }
+    const pad = (max - min) * 0.1;
+    min -= pad; max += pad;
+  }
 
-  const x = (i) => chartX(i, points.length);
+  const firstDate = points[0].date;
+  const lastDate = points[points.length - 1].date;
+  const span = dateScaled ? Math.max(1, daysBetween(firstDate, lastDate)) : null;
+
+  const x = dateScaled
+    ? (i) => left + (daysBetween(firstDate, points[i].date) / span) * (right - left)
+    : (i) => chartX(i, points.length);
   const y = (v) => chartY(v, min, max);
 
-  const spine = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
-  const area = `<polygon class="health-chart__area" points="${x(0).toFixed(1)},${bottom.toFixed(1)} ${spine} ${x(points.length - 1).toFixed(1)},${bottom.toFixed(1)}" />`;
+  // A-7: Segmente an Lücken > DATE_SCALE_GAP_BREAK_DAYS brechen (nur im
+  // datumsskalierten Modus - im index-Modus ist jeder Abstand "1", nie eine
+  // Lücke).
+  const segments = [];
+  let current = [0];
+  for (let i = 1; i < points.length; i += 1) {
+    const gap = dateScaled ? daysBetween(points[i - 1].date, points[i].date) : 1;
+    if (dateScaled && gap > DATE_SCALE_GAP_BREAK_DAYS) {
+      segments.push(current);
+      current = [i];
+    } else {
+      current.push(i);
+    }
+  }
+  segments.push(current);
+
+  const polylines = segments
+    // Ein einzelner Punkt ohne Nachbarn innerhalb der Lücken-Schwelle bekommt
+    // keine Linie (ein <polyline> mit einem Punkt wäre unsichtbar) - der
+    // Punkt selbst (dots, s.u.) bleibt trotzdem sichtbar.
+    .filter((seg) => seg.length >= 2)
+    .map((seg) => {
+      const spine = seg.map((i) => `${x(i).toFixed(1)},${y(points[i].value).toFixed(1)}`).join(' ');
+      return `<polyline fill="none" stroke="var(--module-health)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${spine}" />`;
+    }).join('');
+
+  const area = dateScaled ? '' : (() => {
+    const spine = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+    return `<polygon class="health-chart__area" points="${x(0).toFixed(1)},${bottom.toFixed(1)} ${spine} ${x(points.length - 1).toFixed(1)},${bottom.toFixed(1)}" />`;
+  })();
+
   const dots = points.map((p, i) =>
     `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-health)"><title>${esc(formatPointTooltip(p))}</title></circle>`).join('');
 
   const grid = chartGridMarkup(min, max, (val, wholeTicks) => (formatTick ? formatTick(val, wholeTicks) : String(wholeTicks ? Math.round(val) : val.toFixed(1))));
-  const xLabels = chartXLabelsMarkup(points.map((p) => formatDate(p.date)));
+  const xLabels = dateScaled ? dateScaledXLabelsMarkup(points, x) : chartXLabelsMarkup(points.map((p) => formatDate(p.date)));
   const table = chartTableMarkup(titleText, [t('health.cycle.trends.date'), tableHeader],
     points.map((p) => [formatDate(p.date), formatTableValue(p.value)]));
 
@@ -4819,7 +4903,7 @@ function simpleLineChartMarkup({ points, titleText, formatPointTooltip, formatTa
       <svg class="health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
         ${grid}
         ${area}
-        <polyline fill="none" stroke="var(--module-health)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${spine}" />
+        ${polylines}
         ${dots}
         ${xLabels}
       </svg>
@@ -4939,6 +5023,10 @@ function bbtTrendChartMarkup(series) {
     // BBT-Spannen liegen typischerweise unter 1 °C - hier ist die Nachkommastelle
     // die eigentliche Auskunft, nicht Pseudo-Präzision (siehe chart.js-Kommentar).
     formatTick: (val) => fmtNum(val, BBT_DECIMALS),
+    // A-7: Messungen liegen selten an jedem Tag vor - datumsproportional statt
+    // indexbasiert, sonst zeigt eine 30-Tage-Erfassungspause dieselbe Steigung
+    // wie ein Ein-Tage-Abstand.
+    dateScaled: true,
   });
 }
 
@@ -4951,6 +5039,15 @@ function bbtTrendChartMarkup(series) {
 /**
  * Schweregrad-Verlauf eines Symptoms (Phase 4b) - dieselbe simpleLineChartMarkup()-
  * Geometrie wie Zykluslänge/BBT, nur mit 1-3 statt Tagen/Grad als Werteachse.
+ *
+ * A-8: `yDomain: [1, 3]` fixiert die Achse auf die ECHTEN Grenzen der Skala -
+ * ohne das verschluckte simpleLineChartMarkup()s 10%-Polsterung die Randwerte
+ * 1 und 3 (nur "2" landete zufällig auf einer der 5 Gitterlinien). Die
+ * Tick-Beschriftung zeigt die Intensitäts-WÖRTER ("Leicht"/"Mäßig"/"Stark",
+ * dieselben wie symptomIntensityLabelKey() im Tooltip/der Tabelle) statt der
+ * nackten Zahl 1-3 - eine ordinale Skala ohne Einheit ist als Wort auf Anhieb
+ * lesbar, eine Zahl bräuchte eine zusätzliche Legende dafür. PAD_L (56)
+ * trägt die längsten dieser drei Wörter ("Mäßig") ohne Überlauf.
  */
 function symptomIntensityTrendChartMarkup(trend, symptomLabel) {
   return simpleLineChartMarkup({
@@ -4959,7 +5056,8 @@ function symptomIntensityTrendChartMarkup(trend, symptomLabel) {
     formatPointTooltip: (p) => `${formatDate(p.date)}: ${t(symptomIntensityLabelKey(p.value))}`,
     formatTableValue: (v) => t(symptomIntensityLabelKey(v)),
     tableHeader: t('health.cycle.trends.severity'),
-    formatTick: (val) => (Number.isInteger(val) && val >= 1 && val <= 3 ? String(val) : ''),
+    formatTick: (val) => (Number.isInteger(val) && val >= 1 && val <= 3 ? t(symptomIntensityLabelKey(val)) : ''),
+    yDomain: [1, 3],
   });
 }
 
@@ -5020,17 +5118,18 @@ function symptomFrequencyChartMarkup(freq, dayLogs, periods, settings) {
     // Editor, gerundet auf die naechste Stufe - "nicht gradiert" zeigt bewusst
     // keine Punkte statt einer erfundenen Nullstufe.
     const dots = row.avgIntensity != null ? symptomIntensityDotsHTML(Math.round(row.avgIntensity)) : '';
+    // D-17: EIN Aufklapper statt zwei getrennter ("Schweregrad-Verlauf" +
+    // "Zyklustag-Muster") - acht Symptomzeilen mit je zwei Disclosures waren
+    // eine Wand. Reihenfolge innen: Muster-Satz, Muster-Raster, dann
+    // Schweregrad-Chart (symptomCyclePatternMarkup() liefert Satz+Raster
+    // bereits als EIN Block, siehe dort).
     const trend = symptomIntensityTrend(dayLogs, row.key);
-    const trendChart = trend.length >= 2
-      ? advancedSection(symptomIntensityTrendChartMarkup(trend, label), { label: t('health.cycle.trends.severityTrend') })
-      : '';
-    // Zyklustag-Muster (Phase 4c): eigener, zweiter Aufklapper neben dem
-    // Schweregrad-Verlauf - beide beantworten verschiedene Fragen und schliessen
-    // sich nicht gegenseitig aus.
+    const trendChart = trend.length >= 2 ? symptomIntensityTrendChartMarkup(trend, label) : '';
     const pattern = symptomCyclePattern(dayLogs, periods, settings, row.key);
     const patternMarkup = symptomCyclePatternMarkup(pattern, label);
-    const patternSection = patternMarkup
-      ? advancedSection(patternMarkup, { label: t('health.cycle.trends.cyclePattern') })
+    const detailsInner = [patternMarkup, trendChart].filter(Boolean).join('');
+    const details = detailsInner
+      ? advancedSection(detailsInner, { label: t('health.cycle.trends.details') })
       : '';
     return `
       <div class="cycle-symptom-row">
@@ -5039,8 +5138,7 @@ function symptomFrequencyChartMarkup(freq, dayLogs, periods, settings) {
           <strong>${esc(fmtNum(row.total))}</strong>
         </div>
         <div class="cycle-symptom-row__track">${segs}</div>
-        ${trendChart}
-        ${patternSection}
+        ${details}
       </div>`;
   }).join('');
 
@@ -5049,6 +5147,156 @@ function symptomFrequencyChartMarkup(freq, dayLogs, periods, settings) {
       <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(t('health.cycle.trends.symptomFrequency'))}</div></div>
       <div class="cycle-legend">${legend}</div>
       <div class="cycle-symptom-list">${rows}</div>
+    </div>`;
+}
+
+/**
+ * D-1: Gefühls-Häufigkeit je Phase - dieselbe gestapelte-Anteilsbalken-
+ * Darstellung wie symptomFrequencyChartMarkup() (.cycle-symptom-row wird 1:1
+ * wiederverwendet), nur über feelingFrequencyByPhase() und MOOD_TYPES statt
+ * SYMPTOM_TYPES. Top 6 (statt 8 bei Symptomen) - MOOD_TYPES hat ohnehin nur 7
+ * Presets, mehr als 6 wäre kaum eine Kürzung. Kein Aufklapper je Zeile (anders
+ * als bei Symptomen): weder ein Schweregrad-Verlauf (Gefühle sind ungraduiert)
+ * noch ein Zyklustag-Muster ist hier v1-Scope (D-1-Ticket).
+ */
+function feelingFrequencyChartMarkup(freq) {
+  const top = freq.slice(0, 6);
+  const legend = Object.keys(SYMPTOM_PHASE_COLOR).map((key) => `
+    <span class="cycle-legend__item"><span class="cycle-legend__swatch" style="background:${SYMPTOM_PHASE_COLOR[key]}"></span>${esc(t(SYMPTOM_PHASE_LABEL_KEYS[key]))}</span>`).join('');
+
+  const rows = top.map((row) => {
+    const preset = moodType(row.key);
+    const label = preset ? t(preset.labelKey) : row.key;
+    const icon = preset ? `<i data-lucide="${esc(preset.icon)}" class="icon-sm cycle-symptom-row__icon" aria-hidden="true"></i>` : '';
+    const segs = Object.keys(SYMPTOM_PHASE_COLOR)
+      .map((key) => ({ key, count: row[key] || 0 }))
+      .filter((s) => s.count > 0)
+      .map((s) => `<span class="cycle-symptom-row__seg" style="--seg-share:${s.count};background:${SYMPTOM_PHASE_COLOR[s.key]}" title="${esc(`${t(SYMPTOM_PHASE_LABEL_KEYS[s.key])}: ${fmtNum(s.count)}`)}"></span>`)
+      .join('');
+    return `
+      <div class="cycle-symptom-row">
+        <div class="cycle-symptom-row__head">
+          <span class="cycle-symptom-row__name">${icon}${esc(label)}</span>
+          <strong>${esc(fmtNum(row.total))}</strong>
+        </div>
+        <div class="cycle-symptom-row__track">${segs}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="health-chart-section">
+      <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(t('health.cycle.trends.feelingFrequency'))}</div></div>
+      <div class="cycle-legend">${legend}</div>
+      <div class="cycle-symptom-list">${rows}</div>
+    </div>`;
+}
+
+/**
+ * B-3: Blutungslast je abgeschlossenem Zyklus als Balkendiagramm - dieselbe
+ * Balken-Geometrie wie cycleLengthTrendChartMarkup() (Nullbasis, eigene
+ * Datums-Beschriftung je Balken, Ausdünnung ab MAX_BAR_LABELS), aber ohne
+ * dessen Typisch/Atypisch-Referenzband: es gibt keinen "allgemein üblichen"
+ * Blutungslast-Bereich wie TYPICAL_CYCLE_RANGE bei der Zykluslänge - eine
+ * erfundene Referenz wäre unbegründet. `trend` kommt aus periodFlowLoad()
+ * (health-cycle.js), nur für Perioden mit mindestens einem Flow-Log.
+ */
+function flowLoadTrendChartMarkup(trend) {
+  const { W, H } = CHART;
+  const { left, right, bottom } = chartScales();
+  const n = trend.length;
+
+  const min = 0;
+  const max = Math.max(...trend.map((e) => e.load)) * 1.08;
+  const y = (v) => chartY(v, min, max);
+
+  const bandWidth = (right - left) / n;
+  const barW = Math.max(6, Math.min(28, bandWidth * 0.5));
+  const xFor = (i) => left + bandWidth * (i + 0.5);
+
+  const bars = trend.map((e, i) => {
+    const cx = xFor(i);
+    const by = y(e.load);
+    // Last-Wert nennt beides, den rohen Wert UND die Basis (Anzahl geloggter
+    // Tage, via die schon bestehende health.cycle.unit.days-Pluralform) - eine
+    // Last aus 2 geloggten Tagen ist etwas anderes als dieselbe Last aus 5,
+    // das darf im Hover/der Tabelle nicht verschwinden.
+    const daysText = t('health.cycle.unit.days', { value: fmtNum(e.loggedDays), count: e.loggedDays });
+    const label = `${formatDate(e.date)}: ${t('health.cycle.trends.flowLoadValue', { load: fmtNum(e.load, { maximumFractionDigits: 0 }), days: daysText })}`;
+    return `<rect x="${(cx - barW / 2).toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${(bottom - by).toFixed(1)}" rx="2" fill="var(--module-health)"><title>${esc(label)}</title></rect>`;
+  }).join('');
+
+  const grid = chartGridMarkup(min, max, (val) => String(Math.round(val)));
+  const MAX_BAR_LABELS = 8;
+  const dense = n > MAX_BAR_LABELS;
+  const labelStride = dense ? Math.ceil(n / MAX_BAR_LABELS) : 1;
+  const xLabels = trend.map((e, i) => {
+    if (i !== 0 && i !== n - 1 && i % labelStride !== 0) return '';
+    const anchor = i === 0 ? (dense ? 'start' : 'middle') : i === n - 1 ? (dense ? 'end' : 'middle') : 'middle';
+    return `<text x="${xFor(i).toFixed(1)}" y="${H - 7}" class="chart__axis" text-anchor="${anchor}">${esc(formatDate(e.date))}</text>`;
+  }).join('');
+
+  const titleText = t('health.cycle.trends.flowLoad');
+  const table = chartTableMarkup(titleText, [t('health.cycle.trends.date'), t('health.cycle.trends.flowLoadColumn')],
+    trend.map((e) => {
+      const daysText = t('health.cycle.unit.days', { value: fmtNum(e.loggedDays), count: e.loggedDays });
+      return [formatDate(e.date), t('health.cycle.trends.flowLoadValue', { load: fmtNum(e.load, { maximumFractionDigits: 0 }), days: daysText })];
+    }));
+
+  return `
+    <div class="health-chart-section">
+      <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(titleText)}</div></div>
+      <p class="health-chart-section__caption">${esc(t('health.cycle.trends.flowLoadCaption'))}</p>
+      <svg class="health-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+        ${grid}
+        ${bars}
+        ${xLabels}
+      </svg>
+      ${table}
+    </div>`;
+}
+
+/**
+ * B-4: ruhiger, nicht-alarmistischer Hinweis, wenn heavyBleedingSignal()
+ * (health-cycle.js) ein wiederholtes Muster findet - Ton/Optik wie der
+ * bestehende Disclaimer (.health-disclaimer, kein Warnfarbton), Mustersprache
+ * statt Diagnose. Der allgemeine "kein Medizinprodukt"-Disclaimer steht schon
+ * im Footer der Seite (cycleFooterMarkup(), außerhalb dieses Bereichs) - kein
+ * zweiter hier nötig, nur der zusätzliche eine Satz.
+ */
+function heavyBleedingHintMarkup(signal) {
+  if (!signal) return '';
+  const key = signal === 'heavy' ? 'health.cycle.trends.heavyBleedingHintHeavy' : 'health.cycle.trends.heavyBleedingHintLong';
+  return `<p class="health-disclaimer">${esc(t(key))}</p>`;
+}
+
+/**
+ * D-4: kompakte Schmerz-Kachel am ANFANG des Trends-Bereichs (eine Kachel,
+ * kein Chart) - painSummary() (health-cycle.js) liefert die drei Zahlen
+ * bereits fertig gerechnet, hier nur Layout/i18n. `avgPainDaysPerCycle`/
+ * `avgIntensity` können `null` sein (noch keine abgeschlossenen Zyklen bzw.
+ * keine gradierte Auswahl) - dann steht ein "–" statt einer erfundenen Zahl.
+ */
+function painSummaryTileMarkup(summary) {
+  if (!summary) return '';
+  const avgDaysText = summary.avgPainDaysPerCycle != null ? fmtNum(summary.avgPainDaysPerCycle) : '–';
+  const intensityText = summary.avgIntensity != null ? fmtNum(summary.avgIntensity, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '–';
+  return `
+    <div class="health-chart-section cycle-pain-tile">
+      <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(t('health.cycle.trends.painTitle'))}</div></div>
+      <div class="cycle-pain-tile__stats">
+        <div class="cycle-pain-tile__stat">
+          <span class="cycle-pain-tile__value">${esc(fmtNum(summary.currentCyclePainDays, { maximumFractionDigits: 0 }))}</span>
+          <span class="cycle-pain-tile__label">${esc(t('health.cycle.trends.painCurrentCycleLabel'))}</span>
+        </div>
+        <div class="cycle-pain-tile__stat">
+          <span class="cycle-pain-tile__value">${esc(avgDaysText)}</span>
+          <span class="cycle-pain-tile__label">${esc(t('health.cycle.trends.painAvgPerCycleLabel'))}</span>
+        </div>
+        <div class="cycle-pain-tile__stat">
+          <span class="cycle-pain-tile__value">${esc(intensityText)}</span>
+          <span class="cycle-pain-tile__label">${esc(t('health.cycle.trends.painAvgIntensityLabel'))}</span>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -5099,11 +5347,32 @@ function cycleTrendsMarkup() {
   const lengthTrend = cycleLengthTrend(cycle.periods);
   const settings = cycleSettings();
   const symptomFreq = symptomFrequencyByPhase(cycle.logs, cycle.periods, settings);
+  const feelingFreq = feelingFrequencyByPhase(cycle.logs, cycle.periods, settings);
   const bbt = bbtSeries(cycle.logs);
 
+  // B-3: Blutungslast NUR für abgeschlossene Perioden mit mindestens einem
+  // Flow-Log (periodFlowLoad() liefert sonst null) - eine laufende Episode ist
+  // noch nicht fertig geloggt, ein Balken dafür wäre eine Zwischenmeldung, kein
+  // abgeschlossener Wert.
+  const { avgPeriod } = cycleStats(cycle.periods, settings, todayKey());
+  const flowLoadTrend = sortPeriodsAsc(cycle.periods)
+    .filter((p) => p.end_date)
+    .map((p) => {
+      const load = periodFlowLoad(p, cycle.logs, avgPeriod);
+      return load ? { date: p.start_date, ...load } : null;
+    })
+    .filter(Boolean);
+
+  const heavySignal = heavyBleedingSignal(cycle.periods, cycle.logs);
+  const pain = painSummary(cycle.logs, cycle.periods, settings, todayKey());
+
   const sections = [
+    painSummaryTileMarkup(pain),
     lengthTrend.length >= 2 ? cycleLengthTrendChartMarkup(lengthTrend) : '',
+    flowLoadTrend.length >= 2 ? flowLoadTrendChartMarkup(flowLoadTrend) : '',
+    heavyBleedingHintMarkup(heavySignal),
     symptomFreq.length ? symptomFrequencyChartMarkup(symptomFreq, cycle.logs, cycle.periods, settings) : '',
+    feelingFreq.length ? feelingFrequencyChartMarkup(feelingFreq) : '',
     bbt.length >= 2 ? bbtTrendChartMarkup(bbt) : '',
     symptomLikelihoodMarkup(),
   ].filter(Boolean);

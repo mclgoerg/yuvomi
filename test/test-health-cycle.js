@@ -19,10 +19,11 @@ const {
   daysBetween, sortPeriodsAsc, cycleGaps, periodLengths,
   cycleStats, predictCycle, buildCycleCalendar, cycleRing, pregnancyInfo,
   detectTemperatureShift,
-  cycleLengthTrend, symptomFrequencyByPhase, bbtSeries, symptomIntensityTrend,
+  cycleLengthTrend, symptomFrequencyByPhase, feelingFrequencyByPhase, bbtSeries, symptomIntensityTrend,
   symptomCyclePattern, TYPICAL_CYCLE_RANGE, isTypicalCycleLength,
   predictSymptomLikelihood, projectFutureCycles,
-  pmsWindow, periodFlowSummary,
+  pmsWindow, periodFlowSummary, periodFlowLoad, heavyBleedingSignal,
+  PAIN_SYMPTOM_VALUES, painSummary,
 } = await import('../public/utils/health-cycle.js');
 
 const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
@@ -1319,4 +1320,170 @@ test('periodFlowSummary: ein unbekannter flow-Wert zählt den Tag mit, bestimmt 
   const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-03' };
   const logs = [{ log_date: '2026-01-02', flow: 'not-a-real-level' }];
   assert.deepEqual(periodFlowSummary(period, logs), { heaviest: null, loggedDays: 1 });
+});
+
+// --------------------------------------------------------
+// feelingFrequencyByPhase (v2, D-1)
+// --------------------------------------------------------
+
+test('feelingFrequencyByPhase: klassifiziert Menstruation/Luteal/Sonstige wie symptomFrequencyByPhase, aber über `feelings`', () => {
+  const hist = periods(['2026-05-01', '2026-05-29'], 5);
+  const logs = [
+    { log_date: '2026-05-02', feelings: ['irritable'] }, // Menstruation
+    { log_date: '2026-05-20', feelings: ['sad'] }, // Luteal
+    { log_date: '2026-05-10', feelings: ['sad', 'anxious'] }, // Sonstige (follikulär)
+  ];
+  const freq = feelingFrequencyByPhase(logs, hist, {});
+  assert.deepEqual(freq, [
+    { key: 'sad', menstruation: 0, luteal: 1, other: 1, total: 2, avgIntensity: null },
+    { key: 'irritable', menstruation: 1, luteal: 0, other: 0, total: 1, avgIntensity: null },
+    { key: 'anxious', menstruation: 0, luteal: 0, other: 1, total: 1, avgIntensity: null },
+  ]);
+});
+
+test('feelingFrequencyByPhase: fällt auf das alte Einzelfeld `mood` zurück, wenn `feelings` fehlt oder leer ist', () => {
+  const hist = periods(['2026-05-01'], 5);
+  const logs = [
+    { log_date: '2026-05-02', mood: 'sad' }, // kein feelings-Array -> Fallback auf mood
+    { log_date: '2026-05-03', feelings: [], mood: 'irritable' }, // leeres feelings-Array -> ebenfalls Fallback
+    { log_date: '2026-05-04', feelings: ['great'], mood: 'sad' }, // feelings hat Vorrang vor mood
+  ];
+  const byKey = Object.fromEntries(feelingFrequencyByPhase(logs, hist, {}).map((f) => [f.key, f.total]));
+  assert.deepEqual(byKey, { sad: 1, irritable: 1, great: 1 });
+});
+
+test('feelingFrequencyByPhase: unbekannte Gefühlswerte werden verworfen', () => {
+  const hist = periods(['2026-05-01'], 5);
+  const logs = [{ log_date: '2026-05-02', feelings: ['not-a-real-feeling', 'good'] }];
+  assert.deepEqual(feelingFrequencyByPhase(logs, hist, {}), [
+    { key: 'good', menstruation: 1, luteal: 0, other: 0, total: 1, avgIntensity: null },
+  ]);
+});
+
+test('feelingFrequencyByPhase: ohne jede Periode gibt es keine Klassifikation', () => {
+  assert.deepEqual(feelingFrequencyByPhase([{ log_date: '2026-06-01', feelings: ['good'] }], [], {}), []);
+});
+
+// --------------------------------------------------------
+// periodFlowLoad (v2, B-3)
+// --------------------------------------------------------
+
+test('periodFlowLoad: Summe der Flow-Ränge + Anzahl geloggter Tage einer abgeschlossenen Periode', () => {
+  const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-05' };
+  const logs = [
+    { log_date: '2026-01-01', flow: 'spotting' }, // rank 1
+    { log_date: '2026-01-02', flow: 'medium' },   // rank 3
+    { log_date: '2026-01-03', flow: 'heavy' },    // rank 4
+    { log_date: '2026-01-04', flow: 'light' },    // rank 2
+  ];
+  assert.deepEqual(periodFlowLoad(period, logs), { load: 10, loggedDays: 4 });
+});
+
+test('periodFlowLoad: kein Flow-Log im Zeitraum -> null', () => {
+  const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-05' };
+  assert.equal(periodFlowLoad(period, []), null);
+});
+
+test('periodFlowLoad: ein unbekannter flow-Wert zählt den Tag mit, trägt aber 0 zur Last bei', () => {
+  const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-03' };
+  const logs = [
+    { log_date: '2026-01-01', flow: 'not-a-real-level' },
+    { log_date: '2026-01-02', flow: 'heavy' },
+  ];
+  assert.deepEqual(periodFlowLoad(period, logs), { load: 4, loggedDays: 2 });
+});
+
+test('periodFlowLoad: offene (laufende) Periode nutzt avgPeriod für die Spanne, wie periodFlowSummary()', () => {
+  const period = { id: 1, start_date: '2026-01-01' }; // kein end_date.
+  const logs = [
+    { log_date: '2026-01-02', flow: 'heavy' },
+    { log_date: '2026-01-04', flow: 'heavy' },
+  ];
+  assert.deepEqual(periodFlowLoad(period, logs, 3), { load: 4, loggedDays: 1 });
+  assert.deepEqual(periodFlowLoad(period, logs), { load: 8, loggedDays: 2 });
+});
+
+// --------------------------------------------------------
+// heavyBleedingSignal (v2, B-4)
+// --------------------------------------------------------
+
+test('heavyBleedingSignal: mindestens 3 von 5 abgeschlossenen Episoden "heavy" -> \'heavy\'', () => {
+  const hist = periods(['2026-01-01', '2026-02-01', '2026-03-01', '2026-04-01', '2026-05-01'], 5);
+  const logs = [
+    { log_date: '2026-01-02', flow: 'heavy' },
+    { log_date: '2026-02-02', flow: 'heavy' },
+    { log_date: '2026-03-02', flow: 'heavy' },
+    { log_date: '2026-04-02', flow: 'light' },
+    { log_date: '2026-05-02', flow: 'light' },
+  ];
+  assert.equal(heavyBleedingSignal(hist, logs), 'heavy');
+});
+
+test('heavyBleedingSignal: eine abgeschlossene Episode über 7 Tage -> \'long\'', () => {
+  const hist = [{ id: 1, start_date: '2026-01-01', end_date: '2026-01-09' }]; // 9 Tage
+  assert.equal(heavyBleedingSignal(hist, []), 'long');
+});
+
+test('heavyBleedingSignal: weder Muster noch lang -> false', () => {
+  const hist = periods(['2026-01-01', '2026-02-01'], 5);
+  const logs = [{ log_date: '2026-01-02', flow: 'light' }];
+  assert.equal(heavyBleedingSignal(hist, logs), false);
+});
+
+test('heavyBleedingSignal: eine laufende (nicht abgeschlossene) Episode zählt nicht mit', () => {
+  const hist = [{ id: 1, start_date: '2026-01-01' }]; // kein end_date
+  assert.equal(heavyBleedingSignal(hist, []), false);
+});
+
+test('heavyBleedingSignal: betrachtet nur die letzten 5 abgeschlossenen Episoden', () => {
+  // Drei "heavy"-Episoden liegen VOR den letzten 5 (werden also ausgeschlossen);
+  // die letzten 5 sind alle "light".
+  const oldHeavy = periods(['2025-01-01', '2025-02-01', '2025-03-01'], 5);
+  const recentLight = periods(['2025-04-01', '2025-05-01', '2025-06-01', '2025-07-01', '2025-08-01'], 5);
+  const hist = [...oldHeavy, ...recentLight];
+  const logs = [
+    { log_date: '2025-01-02', flow: 'heavy' },
+    { log_date: '2025-02-02', flow: 'heavy' },
+    { log_date: '2025-03-02', flow: 'heavy' },
+  ];
+  assert.equal(heavyBleedingSignal(hist, logs), false);
+});
+
+// --------------------------------------------------------
+// painSummary (v2, D-4)
+// --------------------------------------------------------
+
+test('painSummary: die vier schmerzbezogenen Symptom-Presets', () => {
+  assert.deepEqual(PAIN_SYMPTOM_VALUES, ['cramps', 'headache', 'backache', 'joint_pain']);
+});
+
+test('painSummary: null ohne jemals ein Schmerz-Symptom geloggt zu haben', () => {
+  assert.equal(painSummary([{ log_date: '2026-01-01', symptoms: [{ key: 'fatigue' }] }], [], {}), null);
+});
+
+test('painSummary: Schmerztage zählen TAGE (nicht Einzel-Einträge); Ø nur über abgeschlossene Zyklen', () => {
+  // Zyklus 1 (abgeschlossen): 2026-01-01..01-29, 2 Schmerztage darin.
+  // Zyklus 2 (laufend, kein zweiter Start): ab 2026-01-29.
+  const hist = periods(['2026-01-01', '2026-01-29'], 5);
+  const logs = [
+    { log_date: '2026-01-02', symptoms: [{ key: 'cramps', intensity: 1 }] },
+    // EIN Tag mit ZWEI Schmerz-Symptomen zählt trotzdem nur einmal als Schmerztag.
+    { log_date: '2026-01-03', symptoms: [{ key: 'cramps', intensity: 2 }, { key: 'headache', intensity: 3 }] },
+    { log_date: '2026-01-30', symptoms: [{ key: 'backache' }] }, // laufender Zyklus, ungradiert
+  ];
+  const summary = painSummary(logs, hist, {}, '2026-02-05');
+  assert.equal(summary.currentCyclePainDays, 1);
+  assert.equal(summary.avgPainDaysPerCycle, 2); // nur der eine abgeschlossene Zyklus zählt
+  assert.equal(summary.avgIntensity, 2); // Mittel aus [1, 2, 3] - die ungradierte Auswahl bleibt außen vor.
+});
+
+test('painSummary: der laufende Zyklus zählt Schmerztage nur bis `todayKey`', () => {
+  const hist = periods(['2026-01-01'], 5); // eine Periode -> ein laufender Zyklus
+  const logs = [
+    { log_date: '2026-01-05', symptoms: [{ key: 'cramps' }] }, // vor "heute"
+    { log_date: '2026-01-20', symptoms: [{ key: 'cramps' }] }, // nach "heute" - darf nicht zählen
+  ];
+  const summary = painSummary(logs, hist, {}, '2026-01-10');
+  assert.equal(summary.currentCyclePainDays, 1);
+  assert.equal(summary.avgPainDaysPerCycle, null); // kein abgeschlossener Zyklus vorhanden
 });

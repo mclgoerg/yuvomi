@@ -4352,7 +4352,19 @@
                 "likelyToday": "Madalas lumitaw ang {{symptom}} sa palibot ng araw na ito ng iyong siklo.",
                 "symptomTracked": "Naitala",
                 "symptomPredicted": "Madalas lumitaw dito",
-                "phaseOther": "Iba pa"
+                "phaseOther": "Iba pa",
+                "details": "Mga detalye",
+                "feelingFrequency": "Dalas ng damdamin",
+                "flowLoad": "Tindi ng daloy bawat siklo",
+                "flowLoadCaption": "Base sa iyong mga tala ng daloy — kung mas kumpleto ang pagta-tala mo, mas makabuluhan ito.",
+                "flowLoadColumn": "Bigat ng daloy",
+                "flowLoadValue": "{{load}} ({{days}} naitala)",
+                "heavyBleedingHintHeavy": "Ang iyong mga huling regla ay paulit-ulit na naitala bilang \"malakas\" — sulit itong banggitin sa isang konsultasyong medikal.",
+                "heavyBleedingHintLong": "Kahit isa sa iyong mga huling regla ay tumagal nang higit sa isang linggo — sulit itong banggitin sa isang konsultasyong medikal.",
+                "painTitle": "Sakit",
+                "painCurrentCycleLabel": "Mga araw ng sakit sa siklong ito",
+                "painAvgPerCycleLabel": "Avg. araw ng sakit bawat siklo",
+                "painAvgIntensityLabel": "Avg. tindi"
             },
             "flow": {
                 "label": "Daloy",

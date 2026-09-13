@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}}は周期のこの日の前後によく現れます。",
                 "symptomTracked": "記録済み",
                 "symptomPredicted": "ここでよく現れる",
-                "phaseOther": "その他"
+                "phaseOther": "その他",
+                "details": "詳細",
+                "feelingFrequency": "気分の頻度",
+                "flowLoad": "周期ごとの経血量の推移",
+                "flowLoadCaption": "経血量の記録に基づきます — 記録が詳しいほど、この情報の意味が増します。",
+                "flowLoadColumn": "経血量の合計",
+                "flowLoadValue": "{{load}}（{{days}}記録）",
+                "heavyBleedingHintHeavy": "直近の月経が繰り返し「多い」と記録されています — 医師への相談時に伝える価値があります。",
+                "heavyBleedingHintLong": "直近の月経のうち少なくとも1回が1週間以上続きました — 医師への相談時に伝える価値があります。",
+                "painTitle": "痛み",
+                "painCurrentCycleLabel": "今周期の痛みのある日数",
+                "painAvgPerCycleLabel": "周期あたりの平均痛み日数",
+                "painAvgIntensityLabel": "平均強度"
             },
             "flow": {
                 "label": "経血量",

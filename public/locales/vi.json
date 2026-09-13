@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} thường xuất hiện quanh ngày này trong chu kỳ của bạn.",
                 "symptomTracked": "Đã ghi",
                 "symptomPredicted": "Thường xuất hiện ở đây",
-                "phaseOther": "Khác"
+                "phaseOther": "Khác",
+                "details": "Chi tiết",
+                "feelingFrequency": "Tần suất cảm xúc",
+                "flowLoad": "Cường độ ra máu theo chu kỳ",
+                "flowLoadCaption": "Dựa trên các mục ghi lượng máu của bạn — bạn ghi càng đầy đủ, dữ liệu này càng có ý nghĩa.",
+                "flowLoadColumn": "Mức độ ra máu",
+                "flowLoadValue": "{{load}} (đã ghi {{days}})",
+                "heavyBleedingHintHeavy": "Các kỳ kinh gần đây của bạn nhiều lần được ghi là \"ra nhiều\" — điều này đáng để đề cập khi khám bác sĩ.",
+                "heavyBleedingHintLong": "Ít nhất một trong các kỳ kinh gần đây của bạn kéo dài hơn một tuần — điều này đáng để đề cập khi khám bác sĩ.",
+                "painTitle": "Đau",
+                "painCurrentCycleLabel": "Số ngày đau trong chu kỳ này",
+                "painAvgPerCycleLabel": "TB số ngày đau mỗi chu kỳ",
+                "painAvgIntensityLabel": "Cường độ TB"
             },
             "flow": {
                 "label": "Lượng máu",

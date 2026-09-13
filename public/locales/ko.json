@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}}은(는) 주기의 이 날 즈음에 자주 나타납니다.",
                 "symptomTracked": "기록됨",
                 "symptomPredicted": "여기서 자주 나타남",
-                "phaseOther": "기타"
+                "phaseOther": "기타",
+                "details": "세부정보",
+                "feelingFrequency": "기분 빈도",
+                "flowLoad": "주기별 생리량 추이",
+                "flowLoadCaption": "생리량 기록을 기반으로 합니다 — 기록이 자세할수록 더 의미 있는 정보입니다.",
+                "flowLoadColumn": "생리량 합계",
+                "flowLoadValue": "{{load}} ({{days}} 기록됨)",
+                "heavyBleedingHintHeavy": "최근 생리가 반복적으로 \"과다\"로 기록되었습니다 — 진료 상담 시 언급해 볼 만합니다.",
+                "heavyBleedingHintLong": "최근 생리 중 적어도 한 번은 일주일 이상 지속되었습니다 — 진료 상담 시 언급해 볼 만합니다.",
+                "painTitle": "통증",
+                "painCurrentCycleLabel": "이번 주기의 통증 일수",
+                "painAvgPerCycleLabel": "주기당 평균 통증 일수",
+                "painAvgIntensityLabel": "평균 강도"
             },
             "flow": {
                 "label": "생리량",

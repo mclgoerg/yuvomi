@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}}通常在你周期的这一天前后出现。",
                 "symptomTracked": "已记录",
                 "symptomPredicted": "常在此处出现",
-                "phaseOther": "其他"
+                "phaseOther": "其他",
+                "details": "详情",
+                "feelingFrequency": "情绪频率",
+                "flowLoad": "每个周期的经量强度",
+                "flowLoadCaption": "基于你记录的经量 — 记录越完整，这项数据就越有参考价值。",
+                "flowLoadColumn": "经量负荷",
+                "flowLoadValue": "{{load}}（已记录{{days}}）",
+                "heavyBleedingHintHeavy": "你最近的月经多次被记录为「量多」——值得在就医时提一提。",
+                "heavyBleedingHintLong": "你最近至少有一次月经持续超过一周——值得在就医时提一提。",
+                "painTitle": "疼痛",
+                "painCurrentCycleLabel": "本周期的疼痛天数",
+                "painAvgPerCycleLabel": "平均每周期疼痛天数",
+                "painAvgIntensityLabel": "平均强度"
             },
             "flow": {
                 "label": "经量",

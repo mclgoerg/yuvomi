@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} suele aparecer alrededor de este día de tu ciclo.",
                 "symptomTracked": "Registrado",
                 "symptomPredicted": "Suele aparecer aquí",
-                "phaseOther": "Otra"
+                "phaseOther": "Otra",
+                "details": "Detalles",
+                "feelingFrequency": "Frecuencia de estados de ánimo",
+                "flowLoad": "Intensidad del sangrado por ciclo",
+                "flowLoadCaption": "Se basa en tus registros de flujo — cuanto más completo sea tu registro, más significativo será.",
+                "flowLoadColumn": "Carga de sangrado",
+                "flowLoadValue": "{{load}} ({{days}} registrados)",
+                "heavyBleedingHintHeavy": "Tus últimos períodos se registraron varias veces como «abundantes» — vale la pena comentarlo en una consulta médica.",
+                "heavyBleedingHintLong": "Al menos uno de tus últimos períodos duró más de una semana — vale la pena comentarlo en una consulta médica.",
+                "painTitle": "Dolor",
+                "painCurrentCycleLabel": "Días de dolor en este ciclo",
+                "painAvgPerCycleLabel": "Prom. días de dolor por ciclo",
+                "painAvgIntensityLabel": "Intensidad prom."
             },
             "flow": {
                 "label": "Intensidad del flujo",

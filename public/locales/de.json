@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} tritt an diesem Zyklustag häufig auf.",
                 "symptomTracked": "Eingetragen",
                 "symptomPredicted": "Tritt hier häufig auf",
-                "phaseOther": "Sonstige"
+                "phaseOther": "Sonstige",
+                "details": "Details",
+                "feelingFrequency": "Gefühls-Häufigkeit",
+                "flowLoad": "Blutungsintensität je Zyklus",
+                "flowLoadCaption": "Beruht auf deinen Blutungs-Einträgen — je vollständiger du protokollierst, desto aussagekräftiger.",
+                "flowLoadColumn": "Blutungslast",
+                "flowLoadValue": "{{load}} ({{days}} protokolliert)",
+                "heavyBleedingHintHeavy": "Deine letzten Perioden wurden mehrfach als „stark“ eingetragen — ärztliche Beratung dazu kann sinnvoll sein.",
+                "heavyBleedingHintLong": "Mindestens eine deiner letzten Perioden dauerte länger als eine Woche — ärztliche Beratung dazu kann sinnvoll sein.",
+                "painTitle": "Schmerzen",
+                "painCurrentCycleLabel": "Schmerztage in diesem Zyklus",
+                "painAvgPerCycleLabel": "Ø Schmerztage je Zyklus",
+                "painAvgIntensityLabel": "Ø Stärke"
             },
             "flow": {
                 "label": "Blutungsstärke",

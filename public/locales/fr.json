@@ -4352,7 +4352,19 @@
                 "likelyToday": "{{symptom}} survient souvent vers ce jour de votre cycle.",
                 "symptomTracked": "Enregistré",
                 "symptomPredicted": "Survient souvent ici",
-                "phaseOther": "Autre"
+                "phaseOther": "Autre",
+                "details": "Détails",
+                "feelingFrequency": "Fréquence des ressentis",
+                "flowLoad": "Intensité des règles par cycle",
+                "flowLoadCaption": "Basé sur tes entrées de flux — plus ton suivi est complet, plus c'est significatif.",
+                "flowLoadColumn": "Intensité cumulée",
+                "flowLoadValue": "{{load}} ({{days}} enregistrés)",
+                "heavyBleedingHintHeavy": "Tes dernières règles ont été plusieurs fois notées comme « abondantes » — cela vaut la peine d'en parler lors d'une consultation médicale.",
+                "heavyBleedingHintLong": "Au moins une de tes dernières règles a duré plus d'une semaine — cela vaut la peine d'en parler lors d'une consultation médicale.",
+                "painTitle": "Douleurs",
+                "painCurrentCycleLabel": "Jours de douleur ce cycle",
+                "painAvgPerCycleLabel": "Moy. jours de douleur par cycle",
+                "painAvgIntensityLabel": "Intensité moy."
             },
             "flow": {
                 "label": "Flux",
