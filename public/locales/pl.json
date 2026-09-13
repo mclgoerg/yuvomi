@@ -4276,7 +4276,10 @@
                 "regular": "Regularny",
                 "irregular": "Nieregularny",
                 "notEnoughData": "Za mało danych",
-                "noPrediction": "Zapisz miesiączkę, aby uzyskać prognozy."
+                "noPrediction": "Zapisz miesiączkę, aby uzyskać prognozy.",
+                "fertilitySuppressedNote": "Okno płodności wstrzymane: antykoncepcja hormonalna.",
+                "nextPeriodRangeSub": "Średnio: {{date}}",
+                "partnerNextPeriod": "Okres osoby {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Tryb ciąży",
                 "dueDate": "Przewidywany termin porodu",
                 "pregnancyHint": "W trybie ciąży prognozy miesiączki i owulacji są wstrzymane. Codzienne zapisy pozostają dostępne.",
-                "saved": "Ustawienia zapisane."
+                "saved": "Ustawienia zapisane.",
+                "contraception": "Metoda antykoncepcji",
+                "contraceptionHint": "Metody hormonalne automatycznie wstrzymują przewidywanie okna płodności.",
+                "contraceptionUnset": "Nie podano",
+                "contraceptionOptions": {
+                    "none": "Brak",
+                    "pill": "Tabletka",
+                    "hormonal_iud": "Wkładka hormonalna",
+                    "copper_iud": "Wkładka miedziana",
+                    "implant": "Implant",
+                    "injection": "Zastrzyk",
+                    "patch": "Plaster",
+                    "ring": "Krążek dopochwowy",
+                    "condom": "Prezerwatywa",
+                    "other": "Inna"
+                },
+                "perimenopauseMode": "Tryb perimenopauzy",
+                "perimenopauseModeHint": "Przewidywania pokazują zakres zamiast jednej daty; ocena regularności zostaje wyłączona.",
+                "showPms": "Pokaż okno PMS",
+                "notifyPartner": "Powiadom partnera",
+                "notifyPartnerHint": "Wybrana osoba otrzymuje tylko przewidywaną datę, nigdy objawy, notatki ani inne wpisy.",
+                "notifyPartnerDaysBefore": "Przypomnienie dla partnera"
             },
             "mucus": {
                 "label": "Śluz szyjkowy",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Zapisz środek przeciwbólowy",
                 "weight": "Zapisz wagę"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Dzisiejszy stan cyklu",
+                "line1": "Dzień cyklu {{day}} · {{phase}}",
+                "periodToday": "Okres oczekiwany dziś — rozpocząć teraz?",
+                "periodOverdue": "Okres jest opóźniony o {{count}} dni — rozpocząć teraz?",
+                "periodOverdue_one": "Okres jest opóźniony o {{count}} dzień — rozpocząć teraz?",
+                "likelySymptomsToday": "Dziś prawdopodobnie: {{symptoms}}",
+                "pmsWindow": "Okno PMS prawdopodobnie od {{weekday}}",
+                "upcomingSymptom": "Od {{weekday}} prawdopodobnie: {{symptom}}",
+                "fertile": "Okno płodności do {{date}}",
+                "fertileConfirmed": "Okno płodności (owulacja potwierdzona) do {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Owulacja w tym cyklu została potwierdzona wzrostem temperatury. Kolejne cykle nadal opierają się na metodzie kalendarzowej; to nie zastępuje antykoncepcji ani porady lekarskiej."
         },
         "duration": {
             "hm": "{{hours}} godz. {{minutes}} min",

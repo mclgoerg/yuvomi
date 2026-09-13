@@ -4276,7 +4276,10 @@
                 "regular": "Regular",
                 "irregular": "Iregular",
                 "notEnoughData": "Kulang ang datos",
-                "noPrediction": "Magtala ng regla para makita ang mga hula."
+                "noPrediction": "Magtala ng regla para makita ang mga hula.",
+                "fertilitySuppressedNote": "Naka-pause ang fertile window: hormonal na contraception.",
+                "nextPeriodRangeSub": "Katamtaman: {{date}}",
+                "partnerNextPeriod": "Regla ni {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Mode ng pagbubuntis",
                 "dueDate": "Tinatayang takdang petsa",
                 "pregnancyHint": "Sa mode ng pagbubuntis, nakahinto ang mga hula sa regla at obulasyon. Nananatiling available ang pang-araw-araw na pagtatala.",
-                "saved": "Na-save ang mga setting."
+                "saved": "Na-save ang mga setting.",
+                "contraception": "Paraan ng pagpaplano ng pamilya",
+                "contraceptionHint": "Awtomatikong ipinapahinto ng mga hormonal na paraan ang prediksyon ng fertile window.",
+                "contraceptionUnset": "Hindi tinukoy",
+                "contraceptionOptions": {
+                    "none": "Wala",
+                    "pill": "Pildoras",
+                    "hormonal_iud": "Hormonal na IUD",
+                    "copper_iud": "Kobreng IUD",
+                    "implant": "Implant",
+                    "injection": "Iniksyon",
+                    "patch": "Patch",
+                    "ring": "Vaginal ring",
+                    "condom": "Condom",
+                    "other": "Iba pa"
+                },
+                "perimenopauseMode": "Moda ng perimenopause",
+                "perimenopauseModeHint": "Ipinapakita ang mga prediksyon bilang saklaw sa halip na iisang petsa; naka-off ang pagtataya ng regularidad.",
+                "showPms": "Ipakita ang PMS window",
+                "notifyPartner": "Abisuhan ang isang partner",
+                "notifyPartnerHint": "Ang piniling tao ay tatanggap lamang ng inaasahang petsa, hindi kailanman ng mga sintomas, tala, o iba pang entry.",
+                "notifyPartnerDaysBefore": "Paalala para sa partner"
             },
             "mucus": {
                 "label": "Mucus sa cervix",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Itala ang gamot sa sakit",
                 "weight": "Itala ang timbang"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Estado ng cycle ngayon",
+                "line1": "Araw {{day}} ng cycle · {{phase}}",
+                "periodToday": "Inaasahan ang regla ngayon — simulan na?",
+                "periodOverdue": "Naantala na ng {{count}} araw ang regla — simulan na?",
+                "periodOverdue_one": "Naantala na ng {{count}} araw ang regla — simulan na?",
+                "likelySymptomsToday": "Malamang ngayon: {{symptoms}}",
+                "pmsWindow": "Malamang magkaroon ng PMS window simula {{weekday}}",
+                "upcomingSymptom": "Malamang simula {{weekday}}: {{symptom}}",
+                "fertile": "Fertile window hanggang {{date}}",
+                "fertileConfirmed": "Fertile window (nakumpirmang obulasyon) hanggang {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Nakumpirma ang obulasyon ng cycle na ito sa pamamagitan ng pagtaas ng temperatura. Ang mga susunod na cycle ay nakabatay pa rin sa calendar method; hindi ito kapalit ng contraception o medical na payo."
         },
         "duration": {
             "hm": "{{hours}} oras {{minutes}} min",

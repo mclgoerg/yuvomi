@@ -4276,7 +4276,10 @@
                 "regular": "Regelmäßig",
                 "irregular": "Unregelmäßig",
                 "notEnoughData": "Zu wenig Daten",
-                "noPrediction": "Erfasse eine Periode für Vorhersagen."
+                "noPrediction": "Erfasse eine Periode für Vorhersagen.",
+                "fertilitySuppressedNote": "Fruchtbares Fenster pausiert: hormonelle Verhütung.",
+                "nextPeriodRangeSub": "Mittel: {{date}}",
+                "partnerNextPeriod": "Periode von {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Schwangerschafts-Modus",
                 "dueDate": "Errechneter Entbindungstermin",
                 "pregnancyHint": "Im Schwangerschafts-Modus werden Perioden- und Eisprung-Vorhersagen angehalten. Tages-Logging bleibt möglich.",
-                "saved": "Einstellungen gespeichert."
+                "saved": "Einstellungen gespeichert.",
+                "contraception": "Verhütungsmethode",
+                "contraceptionHint": "Hormonelle Methoden pausieren automatisch die Vorhersage des fruchtbaren Fensters.",
+                "contraceptionUnset": "Nicht angegeben",
+                "contraceptionOptions": {
+                    "none": "Keine",
+                    "pill": "Pille",
+                    "hormonal_iud": "Hormonspirale",
+                    "copper_iud": "Kupferspirale",
+                    "implant": "Hormonimplantat",
+                    "injection": "Hormonspritze",
+                    "patch": "Verhütungspflaster",
+                    "ring": "Vaginalring",
+                    "condom": "Kondom",
+                    "other": "Andere"
+                },
+                "perimenopauseMode": "Perimenopause-Modus",
+                "perimenopauseModeHint": "Vorhersagen erscheinen als Spanne statt als einzelnes Datum; die Regelmäßigkeits-Einschätzung entfällt.",
+                "showPms": "PMS-Fenster anzeigen",
+                "notifyPartner": "Partner/-in benachrichtigen",
+                "notifyPartnerHint": "Die gewählte Person erhält nur das vorhergesagte Datum, nie Symptome, Notizen oder andere Einträge.",
+                "notifyPartnerDaysBefore": "Erinnerung an Partner/-in"
             },
             "mucus": {
                 "label": "Zervixschleim",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Schmerzmittel erfassen",
                 "weight": "Gewicht erfassen"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Heutiger Zyklusstatus",
+                "line1": "Zyklustag {{day}} · {{phase}}",
+                "periodToday": "Periode heute erwartet – jetzt starten?",
+                "periodOverdue": "Periode ist seit {{count}} Tagen überfällig – jetzt starten?",
+                "periodOverdue_one": "Periode ist seit {{count}} Tag überfällig – jetzt starten?",
+                "likelySymptomsToday": "Heute wahrscheinlich: {{symptoms}}",
+                "pmsWindow": "PMS-Fenster wahrscheinlich ab {{weekday}}",
+                "upcomingSymptom": "Ab {{weekday}} wahrscheinlich: {{symptom}}",
+                "fertile": "Fruchtbares Fenster bis {{date}}",
+                "fertileConfirmed": "Fruchtbares Fenster (Eisprung bestätigt) bis {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Der Eisprung dieses Zyklus wurde durch einen Temperaturanstieg bestätigt. Künftige Zyklen beruhen weiterhin auf der Kalendermethode; das ersetzt keine Verhütung und keine ärztliche Beratung."
         },
         "duration": {
             "hm": "{{hours}} Std. {{minutes}} Min.",

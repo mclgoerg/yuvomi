@@ -4276,7 +4276,10 @@
                 "regular": "नियमित",
                 "irregular": "अनियमित",
                 "notEnoughData": "पर्याप्त डेटा नहीं",
-                "noPrediction": "पूर्वानुमान के लिए एक माहवारी दर्ज करें।"
+                "noPrediction": "पूर्वानुमान के लिए एक माहवारी दर्ज करें।",
+                "fertilitySuppressedNote": "उर्वर विंडो रुकी हुई: हार्मोनल गर्भनिरोधक।",
+                "nextPeriodRangeSub": "औसत: {{date}}",
+                "partnerNextPeriod": "{{name}} का पीरियड"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "गर्भावस्था मोड",
                 "dueDate": "संभावित प्रसव तिथि",
                 "pregnancyHint": "गर्भावस्था मोड में मासिक धर्म और ओव्यूलेशन के पूर्वानुमान रुक जाते हैं। दैनिक लॉगिंग उपलब्ध रहती है।",
-                "saved": "सेटिंग्स सहेजी गईं।"
+                "saved": "सेटिंग्स सहेजी गईं।",
+                "contraception": "गर्भनिरोधक तरीका",
+                "contraceptionHint": "हार्मोनल तरीके उर्वर विंडो के पूर्वानुमान को स्वतः रोक देते हैं।",
+                "contraceptionUnset": "निर्दिष्ट नहीं",
+                "contraceptionOptions": {
+                    "none": "कोई नहीं",
+                    "pill": "गोली",
+                    "hormonal_iud": "हार्मोनल IUD",
+                    "copper_iud": "कॉपर IUD",
+                    "implant": "इम्प्लांट",
+                    "injection": "इंजेक्शन",
+                    "patch": "पैच",
+                    "ring": "योनि रिंग",
+                    "condom": "कंडोम",
+                    "other": "अन्य"
+                },
+                "perimenopauseMode": "पेरिमेनोपॉज़ मोड",
+                "perimenopauseModeHint": "पूर्वानुमान अब एक तारीख के बजाय एक सीमा के रूप में दिखेंगे; नियमितता आकलन बंद हो जाएगा।",
+                "showPms": "PMS विंडो दिखाएं",
+                "notifyPartner": "साथी को सूचित करें",
+                "notifyPartnerHint": "चुने गए व्यक्ति को केवल अनुमानित तारीख मिलती है, कभी लक्षण, नोट्स या अन्य प्रविष्टियां नहीं।",
+                "notifyPartnerDaysBefore": "साथी के लिए रिमाइंडर"
             },
             "mucus": {
                 "label": "गर्भाशय ग्रीवा का म्यूकस",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "दर्दनिवारक दर्ज करें",
                 "weight": "वज़न दर्ज करें"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "आज की चक्र स्थिति",
+                "line1": "चक्र दिन {{day}} · {{phase}}",
+                "periodToday": "आज पीरियड आने की उम्मीद है — अभी शुरू करें?",
+                "periodOverdue": "पीरियड {{count}} दिन देर से है — अभी शुरू करें?",
+                "periodOverdue_one": "पीरियड {{count}} दिन देर से है — अभी शुरू करें?",
+                "likelySymptomsToday": "आज संभावित: {{symptoms}}",
+                "pmsWindow": "PMS विंडो संभवतः {{weekday}} से",
+                "upcomingSymptom": "{{weekday}} से संभावित: {{symptom}}",
+                "fertile": "उर्वर विंडो {{date}} तक",
+                "fertileConfirmed": "उर्वर विंडो (ओव्यूलेशन की पुष्टि) {{date}} तक"
+            },
+            "fertilityDisclaimerConfirmed": "इस चक्र का ओव्यूलेशन तापमान वृद्धि से पुष्ट हुआ है। भविष्य के चक्र अब भी कैलेंडर पद्धति पर आधारित हैं; यह गर्भनिरोधक या चिकित्सकीय सलाह का विकल्प नहीं है।"
         },
         "duration": {
             "hm": "{{hours}} घं {{minutes}} मि",

@@ -4276,7 +4276,10 @@
                 "regular": "Regular",
                 "irregular": "Irregular",
                 "notEnoughData": "Datos insuficientes",
-                "noPrediction": "Registra un periodo para ver predicciones."
+                "noPrediction": "Registra un periodo para ver predicciones.",
+                "fertilitySuppressedNote": "Ventana fértil pausada: anticoncepción hormonal.",
+                "nextPeriodRangeSub": "Media: {{date}}",
+                "partnerNextPeriod": "Regla de {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Modo embarazo",
                 "dueDate": "Fecha probable de parto",
                 "pregnancyHint": "En el modo embarazo se pausan las predicciones de periodo y ovulación. El registro diario sigue disponible.",
-                "saved": "Ajustes guardados."
+                "saved": "Ajustes guardados.",
+                "contraception": "Método anticonceptivo",
+                "contraceptionHint": "Los métodos hormonales pausan automáticamente las predicciones de la ventana fértil.",
+                "contraceptionUnset": "Sin especificar",
+                "contraceptionOptions": {
+                    "none": "Ninguno",
+                    "pill": "Píldora",
+                    "hormonal_iud": "DIU hormonal",
+                    "copper_iud": "DIU de cobre",
+                    "implant": "Implante",
+                    "injection": "Inyección",
+                    "patch": "Parche",
+                    "ring": "Anillo vaginal",
+                    "condom": "Preservativo",
+                    "other": "Otro"
+                },
+                "perimenopauseMode": "Modo perimenopausia",
+                "perimenopauseModeHint": "Las predicciones se muestran como un rango en vez de una fecha única; se desactiva la evaluación de regularidad.",
+                "showPms": "Mostrar ventana de SPM",
+                "notifyPartner": "Avisar a la pareja",
+                "notifyPartnerHint": "La persona elegida solo recibe la fecha prevista, nunca síntomas, notas ni otros registros.",
+                "notifyPartnerDaysBefore": "Aviso a la pareja"
             },
             "mucus": {
                 "label": "Moco cervical",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Registrar analgésico",
                 "weight": "Registrar peso"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Estado del ciclo de hoy",
+                "line1": "Día {{day}} del ciclo · {{phase}}",
+                "periodToday": "Regla esperada hoy — ¿la iniciamos ahora?",
+                "periodOverdue": "La regla lleva {{count}} días de retraso — ¿la iniciamos ahora?",
+                "periodOverdue_one": "La regla lleva {{count}} día de retraso — ¿la iniciamos ahora?",
+                "likelySymptomsToday": "Probable hoy: {{symptoms}}",
+                "pmsWindow": "Ventana premenstrual probable desde el {{weekday}}",
+                "upcomingSymptom": "Probable desde el {{weekday}}: {{symptom}}",
+                "fertile": "Ventana fértil hasta el {{date}}",
+                "fertileConfirmed": "Ventana fértil (ovulación confirmada) hasta el {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "La ovulación de este ciclo se confirmó mediante un aumento de temperatura. Los próximos ciclos seguirán basándose en el método del calendario; esto no sustituye a la anticoncepción ni al consejo médico."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

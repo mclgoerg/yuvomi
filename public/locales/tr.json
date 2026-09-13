@@ -4276,7 +4276,10 @@
                 "regular": "Düzenli",
                 "irregular": "Düzensiz",
                 "notEnoughData": "Yetersiz veri",
-                "noPrediction": "Tahminler için bir adet dönemi kaydet."
+                "noPrediction": "Tahminler için bir adet dönemi kaydet.",
+                "fertilitySuppressedNote": "Doğurgan pencere duraklatıldı: hormonal doğum kontrolü.",
+                "nextPeriodRangeSub": "Ortalama: {{date}}",
+                "partnerNextPeriod": "{{name}} adlı kişinin adeti"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Gebelik modu",
                 "dueDate": "Tahmini doğum tarihi",
                 "pregnancyHint": "Gebelik modunda regl ve yumurtlama tahminleri duraklatılır. Günlük kayıt kullanılmaya devam eder.",
-                "saved": "Ayarlar kaydedildi."
+                "saved": "Ayarlar kaydedildi.",
+                "contraception": "Doğum kontrol yöntemi",
+                "contraceptionHint": "Hormonal yöntemler doğurgan pencere tahminini otomatik olarak duraklatır.",
+                "contraceptionUnset": "Belirtilmedi",
+                "contraceptionOptions": {
+                    "none": "Yok",
+                    "pill": "Doğum kontrol hapı",
+                    "hormonal_iud": "Hormonlu spiral",
+                    "copper_iud": "Bakırlı spiral",
+                    "implant": "İmplant",
+                    "injection": "İğne",
+                    "patch": "Bant",
+                    "ring": "Vajinal halka",
+                    "condom": "Prezervatif",
+                    "other": "Diğer"
+                },
+                "perimenopauseMode": "Perimenopoz modu",
+                "perimenopauseModeHint": "Tahminler tek bir tarih yerine bir aralık olarak gösterilir; düzenlilik değerlendirmesi kapatılır.",
+                "showPms": "PMS penceresini göster",
+                "notifyPartner": "Bir partnere bildir",
+                "notifyPartnerHint": "Seçilen kişi yalnızca tahmini tarihi alır, asla semptomları, notları veya diğer kayıtları almaz.",
+                "notifyPartnerDaysBefore": "Partner hatırlatması"
             },
             "mucus": {
                 "label": "Serviks mukusu",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Ağrı kesici kaydet",
                 "weight": "Kilo kaydet"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Bugünkü döngü durumu",
+                "line1": "Döngü günü {{day}} · {{phase}}",
+                "periodToday": "Adet bugün bekleniyor — şimdi başlatılsın mı?",
+                "periodOverdue": "Adet {{count}} gündür gecikti — şimdi başlatılsın mı?",
+                "periodOverdue_one": "Adet {{count}} gündür gecikti — şimdi başlatılsın mı?",
+                "likelySymptomsToday": "Bugün muhtemel: {{symptoms}}",
+                "pmsWindow": "PMS penceresi muhtemelen {{weekday}} itibarıyla",
+                "upcomingSymptom": "{{weekday}} itibarıyla muhtemel: {{symptom}}",
+                "fertile": "Doğurgan pencere {{date}} tarihine kadar",
+                "fertileConfirmed": "Doğurgan pencere (yumurtlama doğrulandı) {{date}} tarihine kadar"
+            },
+            "fertilityDisclaimerConfirmed": "Bu döngüdeki yumurtlama bir sıcaklık artışıyla doğrulandı. Gelecekteki döngüler yine takvim yöntemine dayanır; bu doğum kontrolünün veya tıbbi tavsiyenin yerini tutmaz."
         },
         "duration": {
             "hm": "{{hours}} sa {{minutes}} dk",

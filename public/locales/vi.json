@@ -4276,7 +4276,10 @@
                 "regular": "Đều đặn",
                 "irregular": "Không đều",
                 "notEnoughData": "Chưa đủ dữ liệu",
-                "noPrediction": "Ghi một kỳ kinh để có dự đoán."
+                "noPrediction": "Ghi một kỳ kinh để có dự đoán.",
+                "fertilitySuppressedNote": "Cửa sổ thụ thai đang tạm dừng: tránh thai nội tiết.",
+                "nextPeriodRangeSub": "Trung bình: {{date}}",
+                "partnerNextPeriod": "Kinh nguyệt của {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Chế độ thai kỳ",
                 "dueDate": "Ngày dự sinh",
                 "pregnancyHint": "Ở chế độ thai kỳ, dự đoán kinh nguyệt và rụng trứng được tạm dừng. Ghi nhật ký hằng ngày vẫn khả dụng.",
-                "saved": "Đã lưu cài đặt."
+                "saved": "Đã lưu cài đặt.",
+                "contraception": "Phương pháp tránh thai",
+                "contraceptionHint": "Các phương pháp nội tiết tự động tạm dừng dự đoán cửa sổ thụ thai.",
+                "contraceptionUnset": "Chưa xác định",
+                "contraceptionOptions": {
+                    "none": "Không",
+                    "pill": "Thuốc tránh thai",
+                    "hormonal_iud": "Vòng tránh thai nội tiết",
+                    "copper_iud": "Vòng tránh thai đồng",
+                    "implant": "Que cấy tránh thai",
+                    "injection": "Thuốc tiêm tránh thai",
+                    "patch": "Miếng dán tránh thai",
+                    "ring": "Vòng âm đạo",
+                    "condom": "Bao cao su",
+                    "other": "Khác"
+                },
+                "perimenopauseMode": "Chế độ tiền mãn kinh",
+                "perimenopauseModeHint": "Dự đoán hiện hiển thị dưới dạng khoảng thay vì một ngày duy nhất; đánh giá tính đều đặn sẽ tắt.",
+                "showPms": "Hiển thị khung PMS",
+                "notifyPartner": "Thông báo cho bạn đời",
+                "notifyPartnerHint": "Người được chọn chỉ nhận được ngày dự đoán, không bao giờ nhận triệu chứng, ghi chú hay mục nhập khác.",
+                "notifyPartnerDaysBefore": "Nhắc nhở cho bạn đời"
             },
             "mucus": {
                 "label": "Dịch nhầy cổ tử cung",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Ghi lại thuốc giảm đau",
                 "weight": "Ghi lại cân nặng"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Trạng thái chu kỳ hôm nay",
+                "line1": "Ngày {{day}} của chu kỳ · {{phase}}",
+                "periodToday": "Dự kiến có kinh hôm nay — bắt đầu ngay?",
+                "periodOverdue": "Kinh nguyệt trễ {{count}} ngày — bắt đầu ngay?",
+                "periodOverdue_one": "Kinh nguyệt trễ {{count}} ngày — bắt đầu ngay?",
+                "likelySymptomsToday": "Có khả năng hôm nay: {{symptoms}}",
+                "pmsWindow": "Khung PMS có khả năng bắt đầu từ {{weekday}}",
+                "upcomingSymptom": "Có khả năng từ {{weekday}}: {{symptom}}",
+                "fertile": "Cửa sổ thụ thai đến {{date}}",
+                "fertileConfirmed": "Cửa sổ thụ thai (đã xác nhận rụng trứng) đến {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Sự rụng trứng của chu kỳ này đã được xác nhận bằng mức tăng nhiệt độ. Các chu kỳ tương lai vẫn dựa trên phương pháp lịch; điều này không thay thế biện pháp tránh thai hay tư vấn y tế."
         },
         "duration": {
             "hm": "{{hours}} giờ {{minutes}} phút",

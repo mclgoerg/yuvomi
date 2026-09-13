@@ -4276,7 +4276,10 @@
                 "regular": "منتظمة",
                 "irregular": "غير منتظمة",
                 "notEnoughData": "بيانات غير كافية",
-                "noPrediction": "سجّلي دورة للحصول على التوقعات."
+                "noPrediction": "سجّلي دورة للحصول على التوقعات.",
+                "fertilitySuppressedNote": "نافذة الخصوبة متوقفة: بسبب وسيلة منع حمل هرمونية.",
+                "nextPeriodRangeSub": "المتوسط: {{date}}",
+                "partnerNextPeriod": "دورة {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "وضع الحمل",
                 "dueDate": "تاريخ الولادة المتوقع",
                 "pregnancyHint": "في وضع الحمل، تتوقف تنبؤات الدورة والإباضة مؤقتًا. يبقى التسجيل اليومي متاحًا.",
-                "saved": "تم حفظ الإعدادات."
+                "saved": "تم حفظ الإعدادات.",
+                "contraception": "وسيلة منع الحمل",
+                "contraceptionHint": "الوسائل الهرمونية توقف تلقائيًا توقع نافذة الخصوبة.",
+                "contraceptionUnset": "غير محدد",
+                "contraceptionOptions": {
+                    "none": "لا شيء",
+                    "pill": "حبوب منع الحمل",
+                    "hormonal_iud": "لولب هرموني",
+                    "copper_iud": "لولب نحاسي",
+                    "implant": "غرسة هرمونية",
+                    "injection": "حقنة",
+                    "patch": "لصقة",
+                    "ring": "حلقة مهبلية",
+                    "condom": "واقي ذكري",
+                    "other": "أخرى"
+                },
+                "perimenopauseMode": "وضع ما حول سن اليأس",
+                "perimenopauseModeHint": "تظهر التوقعات كنطاق بدلاً من تاريخ واحد، ويُعطَّل تقييم الانتظام.",
+                "showPms": "إظهار نافذة ما قبل الدورة",
+                "notifyPartner": "إشعار الشريك",
+                "notifyPartnerHint": "يتلقى الشخص المختار التاريخ المتوقع فقط، ولا يصله أبدًا أي أعراض أو ملاحظات أو تسجيلات أخرى.",
+                "notifyPartnerDaysBefore": "تذكير للشريك"
             },
             "mucus": {
                 "label": "مخاط عنق الرحم",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "تسجيل مسكّن",
                 "weight": "تسجيل الوزن"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "حالة الدورة اليوم",
+                "line1": "اليوم {{day}} من الدورة · {{phase}}",
+                "periodToday": "من المتوقع أن تبدأ الدورة اليوم — هل تبدأ الآن؟",
+                "periodOverdue": "تأخرت الدورة {{count}} يوم — هل تبدأ الآن؟",
+                "periodOverdue_one": "تأخرت الدورة {{count}} يوم — هل تبدأ الآن؟",
+                "likelySymptomsToday": "محتمل اليوم: {{symptoms}}",
+                "pmsWindow": "نافذة ما قبل الدورة محتملة ابتداءً من {{weekday}}",
+                "upcomingSymptom": "محتمل ابتداءً من {{weekday}}: {{symptom}}",
+                "fertile": "نافذة الخصوبة حتى {{date}}",
+                "fertileConfirmed": "نافذة الخصوبة (تأكد الإباضة) حتى {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "تم تأكيد إباضة هذه الدورة من خلال ارتفاع في درجة الحرارة. لا تزال الدورات المستقبلية تعتمد على طريقة التقويم؛ وهذا لا يغني عن وسائل منع الحمل أو الاستشارة الطبية."
         },
         "duration": {
             "hm": "{{hours}} س {{minutes}} د",

@@ -4276,7 +4276,10 @@
                 "regular": "Regular",
                 "irregular": "Irregular",
                 "notEnoughData": "Dados insuficientes",
-                "noPrediction": "Registe um período para obter previsões."
+                "noPrediction": "Registe um período para obter previsões.",
+                "fertilitySuppressedNote": "Janela fértil pausada: contraceção hormonal.",
+                "nextPeriodRangeSub": "Média: {{date}}",
+                "partnerNextPeriod": "Período de {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Modo gravidez",
                 "dueDate": "Data provável do parto",
                 "pregnancyHint": "No modo gravidez, as previsões de menstruação e ovulação ficam pausadas. O registro diário continua disponível.",
-                "saved": "Configurações salvas."
+                "saved": "Configurações salvas.",
+                "contraception": "Método contraceptivo",
+                "contraceptionHint": "Métodos hormonais pausam automaticamente as previsões da janela fértil.",
+                "contraceptionUnset": "Não especificado",
+                "contraceptionOptions": {
+                    "none": "Nenhum",
+                    "pill": "Pílula",
+                    "hormonal_iud": "DIU hormonal",
+                    "copper_iud": "DIU de cobre",
+                    "implant": "Implante",
+                    "injection": "Injeção",
+                    "patch": "Adesivo",
+                    "ring": "Anel vaginal",
+                    "condom": "Preservativo",
+                    "other": "Outro"
+                },
+                "perimenopauseMode": "Modo perimenopausa",
+                "perimenopauseModeHint": "As previsões passam a mostrar um intervalo em vez de uma data única; a avaliação de regularidade é desativada.",
+                "showPms": "Mostrar janela de TPM",
+                "notifyPartner": "Avisar um(a) parceiro(a)",
+                "notifyPartnerHint": "A pessoa escolhida recebe apenas a data prevista, nunca sintomas, notas ou outros registos.",
+                "notifyPartnerDaysBefore": "Aviso ao(à) parceiro(a)"
             },
             "mucus": {
                 "label": "Muco cervical",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Registar analgésico",
                 "weight": "Registar peso"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Estado do ciclo de hoje",
+                "line1": "Dia {{day}} do ciclo · {{phase}}",
+                "periodToday": "Período previsto para hoje — começar agora?",
+                "periodOverdue": "Período está atrasado há {{count}} dias — começar agora?",
+                "periodOverdue_one": "Período está atrasado há {{count}} dia — começar agora?",
+                "likelySymptomsToday": "Provável hoje: {{symptoms}}",
+                "pmsWindow": "Janela pré-menstrual provável a partir de {{weekday}}",
+                "upcomingSymptom": "Provável a partir de {{weekday}}: {{symptom}}",
+                "fertile": "Janela fértil até {{date}}",
+                "fertileConfirmed": "Janela fértil (ovulação confirmada) até {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "A ovulação deste ciclo foi confirmada por um aumento de temperatura. Os próximos ciclos continuam a basear-se no método do calendário; isto não substitui a contraceção nem o aconselhamento médico."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

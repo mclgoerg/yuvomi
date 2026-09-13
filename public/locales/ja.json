@@ -4276,7 +4276,10 @@
                 "regular": "規則的",
                 "irregular": "不規則",
                 "notEnoughData": "データ不足",
-                "noPrediction": "予測するには生理を記録してください。"
+                "noPrediction": "予測するには生理を記録してください。",
+                "fertilitySuppressedNote": "妊娠可能期間は一時停止中: ホルモン避妊のため。",
+                "nextPeriodRangeSub": "平均: {{date}}",
+                "partnerNextPeriod": "{{name}}さんの生理"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "妊娠モード",
                 "dueDate": "出産予定日",
                 "pregnancyHint": "妊娠モードでは生理と排卵の予測が一時停止します。毎日の記録は引き続き利用できます。",
-                "saved": "設定を保存しました。"
+                "saved": "設定を保存しました。",
+                "contraception": "避妊方法",
+                "contraceptionHint": "ホルモン系の方法は妊娠可能期間の予測を自動的に停止します。",
+                "contraceptionUnset": "未設定",
+                "contraceptionOptions": {
+                    "none": "なし",
+                    "pill": "ピル",
+                    "hormonal_iud": "ホルモンIUD",
+                    "copper_iud": "銅IUD",
+                    "implant": "インプラント",
+                    "injection": "注射",
+                    "patch": "パッチ",
+                    "ring": "腟内リング",
+                    "condom": "コンドーム",
+                    "other": "その他"
+                },
+                "perimenopauseMode": "更年期モード",
+                "perimenopauseModeHint": "予測は単一の日付ではなく期間で表示され、規則性の判定はオフになります。",
+                "showPms": "PMS期間を表示",
+                "notifyPartner": "パートナーに通知",
+                "notifyPartnerHint": "選択された相手には予測日のみが伝わり、症状やメモなどの記録は一切共有されません。",
+                "notifyPartnerDaysBefore": "パートナーへのリマインダー"
             },
             "mucus": {
                 "label": "頸管粘液",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "鎮痛剤を記録",
                 "weight": "体重を記録"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "今日のサイクル状況",
+                "line1": "サイクル{{day}}日目 · {{phase}}",
+                "periodToday": "今日生理が予測されています — 今すぐ開始しますか?",
+                "periodOverdue": "生理が{{count}}日遅れています — 今すぐ開始しますか?",
+                "periodOverdue_one": "生理が{{count}}日遅れています — 今すぐ開始しますか?",
+                "likelySymptomsToday": "今日起こりやすい: {{symptoms}}",
+                "pmsWindow": "PMS期間はおそらく{{weekday}}から",
+                "upcomingSymptom": "{{weekday}}からおそらく: {{symptom}}",
+                "fertile": "妊娠可能期間は{{date}}まで",
+                "fertileConfirmed": "妊娠可能期間(排卵確認済み)は{{date}}まで"
+            },
+            "fertilityDisclaimerConfirmed": "この周期の排卵は体温上昇によって確認されました。今後の周期は引き続きカレンダー法に基づきます。避妊や医師の助言の代わりにはなりません。"
         },
         "duration": {
             "hm": "{{hours}}時間{{minutes}}分",

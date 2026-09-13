@@ -4276,7 +4276,10 @@
                 "regular": "Regelmatig",
                 "irregular": "Onregelmatig",
                 "notEnoughData": "Te weinig gegevens",
-                "noPrediction": "Registreer een menstruatie voor voorspellingen."
+                "noPrediction": "Registreer een menstruatie voor voorspellingen.",
+                "fertilitySuppressedNote": "Vruchtbaar venster gepauzeerd: hormonale anticonceptie.",
+                "nextPeriodRangeSub": "Gemiddeld: {{date}}",
+                "partnerNextPeriod": "Menstruatie van {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Zwangerschapsmodus",
                 "dueDate": "Uitgerekende datum",
                 "pregnancyHint": "In de zwangerschapsmodus worden voorspellingen voor menstruatie en eisprong gepauzeerd. Dagelijks loggen blijft mogelijk.",
-                "saved": "Instellingen opgeslagen."
+                "saved": "Instellingen opgeslagen.",
+                "contraception": "Anticonceptiemethode",
+                "contraceptionHint": "Hormonale methoden pauzeren automatisch de voorspelling van het vruchtbare venster.",
+                "contraceptionUnset": "Niet opgegeven",
+                "contraceptionOptions": {
+                    "none": "Geen",
+                    "pill": "Pil",
+                    "hormonal_iud": "Hormoonspiraal",
+                    "copper_iud": "Koperspiraal",
+                    "implant": "Implantaat",
+                    "injection": "Prikpil",
+                    "patch": "Pleister",
+                    "ring": "Vaginale ring",
+                    "condom": "Condoom",
+                    "other": "Anders"
+                },
+                "perimenopauseMode": "Perimenopauze-modus",
+                "perimenopauseModeHint": "Voorspellingen worden getoond als bereik in plaats van één datum; de regelmaat-beoordeling wordt uitgeschakeld.",
+                "showPms": "PMS-venster tonen",
+                "notifyPartner": "Partner op de hoogte stellen",
+                "notifyPartnerHint": "De gekozen persoon ontvangt alleen de voorspelde datum, nooit symptomen, notities of andere gegevens.",
+                "notifyPartnerDaysBefore": "Herinnering voor partner"
             },
             "mucus": {
                 "label": "Baarmoederhalsslijm",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Pijnstiller registreren",
                 "weight": "Gewicht registreren"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Cyclusstatus vandaag",
+                "line1": "Cyclusdag {{day}} · {{phase}}",
+                "periodToday": "Menstruatie vandaag verwacht — nu starten?",
+                "periodOverdue": "Menstruatie is {{count}} dagen over tijd — nu starten?",
+                "periodOverdue_one": "Menstruatie is {{count}} dag over tijd — nu starten?",
+                "likelySymptomsToday": "Vandaag waarschijnlijk: {{symptoms}}",
+                "pmsWindow": "PMS-venster waarschijnlijk vanaf {{weekday}}",
+                "upcomingSymptom": "Vanaf {{weekday}} waarschijnlijk: {{symptom}}",
+                "fertile": "Vruchtbaar venster tot {{date}}",
+                "fertileConfirmed": "Vruchtbaar venster (eisprong bevestigd) tot {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "De eisprong van deze cyclus is bevestigd door een temperatuurstijging. Toekomstige cycli blijven op de kalendermethode gebaseerd; dit vervangt geen anticonceptie of medisch advies."
         },
         "duration": {
             "hm": "{{hours}} u {{minutes}} min",

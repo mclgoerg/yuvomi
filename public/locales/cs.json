@@ -4276,7 +4276,10 @@
                 "regular": "Pravidelný",
                 "irregular": "Nepravidelný",
                 "notEnoughData": "Málo dat",
-                "noPrediction": "Zaznamenej menstruaci pro předpovědi."
+                "noPrediction": "Zaznamenej menstruaci pro předpovědi.",
+                "fertilitySuppressedNote": "Plodné okno pozastaveno: hormonální antikoncepce.",
+                "nextPeriodRangeSub": "Průměr: {{date}}",
+                "partnerNextPeriod": "Menstruace osoby {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Režim těhotenství",
                 "dueDate": "Předpokládaný termín porodu",
                 "pregnancyHint": "V režimu těhotenství jsou předpovědi menstruace a ovulace pozastaveny. Denní záznamy zůstávají dostupné.",
-                "saved": "Nastavení uloženo."
+                "saved": "Nastavení uloženo.",
+                "contraception": "Metoda antikoncepce",
+                "contraceptionHint": "Hormonální metody automaticky pozastaví predikci plodného okna.",
+                "contraceptionUnset": "Neuvedeno",
+                "contraceptionOptions": {
+                    "none": "Žádná",
+                    "pill": "Pilulka",
+                    "hormonal_iud": "Hormonální nitroděložní tělísko",
+                    "copper_iud": "Měděné nitroděložní tělísko",
+                    "implant": "Implantát",
+                    "injection": "Injekce",
+                    "patch": "Náplast",
+                    "ring": "Vaginální kroužek",
+                    "condom": "Kondom",
+                    "other": "Jiná"
+                },
+                "perimenopauseMode": "Režim perimenopauzy",
+                "perimenopauseModeHint": "Predikce se zobrazují jako rozmezí místo jednoho data; hodnocení pravidelnosti se vypíná.",
+                "showPms": "Zobrazit PMS okno",
+                "notifyPartner": "Upozornit partnera",
+                "notifyPartnerHint": "Zvolená osoba dostane pouze předpovězené datum, nikdy příznaky, poznámky ani jiné záznamy.",
+                "notifyPartnerDaysBefore": "Připomenutí pro partnera"
             },
             "mucus": {
                 "label": "Cervikální hlen",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Zaznamenat lék proti bolesti",
                 "weight": "Zaznamenat váhu"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Dnešní stav cyklu",
+                "line1": "Den cyklu {{day}} · {{phase}}",
+                "periodToday": "Menstruace se dnes očekává — začít teď?",
+                "periodOverdue": "Menstruace mešká {{count}} dní — začít teď?",
+                "periodOverdue_one": "Menstruace mešká {{count}} den — začít teď?",
+                "likelySymptomsToday": "Dnes pravděpodobně: {{symptoms}}",
+                "pmsWindow": "PMS okno pravděpodobně od {{weekday}}",
+                "upcomingSymptom": "Od {{weekday}} pravděpodobně: {{symptom}}",
+                "fertile": "Plodné okno do {{date}}",
+                "fertileConfirmed": "Plodné okno (ovulace potvrzena) do {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Ovulace v tomto cyklu byla potvrzena vzestupem teploty. Budoucí cykly nadále vycházejí z kalendářní metody; to nenahrazuje antikoncepci ani lékařskou radu."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

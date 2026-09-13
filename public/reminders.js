@@ -239,6 +239,19 @@ function processReminders(reminders) {
  * wird oder der heutige Tag noch nicht geloggt ist. Gleiche Korrektur wie
  * server/services/notifications.js#cycleBody für den Push-Body, hier mit der
  * Locale des Empfängers statt der Haushaltssprache, weil der Client sie kennt.
+ *
+ * D-15 (Partner-Erinnerung): server/services/notifications.js#cycleBody
+ * unterscheidet dort den Partner-Fall ("Periode von {{name}}" statt "Nächste
+ * Periode") über `reminder.cycle_anchor_kind === 'partner_period'` - dieses
+ * Feld kommt hier NICHT an. `GET /reminders/pending`
+ * (server/routes/reminders.js) selektiert nur `r.*` aus der `reminders`-
+ * Tabelle plus das berechnete `entity_title`; `cycle_anchor_kind`/
+ * `cycle_owner_name` werden dort nicht mitgejoint (nur im Push-Payload-Pfad
+ * von notifications.js). Ein Erinnerungs-Objekt an dieser Stelle hat also
+ * keine Möglichkeit, die eigene von einer Partner-Periode zu unterscheiden -
+ * absichtlich unverändert gelassen (kein Rätselraten über `entity_id`), bis
+ * der REST-Endpoint dasselbe Feld mitliefert. Das ist server/**-Gebiet und
+ * damit außerhalb dieses Arbeitspakets.
  * @returns {string|null} null für jede andere Erinnerungsart - Aufrufer fällt dann auf entity_title zurück.
  */
 function cycleReminderBody(reminder) {

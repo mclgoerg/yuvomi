@@ -1598,6 +1598,71 @@ button.health-med-card:hover {
   50%      { transform: scale(1.18); }
 }
 
+/* ---- "Heute"-Einblendung (C-1) ---- */
+
+.cycle-bubble {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  /* Modulton als Inhalts-Aussage ("wo bin ich"), keine Kartenexplosion: Kante
+   * im Vollton + Waschung in DERSELBEN Regel, damit der Struktur-Audit
+   * (test-frontend-audit.js, Vollton-Regel) die Aussage nicht zweimal blass
+   * zaehlt - die Kante traegt den vollen Ton, die Flaeche nur die Waschung. */
+  border-inline-start: 3px solid var(--module-health);
+  background: color-mix(in oklab, var(--module-health) var(--tint-wash), var(--color-surface));
+}
+
+.cycle-bubble__icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--module-health);
+}
+.cycle-bubble__icon svg { width: var(--icon-md); height: var(--icon-md); }
+
+.cycle-bubble__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+
+.cycle-bubble__line1 { margin: 0; font-weight: 600; font-size: var(--text-sm); color: var(--color-text-primary); }
+
+.cycle-bubble__line2 {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.cycle-bubble__line2--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* Zeile 2 als echter Knopf (Barrierefreiheit: Symptom-Fall oeffnet das
+ * Tages-Log) - optisch bleibt sie eine Textzeile, keine Schaltflaeche. */
+.cycle-bubble__line2--action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--color-text-secondary);
+  text-align: start;
+  cursor: pointer;
+}
+.cycle-bubble__line2--action svg { width: var(--icon-sm); height: var(--icon-sm); flex: 0 0 auto; color: var(--color-text-tertiary); }
+.cycle-bubble__line2--action:hover,
+.cycle-bubble__line2--action:focus-visible { color: var(--color-text-primary); }
+
 /* ---- Schwangerschaft (Vorhersage pausiert) ---- */
 
 .cycle-preg {
@@ -1748,6 +1813,20 @@ button.health-med-card:hover {
   grid-column: 1 / -1;
   gap: var(--space-1);
 }
+
+/* D-9: Hinweiskachel, wenn hormonelle Verhuetung das fruchtbare Fenster
+ * pausiert - reine Meldung (Ton in Schrift/Icon, KEINE getoente Flaeche,
+ * siehe .cycle-likelihood__callout weiter unten fuer dieselbe Regel), damit
+ * die freigewordene Kachel-Luecke nicht wie ein Fehler wirkt. */
+.cycle-stat--note {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.cycle-stat--note i { width: var(--icon-sm); height: var(--icon-sm); flex: 0 0 auto; color: var(--color-text-tertiary); }
 
 .cycle-stat__pair-row {
   display: flex;
@@ -2490,6 +2569,19 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
 }
 /* display erst wenn sichtbar - sonst überschreibt der Flex das UA-[hidden]. */
 .cycle-bulk__confirm:not([hidden]) { display: flex; }
+/* [hidden] durchsetzen: `.form-field` (layout.css) setzt `display: flex` mit
+ * derselben Spezifitaet wie das UA-`[hidden] { display: none }` und gewinnt
+ * als spaeter geladene Regel - betraf schon das Entbindungstermin-Feld
+ * (#cs-due-field, unveraendert sichtbar geblieben, obwohl der Schwanger-
+ * schafts-Modus aus war) und beim Bau der Partner-Erinnerung neu dazu-
+ * gekommene #cs-notify-partner-days-field genauso. Gleiches Muster wie
+ * .inventory-filters[hidden]/.tasks-filters-row[hidden] in ihren jeweiligen
+ * Modulen - hier lokal auf die beiden betroffenen Felder begrenzt, statt
+ * layout.css global anzufassen. */
+#cs-due-field[hidden],
+#cs-notify-partner-days-field[hidden] {
+  display: none;
+}
 .cycle-bulk__question { color: var(--color-text-primary); }
 /* Umbruch statt Quetschen - Begruendung an `.modal-panel__footer`
  * (layout.css, #872). */

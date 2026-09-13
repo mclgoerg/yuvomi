@@ -4276,7 +4276,10 @@
                 "regular": "منظم",
                 "irregular": "نامنظم",
                 "notEnoughData": "داده کافی نیست",
-                "noPrediction": "برای پیش‌بینی یک قاعدگی ثبت کنید."
+                "noPrediction": "برای پیش‌بینی یک قاعدگی ثبت کنید.",
+                "fertilitySuppressedNote": "پنجره باروری متوقف شده: پیشگیری هورمونی از بارداری.",
+                "nextPeriodRangeSub": "میانگین: {{date}}",
+                "partnerNextPeriod": "پریود {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "حالت بارداری",
                 "dueDate": "تاریخ تخمینی زایمان",
                 "pregnancyHint": "در حالت بارداری، پیش‌بینی‌های قاعدگی و تخمک‌گذاری متوقف می‌شود. ثبت روزانه همچنان در دسترس است.",
-                "saved": "تنظیمات ذخیره شد."
+                "saved": "تنظیمات ذخیره شد.",
+                "contraception": "روش پیشگیری از بارداری",
+                "contraceptionHint": "روش‌های هورمونی پیش‌بینی پنجره باروری را به‌طور خودکار متوقف می‌کنند.",
+                "contraceptionUnset": "مشخص نشده",
+                "contraceptionOptions": {
+                    "none": "هیچ‌کدام",
+                    "pill": "قرص",
+                    "hormonal_iud": "آی‌یودی هورمونی",
+                    "copper_iud": "آی‌یودی مسی",
+                    "implant": "کاشت زیرپوستی",
+                    "injection": "تزریق",
+                    "patch": "چسب",
+                    "ring": "حلقه واژینال",
+                    "condom": "کاندوم",
+                    "other": "سایر"
+                },
+                "perimenopauseMode": "حالت پیرامنوپوز",
+                "perimenopauseModeHint": "پیش‌بینی‌ها به‌جای یک تاریخ واحد، به‌صورت یک بازه نمایش داده می‌شوند؛ ارزیابی منظم بودن غیرفعال می‌شود.",
+                "showPms": "نمایش پنجره PMS",
+                "notifyPartner": "اطلاع‌رسانی به شریک",
+                "notifyPartnerHint": "فرد انتخاب‌شده فقط تاریخ پیش‌بینی‌شده را دریافت می‌کند، هرگز علائم، یادداشت‌ها یا سایر ثبت‌ها را.",
+                "notifyPartnerDaysBefore": "یادآوری برای شریک"
             },
             "mucus": {
                 "label": "مخاط دهانه رحم",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "ثبت مسکن",
                 "weight": "ثبت وزن"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "وضعیت چرخه امروز",
+                "line1": "روز {{day}} چرخه · {{phase}}",
+                "periodToday": "امروز انتظار می‌رود پریود شروع شود — همین حالا شروع شود؟",
+                "periodOverdue": "پریود {{count}} روز به تأخیر افتاده — همین حالا شروع شود؟",
+                "periodOverdue_one": "پریود {{count}} روز به تأخیر افتاده — همین حالا شروع شود؟",
+                "likelySymptomsToday": "احتمال امروز: {{symptoms}}",
+                "pmsWindow": "پنجره PMS احتمالاً از {{weekday}}",
+                "upcomingSymptom": "احتمالاً از {{weekday}}: {{symptom}}",
+                "fertile": "پنجره باروری تا {{date}}",
+                "fertileConfirmed": "پنجره باروری (تخمک‌گذاری تأیید شده) تا {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "تخمک‌گذاری این چرخه با افزایش دما تأیید شد. چرخه‌های آینده همچنان بر اساس روش تقویمی هستند؛ این جایگزین پیشگیری از بارداری یا مشاوره پزشکی نیست."
         },
         "duration": {
             "hm": "{{hours}} ساعت {{minutes}} دقیقه",

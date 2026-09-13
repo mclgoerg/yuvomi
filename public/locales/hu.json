@@ -4276,7 +4276,10 @@
                 "regular": "Szabályos",
                 "irregular": "Szabálytalan",
                 "notEnoughData": "Kevés adat",
-                "noPrediction": "Rögzíts egy menstruációt az előrejelzésekhez."
+                "noPrediction": "Rögzíts egy menstruációt az előrejelzésekhez.",
+                "fertilitySuppressedNote": "Termékeny időszak szüneteltetve: hormonális fogamzásgátlás.",
+                "nextPeriodRangeSub": "Átlag: {{date}}",
+                "partnerNextPeriod": "{{name}} menstruációja"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Terhesség mód",
                 "dueDate": "Várható szülési időpont",
                 "pregnancyHint": "Terhesség módban a menstruáció- és ovulációs előrejelzések szünetelnek. A napi naplózás továbbra is elérhető.",
-                "saved": "Beállítások mentve."
+                "saved": "Beállítások mentve.",
+                "contraception": "Fogamzásgátlási módszer",
+                "contraceptionHint": "A hormonális módszerek automatikusan szüneteltetik a termékeny időszak előrejelzését.",
+                "contraceptionUnset": "Nincs megadva",
+                "contraceptionOptions": {
+                    "none": "Nincs",
+                    "pill": "Tabletta",
+                    "hormonal_iud": "Hormonspirál",
+                    "copper_iud": "Rézspirál",
+                    "implant": "Implantátum",
+                    "injection": "Injekció",
+                    "patch": "Tapasz",
+                    "ring": "Hüvelygyűrű",
+                    "condom": "Óvszer",
+                    "other": "Egyéb"
+                },
+                "perimenopauseMode": "Perimenopauza mód",
+                "perimenopauseModeHint": "Az előrejelzések tartományként jelennek meg egyetlen dátum helyett; a szabályosság-értékelés kikapcsol.",
+                "showPms": "PMS-időszak megjelenítése",
+                "notifyPartner": "Partner értesítése",
+                "notifyPartnerHint": "A kiválasztott személy csak az előre jelzett dátumot kapja meg, sosem tüneteket, jegyzeteket vagy más bejegyzéseket.",
+                "notifyPartnerDaysBefore": "Emlékeztető a partnernek"
             },
             "mucus": {
                 "label": "Méhnyaknyák",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Fájdalomcsillapító rögzítése",
                 "weight": "Testsúly rögzítése"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Mai ciklusállapot",
+                "line1": "{{day}}. ciklusnap · {{phase}}",
+                "periodToday": "A menstruáció ma várható — elindítod most?",
+                "periodOverdue": "A menstruáció {{count}} napja késik — elindítod most?",
+                "periodOverdue_one": "A menstruáció {{count}} napja késik — elindítod most?",
+                "likelySymptomsToday": "Ma valószínű: {{symptoms}}",
+                "pmsWindow": "PMS-időszak valószínűleg {{weekday}}-tól",
+                "upcomingSymptom": "{{weekday}}-tól valószínű: {{symptom}}",
+                "fertile": "Termékeny időszak eddig: {{date}}",
+                "fertileConfirmed": "Termékeny időszak (megerősített ovuláció) eddig: {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Ennek a ciklusnak az ovulációját hőmérséklet-emelkedés igazolta. A jövőbeli ciklusok továbbra is a naptári módszeren alapulnak; ez nem helyettesíti a fogamzásgátlást vagy az orvosi tanácsot."
         },
         "duration": {
             "hm": "{{hours}} ó {{minutes}} p",

@@ -4276,7 +4276,10 @@
                 "regular": "Teratur",
                 "irregular": "Tidak teratur",
                 "notEnoughData": "Data tidak cukup",
-                "noPrediction": "Catat menstruasi untuk mendapatkan prediksi."
+                "noPrediction": "Catat menstruasi untuk mendapatkan prediksi.",
+                "fertilitySuppressedNote": "Masa subur dijeda: kontrasepsi hormonal.",
+                "nextPeriodRangeSub": "Rata-rata: {{date}}",
+                "partnerNextPeriod": "Menstruasi {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Mode kehamilan",
                 "dueDate": "Perkiraan tanggal lahir",
                 "pregnancyHint": "Dalam mode kehamilan, prediksi menstruasi dan ovulasi dijeda. Pencatatan harian tetap tersedia.",
-                "saved": "Pengaturan disimpan."
+                "saved": "Pengaturan disimpan.",
+                "contraception": "Metode kontrasepsi",
+                "contraceptionHint": "Metode hormonal secara otomatis menjeda prediksi masa subur.",
+                "contraceptionUnset": "Belum ditentukan",
+                "contraceptionOptions": {
+                    "none": "Tidak ada",
+                    "pill": "Pil",
+                    "hormonal_iud": "IUD hormonal",
+                    "copper_iud": "IUD tembaga",
+                    "implant": "Implan",
+                    "injection": "Suntik",
+                    "patch": "Koyo",
+                    "ring": "Cincin vagina",
+                    "condom": "Kondom",
+                    "other": "Lainnya"
+                },
+                "perimenopauseMode": "Mode perimenopause",
+                "perimenopauseModeHint": "Prediksi kini ditampilkan sebagai rentang, bukan satu tanggal; penilaian keteraturan dimatikan.",
+                "showPms": "Tampilkan jendela PMS",
+                "notifyPartner": "Beri tahu pasangan",
+                "notifyPartnerHint": "Orang yang dipilih hanya menerima tanggal prediksi, tidak pernah gejala, catatan, atau entri lainnya.",
+                "notifyPartnerDaysBefore": "Pengingat untuk pasangan"
             },
             "mucus": {
                 "label": "Lendir serviks",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Catat pereda nyeri",
                 "weight": "Catat berat badan"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Status siklus hari ini",
+                "line1": "Hari siklus {{day}} · {{phase}}",
+                "periodToday": "Menstruasi diperkirakan hari ini — mulai sekarang?",
+                "periodOverdue": "Menstruasi terlambat {{count}} hari — mulai sekarang?",
+                "periodOverdue_one": "Menstruasi terlambat {{count}} hari — mulai sekarang?",
+                "likelySymptomsToday": "Kemungkinan hari ini: {{symptoms}}",
+                "pmsWindow": "Jendela PMS kemungkinan mulai {{weekday}}",
+                "upcomingSymptom": "Kemungkinan mulai {{weekday}}: {{symptom}}",
+                "fertile": "Masa subur hingga {{date}}",
+                "fertileConfirmed": "Masa subur (ovulasi terkonfirmasi) hingga {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Ovulasi pada siklus ini dikonfirmasi oleh kenaikan suhu. Siklus mendatang tetap menggunakan metode kalender; ini tidak menggantikan kontrasepsi atau saran medis."
         },
         "duration": {
             "hm": "{{hours}} j {{minutes}} mnt",

@@ -29,7 +29,7 @@ import {
 } from '/utils/health-vitals.js';
 import {
   computeDueDoses, computeAdherence, refillState,
-  daysMaskToIndices, indicesToDaysMask, WEEKDAY_COUNT,
+  daysMaskToIndices, indicesToDaysMask, WEEKDAY_COUNT, weekdayIndex,
   prnDoseState, splitRemaining, toLocalStamp, parseLogInstant, scheduledLogs,
 } from '/utils/health-meds.js';
 import {
@@ -4242,6 +4242,7 @@ function renderCycleShell() {
   if (prediction.isPregnant) {
     cycle.root.insertAdjacentHTML('beforeend', `
       ${persons}
+      ${own ? cycleBubbleMarkup(prediction) : ''}
       ${cyclePregnancyMarkup(prediction, own)}
       ${own ? cycleTodayActionsMarkup(true) : ''}
       ${cycleCalendarMarkup(own)}
@@ -4276,11 +4277,12 @@ function renderCycleShell() {
 
   cycle.root.insertAdjacentHTML('beforeend', `
     ${persons}
+    ${own ? cycleBubbleMarkup(prediction) : ''}
     <div class="cycle-hero">
       ${cycleRingMarkup(prediction)}
       <div class="cycle-hero__side">
         ${cycleStatsMarkup(prediction)}
-        ${prediction.trackFertility ? `<p class="health-disclaimer">${esc(t('health.cycle.fertilityDisclaimer'))}</p>` : ''}
+        ${prediction.trackFertility ? `<p class="health-disclaimer">${esc(t(prediction.ovulationConfirmed ? 'health.cycle.fertilityDisclaimerConfirmed' : 'health.cycle.fertilityDisclaimer'))}</p>` : ''}
       </div>
     </div>
     ${cycleRingLegendMarkup(prediction)}
@@ -4296,6 +4298,135 @@ function renderCycleShell() {
 }
 
 // --------------------------------------------------------
+// "Heute"-Einblendung (C-1): EIN kompaktes Banner statt einer Kartenexplosion -
+// Zyklustag + Phase (immer) plus HOECHSTENS eine zweite Zeile nach fester
+// Prioritaet (ueberfaellige Periode > heute wahrscheinliche Symptome > PMS-
+// Fenster > kommendes wahrscheinliches Symptom > fruchtbares Fenster >
+// nichts - NIE eine Fuellphrase). Nur in der eigenen Ansicht
+// (isOwnCycleView(), siehe Aufrufstellen in renderCycleShell()) - Vorhersagen
+// einer fremden Person zu einer "heute"-Aussage zu verdichten waere anmassend.
+// Der alte, im Trends-Bereich vergrabene likelyToday-Callout (symptomLikelihood
+// Markup()) bleibt unangetastet - Trends gehoert nicht zu diesem Arbeitspaket.
+// --------------------------------------------------------
+
+/** SSW-Zeile einer Schwangerschaft - von cyclePregnancyMarkup() UND der
+ * "Heute"-Einblendung geteilt, damit die Wochen/Tage-Berechnung nur an einer
+ * Stelle steht (Aufgabenvorgabe: nicht duplizieren). */
+function cyclePregnancyWeekText(p) {
+  return t('health.cycle.pregnancy.week', { weeks: p.gestWeeks, days: p.gestDays });
+}
+
+function cycleBubbleShell(line1Text, line2Html) {
+  return `
+    <div class="cycle-bubble" role="region" aria-label="${esc(t('health.cycle.bubble.ariaLabel'))}">
+      <div class="cycle-bubble__icon" aria-hidden="true"><i data-lucide="sparkles"></i></div>
+      <div class="cycle-bubble__body">
+        <p class="cycle-bubble__line1">${esc(line1Text)}</p>
+        ${line2Html}
+      </div>
+    </div>`;
+}
+
+function cycleBubbleMarkup(prediction) {
+  const today = todayKey();
+
+  // Schwangerschaft: Zeile 1 ist die SSW-Zeile (cyclePregnancyWeekText(), s.o.)
+  // - keine Zeile 2, da waehrend der Schwangerschaft alle Zyklus-Vorhersagen
+  // ohnehin pausiert sind (siehe predictCycle()).
+  if (prediction.isPregnant) {
+    const p = prediction.pregnancy || {};
+    const line1 = p.hasDue ? cyclePregnancyWeekText(p) : t('health.cycle.pregnancy.title');
+    return `
+      <div class="cycle-bubble" role="region" aria-label="${esc(t('health.cycle.bubble.ariaLabel'))}">
+        <div class="cycle-bubble__icon" aria-hidden="true"><i data-lucide="baby"></i></div>
+        <div class="cycle-bubble__body">
+          <p class="cycle-bubble__line1">${esc(line1)}</p>
+        </div>
+      </div>`;
+  }
+
+  const phaseLabel = t(CYCLE_PHASE_LABEL_KEYS[prediction.phase] || CYCLE_PHASE_LABEL_KEYS[PHASE.FOLLICULAR]);
+  const line1 = t('health.cycle.bubble.line1', { day: prediction.cycleDay, phase: phaseLabel });
+
+  // Prioritaet 1: Periode heute/ueberfaellig erwartet - derselbe Handlungsaufruf
+  // wie die "Heute"-Aktionsleiste (cycleStartPeriodToday(), keine zweite
+  // Speicherlogik). Eigener data-action-Name (cycle-bubble-start-period), damit
+  // wireCycle()s einzelner querySelector(...) fuer "cycle-start-period"
+  // weiterhin genau den Knopf der Aktionsleiste trifft - zwei Elemente mit
+  // demselben data-action wuerden sich sonst den einen Listener teilen.
+  if (prediction.daysUntilNext <= 0) {
+    const line2Text = prediction.daysUntilNext === 0
+      ? t('health.cycle.bubble.periodToday')
+      : t('health.cycle.bubble.periodOverdue', { count: Math.abs(prediction.daysUntilNext) });
+    return cycleBubbleShell(line1, `
+      <div class="cycle-bubble__line2 cycle-bubble__line2--row">
+        <span>${esc(line2Text)}</span>
+        <button type="button" class="btn btn--sm btn--primary" data-action="cycle-bubble-start-period">${esc(t('health.cycle.today.startPeriod'))}</button>
+      </div>`);
+  }
+
+  // Die verbleibenden Prioritaeten brauchen dieselbe Symptom-Wahrscheinlichkeit
+  // ueber ALLE SYMPTOM_TYPES (nicht nur das im Trends-Bereich gewaehlte) - EIN
+  // Durchlauf fuer diesen Render, nicht pro Fall neu. predictSymptomLikelihood()
+  // rekonstruiert die Zyklen aus Perioden/Logs bei JEDEM Aufruf (siehe
+  // symptomCyclePattern()/reconstructCycles() in health-cycle.js); 20 Aufrufe
+  // pro Render sind bei den ueblichen Datenmengen (Dutzende Perioden, Hunderte
+  // Tages-Logs) unkritisch, aber unnoetig oefter als einmal wiederholt -
+  // dasselbe Muster wie pmsWindow() dort, das ebenfalls ueber alle Symptome
+  // iteriert.
+  const settings = cycleSettings();
+  const likelihoods = SYMPTOM_TYPES.map((s) => ({
+    symptom: s,
+    result: predictSymptomLikelihood(cycle.logs, cycle.periods, settings, s.value, today),
+  }));
+
+  // Prioritaet 2: heute wahrscheinliche Symptome (bis zu drei, in SYMPTOM_TYPES-
+  // Reihenfolge - keine weitere Gewichtung noetig).
+  const likelyToday = likelihoods.filter((l) => l.result.isLikelyToday).slice(0, 3);
+  if (likelyToday.length) {
+    const names = likelyToday.map((l) => t(l.symptom.labelKey)).join(', ');
+    return cycleBubbleShell(line1, `
+      <button type="button" class="cycle-bubble__line2 cycle-bubble__line2--action" data-action="cycle-bubble-log-today">
+        <span>${esc(t('health.cycle.bubble.likelySymptomsToday', { symptoms: names }))}</span>
+        <i data-lucide="chevron-right" aria-hidden="true"></i>
+      </button>`);
+  }
+
+  // Prioritaet 3: PMS-Fenster (D-8) - enthaelt "heute" oder beginnt innerhalb
+  // der naechsten drei Tage.
+  const pms = pmsWindow(cycle.logs, cycle.periods, settings, today);
+  if (pms) {
+    const startsWithinDays = daysBetween(today, pms.start);
+    const containsToday = today >= pms.start && today <= pms.end;
+    if (containsToday || (startsWithinDays >= 0 && startsWithinDays <= 3)) {
+      const weekday = t(CYCLE_WEEKDAY_LABEL_KEYS[weekdayIndex(pms.start)]);
+      return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t('health.cycle.bubble.pmsWindow', { weekday }))}</p>`);
+    }
+  }
+
+  // Prioritaet 4: naechstes wahrscheinliches Symptom - ueber alle Symptome
+  // hinweg das fruehste `nextLikelyDate` innerhalb der naechsten 7 Tage.
+  const upcoming = likelihoods
+    .filter((l) => l.result.nextLikelyDate && daysBetween(today, l.result.nextLikelyDate) >= 0 && daysBetween(today, l.result.nextLikelyDate) <= 7)
+    .sort((a, b) => (a.result.nextLikelyDate < b.result.nextLikelyDate ? -1 : 1))[0];
+  if (upcoming) {
+    const weekday = t(CYCLE_WEEKDAY_LABEL_KEYS[weekdayIndex(upcoming.result.nextLikelyDate)]);
+    const symptom = t(upcoming.symptom.labelKey);
+    return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t('health.cycle.bubble.upcomingSymptom', { weekday, symptom }))}</p>`);
+  }
+
+  // Prioritaet 5: fruchtbares Fenster (nur wenn ueberhaupt verfolgt - D-9
+  // schaltet trackFertility unter hormoneller Verhuetung bereits ab).
+  if (prediction.trackFertility && prediction.fertileStart && today >= prediction.fertileStart && today <= prediction.fertileEnd) {
+    const key = prediction.ovulationConfirmed ? 'health.cycle.bubble.fertileConfirmed' : 'health.cycle.bubble.fertile';
+    return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t(key, { date: formatDate(prediction.fertileEnd) }))}</p>`);
+  }
+
+  // Prioritaet 6: nichts Passendes - NIE eine Fuellphrase, nur Zeile 1.
+  return cycleBubbleShell(line1, '');
+}
+
+// --------------------------------------------------------
 // Hero: Schwangerschaft (Vorhersage pausiert)
 // --------------------------------------------------------
 
@@ -4305,7 +4436,7 @@ function cyclePregnancyMarkup(prediction, own) {
 
   let detail;
   if (p.hasDue) {
-    const weekLine = t('health.cycle.pregnancy.week', { weeks: p.gestWeeks, days: p.gestDays });
+    const weekLine = cyclePregnancyWeekText(p);
     const countdown = p.overdue
       ? t('health.cycle.pregnancy.overdue', { days: Math.abs(p.daysUntilDue) })
       : t('health.cycle.pregnancy.countdown', { days: p.daysUntilDue });
@@ -4450,11 +4581,23 @@ function cycleStatsMarkup(prediction) {
 
   // Nächste Periode: nur das Datum — der Countdown steht bereits im Ring-Zentrum,
   // die Karte würde ihn sonst dublieren (Critique).
+  //
+  // D-14 (Perimenopause): mit gesetztem Modus UND einer Spanne (nextStartRange,
+  // siehe predictCycle()-Dokblock) zeigt die Kachel die Spanne statt des
+  // einzelnen Mittelwert-Datums, mit dem Mittelwert als Unterzeile - der
+  // Ring-Mittelpunkt (cycleCountdownText()) bleibt bewusst bei EINER Zahl
+  // (nextStart/daysUntilNext), weil ein Countdown auf eine Spanne dort keinen
+  // sinnvollen einzelnen Text ergäbe.
+  const perimenopauseRange = (prediction.perimenopause && prediction.nextStartRange) ? prediction.nextStartRange : null;
   tiles.push(cycleStatCardMarkup({
     icon: 'calendar-heart',
     labelKey: 'health.cycle.status.nextPeriod',
-    value: formatDate(prediction.nextStart),
-    sub: '',
+    value: perimenopauseRange
+      ? `${formatDate(perimenopauseRange.min)} – ${formatDate(perimenopauseRange.max)}`
+      : formatDate(prediction.nextStart),
+    sub: perimenopauseRange
+      ? t('health.cycle.status.nextPeriodRangeSub', { date: formatDate(prediction.nextStart) })
+      : '',
   }));
 
   if (prediction.trackFertility) {
@@ -4470,6 +4613,15 @@ function cycleStatsMarkup(prediction) {
       value: `${formatDate(prediction.fertileStart)} – ${formatDate(prediction.fertileEnd)}`,
       sub: `${ovulationLabel}: ${formatDate(prediction.ovulationDate)}`,
     }));
+  } else if (prediction.fertilitySuppressed === 'contraception') {
+    // D-9: ohne die fruchtbares-Fenster-Kachel bliebe die Kachel-Luecke
+    // unerklaert (saehe wie ein Fehler statt einer bewussten Abschaltung aus) -
+    // ein ruhiger Hinweis statt stillschweigendem Verschwinden.
+    tiles.push(`
+      <div class="cycle-stat cycle-stat--note">
+        <i data-lucide="info" aria-hidden="true"></i>
+        <span>${esc(t('health.cycle.status.fertilitySuppressedNote'))}</span>
+      </div>`);
   }
 
   // Regelmäßigkeit (Phase 4d): vorher nur sichtbar, wenn Fruchtbarkeit NICHT
@@ -5481,6 +5633,12 @@ function wireCycle() {
   cycle.root.querySelector('[data-action="cycle-log-today"]')?.addEventListener('click', () => openDayLogModal(todayKey()));
   cycle.root.querySelector('[data-action="cycle-settings"]')?.addEventListener('click', () => openCycleSettingsModal());
 
+  // C-1: "Heute"-Einblendung - eigene data-action-Namen (siehe cycleBubbleMarkup()),
+  // ruft aber dieselben Funktionen wie die bestehende Aktionsleiste auf, keine
+  // zweite Speicher-/Navigationslogik.
+  cycle.root.querySelector('[data-action="cycle-bubble-start-period"]')?.addEventListener('click', () => cycleStartPeriodToday());
+  cycle.root.querySelector('[data-action="cycle-bubble-log-today"]')?.addEventListener('click', () => openDayLogModal(todayKey()));
+
   // Symptom-Wahrscheinlichkeits-Chip (Phase 4e): erneutes Antippen des schon
   // gewaehlten Chips waehlt ab (Overlay aus) - dieselbe Toggle-Geste wie ein
   // aktiver Filter, kein Extra-"Zuruecksetzen"-Knopf noetig.
@@ -5923,6 +6081,30 @@ async function deleteDayLog(log) {
 // Einstellungs-Modal (persönliche Vorhersage-Parameter)
 // --------------------------------------------------------
 
+// D-9: dieselbe geschlossene Auswahl wie server/routes/health/cycle.js#
+// CONTRACEPTION_VALUES (dort die Quelle der Wahrheit für die Validierung) -
+// 'none' ist ein bewusst gewaehlter Wert ("keine Verhuetung", explizit
+// angegeben) und bleibt von der leeren Option ("nicht angegeben", `null` in
+// der DB) unterschieden.
+const CONTRACEPTION_TYPES = Object.freeze([
+  { value: 'none',         labelKey: 'health.cycle.settings.contraceptionOptions.none' },
+  { value: 'pill',         labelKey: 'health.cycle.settings.contraceptionOptions.pill' },
+  { value: 'hormonal_iud', labelKey: 'health.cycle.settings.contraceptionOptions.hormonal_iud' },
+  { value: 'copper_iud',   labelKey: 'health.cycle.settings.contraceptionOptions.copper_iud' },
+  { value: 'implant',      labelKey: 'health.cycle.settings.contraceptionOptions.implant' },
+  { value: 'injection',    labelKey: 'health.cycle.settings.contraceptionOptions.injection' },
+  { value: 'patch',        labelKey: 'health.cycle.settings.contraceptionOptions.patch' },
+  { value: 'ring',         labelKey: 'health.cycle.settings.contraceptionOptions.ring' },
+  { value: 'condom',       labelKey: 'health.cycle.settings.contraceptionOptions.condom' },
+  { value: 'other',        labelKey: 'health.cycle.settings.contraceptionOptions.other' },
+]);
+
+// Dieselbe 0/1/2/3/5/7-Reihe wie die bestehende Perioden-Erinnerung
+// (cs-remind-days), hier fuer die Partner-Erinnerung - absichtlich OHNE
+// 10/14 (die Partner-Benachrichtigung ist eine kurzfristige Vorwarnung, keine
+// langfristige Planungserinnerung wie die eigene).
+const PARTNER_REMIND_DAYS = Object.freeze([0, 1, 2, 3, 5, 7]);
+
 function openCycleSettingsModal() {
   const s = cycle.settings || {};
   const val = (v) => (v == null ? '' : String(v));
@@ -5962,6 +6144,38 @@ function openCycleSettingsModal() {
           <span>${esc(t('health.cycle.settings.trackFertility'))}</span>
         </label>
         <p class="cycle-hint" id="cs-auto-hint">${esc(t('health.cycle.settings.autoHint'))}</p>
+        <div class="form-field">
+          <label class="label" for="cs-contraception">${esc(t('health.cycle.settings.contraception'))}</label>
+          <select class="input" id="cs-contraception" aria-describedby="cs-contraception-hint">
+            <option value="" ${s.contraception ? '' : 'selected'}>${esc(t('health.cycle.settings.contraceptionUnset'))}</option>
+            ${CONTRACEPTION_TYPES.map((c) => `<option value="${esc(c.value)}" ${s.contraception === c.value ? 'selected' : ''}>${esc(t(c.labelKey))}</option>`).join('')}
+          </select>
+          <p class="cycle-hint" id="cs-contraception-hint">${esc(t('health.cycle.settings.contraceptionHint'))}</p>
+        </div>
+        <label class="cycle-toggle">
+          <input type="checkbox" id="cs-perimenopause" aria-describedby="cs-perimenopause-hint" ${s.perimenopause_mode ? 'checked' : ''}>
+          <span>${esc(t('health.cycle.settings.perimenopauseMode'))}</span>
+        </label>
+        <p class="cycle-hint" id="cs-perimenopause-hint">${esc(t('health.cycle.settings.perimenopauseModeHint'))}</p>
+        <label class="cycle-toggle">
+          <input type="checkbox" id="cs-show-pms" ${s.show_pms === 0 ? '' : 'checked'}>
+          <span>${esc(t('health.cycle.settings.showPms'))}</span>
+        </label>
+        <div class="form-field">
+          <label class="label" for="cs-notify-partner">${esc(t('health.cycle.settings.notifyPartner'))}</label>
+          <select class="input" id="cs-notify-partner" aria-describedby="cs-notify-partner-hint">
+            <option value="" ${s.notify_partner_user_id ? '' : 'selected'}>${esc(t('health.cycle.settings.remindOff'))}</option>
+            ${cycle.members.filter((m) => m.id !== cycle.meId).map((m) => `<option value="${m.id}" ${Number(s.notify_partner_user_id) === m.id ? 'selected' : ''}>${esc(m.display_name)}</option>`).join('')}
+          </select>
+          <p class="cycle-hint" id="cs-notify-partner-hint">${esc(t('health.cycle.settings.notifyPartnerHint'))}</p>
+        </div>
+        <div class="form-field" id="cs-notify-partner-days-field" ${s.notify_partner_user_id ? '' : 'hidden'}>
+          <label class="label" for="cs-notify-partner-days">${esc(t('health.cycle.settings.notifyPartnerDaysBefore'))}</label>
+          <select class="input" id="cs-notify-partner-days">
+            ${PARTNER_REMIND_DAYS.map((d) => `<option value="${d}" ${Number(s.notify_partner_days_before) === d ? 'selected' : ''}>${esc(d === 0 ? t('health.cycle.settings.remindSameDay') : t('health.cycle.unit.days', { value: d, count: d }))}</option>`).join('')}
+          </select>
+        </div>
+        <hr class="cycle-settings__sep">
         <div class="form-field">
           <label class="label" for="cs-default-visibility">${esc(t('health.cycle.settings.defaultVisibility'))}</label>
           <select class="input" id="cs-default-visibility" aria-describedby="cs-default-visibility-hint">
@@ -6017,6 +6231,15 @@ function openCycleSettingsModal() {
       const dueField = panel.querySelector('#cs-due-field');
       pregToggle?.addEventListener('change', () => { dueField.hidden = !pregToggle.checked; });
 
+      // Tage-vor-Auswahl der Partner-Erinnerung nur zeigen, solange tatsaechlich
+      // eine Person gewaehlt ist - dasselbe Zeig-bei-Bedarf-Muster wie das
+      // Entbindungstermin-Feld oben.
+      const notifyPartnerSelect = panel.querySelector('#cs-notify-partner');
+      const notifyPartnerDaysField = panel.querySelector('#cs-notify-partner-days-field');
+      notifyPartnerSelect?.addEventListener('change', () => {
+        notifyPartnerDaysField.hidden = !notifyPartnerSelect.value;
+      });
+
       // Bulk-Sichtbarkeit: setzt alle bestehenden Einträge auf den oben gewählten
       // Wert. Inline-Bestätigung statt confirmModal - das Modal-System stapelt
       // nicht, ein verschachteltes confirmModal würde die Settings mitsamt noch
@@ -6062,14 +6285,23 @@ function openCycleSettingsModal() {
         const numOr = (sel) => { const raw = panel.querySelector(sel).value.trim(); return raw === '' ? null : Number(raw); };
         const pregnant = pregToggle.checked;
         const due = (panel.querySelector('#cs-due').value || '').trim();
+        const partnerId = numOr('#cs-notify-partner');
         const body = {
           cycle_length_avg: numOr('#cs-cycle'),
           period_length_avg: numOr('#cs-period'),
           luteal_length: numOr('#cs-luteal') ?? 14,
           track_fertility: panel.querySelector('#cs-fertility').checked,
+          contraception: panel.querySelector('#cs-contraception').value || null,
+          perimenopause_mode: panel.querySelector('#cs-perimenopause').checked,
+          show_pms: panel.querySelector('#cs-show-pms').checked,
           default_visibility: panel.querySelector('#cs-default-visibility').value || 'private',
           remind_period_days_before: numOr('#cs-remind-days'),
           remind_log_daily: panel.querySelector('#cs-remind-log').checked,
+          notify_partner_user_id: partnerId,
+          // Ohne gewaehlte Person ist der Tage-Wert bedeutungslos (kein
+          // Empfaenger) - nicht mitschicken, statt eines von der UI
+          // ausgeblendeten, aber dennoch gesendeten Zahlenwerts.
+          notify_partner_days_before: partnerId ? numOr('#cs-notify-partner-days') : null,
           pregnancy_mode: pregnant,
           // Termin auch beim Ausschalten behalten (nur im aktiven Modus genutzt) —
           // versehentliches Umschalten löscht die Eingabe dann nicht.

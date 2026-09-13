@@ -4276,7 +4276,10 @@
                 "regular": "规律",
                 "irregular": "不规律",
                 "notEnoughData": "数据不足",
-                "noPrediction": "记录一次月经以获得预测。"
+                "noPrediction": "记录一次月经以获得预测。",
+                "fertilitySuppressedNote": "易孕期已暂停：激素避孕。",
+                "nextPeriodRangeSub": "平均：{{date}}",
+                "partnerNextPeriod": "{{name}}的月经"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "怀孕模式",
                 "dueDate": "预产期",
                 "pregnancyHint": "在怀孕模式下，月经和排卵预测将暂停。每日记录仍可使用。",
-                "saved": "设置已保存。"
+                "saved": "设置已保存。",
+                "contraception": "避孕方式",
+                "contraceptionHint": "激素类方式会自动暂停易孕期预测。",
+                "contraceptionUnset": "未设置",
+                "contraceptionOptions": {
+                    "none": "无",
+                    "pill": "口服避孕药",
+                    "hormonal_iud": "激素宫内节育器",
+                    "copper_iud": "含铜宫内节育器",
+                    "implant": "皮下埋植剂",
+                    "injection": "避孕针",
+                    "patch": "避孕贴片",
+                    "ring": "阴道环",
+                    "condom": "避孕套",
+                    "other": "其他"
+                },
+                "perimenopauseMode": "围绝经期模式",
+                "perimenopauseModeHint": "预测将显示为一个区间而非单一日期；规律性判断将关闭。",
+                "showPms": "显示 PMS 窗口",
+                "notifyPartner": "通知伴侣",
+                "notifyPartnerHint": "所选的人只会收到预测日期，绝不会收到症状、备注或其他记录。",
+                "notifyPartnerDaysBefore": "伴侣提醒"
             },
             "mucus": {
                 "label": "宫颈粘液",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "记录止痛药",
                 "weight": "记录体重"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "今日周期状态",
+                "line1": "周期第{{day}}天 · {{phase}}",
+                "periodToday": "预计今天来月经——现在开始记录？",
+                "periodOverdue": "月经已延迟{{count}}天——现在开始记录？",
+                "periodOverdue_one": "月经已延迟{{count}}天——现在开始记录？",
+                "likelySymptomsToday": "今天可能出现：{{symptoms}}",
+                "pmsWindow": "PMS 窗口可能从{{weekday}}开始",
+                "upcomingSymptom": "从{{weekday}}起可能出现：{{symptom}}",
+                "fertile": "易孕期至{{date}}",
+                "fertileConfirmed": "易孕期（排卵已确认）至{{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "本周期的排卵已通过体温上升得到确认。未来的周期仍基于日历法；这不能替代避孕措施或医生建议。"
         },
         "duration": {
             "hm": "{{hours}} 小时 {{minutes}} 分钟",

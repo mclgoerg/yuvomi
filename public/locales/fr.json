@@ -4276,7 +4276,10 @@
                 "regular": "Régulier",
                 "irregular": "Irrégulier",
                 "notEnoughData": "Données insuffisantes",
-                "noPrediction": "Enregistrez des règles pour obtenir des prévisions."
+                "noPrediction": "Enregistrez des règles pour obtenir des prévisions.",
+                "fertilitySuppressedNote": "Fenêtre fertile suspendue : contraception hormonale.",
+                "nextPeriodRangeSub": "Moyenne : {{date}}",
+                "partnerNextPeriod": "Règles de {{name}}"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Mode grossesse",
                 "dueDate": "Date prévue d'accouchement",
                 "pregnancyHint": "En mode grossesse, les prévisions de règles et d'ovulation sont en pause. Le suivi quotidien reste disponible.",
-                "saved": "Paramètres enregistrés."
+                "saved": "Paramètres enregistrés.",
+                "contraception": "Méthode de contraception",
+                "contraceptionHint": "Les méthodes hormonales suspendent automatiquement les prévisions de fenêtre fertile.",
+                "contraceptionUnset": "Non renseigné",
+                "contraceptionOptions": {
+                    "none": "Aucune",
+                    "pill": "Pilule",
+                    "hormonal_iud": "Stérilet hormonal",
+                    "copper_iud": "Stérilet en cuivre",
+                    "implant": "Implant",
+                    "injection": "Injection",
+                    "patch": "Patch",
+                    "ring": "Anneau vaginal",
+                    "condom": "Préservatif",
+                    "other": "Autre"
+                },
+                "perimenopauseMode": "Mode périménopause",
+                "perimenopauseModeHint": "Les prévisions s'affichent sous forme de plage plutôt que d'une seule date ; l'évaluation de la régularité est désactivée.",
+                "showPms": "Afficher la fenêtre prémenstruelle",
+                "notifyPartner": "Prévenir un·e partenaire",
+                "notifyPartnerHint": "La personne choisie ne reçoit que la date prévue, jamais les symptômes, notes ou autres entrées.",
+                "notifyPartnerDaysBefore": "Rappel au/à la partenaire"
             },
             "mucus": {
                 "label": "Glaire cervicale",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Enregistrer un antalgique",
                 "weight": "Enregistrer le poids"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "État du cycle aujourd'hui",
+                "line1": "Jour {{day}} du cycle · {{phase}}",
+                "periodToday": "Règles attendues aujourd'hui — les commencer maintenant ?",
+                "periodOverdue": "Règles en retard de {{count}} jours — les commencer maintenant ?",
+                "periodOverdue_one": "Règles en retard de {{count}} jour — les commencer maintenant ?",
+                "likelySymptomsToday": "Probable aujourd'hui : {{symptoms}}",
+                "pmsWindow": "Fenêtre prémenstruelle probable à partir de {{weekday}}",
+                "upcomingSymptom": "Probable à partir de {{weekday}} : {{symptom}}",
+                "fertile": "Fenêtre fertile jusqu'au {{date}}",
+                "fertileConfirmed": "Fenêtre fertile (ovulation confirmée) jusqu'au {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "L'ovulation de ce cycle a été confirmée par une hausse de température. Les cycles à venir restent basés sur la méthode du calendrier ; cela ne remplace ni une contraception ni un avis médical."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

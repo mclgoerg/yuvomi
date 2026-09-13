@@ -4276,7 +4276,10 @@
                 "regular": "Regular",
                 "irregular": "Irregular",
                 "notEnoughData": "Not enough data",
-                "noPrediction": "Log a period to see predictions."
+                "noPrediction": "Log a period to see predictions.",
+                "fertilitySuppressedNote": "Fertile window paused: hormonal contraception.",
+                "nextPeriodRangeSub": "Average: {{date}}",
+                "partnerNextPeriod": "{{name}}'s period"
             },
             "stats": {
                 "source": {
@@ -4474,7 +4477,28 @@
                 "pregnancyMode": "Pregnancy mode",
                 "dueDate": "Estimated due date",
                 "pregnancyHint": "In pregnancy mode, period and ovulation predictions are paused. Daily logging stays available.",
-                "saved": "Settings saved."
+                "saved": "Settings saved.",
+                "contraception": "Contraception method",
+                "contraceptionHint": "Hormonal methods automatically pause fertile-window predictions.",
+                "contraceptionUnset": "Not specified",
+                "contraceptionOptions": {
+                    "none": "None",
+                    "pill": "Pill",
+                    "hormonal_iud": "Hormonal IUD",
+                    "copper_iud": "Copper IUD",
+                    "implant": "Implant",
+                    "injection": "Injection",
+                    "patch": "Patch",
+                    "ring": "Vaginal ring",
+                    "condom": "Condom",
+                    "other": "Other"
+                },
+                "perimenopauseMode": "Perimenopause mode",
+                "perimenopauseModeHint": "Predictions show as a range instead of a single date; the regularity judgment is turned off.",
+                "showPms": "Show PMS window",
+                "notifyPartner": "Notify a partner",
+                "notifyPartnerHint": "The chosen person only receives the predicted date, never symptoms, notes, or any other entries.",
+                "notifyPartnerDaysBefore": "Partner reminder timing"
             },
             "mucus": {
                 "label": "Cervical mucus",
@@ -4508,7 +4532,20 @@
             "quickLink": {
                 "painkiller": "Log painkiller",
                 "weight": "Log weight"
-            }
+            },
+            "bubble": {
+                "ariaLabel": "Today's cycle status",
+                "line1": "Cycle day {{day}} · {{phase}}",
+                "periodToday": "Period expected today — start it now?",
+                "periodOverdue": "Period is {{count}} days overdue — start it now?",
+                "periodOverdue_one": "Period is {{count}} day overdue — start it now?",
+                "likelySymptomsToday": "Likely today: {{symptoms}}",
+                "pmsWindow": "PMS window likely from {{weekday}}",
+                "upcomingSymptom": "Likely from {{weekday}}: {{symptom}}",
+                "fertile": "Fertile window until {{date}}",
+                "fertileConfirmed": "Fertile window (ovulation confirmed) until {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "This cycle's ovulation was confirmed by a temperature rise. Future cycles still rely on the calendar method; this does not replace contraception or medical advice."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",
