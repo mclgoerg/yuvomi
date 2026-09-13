@@ -488,6 +488,12 @@ What a copy never carries over, independent of the flags:
   the original item.
 - `price_cents` and `store_id` reset to `NULL` — both are facts about a purchase actually made
   (#1003), "paid once, in this shop"; a copy has not been bought yet.
+- Tags (`shopping_item_tags`) — they are mirrored VTODO `CATEGORIES` and hang off the same sync
+  identity that is not copied either; the same rule, not an oversight.
+
+The three flags are optional but must be real booleans when present — a string `'false'` would
+otherwise silently act as `true`; the route answers `400` instead. A body-less POST answers `400`
+("Name is required."), not `500`.
 
 `GET /shopping/suggestions?q=` additionally returns each suggested name's most recently used
 `category` and `quantity`, not the name alone, so picking a suggestion in quick-add restores its usual
@@ -495,9 +501,13 @@ aisle placement instead of defaulting to the fallback category (the gap #1103 op
 are ordered by most recently used first (`MAX(created_at)`, tie-broken by row id) rather than
 alphabetically.
 
-The item POST route's own default category (when none is given) is the *last* category, matching
-`import-pantry`'s existing fallback and the original intent of issue #548 ("default manually added
-items to the misc category") — the route had drifted to defaulting to the *first* category instead.
+The item POST route's own default category (when none is given) is `Sonstiges` by name as long as
+the household still has that category, and only then the *last* category by `sort_order` — "last"
+alone is not stable, since `POST /categories` appends new categories at `MAX(sort_order) + 1`, so
+the last category is simply whatever was added most recently. This matches quick-add's
+`DEFAULT_CATEGORY_NAME` and the original intent of issue #548 ("default manually added items to the
+misc category") — the route had drifted to defaulting to the *first* category instead.
+`import-pantry` applies the same rule, so the two stay in step.
 
 ### Meals
 | Column | Type | Constraint |

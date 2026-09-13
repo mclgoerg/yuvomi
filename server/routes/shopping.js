@@ -800,6 +800,9 @@ router.put('/:listId', (req, res) => {
 //     bezahlt, ihr fehlen beide Tatsachen, die Preis und Laden festhalten
 //     (Ruecksprache mit dem Maintainer auf #1103: derselbe Grund fuer beide,
 //     nicht nur fuer den Preis).
+//   - Tags (shopping_item_tags): sie sind gespiegelte VTODO-CATEGORIES und
+//     haengen damit an denselben Sync-Spalten, die oben nicht mitkommen -
+//     dieselbe Regel, nicht ein Versehen.
 // --------------------------------------------------------
 router.post('/:listId/duplicate', (req, res) => {
   try {
@@ -808,12 +811,24 @@ router.post('/:listId/duplicate', (req, res) => {
       .get(req.params.listId);
     if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
 
-    const vName = str(req.body.name, 'Name', { max: MAX_TITLE });
+    // Express 5 laesst req.body bei einem POST ohne Body undefined -
+    // ohne das ?. antwortete die Route hier mit 500 statt 400.
+    const vName = str(req.body?.name, 'Name', { max: MAX_TITLE });
     if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
 
-    const resetChecked   = req.body.resetChecked !== false;
-    const keepQuantities = req.body.keepQuantities !== false;
-    const keepNotes      = req.body.keepNotes !== false;
+    // Die drei Flags sind optional, aber wenn gesetzt, echte Booleans. Ohne
+    // diese Pruefung wirkte jeder Nicht-false-Wert wie true - der String
+    // 'false' duplizierte also mit zurueckgesetzten Haken und behaltenen
+    // Mengen, und der API-Aufrufer erfuhr nie, dass sein Flag ignoriert wurde.
+    for (const flag of ['resetChecked', 'keepQuantities', 'keepNotes']) {
+      const value = req.body?.[flag];
+      if (value !== undefined && typeof value !== 'boolean')
+        return res.status(400).json({ error: `${flag} must be a boolean.`, code: 400 });
+    }
+
+    const resetChecked   = req.body?.resetChecked !== false;
+    const keepQuantities = req.body?.keepQuantities !== false;
+    const keepNotes      = req.body?.keepNotes !== false;
 
     const items = db.get()
       .prepare('SELECT * FROM shopping_items WHERE list_id = ?')
@@ -986,14 +1001,19 @@ router.post('/:listId/items', (req, res) => {
       .get(req.params.listId);
     if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
 
-    // Ohne Kategorie faellt der Artikel auf die LETZTE (#548, "Sonstiges"),
-    // nicht die erste ("Obst & Gemuese" nach Gang-Reihenfolge) - genau das war
-    // der gemeldete Fehler: unzusammenhaengende Artikel landeten automatisch
-    // in der ersten Kategorie, statt in der neutralen Sammelkategorie. Der
-    // Quick-Add-Client schickt die Kategorie ohnehin immer explizit mit;
-    // dieser Rueckfall greift nur, wenn sie fehlt (z.B. direkter API-Aufruf).
+    // Ohne Kategorie faellt der Artikel auf "Sonstiges", solange der Haushalt
+    // diese Kategorie noch hat - erst wenn sie umbenannt oder geloescht wurde,
+    // auf die LETZTE nach Gang-Reihenfolge. Nur "letzte" reicht nicht: POST
+    // /categories haengt Neues bei MAX(sort_order)+1 an, die letzte Kategorie
+    // ist also schlicht die zuletzt angelegte ("Baumarkt"), nicht die neutrale
+    // Sammelkategorie. Es kursierten drei Definitionen des Standards (hier:
+    // letzte; Quick-Add-Client: der NAME via DEFAULT_CATEGORY_NAME; Loesch-
+    // Rueckfall: erste) - diese Regel deckt sich mit dem Client und der
+    // Absicht von #548. Der Quick-Add-Client schickt die Kategorie ohnehin
+    // immer explizit mit; dieser Rueckfall greift nur, wenn sie fehlt (z.B.
+    // direkter API-Aufruf).
     const validNames = validCategoryNames();
-    const defaultCat = validNames[validNames.length - 1] ?? 'Sonstiges';
+    const defaultCat = (validNames.includes('Sonstiges') ? 'Sonstiges' : validNames.at(-1)) ?? 'Sonstiges';
     const requestedCat = req.body.category || defaultCat;
 
     const vName  = str(req.body.name, 'Name', { max: MAX_TITLE });
@@ -1230,7 +1250,10 @@ router.post('/:listId/import-pantry', (req, res) => {
     if (!entries.length) return res.json({ data: { added: 0, skipped: 0, added_ids: [] } });
 
     const validNames = validCategoryNames();
-    const defaultCat = validNames[validNames.length - 1] ?? 'Sonstiges';
+    // Gleiche Standard-Regel wie beim Artikel-POST oben: "Sonstiges" solange
+    // es die Kategorie gibt, sonst die letzte nach Gang-Reihenfolge - die
+    // beiden Routen sollen nicht auseinanderlaufen.
+    const defaultCat = (validNames.includes('Sonstiges') ? 'Sonstiges' : validNames.at(-1)) ?? 'Sonstiges';
 
     const result = db.get().transaction(() => {
       const findPantryItem = db.get().prepare('SELECT name, category FROM pantry_items WHERE id = ?');

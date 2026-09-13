@@ -25,7 +25,16 @@ export function shoppingPaths() {
     '/api/v1/shopping/categories/reorder': {
       patch: op({ summary: 'Reorder shopping categories', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
     },
-    '/api/v1/shopping/suggestions': { get: op({ summary: 'Get shopping suggestions', tag: 'Shopping' }) },
+    '/api/v1/shopping/suggestions': {
+      get: op({
+        summary: 'Get shopping suggestions',
+        description: 'Contract change (#1103): response items are now objects { name, category, quantity } instead of '
+          + 'plain name strings (string[] before), and the list is ordered by most recently used first instead of alphabetically. '
+          + 'Category and quantity come from the most recent item row with that name - the latest statement about '
+          + 'how the household files the article today.',
+        tag: 'Shopping',
+      }),
+    },
     '/api/v1/shopping/versions': {
       get: op({
         summary: 'Change counter of every shopping list',

@@ -1395,6 +1395,30 @@ function syncQuickAddDisclosure(container, open) {
   }
 }
 
+/**
+ * Setzt die Kategorie-Auswahl des Quick-Add auf den Standard zurueck.
+ *
+ * Die Kategorie faellt nach dem Anlegen auf den Standard zurueck (#548:
+ * neu = Sonstiges), statt fuer den NAECHSTEN, unverwandten Artikel stehen zu
+ * bleiben. Ohne diesen Rueckfall blieb sie an der zuletzt gewaehlten
+ * Kategorie haengen - ob von Hand gewaehlt oder von einem Vorschlag
+ * uebernommen (applyAutocompleteSuggestion) - und ein danach eingetippter
+ * Artikel landete dort, nicht in Sonstiges (gemeldet 2026-09-11: "Toast"
+ * landete in "Milchprodukte", weil zuvor ein Milch-Vorschlag gewaehlt wurde).
+ *
+ * Eigene Funktion statt Inline-Zweig im Submit-Handler, damit das Verhalten
+ * testbar ist (Review #1165: die reine Textprobe blieb auch bei totem Code
+ * gruen). Fehlt "Sonstiges" (umbenannt/geloescht), bleibt die Auswahl stehen -
+ * ein ungueltiger Wert im <select> waere schlimmer als eine stehende Kategorie.
+ *
+ * @param {HTMLSelectElement} catSelect
+ */
+function resetQuickAddCategory(catSelect) {
+  if ([...catSelect.options].some((o) => o.value === DEFAULT_CATEGORY_NAME)) {
+    catSelect.value = DEFAULT_CATEGORY_NAME;
+  }
+}
+
 function wireQuickAdd(container) {
   const form = container.querySelector('#quick-add-form');
   if (!form) return;
@@ -1432,16 +1456,7 @@ function wireQuickAdd(container) {
       renderTabs(container);
       nameInput.value = '';
       qtyInput.value  = '';
-      // Die Kategorie faellt auf den Standard zurueck (#548: neu = Sonstiges),
-      // statt fuer den NAECHSTEN, unverwandten Artikel stehen zu bleiben. Ohne
-      // diese Zeile blieb sie an der zuletzt gewaehlten Kategorie haengen -
-      // ob von Hand gewaehlt oder von einem Vorschlag uebernommen
-      // (applyAutocompleteSuggestion) - und ein danach eingetippter Artikel
-      // landete dort, nicht in Sonstiges (gemeldet 2026-09-11: "Toast" landete
-      // in "Milchprodukte", weil zuvor ein Milch-Vorschlag gewaehlt wurde).
-      if ([...catSelect.options].some((o) => o.value === DEFAULT_CATEGORY_NAME)) {
-        catSelect.value = DEFAULT_CATEGORY_NAME;
-      }
+      resetQuickAddCategory(catSelect);
       // Erfolgs-Feedback auf dem +-Button (DOM-API, kein innerHTML)
       _flashAddBtn(form.querySelector('.quick-add__btn'));
       nameInput.focus();
@@ -3410,6 +3425,10 @@ export const __test = {
   // Namensfeld, weil diese Uebernahme nie eine eigene Pruefung hatte (nur die
   // Server-Seite der Route war getestet).
   applyAutocompleteSuggestion,
+  // Quick-Add-Kategorie-Rueckfall (#548, Review #1165): als eigene Funktion
+  // exportiert, damit der Test das VERHALTEN treibt statt den Quelltext zu
+  // durchsuchen - die Textprobe blieb auch gruen, wenn der Zweig tot war.
+  resetQuickAddCategory,
   // Die Absichten-Karte und ihre Lesefunktion: die Tests pruefen an ihnen die
   // Trennung selbst - dass `state.items` den Serverstand behaelt und die Zeile
   // die Ueberlagerung zeigt.

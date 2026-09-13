@@ -74,13 +74,15 @@ test('GET /suggestions: Präfix liefert distinct Namen', async () => {
 
 test('GET /suggestions: sortiert nach zuletzt verwendet, nicht alphabetisch (#1103)', async () => {
   const list = await newList('SuggOrder');
-  // "Zwiebeln" zuerst angelegt (alphabetisch nach "Zucchini"), aber "Zucchini"
-  // danach - die Antwort muss trotzdem mit dem zuletzt verwendeten beginnen.
-  await call('POST', `/${list}/items`, { name: 'Zwiebeln' });
+  // Alphabetische Reihenfolge ABSICHTLICH ENTGEGEN der Einfüge-Reihenfolge
+  // ("Zucchini" < "Zwiebeln", aber "Zwiebeln" kommt zuletzt): ein Rückfall auf
+  // ORDER BY name ASC lieferte hier ['Zucchini', 'Zwiebeln'] und fiele durch.
+  // (Review #1165: die alte Wahl war zufällig zugleich alphabetisch korrekt.)
   await call('POST', `/${list}/items`, { name: 'Zucchini' });
+  await call('POST', `/${list}/items`, { name: 'Zwiebeln' });
   const r = await call('GET', '/suggestions?q=Z');
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body.data.map((s) => s.name), ['Zucchini', 'Zwiebeln']);
+  assert.deepEqual(r.body.data.map((s) => s.name), ['Zwiebeln', 'Zucchini']);
 });
 
 test('GET /suggestions: trägt Kategorie + Menge der zuletzt verwendeten Zeile mit (#1103)', async () => {
@@ -93,6 +95,31 @@ test('GET /suggestions: trägt Kategorie + Menge der zuletzt verwendeten Zeile m
   const r = await call('GET', '/suggestions?q=Käse');
   assert.equal(r.status, 200);
   assert.deepEqual(r.body.data, [{ name: 'Käse', category: secondCat.name, quantity: '1 Stück' }]);
+});
+
+test('GET /suggestions: created_at schlägt id - jünger gewinnt auch mit KLEINERER id (#1165)', async () => {
+  const cats = await call('GET', '/categories');
+  const [firstCat, secondCat] = cats.body.data;
+  const list = await newList('Sugg3');
+  // Zwei Zeilen desselben Namens; danach bekommt die ZUERST angelegte (kleinere
+  // id) per UPDATE den späteren Zeitstempel. Wer created_at ignoriert und nur
+  // nach id sortiert, greift die falsche Zeile - Review #1165: die Tests davor
+  // fügten in derselben Sekunde ein und übten so nur den id-Tiebreak.
+  const older = await call('POST', `/${list}/items`, { name: 'Quark', category: firstCat.name, quantity: '500 g' });
+  await call('POST', `/${list}/items`, { name: 'Quark', category: secondCat.name, quantity: '250 g' });
+  db.prepare(`UPDATE shopping_items
+              SET created_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '+1 hour') WHERE id = ?`)
+    .run(older.body.data.id);
+  // Und ein zweiter Name mit GRÖSSERER id, aber älterem Zeitstempel: auch die
+  // Namens-Reihenfolge muss an created_at hängen, nicht an der höchsten id.
+  await call('POST', `/${list}/items`, { name: 'Quitten', category: secondCat.name, quantity: '1 kg' });
+
+  const r = await call('GET', '/suggestions?q=Qu');
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.data, [
+    { name: 'Quark', category: firstCat.name, quantity: '500 g' },
+    { name: 'Quitten', category: secondCat.name, quantity: '1 kg' },
+  ]);
 });
 
 // --------------------------------------------------------------------------
@@ -152,6 +179,31 @@ test('POST /:listId/duplicate: leerer Name → 400', async () => {
   const list = await newList('Original');
   const r = await call('POST', `/${list}/duplicate`, { name: '' });
   assert.equal(r.status, 400);
+});
+
+test('POST /:listId/duplicate: ganz ohne Body → 400, nicht 500 (#1165)', async () => {
+  // Express 5 lässt req.body bei einem POST ohne Body undefined - ohne das
+  // Optional Chaining in der Route flog hier ein TypeError (500).
+  const list = await newList('OhneBody');
+  const r = await call('POST', `/${list}/duplicate`);
+  assert.equal(r.status, 400);
+});
+
+test('POST /:listId/duplicate: Nicht-Boolean-Flags → 400 (#1165)', async () => {
+  // 'false' als String wirkte vorher wie true (jeder Nicht-false-Wert):
+  // dupliziert wurde mit zurückgesetzten Haken und behaltenen Mengen, und der
+  // Aufrufer erfuhr nie, dass sein Flag ignoriert wurde.
+  const list = await newList('FlagTypen');
+  for (const flag of ['resetChecked', 'keepQuantities', 'keepNotes']) {
+    const r = await call('POST', `/${list}/duplicate`, { name: 'Kopie', [flag]: 'false' });
+    assert.equal(r.status, 400, `${flag}: 'false' (String) muss abgelehnt werden`);
+    assert.match(r.body.error, /boolean/i);
+  }
+  // Echte Booleans bleiben natürlich erlaubt.
+  const ok = await call('POST', `/${list}/duplicate`, {
+    name: 'Kopie', resetChecked: false, keepQuantities: true, keepNotes: false,
+  });
+  assert.equal(ok.status, 201);
 });
 
 test('POST /:listId/duplicate: kopiert Kategorie + Handsortierung immer, unabhängig von den Flags', async () => {
@@ -259,13 +311,38 @@ test('POST /:listId/items: Nicht-http(s)-URL → 400', async () => {
   assert.equal(r.status, 400);
 });
 
-test('POST /:listId/items: legt Artikel an, Default-Kategorie = letzte (#548)', async () => {
+test('POST /:listId/items: legt Artikel an, Default-Kategorie = Sonstiges (#548)', async () => {
   const list = await newList();
   const r = await call('POST', `/${list}/items`, { name: 'Milch', quantity: '1 l', url: 'https://example.com' });
   assert.equal(r.status, 201);
   assert.equal(r.body.data.name, 'Milch');
-  assert.equal(r.body.data.category, 'Sonstiges'); // letzte Kategorie, nicht die erste (#548)
+  assert.equal(r.body.data.category, 'Sonstiges'); // die Sammelkategorie, nicht die erste (#548)
   assert.equal(r.body.data.url, 'https://example.com');
+});
+
+test('POST /:listId/items: Default bleibt Sonstiges, auch wenn der Haushalt danach eine Kategorie anlegt (#1165)', async () => {
+  // Der gemessene Fehlerfall aus dem Review: POST /categories hängt Neues bei
+  // MAX(sort_order)+1 an - "letzte Kategorie" wäre danach 'Baumarkt', und
+  // unzusammenhängende Artikel landeten im Baumarkt statt in der Sammelkategorie.
+  const baumarkt = (await call('POST', '/categories', { name: 'Baumarkt' })).body.data;
+  const list = await newList();
+  const r = await call('POST', `/${list}/items`, { name: 'Servietten' });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.data.category, 'Sonstiges');
+  await call('DELETE', `/categories/${baumarkt.id}`); // geteilte DB: aufräumen
+});
+
+test('POST /:listId/items: ohne Sonstiges gewinnt die letzte Kategorie nach sort_order (#1165)', async () => {
+  // Hat der Haushalt die Sammelkategorie umbenannt, greift der Rückfall auf
+  // die LETZTE nach Gang-Reihenfolge - nicht die erste ('Obst & Gemüse').
+  const cats = (await call('GET', '/categories')).body.data;
+  const sonstiges = cats.find((c) => c.name === 'Sonstiges');
+  await call('PUT', `/categories/${sonstiges.id}`, { name: 'Diverses' });
+  const list = await newList();
+  const r = await call('POST', `/${list}/items`, { name: 'Krimskrams' });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.data.category, 'Diverses'); // letzte per sort_order, nicht 'Obst & Gemüse'
+  await call('PUT', `/categories/${sonstiges.id}`, { name: 'Sonstiges' }); // geteilte DB: zurückbenennen
 });
 
 test('GET /:listId/items: unbekannte Liste → 404', async () => {

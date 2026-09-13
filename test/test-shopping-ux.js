@@ -2059,16 +2059,38 @@ test('shopping.js: der Vorschlags-Renderer zeigt s.name, nicht das ganze Vorschl
 // "Milchprodukte" stehen - ein danach eingetippter, unverwandter Artikel
 // ("Toast") landete dort statt in Sonstiges (#548). Name/Menge wurden nach
 // dem Anlegen schon zurueckgesetzt, die Kategorie nicht.
+//
+// VERHALTENSTEST statt Textprobe (Review #1165): die fruehere Probe suchte nur
+// die Zuweisung im Submit-Block und blieb gruen, wenn der Zweig tot war
+// (`if (false && ...)`). Der Rueckfall ist dafuer eine eigene, exportierte
+// Funktion geworden; die Textprobe unten prueft nur noch, dass der
+// Submit-Handler sie wirklich aufruft.
 // --------------------------------------------------------------------------
-test('wireQuickAdd: setzt die Kategorie nach dem Anlegen auf den Standard zurueck, nicht nur Name/Menge', () => {
+test('resetQuickAddCategory: setzt die Auswahl auf den Standard zurueck', () => {
+  const cat = fakeSelect(['Obst & Gemüse', 'Milchprodukte', 'Sonstiges'], 'Milchprodukte');
+  __test.resetQuickAddCategory(cat);
+  assert.equal(cat.value, 'Sonstiges',
+    'nach dem Anlegen muss die Auswahl auf DEFAULT_CATEGORY_NAME zurueckfallen, ' +
+    'sonst bleibt eine per Vorschlag oder von Hand gewaehlte Kategorie fuer den naechsten Artikel stehen.');
+});
+
+test('resetQuickAddCategory: ohne "Sonstiges" in den Optionen bleibt die Auswahl stehen', () => {
+  // Ein Haushalt kann die Sammelkategorie umbenannt oder geloescht haben -
+  // dann darf das <select> keinen Wert bekommen, den es gar nicht anbietet.
+  const cat = fakeSelect(['Obst & Gemüse', 'Backwaren'], 'Backwaren');
+  __test.resetQuickAddCategory(cat);
+  assert.equal(cat.value, 'Backwaren');
+});
+
+test('wireQuickAdd: der Submit-Handler ruft den Kategorie-Rueckfall wirklich auf', () => {
+  // Erreichbarkeits-Probe zum Verhaltenstest oben: die Funktion kann korrekt
+  // sein und trotzdem nie laufen, wenn der Aufruf aus dem Handler faellt.
   const source = readFileSync(new URL('../public/pages/shopping.js', import.meta.url), 'utf8');
   const submitBlock = source.slice(
     source.indexOf("form.addEventListener('submit'"),
     source.indexOf("form.addEventListener('submit'") + 2500,
   );
   assert.match(submitBlock, /nameInput\.value = '';/);
-  assert.match(submitBlock, /catSelect\.value = DEFAULT_CATEGORY_NAME/,
-    'die Kategorie-Auswahl muss nach dem Anlegen auf DEFAULT_CATEGORY_NAME zurueckfallen, ' +
-    'sonst bleibt eine per Vorschlag oder von Hand gewaehlte Kategorie fuer den naechsten Artikel stehen.');
+  assert.match(submitBlock, /resetQuickAddCategory\(catSelect\);/,
+    'der Submit-Handler muss resetQuickAddCategory(catSelect) aufrufen.');
 });
-
