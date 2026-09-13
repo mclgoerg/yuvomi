@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offers the visit report instead and says that only an admin can change it. A calendar link to
   such a visit opens the report rather than a form that cannot be saved.
 
+- **Household members and guests created as contacts now show the translated "Other" category
+  instead of the German "Sonstiges"** (#1140). The contact that is mirrored when a household member
+  or a split-expenses guest is created carried the raw German word instead of the category key, so
+  every non-German household saw it untranslated on the contacts page. New contacts get the proper
+  key, and existing ones are corrected when the app updates.
+
 - **Opening Housekeeping with a broken visit deep link now says so** (#1139). Tapping a
   housekeeping visit in the calendar opens Housekeeping through an `?editVisit=<id>` link; when
   that visit has been deleted or the link is malformed, it used to fail silently and land on the
