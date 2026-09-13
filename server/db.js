@@ -8059,7 +8059,7 @@ const MIGRATIONS = [
     // 'monthly_ordinal_weekday' needs the same CREATE+COPY+DROP+RENAME rebuild
     // as every other CHECK-widening in this file. foreignKeysOff avoids the
     // DROP TABLE step cascade-deleting every waste_schedule_overrides row
-    // through its own ON DELETE CASCADE (same hazard as migrations 52/199/200).
+    // through its own ON DELETE CASCADE (same hazard as migrations 52/202/203).
     //
     // NO NEW COLUMNS: an ordinal-weekday schedule reuses `weekdays` (exactly
     // one code, e.g. 'MO' - not the CSV list a weekly schedule stores) and

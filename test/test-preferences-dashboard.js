@@ -494,6 +494,7 @@ test('die Form der Optionen wird geprüft, ihre Bedeutung nicht', async () => {
     assert.equal((await withOptions({ list: [{ a: 1 }] })).status, 400);
     assert.equal((await withOptions({ list: [Infinity] })).status, 400, 'eine nicht-endliche Zahl bleibt ungültig, wie beim Einzelwert');
     assert.equal((await withOptions({ list: [NaN] })).status, 400);
+    assert.equal((await withOptions({ list: [1.5] })).status, 400, 'Listen tragen nur Integer (Typ-Ids), keine Brüche - Number.isInteger, nicht isFinite');
     assert.equal((await withOptions({ text: 'x'.repeat(65) })).status, 400);
     assert.equal((await withOptions({ list: Array.from({ length: 51 }, (_, i) => `c${i}`) })).status, 400);
     assert.equal((await withOptions(Object.fromEntries(

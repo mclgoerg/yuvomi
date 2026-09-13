@@ -35,7 +35,7 @@ const { __test } = await import('../public/pages/waste.js');
 const {
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
   defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
-  splitUpcomingByType, deepLinkNeedsExpand,
+  splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
 } = __test;
 
 // -------------------------------------------------------------------------
@@ -266,4 +266,37 @@ test('sourceHealthBadgeInfo: an error takes priority over needs_refresh, and a h
   assert.equal(sourceHealthBadgeInfo({ last_error: 'boom', needs_refresh: true }).code, 'error');
   assert.equal(sourceHealthBadgeInfo({ last_error: null, needs_refresh: true }).code, 'needs-refresh');
   assert.equal(sourceHealthBadgeInfo({ last_error: null, needs_refresh: false }), null);
+});
+
+// -------------------------------------------------------------------------
+// nearestOrdinalAnchorDateKey - Anker-Vorbelegung fuer Ordinal-Schedules
+// (#1063 Phase 9)
+// -------------------------------------------------------------------------
+
+// Rechnet komplett auf lokalen Date-Feldern; die Zone darf am Ergebnis nichts
+// aendern. Genau diese Achse war der Round-3-Fund (toISOString().slice auf
+// einem lokal gebauten Datum kippt westlich von UTC einen Tag) - deshalb
+// laeuft jeder Fall einmal westlich, einmal oestlich von UTC und einmal unter
+// der CI-Zone selbst, nach dem Muster von test-calendar-timezone-window.js.
+function inTimezone(tz, fn) {
+  const prev = process.env.TZ;
+  process.env.TZ = tz;
+  try { fn(); } finally {
+    if (prev === undefined) delete process.env.TZ; else process.env.TZ = prev;
+  }
+}
+
+test('nearestOrdinalAnchorDateKey: this month\'s occurrence when it is today or later, else next month\'s - in any timezone', () => {
+  for (const tz of ['America/Los_Angeles', 'Pacific/Auckland', 'UTC']) {
+    inTimezone(tz, () => {
+      // 2026-09-13 ist ein Sonntag; der zweite Montag (14.) liegt noch vor uns ...
+      assert.equal(nearestOrdinalAnchorDateKey(2, 'MO', '2026-09-13'), '2026-09-14', `zweiter Montag unter ${tz}`);
+      // ... der erste Montag (7.) nicht mehr - also der erste Montag des Oktobers.
+      assert.equal(nearestOrdinalAnchorDateKey(1, 'MO', '2026-09-13'), '2026-10-05', `erster Montag unter ${tz}`);
+      // "Letzter Freitag": Rueckwaertssuche vom Monatsletzten (Mi, 30.09.) aus.
+      assert.equal(nearestOrdinalAnchorDateKey(-1, 'FR', '2026-09-13'), '2026-09-25', `letzter Freitag unter ${tz}`);
+      // Heute selbst zaehlt ("am oder nach heute"): am 14. bleibt es der 14.
+      assert.equal(nearestOrdinalAnchorDateKey(2, 'MO', '2026-09-14'), '2026-09-14', `heutiges Vorkommen unter ${tz}`);
+    });
+  }
 });

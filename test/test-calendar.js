@@ -2142,9 +2142,9 @@ test('#1064: eine ausgeblendete Quelle zaehlt am Filterknopf als ein Filter', ()
   const { activeFilterCount } = calendarHelpers;
   const basis = { assignedToMe: false, people: new Set(), holidayPrefs: {}, layerBirthdays: true, layerSchedule: true, layerWaste: true, wasteVisibleTypeIds: new Set() };
   // scheduleEnabled()/wasteEnabled() fragen window.yuvomi - ohne Modul-Registry gelten Schichtplan
-  // und Waste als an, deshalb muss layerWaste hier explizit auf "sichtbar" stehen wie layerSchedule -
-  // sonst zaehlt Wastes eigener Opt-in-Default (aus) hier faelschlich als zusaetzlicher Filter, an
-  // einer Achse, die dieser Test gar nicht prueft.
+  // und Waste als an, deshalb steht layerWaste hier explizit auf "sichtbar" wie layerSchedule.
+  // Am Zaehler aendert der Wert nichts mehr (die ausgeschaltete Ebene zaehlt seit 7de80c16 nicht
+  // als Filter) - er haelt diesen Test nur unabhaengig von der Waste-Achse, die er nicht prueft.
   const previousWindow = globalThis.window;
   globalThis.window = {};
   try {

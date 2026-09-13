@@ -58,6 +58,24 @@ function nthWeekdayOfMonthLocal(year, month, weekday, ordinal) {
   const diff = (weekday - first.getDay() + 7) % 7;
   return new Date(year, month, 1 + diff + (ordinal - 1) * 7);
 }
+
+/** Naechster Kalendertag am/nach "heute", der selbst das gewaehlte
+ *  Ordinal-Vorkommen ist (n-ter/letzter Wochentag des Monats), als Datums-Key.
+ *  Der Anker muss serverseitig selbst auf der Regel liegen (dieselbe
+ *  Konsistenz-Invariante wie bei monthly_fixed_day), deshalb rechnet das
+ *  Schedule-Modal ihn vor, statt den Nutzer ein passendes Datum von Hand
+ *  suchen zu lassen. todayKeyValue ist injizierbar, damit der Test einen
+ *  festen Tag unter einer fremden Zone anlegen kann; der Default bleibt
+ *  todayKey(). */
+function nearestOrdinalAnchorDateKey(ordinal, weekdayCode, todayKeyValue = todayKey()) {
+  const weekday = DAY_INDEX[weekdayCode];
+  const today = parseLocalDateKey(todayKeyValue);
+  const candidateInThisMonth = nthWeekdayOfMonthLocal(today.getFullYear(), today.getMonth(), weekday, ordinal);
+  const target = candidateInThisMonth >= today
+    ? candidateInThisMonth
+    : nthWeekdayOfMonthLocal(today.getFullYear(), today.getMonth() + 1, weekday, ordinal);
+  return toLocalDateKey(target);
+}
 const TYPE_PRESETS = [
   { key: 'general', icon: 'trash-2', color: '#64748B' },
   { key: 'recycling', icon: 'recycle', color: '#2563EB' },
@@ -753,24 +771,13 @@ function openScheduleModal(type, schedule = null) {
       const ordinalWeekdaySelect = panel.querySelector('#wsm-ordinal-weekday');
       const anchorInput = panel.querySelector('#wsm-anchor');
 
-      // The anchor must itself BE the chosen ordinal occurrence (server-side
-      // invariant, mirrors monthly_fixed_day's own anchor-consistency rule) -
-      // recompute it whenever the user changes ordinal/weekday, rather than
-      // asking them to find a matching date by hand in a plain datepicker.
-      // The nearest such date at or after today, same reasoning as any other
-      // "start now" default.
-      function nearestOrdinalAnchor(ordinal, weekdayCode) {
-        const weekday = DAY_INDEX[weekdayCode];
-        const today = parseLocalDateKey(todayKey());
-        const candidateInThisMonth = nthWeekdayOfMonthLocal(today.getFullYear(), today.getMonth(), weekday, ordinal);
-        const target = candidateInThisMonth >= today
-          ? candidateInThisMonth
-          : nthWeekdayOfMonthLocal(today.getFullYear(), today.getMonth() + 1, weekday, ordinal);
-        return toLocalDateKey(target);
-      }
+      // Der Anker wird bei jeder Ordinal-/Wochentags-Aenderung neu berechnet
+      // (naechstes passendes Datum ab heute, wie jeder andere "ab jetzt"-
+      // Default) - die Rechnung selbst lebt in nearestOrdinalAnchorDateKey()
+      // auf Modulebene, wo der Test sie unter einer fremden Zone binden kann.
       function refreshOrdinalAnchor() {
         if (kindSelect.value !== 'monthly_ordinal_weekday') return;
-        anchorInput.value = nearestOrdinalAnchor(Number(ordinalPositionSelect.value), ordinalWeekdaySelect.value);
+        anchorInput.value = nearestOrdinalAnchorDateKey(Number(ordinalPositionSelect.value), ordinalWeekdaySelect.value);
       }
       ordinalPositionSelect.addEventListener('change', refreshOrdinalAnchor);
       ordinalWeekdaySelect.addEventListener('change', refreshOrdinalAnchor);
@@ -1888,5 +1895,5 @@ export async function render(container, { signal: routeSignal = null } = {}) {
 export const __test = {
   findScheduleOrigin, parseDeepLinkParams, deepLinkSelectors, recurrenceSummary, originBadges,
   defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
-  splitUpcomingByType, deepLinkNeedsExpand,
+  splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
 };
