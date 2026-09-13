@@ -4322,14 +4322,16 @@
                 "fertile": "가임",
                 "ovulation": "배란",
                 "today": "오늘",
-                "logged": "기록"
+                "logged": "기록",
+                "pms": "PMS 기간 (패턴)"
             },
             "history": {
                 "title": "추이",
                 "ongoing": "진행 중",
                 "empty": "아직 기록된 생리가 없습니다.",
                 "cycleLength": "주기 {{value}}일",
-                "cycleLength_one": "주기 {{value}}일"
+                "cycleLength_one": "주기 {{value}}일",
+                "flowHeaviest": "최고: {{value}}"
             },
             "trends": {
                 "title": "추세",

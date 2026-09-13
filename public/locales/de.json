@@ -4322,14 +4322,16 @@
                 "fertile": "Fruchtbar",
                 "ovulation": "Eisprung",
                 "today": "Heute",
-                "logged": "Eintrag"
+                "logged": "Eintrag",
+                "pms": "PMS-Fenster (Muster)"
             },
             "history": {
                 "title": "Verlauf",
                 "ongoing": "laufend",
                 "empty": "Noch keine Perioden erfasst.",
                 "cycleLength": "Zyklus {{value}} Tage",
-                "cycleLength_one": "Zyklus {{value}} Tag"
+                "cycleLength_one": "Zyklus {{value}} Tag",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trends",

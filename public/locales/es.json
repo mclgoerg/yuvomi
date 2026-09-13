@@ -4322,14 +4322,16 @@
                 "fertile": "Fértil",
                 "ovulation": "Ovulación",
                 "today": "Hoy",
-                "logged": "Entrada"
+                "logged": "Entrada",
+                "pms": "Ventana de SPM (patrón)"
             },
             "history": {
                 "title": "Evolución",
                 "ongoing": "en curso",
                 "empty": "Aún no se han registrado periodos.",
                 "cycleLength": "Ciclo {{value}} días",
-                "cycleLength_one": "Ciclo {{value}} día"
+                "cycleLength_one": "Ciclo {{value}} día",
+                "flowHeaviest": "Máx. {{value}}"
             },
             "trends": {
                 "title": "Tendencias",

@@ -4322,14 +4322,16 @@
                 "fertile": "Termékeny",
                 "ovulation": "Ovuláció",
                 "today": "Ma",
-                "logged": "Bejegyzés"
+                "logged": "Bejegyzés",
+                "pms": "PMS-időszak (minta)"
             },
             "history": {
                 "title": "Tendencia",
                 "ongoing": "folyamatban",
                 "empty": "Még nincs rögzített menstruáció.",
                 "cycleLength": "Ciklus {{value}} nap",
-                "cycleLength_one": "Ciklus {{value}} nap"
+                "cycleLength_one": "Ciklus {{value}} nap",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trendek",

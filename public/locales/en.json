@@ -4322,14 +4322,16 @@
                 "fertile": "Fertile",
                 "ovulation": "Ovulation",
                 "today": "Today",
-                "logged": "Entry"
+                "logged": "Entry",
+                "pms": "PMS window (pattern)"
             },
             "history": {
                 "title": "History",
                 "ongoing": "ongoing",
                 "empty": "No periods logged yet.",
                 "cycleLength": "Cycle {{value}} days",
-                "cycleLength_one": "Cycle {{value}} day"
+                "cycleLength_one": "Cycle {{value}} day",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trends",

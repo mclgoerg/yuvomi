@@ -274,6 +274,47 @@ test('D-6/D-10/D-11: der Tages-Log-Submit sendet cervix_mucus, lh_test, pregnanc
   assert.ok(!/body\s*=\s*\{[\s\S]*?mood:/.test(fn), 'mood darf im Submit-Body nicht mehr geschrieben werden');
 });
 
+test('A-9/B-1: der Kalender traegt eine 4-stufige Flow-Skala + einen Log-Punkt-Legendeneintrag', () => {
+  const fn = functionSource('cycleLegendMarkup');
+  assert.ok(fn, 'cycleLegendMarkup() nicht gefunden');
+  assert.match(fn, /health\.cycle\.legend\.logged/, 'Legendeneintrag fuer den einfachen Log-Punkt fehlt');
+  assert.match(fn, /cycle-legend__flow-row/, 'kompakte Flow-Skalen-Zeile fehlt');
+  // Eine einzige Zeile fuer alle vier Stufen - "Keep the legend from exploding".
+  assert.match(fn, /FLOW_LEVELS\.map/, 'die vier Stufen muessen aus FLOW_LEVELS kommen, nicht hartkodiert sein');
+});
+
+test('T2: bestätigtes Fenster (BBT) traegt eine eigene Klasse, getrennt von "predicted"', () => {
+  const fn = functionSource('cycleCalendarMarkup');
+  assert.ok(fn, 'cycleCalendarMarkup() nicht gefunden');
+  assert.match(fn, /c\.confirmed[\s\S]{0,40}is-confirmed/, 'confirmed-Zellen muessen is-confirmed tragen');
+  // Die Legende zeigt "Eisprung bestätigt" NUR, wenn der gerenderte Monat
+  // tatsächlich eine bestätigte Zelle enthält (kein Erklären eines nicht
+  // sichtbaren Zustands).
+  assert.match(fn, /hasConfirmedOvulation/, 'hasConfirmedOvulation-Sichtbarkeitspruefung fehlt');
+  const legendFn = functionSource('cycleLegendMarkup');
+  assert.match(legendFn, /health\.cycle\.status\.ovulationConfirmed/, 'Legendeneintrag "Eisprung bestätigt" fehlt');
+});
+
+test('D-7: Intimitäts-Marker nur in der eigenen Ansicht, eigene Kalender-Ecke', () => {
+  const fn = functionSource('cycleCalendarMarkup');
+  assert.ok(fn, 'cycleCalendarMarkup() nicht gefunden');
+  assert.match(fn, /own\s*\?\s*\n?\s*new Set/, 'intimacyDates darf nur in der eigenen Ansicht befuellt werden');
+  assert.match(fn, /l\.intimacy/, 'Intimitäts-Filter auf cycle.logs fehlt');
+  assert.match(fn, /cycle-cal__intimacy-icon/, 'Herz-Marker-Klasse fehlt');
+  const legendFn = functionSource('cycleLegendMarkup');
+  assert.match(legendFn, /own\s*\n?\s*\?\s*`<span class="cycle-legend__item">.*heart/, 'Legendeneintrag muss own-gated sein');
+});
+
+test('D-8-UI: PMS-Fenster shadet nur unphasierte Tage, Legende nur wenn im Monat sichtbar', () => {
+  const fn = functionSource('cycleCalendarMarkup');
+  assert.ok(fn, 'cycleCalendarMarkup() nicht gefunden');
+  assert.match(fn, /pmsWindow\(cycle\.logs,\s*cycle\.periods,\s*cycleSettings\(\),\s*todayKey\(\)\)/, 'pmsWindow()-Aufruf fehlt/falsch parametrisiert');
+  assert.match(fn, /!c\.phase[\s\S]{0,20}inPmsWindow/, 'PMS-Shading darf nur auf Zellen ohne eigene Phase greifen');
+  assert.match(fn, /pmsVisibleInMonth/, 'Sichtbarkeits-Flag fuer die Legende fehlt');
+  const legendFn = functionSource('cycleLegendMarkup');
+  assert.match(legendFn, /health\.cycle\.legend\.pms/, 'PMS-Legendeneintrag fehlt');
+});
+
 test('D-5/D-16: die Schnellzugriffs-Links schliessen ueber den regulaeren (Dirty-Check-)Pfad, bevor sie navigieren', () => {
   const fn = functionSource('openDayLogModal');
   assert.ok(fn, 'openDayLogModal() nicht gefunden');

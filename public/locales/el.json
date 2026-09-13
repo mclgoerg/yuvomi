@@ -4322,14 +4322,16 @@
                 "fertile": "Γόνιμη",
                 "ovulation": "Ωορρηξία",
                 "today": "Σήμερα",
-                "logged": "Καταχώριση"
+                "logged": "Καταχώριση",
+                "pms": "Παράθυρο ΠΕΣ (μοτίβο)"
             },
             "history": {
                 "title": "Τάση",
                 "ongoing": "σε εξέλιξη",
                 "empty": "Δεν έχουν καταχωριστεί περίοδοι ακόμη.",
                 "cycleLength": "Κύκλος {{value}} ημέρες",
-                "cycleLength_one": "Κύκλος {{value}} ημέρα"
+                "cycleLength_one": "Κύκλος {{value}} ημέρα",
+                "flowHeaviest": "Μέγ. {{value}}"
             },
             "trends": {
                 "title": "Τάσεις",

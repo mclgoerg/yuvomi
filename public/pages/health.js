@@ -45,7 +45,7 @@ import {
   normalizeSymptomEntries, symptomIntensityLabelKey,
   cycleLengthTrend, symptomFrequencyByPhase, bbtSeries, symptomIntensityTrend,
   symptomCyclePattern, TYPICAL_CYCLE_RANGE, isTypicalCycleLength,
-  predictSymptomLikelihood,
+  predictSymptomLikelihood, pmsWindow, periodFlowSummary,
 } from '/utils/health-cycle.js';
 import { HEALTH_ROUTES, renderHealthTabsBar } from '/utils/health-tabs.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
@@ -4625,8 +4625,29 @@ function cycleCalendarMarkup(own) {
     predictedDates = new Set(predictSymptomLikelihood(cycle.logs, cycle.periods, settings, cycle.likelihoodSymptom).likelyDates);
   }
 
+  // D-7: Intimitäts-Marker NUR in der eigenen Ansicht - das Feld kommt bei
+  // einer fremden Person serverseitig ohnehin nicht mit (siehe DECISIONS.md,
+  // "Sex-life logging is hard-private"), das Set bleibt hier aber zusätzlich
+  // durch `own` geschützt, statt sich allein auf das leere Feld zu verlassen.
+  const intimacyDates = own
+    ? new Set((cycle.logs || []).filter((l) => l.intimacy).map((l) => String(l.log_date).slice(0, 10)))
+    : null;
+
+  // D-8-UI: PMS-Fenster aus dem Symptom-Muster (Util bereits vorhanden/getestet).
+  // Fensterlogik siehe pmsWindow()-Dokblock (health-cycle.js) - reine
+  // Musterableitung, nie diagnostisch. Shading NUR auf Zellen ohne eigene
+  // Phase (Menstruation/fruchtbar/Eisprung behalten ihre Farbe) - eine
+  // Unterlegung unter einer bereits getönten Phasenfläche würde entweder die
+  // Phasenfarbe verwaschen oder unsichtbar bleiben; ein unphasierter Tag hat
+  // dagegen nichts, das die Musterfarbe verdecken könnte.
+  const pms = pmsWindow(cycle.logs, cycle.periods, cycleSettings(), todayKey());
+  const inPmsWindow = pms ? (dateKey) => dateKey >= pms.start && dateKey <= pms.end : () => false;
+
   const weekdays = CYCLE_WEEKDAY_LABEL_KEYS
     .map((k) => `<span class="cycle-cal__wd">${esc(t(k))}</span>`).join('');
+
+  let hasConfirmedOvulation = false;
+  let pmsVisibleInMonth = false;
 
   const cells = cal.weeks.flat().map((c) => {
     const cls = ['cycle-cal__day'];
@@ -4634,16 +4655,31 @@ function cycleCalendarMarkup(own) {
     if (c.isToday) cls.push('is-today');
     if (c.phase) cls.push(`is-${c.phase}`);
     if (c.predicted) cls.push('is-predicted');
+    // T2: ein per BBT bestätigtes Fenster (Eisprung + fruchtbare Tage des
+    // AKTUELLEN Zyklus) ist ein MESSWERT, keine Vorhersage mehr - dieselbe
+    // Voll-/Umriss-Unterscheidung, die der Ring dafür schon nutzt (siehe
+    // cycleRingMarkup(): ein zusätzlicher Aussenring am bestätigten Punkt,
+    // keine zweite Farbe). `confirmed` und `predicted` schließen sich laut
+    // buildCycleCalendar() gegenseitig aus.
+    if (c.confirmed) { cls.push('is-confirmed'); hasConfirmedOvulation = true; }
     if (c.hasLog) cls.push('has-log');
     if (trackedDates?.has(c.dateKey)) cls.push('is-symptom-tracked');
     else if (predictedDates?.has(c.dateKey)) cls.push('is-symptom-predicted');
+    if (!c.phase && inPmsWindow(c.dateKey)) {
+      cls.push('is-pms');
+      if (c.inMonth) pmsVisibleInMonth = true;
+    }
     const flowAttr = c.flow ? ` data-flow="${esc(c.flow)}"` : '';
     const tag = own ? 'button' : 'div';
     const attrs = own
       ? `type="button" data-cycle-day="${esc(c.dateKey)}" aria-label="${esc(formatDate(c.dateKey))}"`
       : 'aria-hidden="true"';
+    const heart = intimacyDates?.has(c.dateKey)
+      ? '<i data-lucide="heart" class="cycle-cal__intimacy-icon icon-sm" aria-hidden="true"></i>'
+      : '';
     return `<${tag} class="${cls.join(' ')}"${flowAttr} ${attrs}>
       <span class="cycle-cal__num">${esc(c.day)}</span>
+      ${heart}
       ${c.hasLog ? '<span class="cycle-cal__dot" aria-hidden="true"></span>' : ''}
     </${tag}>`;
   }).join('');
@@ -4663,26 +4699,60 @@ function cycleCalendarMarkup(own) {
            verspricht Pfeiltasten-Navigation, die es hier nicht gibt. Die Tage
            sind eigenstaendige Buttons mit Datums-Label. -->
       <div class="cycle-cal__grid">${cells}</div>
-      ${cycleLegendMarkup()}
+      ${cycleLegendMarkup({ hasConfirmedOvulation, showPms: pmsVisibleInMonth, own })}
     </section>`;
 }
 
-function cycleLegendMarkup() {
+function cycleLegendMarkup({ hasConfirmedOvulation = false, showPms = false, own = false } = {}) {
   const items = [
+    // A-9/B-1: der einfache Log-Punkt (kein Flow-Wert) bekommt endlich einen
+    // eigenen Legenden-Eintrag - er stand bisher unerklärt im Kalender.
+    { cls: 'cycle-legend__swatch--dot', key: 'health.cycle.legend.logged' },
     { cls: 'is-menstruation', key: 'health.cycle.legend.period' },
     { cls: 'is-menstruation is-predicted', key: 'health.cycle.legend.predicted' },
     { cls: 'is-fertile', key: 'health.cycle.legend.fertile' },
-    { cls: 'is-ovulation', key: 'health.cycle.legend.ovulation' },
+    // T2: die Standard-Eisprung-Zelle zeigt jetzt den Umriss der Kalender-
+    // methode (Vorhersage) - der Vollton ist "bestätigt" vorbehalten (s.u.).
+    { cls: 'is-ovulation is-predicted', key: 'health.cycle.legend.ovulation' },
     { cls: 'is-today', key: 'health.cycle.legend.today' },
   ];
+  if (hasConfirmedOvulation) {
+    // Nur eingeblendet, wenn der gerade gerenderte Monat tatsächlich eine
+    // bestätigte Zelle zeigt - sonst erklärt die Legende einen Zustand, der
+    // gar nicht zu sehen ist (dieselbe Regel wie beim Symptom-Overlay unten).
+    items.push({ cls: 'is-ovulation is-confirmed', key: 'health.cycle.status.ovulationConfirmed' });
+  }
   if (cycle.likelihoodSymptom) {
     items.push(
       { cls: 'is-symptom-tracked', key: 'health.cycle.trends.symptomTracked' },
       { cls: 'is-symptom-predicted', key: 'health.cycle.trends.symptomPredicted' },
     );
   }
-  return `<div class="cycle-legend">${items.map((i) => `
-    <span class="cycle-legend__item"><span class="cycle-legend__swatch ${i.cls}"></span>${esc(t(i.key))}</span>`).join('')}</div>`;
+
+  const rows = items.map((i) => `
+    <span class="cycle-legend__item"><span class="cycle-legend__swatch ${i.cls}"></span>${esc(t(i.key))}</span>`).join('');
+
+  // D-7: eigener Eintrag NUR in der eigenen Ansicht (siehe cycleCalendarMarkup()).
+  const heartRow = own
+    ? `<span class="cycle-legend__item"><i data-lucide="heart" class="cycle-legend__heart-icon icon-sm" aria-hidden="true"></i>${esc(t('health.cycle.intimacy.label'))}</span>`
+    : '';
+
+  // D-8-UI: eigene Zeile statt Legenden-Item, nur wenn ein Muster im
+  // gerenderten Monat tatsächlich sichtbar ist (siehe pmsVisibleInMonth).
+  const pmsRow = showPms
+    ? `<span class="cycle-legend__item"><span class="cycle-legend__swatch is-pms"></span>${esc(t('health.cycle.legend.pms'))}</span>`
+    : '';
+
+  // B-1: eine einzige kompakte Zeile für die 4-stufige Blutungsstärke-Skala,
+  // statt vier weitere Legenden-Items - "Keep the legend from exploding".
+  const flowScale = `
+    <div class="cycle-legend__flow-row">
+      <span class="cycle-legend__flow-label">${esc(t('health.cycle.flow.label'))}</span>
+      ${FLOW_LEVELS.map((f) => `
+        <span class="cycle-legend__flow-step"><span class="cycle-legend__flow-dot" data-flow="${esc(f.value)}"></span>${esc(t(f.labelKey))}</span>`).join('')}
+    </div>`;
+
+  return `<div class="cycle-legend">${rows}${heartRow}${pmsRow}${flowScale}</div>`;
 }
 
 // --------------------------------------------------------
@@ -5061,6 +5131,11 @@ function cycleHistoryMarkup(own) {
 
   if (!rows.length) return '';
 
+  // B-2: dieselbe avgPeriod wie der Kalender/die Vorhersage - eine offene
+  // (laufende) Periode nutzt sie für periodFlowSummary()s Spannenberechnung
+  // (siehe dessen Dokblock/periodDateRange() in health-cycle.js).
+  const { avgPeriod } = cycleStats(cycle.periods, cycleSettings(), todayKey());
+
   return `
     <section class="cycle-history">
       <h3 class="cycle-section__title u-section-title">${esc(t('health.cycle.history.title'))}</h3>
@@ -5075,6 +5150,13 @@ function cycleHistoryMarkup(own) {
         if (lenDays != null) meta.push(t('health.cycle.unit.days', { value: fmtNum(lenDays), count: lenDays }));
         else meta.push(t('health.cycle.history.ongoing'));
         if (cycleLen != null) meta.push(t('health.cycle.history.cycleLength', { value: fmtNum(cycleLen), count: cycleLen }));
+        // B-2: nur ein Chip, wenn im Zeitraum dieser Periode wirklich ein
+        // Flow-Wert geloggt wurde (periodFlowSummary() liefert sonst null).
+        const flowSummary = periodFlowSummary(p, cycle.logs, avgPeriod);
+        if (flowSummary) {
+          const level = flowLevel(flowSummary.heaviest);
+          meta.push(t('health.cycle.history.flowHeaviest', { value: level ? t(level.labelKey) : flowSummary.heaviest }));
+        }
         const editBtn = own
           ? `<button type="button" class="btn btn--icon btn--sm" data-cycle-edit="${esc(p.id)}" aria-label="${esc(t('health.cycle.period.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>`
           : '';

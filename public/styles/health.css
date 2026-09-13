@@ -1889,6 +1889,55 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--cycle-period) calc(55% * var(--cycle-marker-alpha, 1)), transparent);
 }
 
+/* T2: bestätigter (BBT-Temperaturanstieg) Eisprung/fruchtbares Fenster vs.
+ * reine Kalendermethode - dieselbe Voll-/Umriss-Grammatik wie oben bei der
+ * Periode, NICHT eine zweite Farbe (der Ring löst dasselbe Problem am selben
+ * Punkt mit einem zusätzlichen Aussenring, siehe cycleRingMarkup()). Die
+ * Basisregel .is-ovulation oben (Füllung + Rand-Ring) bleibt der BESTÄTIGTE
+ * Zustand (Messwert); .is-predicted schwächt sie zum reinen Umriss ab, wenn
+ * es (noch) nur die Kalendermethode ist - `confirmed`/`predicted` schließen
+ * sich laut buildCycleCalendar() gegenseitig aus. */
+.cycle-cal__day.is-ovulation.is-predicted {
+  background: transparent;
+  font-weight: 400;
+}
+.cycle-cal__day.is-ovulation.is-predicted::after {
+  border-width: 1.5px;
+  border-color: color-mix(in oklab, var(--cycle-ovulation) calc(55% * var(--cycle-marker-alpha, 1)), transparent);
+}
+
+/* Dasselbe Prinzip für das fruchtbare Fenster: die Schraffur STEHT für "noch
+ * Vorhersage" (siehe Kommentar bei .is-fertile oben) - ein bestätigtes
+ * Fenster tauscht sie gegen eine ruhige Vollfläche, statt eine zweite Farbe
+ * einzuführen. */
+.cycle-cal__day.is-fertile.is-confirmed {
+  background-image: none;
+  background-color: color-mix(in oklab, var(--cycle-fertile) calc(var(--tint-raised) * var(--cycle-marker-alpha, 1)), transparent);
+}
+
+/* D-7: Intimitäts-Marker - eigene Ecke (oben links), damit er weder mit dem
+ * Flow-Punkt (unten mittig) noch mit dem Symptom-Overlay (oben rechts, s.u.)
+ * kollidiert. Bewusst NEUTRAL (--color-text-tertiary), nicht im Periodenton -
+ * dieses Feld ist hart-privat (siehe DECISIONS.md) und soll nicht wie ein
+ * weiterer Phasen-/Blutungsmarker wirken, nur "still" auf den Tag hinweisen. */
+.cycle-cal__intimacy-icon {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  z-index: 1;
+  color: color-mix(in oklab, var(--color-text-tertiary) calc(100% * var(--cycle-marker-alpha, 1)), transparent);
+}
+
+/* D-8-UI: PMS-Fenster (aus dem Symptom-Muster abgeleitet, s. pmsWindow()) -
+ * eine schwache Waschung des Modultons, bewusst nur --tint-wash (die
+ * schwächste Stufe der Skala) und NUR auf Zellen ohne eigene Phase
+ * (cycleCalendarMarkup() filtert das) - so bleibt Menstruation/fruchtbar/
+ * Eisprung immer in ihrer eigenen Farbe lesbar, und die Musterfläche bleibt
+ * klar schwächer als jede Phasenfarbe (12/22/20 % oben vs. 8 % hier). */
+.cycle-cal__day.is-pms {
+  background: color-mix(in oklab, var(--module-health) calc(var(--tint-wash) * var(--cycle-marker-alpha, 1)), transparent);
+}
+
 /* HEUTE IST DIE STIMME, KEINE PHASE.
  *
  * Der Ring stand im Modulton - und der ist im Zyklus-Kalender der Ton, der den
@@ -1927,8 +1976,31 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   z-index: 1;
 }
 
-.cycle-cal__day[data-flow="spotting"] .cycle-cal__dot { opacity: 0.55; }
-.cycle-cal__day[data-flow="heavy"] .cycle-cal__dot { width: 6px; height: 6px; }
+/* B-1/A-9: 4-stufige Blutungsstärke-Skala - Größe UND Füllstärke steigen
+ * gemeinsam an, statt (wie zuvor) allein über eine kaum wahrnehmbare
+ * Opazität (Schmierblutung) bzw. 1px Größenunterschied (stark), bei dem
+ * "leicht" und "mittel" identisch aussahen. Die drei helleren Stufen nutzen
+ * je eine benannte Toenungsstufe (tokens.css §6b) auf --cycle-period, "stark"
+ * bleibt der volle Ton der Basisregel oben (keine Toenung nötig - Vollton IST
+ * die stärkste Stufe). `--cycle-marker-alpha` bleibt überall erhalten, damit
+ * ein Log auf einem Nachbarmonatstag genauso gedimmt wird wie jeder andere
+ * Marker der Zelle. */
+.cycle-cal__day[data-flow="spotting"] .cycle-cal__dot {
+  width: 4px;
+  height: 4px;
+  background: color-mix(in oklab, var(--cycle-period) calc(var(--tint-raised) * var(--cycle-marker-alpha, 1)), transparent);
+}
+.cycle-cal__day[data-flow="light"] .cycle-cal__dot {
+  width: 5.5px;
+  height: 5.5px;
+  background: color-mix(in oklab, var(--cycle-period) calc(var(--tint-hint) * var(--cycle-marker-alpha, 1)), transparent);
+}
+.cycle-cal__day[data-flow="medium"] .cycle-cal__dot {
+  width: 7px;
+  height: 7px;
+  background: color-mix(in oklab, var(--cycle-period) calc(var(--tint-ink) * var(--cycle-marker-alpha, 1)), transparent);
+}
+.cycle-cal__day[data-flow="heavy"] .cycle-cal__dot { width: 8.5px; height: 8.5px; }
 
 /* Symptom-Wahrscheinlichkeits-Overlay (Phase 4e): eigene Ecke (oben rechts),
  * damit der Marker nicht mit dem bestehenden hasLog-Punkt (unten mittig)
@@ -1992,8 +2064,35 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   background: color-mix(in oklab, var(--cycle-ovulation) 20%, transparent);
   border: 2px solid var(--cycle-ovulation);
 }
+/* T2: die Standard-Legendenzeile "Eisprung" zeigt jetzt den Umriss der
+ * Kalendermethode (Vorhersage, s. .cycle-cal__day.is-ovulation.is-predicted);
+ * "Eisprung bestätigt" (nur bei Bedarf angehängt) bleibt der Vollton oben. */
+.cycle-legend__swatch.is-ovulation.is-predicted {
+  background: transparent;
+  border-width: 1.5px;
+  border-color: color-mix(in oklab, var(--cycle-ovulation) 55%, transparent);
+}
 /* Die Legende spiegelt den Kalender-Marker 1:1 - also auch seinen Ton. */
 .cycle-legend__swatch.is-today { box-shadow: inset 0 0 0 2px var(--color-accent); }
+
+/* A-9/B-1: einfacher Log-Punkt ohne Flow-Wert - ein kleiner Kreis MITTIG im
+ * quadratischen Swatch-Rahmen, statt (wie die Phasen) die ganze Fläche zu
+ * füllen; genau der "aktuelle Look" aus .cycle-cal__dot. */
+.cycle-legend__swatch--dot { position: relative; }
+.cycle-legend__swatch--dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--cycle-period);
+}
+
+/* D-8-UI: PMS-Legendenswatch spiegelt die schwache Modulton-Waschung des
+ * Kalenders 1:1. */
+.cycle-legend__swatch.is-pms { background: color-mix(in oklab, var(--module-health) var(--tint-wash), transparent); }
 
 /* Ring-Legende (Phase Post-Ship) - der Ring selbst zeichnet volle Bogenfarben
    und einen gefuellten Punkt, nicht die 20%-Wash/Schraffur/Hohlring-Optik des
@@ -2022,6 +2121,56 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   border: 1.5px solid var(--module-health);
   border-radius: 50%;
 }
+
+/* D-7: Herz-Icon in der Legende - derselbe stille, nicht-phasenfarbene Ton
+ * wie der Kalender-Marker (siehe .cycle-cal__intimacy-icon). */
+.cycle-legend__heart-icon { color: var(--color-text-tertiary); }
+
+/* B-1: kompakte Zeile für die 4-stufige Blutungsstärke-Skala - EINE Zeile
+ * statt vier zusätzlicher .cycle-legend__item-Einträge, damit die Legende bei
+ * fünf/sechs weiteren Zuständen (Eisprung bestätigt, Symptom-Overlay, PMS)
+ * nicht auswuchert. Die Punkte spiegeln .cycle-cal__day[data-flow]
+ * .cycle-cal__dot 1:1, nur ohne --cycle-marker-alpha (die Legende kennt kein
+ * "Nachbarmonat"). */
+.cycle-legend__flow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: var(--text-2xs);
+  color: var(--color-text-secondary);
+}
+.cycle-legend__flow-label { font-weight: 600; }
+.cycle-legend__flow-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.cycle-legend__flow-dot {
+  display: inline-block;
+  border-radius: var(--radius-full);
+  background: var(--cycle-period);
+}
+.cycle-legend__flow-dot[data-flow="spotting"] {
+  width: 4px;
+  height: 4px;
+  background: color-mix(in oklab, var(--cycle-period) var(--tint-raised), transparent);
+}
+.cycle-legend__flow-dot[data-flow="light"] {
+  width: 5.5px;
+  height: 5.5px;
+  background: color-mix(in oklab, var(--cycle-period) var(--tint-hint), transparent);
+}
+.cycle-legend__flow-dot[data-flow="medium"] {
+  width: 7px;
+  height: 7px;
+  background: color-mix(in oklab, var(--cycle-period) var(--tint-ink), transparent);
+}
+.cycle-legend__flow-dot[data-flow="heavy"] { width: 8.5px; height: 8.5px; }
 
 /* ---- Trends (Phase 4) ---- */
 

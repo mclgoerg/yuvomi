@@ -4322,14 +4322,16 @@
                 "fertile": "Fécond",
                 "ovulation": "Ovulation",
                 "today": "Aujourd'hui",
-                "logged": "Entrée"
+                "logged": "Entrée",
+                "pms": "Fenêtre de SPM (schéma)"
             },
             "history": {
                 "title": "Évolution",
                 "ongoing": "en cours",
                 "empty": "Aucune période enregistrée pour l’instant.",
                 "cycleLength": "Cycle {{value}} jours",
-                "cycleLength_one": "Cycle {{value}} jour"
+                "cycleLength_one": "Cycle {{value}} jour",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Tendances",

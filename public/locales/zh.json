@@ -4322,14 +4322,16 @@
                 "fertile": "易孕",
                 "ovulation": "排卵",
                 "today": "今天",
-                "logged": "记录"
+                "logged": "记录",
+                "pms": "经前期窗口(模式)"
             },
             "history": {
                 "title": "趋势",
                 "ongoing": "进行中",
                 "empty": "尚未记录任何月经。",
                 "cycleLength": "周期 {{value}} 天",
-                "cycleLength_one": "周期 {{value}} 天"
+                "cycleLength_one": "周期 {{value}} 天",
+                "flowHeaviest": "最强: {{value}}"
             },
             "trends": {
                 "title": "趋势",

@@ -20,6 +20,8 @@
  *                          NÄCHSTEN Zyklus, nicht nur den laufenden.
  *        - pmsWindow() (v2, D-8): abgeleitetes PMS-Fenster aus dem
  *                          Symptom-Zyklustag-Muster.
+ *        - periodFlowSummary() (v2, B-2): stärkster Flow-Wert + geloggte Tage
+ *                          EINER Periode, für den Historie-Chip.
  *        Bewusst KEINE i18n/DOM — in Node ohne Browser testbar (labelKeys liefern
  *        die Übersetzung erst im UI).
  * Abhängigkeiten: ./date.js (ebenfalls DOM-frei; relativer Import, siehe
@@ -999,13 +1001,55 @@ export function predictCycle(periods, settings = {}, todayKey = householdToday()
 // Monatskalender
 // --------------------------------------------------------
 
+/**
+ * Datumsspanne EINER Periode: abgeschlossen → start_date..end_date, offen
+ * (kein end_date, laeuft noch) → start_date..start_date+avgPeriod-1. Von
+ * loggedPeriodPhase() (Kalenderzellen) UND periodFlowSummary() (B-2,
+ * Historie-Chip) geteilt, statt die "offene Episode" Regel zweimal zu pflegen.
+ */
+function periodDateRange(period, avgPeriod) {
+  const s = dayKey(period.start_date);
+  const e = period.end_date ? dayKey(period.end_date) : addLocalDays(s, avgPeriod - 1);
+  return { start: s, end: e };
+}
+
 /** Deckt ein Datum eine geloggte Periode ab? (offene Episode → avgPeriod Tage). */
 function loggedPeriodPhase(dateKey, periodsAsc, avgPeriod) {
   return periodsAsc.some((p) => {
-    const s = dayKey(p.start_date);
-    const e = p.end_date ? dayKey(p.end_date) : addLocalDays(s, avgPeriod - 1);
+    const { start: s, end: e } = periodDateRange(p, avgPeriod);
     return daysBetween(s, dateKey) >= 0 && daysBetween(dateKey, e) >= 0;
   });
+}
+
+/**
+ * B-2: Blutungsstärke-Zusammenfassung EINER Periode für die Historie-Zeile -
+ * stärkster geloggter Flow-Wert (FLOW_LEVELS-Rang) + Anzahl der Tage mit
+ * einem Flow-Eintrag innerhalb ihrer Spanne (periodDateRange(), s.o. -
+ * dieselbe "offene Episode laeuft avgPeriod Tage"-Regel wie loggedPeriodPhase(),
+ * nicht zweimal implementiert).
+ *
+ * @param {Object} period - eine Zeile aus cycle.periods (start_date, end_date?).
+ * @param {Array<Object>} logs - cycle_day_logs (log_date, flow).
+ * @param {number} [avgPeriod=DEFAULT_PERIOD] - Fallback-Länge einer offenen
+ *        Episode; Aufrufer sollten cycleStats(...).avgPeriod durchreichen,
+ *        wenn bekannt (History kennt die echte Zyklushistorie).
+ * @returns {{heaviest: string, loggedDays: number}|null} null, wenn im
+ *          Zeitraum kein einziger Tag einen Flow-Wert trägt (kein Chip).
+ */
+export function periodFlowSummary(period, logs, avgPeriod = DEFAULT_PERIOD) {
+  const { start, end } = periodDateRange(period, avgPeriod);
+  let heaviestRank = 0;
+  let heaviest = null;
+  let loggedDays = 0;
+  for (const log of (logs || [])) {
+    if (!log?.flow || !log.log_date) continue;
+    const d = dayKey(log.log_date);
+    if (daysBetween(start, d) < 0 || daysBetween(d, end) < 0) continue;
+    loggedDays += 1;
+    const level = flowLevel(log.flow);
+    if (level && level.rank > heaviestRank) { heaviestRank = level.rank; heaviest = level.value; }
+  }
+  return loggedDays ? { heaviest, loggedDays } : null;
 }
 
 /**

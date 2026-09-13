@@ -4322,14 +4322,16 @@
                 "fertile": "Vruchtbaar",
                 "ovulation": "Eisprong",
                 "today": "Vandaag",
-                "logged": "Item"
+                "logged": "Item",
+                "pms": "PMS-venster (patroon)"
             },
             "history": {
                 "title": "Verloop",
                 "ongoing": "lopend",
                 "empty": "Nog geen menstruaties geregistreerd.",
                 "cycleLength": "Cyclus {{value}} dagen",
-                "cycleLength_one": "Cyclus {{value}} dag"
+                "cycleLength_one": "Cyclus {{value}} dag",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trends",

@@ -4322,14 +4322,16 @@
                 "fertile": "Płodne",
                 "ovulation": "Owulacja",
                 "today": "Dzisiaj",
-                "logged": "Wpis"
+                "logged": "Wpis",
+                "pms": "Okno PMS (wzorzec)"
             },
             "history": {
                 "title": "Trend",
                 "ongoing": "w toku",
                 "empty": "Nie zapisano jeszcze miesiączek.",
                 "cycleLength": "Cykl {{value}} dni",
-                "cycleLength_one": "Cykl {{value}} dzień"
+                "cycleLength_one": "Cykl {{value}} dzień",
+                "flowHeaviest": "Maks. {{value}}"
             },
             "trends": {
                 "title": "Trendy",

@@ -4322,14 +4322,16 @@
                 "fertile": "उपजाऊ",
                 "ovulation": "ओव्यूलेशन",
                 "today": "आज",
-                "logged": "प्रविष्टि"
+                "logged": "प्रविष्टि",
+                "pms": "पीएमएस विंडो (पैटर्न)"
             },
             "history": {
                 "title": "प्रवृत्ति",
                 "ongoing": "चालू",
                 "empty": "अभी तक कोई माहवारी दर्ज नहीं।",
                 "cycleLength": "चक्र {{value}} दिन",
-                "cycleLength_one": "चक्र {{value}} दिन"
+                "cycleLength_one": "चक्र {{value}} दिन",
+                "flowHeaviest": "अधिकतम: {{value}}"
             },
             "trends": {
                 "title": "रुझान",

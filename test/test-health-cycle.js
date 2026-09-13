@@ -22,7 +22,7 @@ const {
   cycleLengthTrend, symptomFrequencyByPhase, bbtSeries, symptomIntensityTrend,
   symptomCyclePattern, TYPICAL_CYCLE_RANGE, isTypicalCycleLength,
   predictSymptomLikelihood, projectFutureCycles,
-  pmsWindow,
+  pmsWindow, periodFlowSummary,
 } = await import('../public/utils/health-cycle.js');
 
 const de = JSON.parse(readFileSync(new URL('../public/locales/de.json', import.meta.url), 'utf8'));
@@ -1266,4 +1266,57 @@ test('pmsWindow: die dem nächsten Start nähere Grenze wird auf mindestens 2 Ta
   ];
   const win = pmsWindow(logs, PMS_HIST, {}, '2026-04-01');
   assert.deepEqual(win, { start: '2026-04-21', end: '2026-04-21', symptomKeys: ['fatigue'] });
+});
+
+// --------------------------------------------------------
+// periodFlowSummary (v2, B-2) — Blutungsstärke-Zusammenfassung je Periode
+// --------------------------------------------------------
+
+test('periodFlowSummary: stärkster Flow-Wert + Anzahl geloggter Tage einer abgeschlossenen Periode', () => {
+  const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-05' };
+  const logs = [
+    { log_date: '2026-01-01', flow: 'spotting' },
+    { log_date: '2026-01-02', flow: 'medium' },
+    { log_date: '2026-01-03', flow: 'heavy' },
+    { log_date: '2026-01-04', flow: 'light' },
+    // kein Log am 01-05.
+  ];
+  assert.deepEqual(periodFlowSummary(period, logs), { heaviest: 'heavy', loggedDays: 4 });
+});
+
+test('periodFlowSummary: kein Flow-Log im Zeitraum -> null', () => {
+  const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-05' };
+  assert.equal(periodFlowSummary(period, []), null);
+  // Logs existieren, aber ohne flow-Wert (nur Symptome/Notiz) -> zählen nicht.
+  const logsWithoutFlow = [{ log_date: '2026-01-02', symptoms: [{ key: 'cramps' }] }];
+  assert.equal(periodFlowSummary(period, logsWithoutFlow), null);
+});
+
+test('periodFlowSummary: Logs außerhalb der Periodenspanne zählen nicht mit', () => {
+  const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-05' };
+  const logs = [
+    { log_date: '2025-12-31', flow: 'heavy' }, // ein Tag zu früh
+    { log_date: '2026-01-06', flow: 'heavy' }, // ein Tag zu spät
+    { log_date: '2026-01-03', flow: 'light' }, // einzig gültiger Tag
+  ];
+  assert.deepEqual(periodFlowSummary(period, logs), { heaviest: 'light', loggedDays: 1 });
+});
+
+test('periodFlowSummary: offene (laufende) Periode nutzt avgPeriod für die Spanne, wie loggedPeriodPhase()', () => {
+  const period = { id: 1, start_date: '2026-01-01' }; // kein end_date.
+  // avgPeriod=3 -> Spanne 01-01..01-03; ein Log am 01-04 liegt außerhalb.
+  const logs = [
+    { log_date: '2026-01-02', flow: 'heavy' },
+    { log_date: '2026-01-04', flow: 'heavy' },
+  ];
+  assert.deepEqual(periodFlowSummary(period, logs, 3), { heaviest: 'heavy', loggedDays: 1 });
+  // Ohne avgPeriod-Argument greift der DEFAULT_PERIOD-Fallback (5 Tage) - der
+  // 01-04-Log liegt dann innerhalb der Spanne.
+  assert.deepEqual(periodFlowSummary(period, logs), { heaviest: 'heavy', loggedDays: 2 });
+});
+
+test('periodFlowSummary: ein unbekannter flow-Wert zählt den Tag mit, bestimmt aber keinen Rang', () => {
+  const period = { id: 1, start_date: '2026-01-01', end_date: '2026-01-03' };
+  const logs = [{ log_date: '2026-01-02', flow: 'not-a-real-level' }];
+  assert.deepEqual(periodFlowSummary(period, logs), { heaviest: null, loggedDays: 1 });
 });

@@ -4322,14 +4322,16 @@
                 "fertile": "Fertile",
                 "ovulation": "Ovulazione",
                 "today": "Oggi",
-                "logged": "Voce"
+                "logged": "Voce",
+                "pms": "Finestra SPM (andamento)"
             },
             "history": {
                 "title": "Andamento",
                 "ongoing": "in corso",
                 "empty": "Ancora nessun ciclo registrato.",
                 "cycleLength": "Ciclo {{value}} giorni",
-                "cycleLength_one": "Ciclo {{value}} giorno"
+                "cycleLength_one": "Ciclo {{value}} giorno",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Tendenze",

@@ -4322,14 +4322,16 @@
                 "fertile": "Subur",
                 "ovulation": "Ovulasi",
                 "today": "Hari ini",
-                "logged": "Entri"
+                "logged": "Entri",
+                "pms": "Jendela PMS (pola)"
             },
             "history": {
                 "title": "Tren",
                 "ongoing": "berlangsung",
                 "empty": "Belum ada menstruasi yang dicatat.",
                 "cycleLength": "Siklus {{value}} hari",
-                "cycleLength_one": "Siklus {{value}} hari"
+                "cycleLength_one": "Siklus {{value}} hari",
+                "flowHeaviest": "Maks. {{value}}"
             },
             "trends": {
                 "title": "Tren",

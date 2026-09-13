@@ -4322,14 +4322,16 @@
                 "fertile": "Fértil",
                 "ovulation": "Ovulação",
                 "today": "Hoje",
-                "logged": "Entrada"
+                "logged": "Entrada",
+                "pms": "Janela de TPM (padrão)"
             },
             "history": {
                 "title": "Evolução",
                 "ongoing": "em curso",
                 "empty": "Ainda não há períodos registados.",
                 "cycleLength": "Ciclo {{value}} dias",
-                "cycleLength_one": "Ciclo {{value}} dia"
+                "cycleLength_one": "Ciclo {{value}} dia",
+                "flowHeaviest": "Máx. {{value}}"
             },
             "trends": {
                 "title": "Tendências",

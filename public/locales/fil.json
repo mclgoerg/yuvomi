@@ -4322,14 +4322,16 @@
                 "fertile": "Mataba",
                 "ovulation": "Obulasyon",
                 "today": "Ngayon",
-                "logged": "Entry"
+                "logged": "Entry",
+                "pms": "Bintana ng PMS (pattern)"
             },
             "history": {
                 "title": "Kasaysayan",
                 "ongoing": "kasalukuyan",
                 "empty": "Wala pang naitalang regla.",
                 "cycleLength": "Siklo {{value}} araw",
-                "cycleLength_one": "Siklo {{value}} araw"
+                "cycleLength_one": "Siklo {{value}} araw",
+                "flowHeaviest": "Pinakamataas: {{value}}"
             },
             "trends": {
                 "title": "Mga Trend",

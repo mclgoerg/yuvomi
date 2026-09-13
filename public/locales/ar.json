@@ -4322,14 +4322,16 @@
                 "fertile": "خصبة",
                 "ovulation": "الإباضة",
                 "today": "اليوم",
-                "logged": "إدخال"
+                "logged": "إدخال",
+                "pms": "نافذة المتلازمة السابقة للحيض (نمط)"
             },
             "history": {
                 "title": "الاتجاه",
                 "ongoing": "جارية",
                 "empty": "لم تُسجَّل أي دورات بعد.",
                 "cycleLength": "دورة {{value}} يوم",
-                "cycleLength_one": "دورة {{value}} يوم"
+                "cycleLength_one": "دورة {{value}} يوم",
+                "flowHeaviest": "الحد الأقصى: {{value}}"
             },
             "trends": {
                 "title": "الاتجاهات",

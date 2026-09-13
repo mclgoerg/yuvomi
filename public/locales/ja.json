@@ -4322,14 +4322,16 @@
                 "fertile": "妊娠可能",
                 "ovulation": "排卵",
                 "today": "今日",
-                "logged": "記録"
+                "logged": "記録",
+                "pms": "PMS期間(パターン)"
             },
             "history": {
                 "title": "推移",
                 "ongoing": "進行中",
                 "empty": "まだ生理が記録されていません。",
                 "cycleLength": "周期{{value}}日",
-                "cycleLength_one": "周期{{value}}日"
+                "cycleLength_one": "周期{{value}}日",
+                "flowHeaviest": "最大: {{value}}"
             },
             "trends": {
                 "title": "傾向",

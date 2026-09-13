@@ -4322,14 +4322,16 @@
                 "fertile": "Фертильный",
                 "ovulation": "Овуляция",
                 "today": "Сегодня",
-                "logged": "Запись"
+                "logged": "Запись",
+                "pms": "Окно ПМС (паттерн)"
             },
             "history": {
                 "title": "Динамика",
                 "ongoing": "текущая",
                 "empty": "Менструации ещё не записаны.",
                 "cycleLength": "Цикл {{value}} дн.",
-                "cycleLength_one": "Цикл {{value}} день"
+                "cycleLength_one": "Цикл {{value}} день",
+                "flowHeaviest": "Макс. {{value}}"
             },
             "trends": {
                 "title": "Тенденции",

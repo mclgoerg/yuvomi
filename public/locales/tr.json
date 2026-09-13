@@ -4322,14 +4322,16 @@
                 "fertile": "Doğurgan",
                 "ovulation": "Yumurtlama",
                 "today": "Bugün",
-                "logged": "Kayıt"
+                "logged": "Kayıt",
+                "pms": "PMS penceresi (örüntü)"
             },
             "history": {
                 "title": "Eğilim",
                 "ongoing": "devam ediyor",
                 "empty": "Henüz adet dönemi kaydedilmedi.",
                 "cycleLength": "Döngü {{value}} gün",
-                "cycleLength_one": "Döngü {{value}} gün"
+                "cycleLength_one": "Döngü {{value}} gün",
+                "flowHeaviest": "Maks. {{value}}"
             },
             "trends": {
                 "title": "Eğilimler",

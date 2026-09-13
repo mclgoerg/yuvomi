@@ -4322,14 +4322,16 @@
                 "fertile": "Dễ thụ thai",
                 "ovulation": "Rụng trứng",
                 "today": "Hôm nay",
-                "logged": "Mục"
+                "logged": "Mục",
+                "pms": "Cửa sổ PMS (mẫu hình)"
             },
             "history": {
                 "title": "Xu hướng",
                 "ongoing": "đang diễn ra",
                 "empty": "Chưa ghi kỳ kinh nào.",
                 "cycleLength": "Chu kỳ {{value}} ngày",
-                "cycleLength_one": "Chu kỳ {{value}} ngày"
+                "cycleLength_one": "Chu kỳ {{value}} ngày",
+                "flowHeaviest": "Tối đa: {{value}}"
             },
             "trends": {
                 "title": "Xu hướng",

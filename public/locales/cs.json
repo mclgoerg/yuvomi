@@ -4322,14 +4322,16 @@
                 "fertile": "Plodné",
                 "ovulation": "Ovulace",
                 "today": "Dnes",
-                "logged": "Záznam"
+                "logged": "Záznam",
+                "pms": "Okno PMS (vzorec)"
             },
             "history": {
                 "title": "Vývoj",
                 "ongoing": "probíhá",
                 "empty": "Zatím nezaznamenána žádná menstruace.",
                 "cycleLength": "Cyklus {{value}} dní",
-                "cycleLength_one": "Cyklus {{value}} den"
+                "cycleLength_one": "Cyklus {{value}} den",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trendy",
