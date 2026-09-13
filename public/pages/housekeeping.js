@@ -1447,7 +1447,82 @@ function openStaffModal(worker, content, options = {}) {
   if (window.lucide) window.lucide.createIcons({ el: panel });
 }
 
-export async function render(container) {
+// `?editVisit=<id>` (die beiden Kalender-Termin-Klicks in `calendar.js` -
+// `openEventDetail`/`openEventModal` - bauen diesen Link; keine Erinnerung
+// oder Benachrichtigung tut das): der Fehlerfall war zuvor ein leerer `catch`
+// - eine falsche, geloeschte oder fremde ID landete unauffaellig auf dem
+// normalen Dashboard, nicht unterscheidbar von einem funktionierenden Link
+// (#1139). Die fehlgeschlagene Kennung wird sofort aus der URL entfernt (nur
+// sie: uebrige Parameter, Hash und `history.state` bleiben stehen, wie in
+// `sync-calendar.js`/`documents-storage.js`), damit ein erneutes Rendern
+// (Zurueck-Navigation, Reload) den Aufruf nicht wiederholt; ein erneuter
+// Versuch ueber den Retry-Toast haelt die ID dafuer in diesem Closure fest.
+// Jeder 4xx-Status ausser 429 (404 fehlt, 403 kein Zugriff, 400 z.B. eine
+// verstuemmelte ID) ist ein Endzustand fuer dieselbe ID - ein Retry liefert
+// nur denselben Fehler noch einmal. 429 dagegen ist voruebergehend: der
+// `apiLimiter` erlaubt 300 Anfragen/Minute PRO IP, ein Haushalt hinter einem
+// NAT teilt sich diese IP, und `api.js` traegt sogar `Retry-After` am
+// `ApiError` - ein Retry kann hier durchaus gelingen. Neben 429 duerfen es
+// also ein Serverfehler und ein Netzwerkproblem (kein Status) erneut
+// versuchen. `friendlyError()` kennt nur 403/404/5xx explizit und faellt
+// sonst auf den rohen, unlokalisierten Servertext zurueck (`err.data.error`)
+// - fuer jeden anderen 4xx (auch 429) wird deshalb bewusst die generische,
+// lokalisierte Meldung erzwungen statt dieser Fallback-String. Es gilt keine
+// visit-eigene Zugriffssperre - `GET /visits/:id` prueft nur die ID, der
+// einzige 403 kommt vom Modul-Gate, und der Router leitet vor dieser Stelle
+// schon weg (siehe render()) - 403 wird trotzdem defensiv behandelt, etwa fuer
+// ein Wettrennen zwischen Seitenaufbau und Rechteentzug.
+function describeDeepLinkError(err) {
+  const status = err?.status;
+  const isTransient = status == null || status >= 500 || status === 429;
+  const message = (status >= 400 && status < 500 && status !== 403 && status !== 404)
+    ? t('common.errorGeneric')
+    : (window.yuvomi?.friendlyError?.(err) ?? t('common.errorGeneric'));
+  return { message, offerRetry: isTransient };
+}
+
+async function openVisitFromDeepLink(editVisitId, container, signal) {
+  try {
+    const res = await api.get(`/housekeeping/visits/${editVisitId}`);
+    // Der Router bricht das Signal beim Seitenwechsel ab (`router.js`): kommt
+    // die Antwort erst danach an, gehoert der Bildschirm laengst einer anderen
+    // Seite - kein Modal mehr oeffnen.
+    if (signal?.aborted) return;
+    const visit = res.data;
+    if (visit) {
+      const content = container.querySelector('#housekeeping-content') || container;
+      // Wer einen abgerechneten Besuch nicht aendern darf, bekommt den
+      // Bericht statt eines Formulars, das erst beim Speichern scheitert (#1135).
+      if (visit.can_edit) openVisitEditModal(visit, content);
+      else openVisitReportModal(visit, null, { onRefresh: () => renderCurrentTab(container) });
+    }
+  } catch (err) {
+    // Nach einem Seitenwechsel zeigt `location` schon die NEUE Seite: das
+    // `replaceState` traefe deren URL (und wuerde ihre Parameter und den
+    // Router-State verwerfen), der Toast erschiene ueber der falschen Seite.
+    if (signal?.aborted) return;
+    const url = new URL(location.href);
+    url.searchParams.delete('editVisit');
+    history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    const { message, offerRetry } = describeDeepLinkError(err);
+    if (offerRetry) {
+      window.yuvomi?.showToast(message, 'danger', 6000, {
+        label: t('common.retry'),
+        onClick: () => {
+          // Der Toast lebt bis zu 6 s weiter - auch ueber einen Seitenwechsel
+          // hinaus. Ein Klick darf dann das Bearbeiten-Modal nicht ueber einer
+          // fremden Seite oeffnen.
+          if (signal?.aborted) return;
+          openVisitFromDeepLink(editVisitId, container, signal);
+        },
+      });
+    } else {
+      window.yuvomi?.showToast(message, 'danger');
+    }
+  }
+}
+
+export async function render(container, { signal } = {}) {
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
     <section class="housekeeping-page app-page app-page--data housekeeping-page--loading" data-composition="data" aria-busy="true">
@@ -1458,21 +1533,7 @@ export async function render(container) {
     await loadData();
     renderShell(container);
     const editVisitId = new URLSearchParams(window.location.search).get('editVisit');
-    if (editVisitId) {
-      try {
-        const res = await api.get(`/housekeeping/visits/${editVisitId}`);
-        const visit = res.data;
-        if (visit) {
-          const content = container.querySelector('#housekeeping-content') || container;
-          // Wer einen abgerechneten Besuch nicht aendern darf, bekommt den
-          // Bericht statt eines Formulars, das erst beim Speichern scheitert (#1135).
-          if (visit.can_edit) openVisitEditModal(visit, content);
-          else openVisitReportModal(visit, null, { onRefresh: () => renderCurrentTab(container) });
-        }
-      } catch {
-        // visit not found or unauthorized — silently ignore
-      }
-    }
+    if (editVisitId) await openVisitFromDeepLink(editVisitId, container, signal);
   } catch (err) {
     // Vorher: Leerzustands-Markup ohne Rolle, ohne Ausweg - und als Erklaerung
     // der rohe `err.message`. Der ist bei allen Routen das unlokalisierte
@@ -1487,13 +1548,16 @@ export async function render(container) {
       description: t('common.loadErrorDescription'),
       error: err,
       retryLabel: t('common.retry'),
-      onRetry: () => render(container),
+      onRetry: () => render(container, { signal }),
     });
   }
 }
 
-// Nur fuer die Tests (test-housekeeping-ui.js): die Seite laeuft dort ohne DOM.
+// Nur fuer die Tests (test-housekeeping-ui.js, test-housekeeping-editvisit.js):
+// die Seite laeuft dort ohne DOM.
 export const __test = {
+  describeDeepLinkError,
+  openVisitFromDeepLink,
   loadData,
   renderReports,
   renderStaffVisitLog,

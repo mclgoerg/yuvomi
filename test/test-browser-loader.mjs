@@ -103,7 +103,7 @@ const STUBS = {
     export const recurrenceRow = () => ({ icon: 'repeat', label: '', value: '' });
   `,
   '/components/modal.js': `
-    export const openModal = () => {};
+    export const openModal = (...args) => globalThis.__openModal?.(...args);
     export const closeModal = () => {};
     export const confirmModal = async () => true;
     export const confirmOverModal = async (...args) => globalThis.__confirmOverModal?.(...args) ?? true;

@@ -33,6 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offers the visit report instead and says that only an admin can change it. A calendar link to
   such a visit opens the report rather than a form that cannot be saved.
 
+- **Opening Housekeeping with a broken visit deep link now says so** (#1139). Tapping a
+  housekeeping visit in the calendar opens Housekeeping through an `?editVisit=<id>` link; when
+  that visit has been deleted or the link is malformed, it used to fail silently and land on the
+  ordinary dashboard, with nothing to tell a stale link apart from a working one. It now shows a
+  localized message - a missing or invalid visit says so without a retry, while a server error, a
+  network problem or rate limiting offers to try again. The broken link is cleared from the
+  address bar right away - only that parameter, the rest of the URL stays - so a reload or going
+  back does not repeat the failed request.
+
 ## [2.66.0] - 2026-09-13
 
 ### Added
