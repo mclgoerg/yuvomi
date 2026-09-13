@@ -971,7 +971,25 @@
         "filterUnassigned": "Chưa được giao"
     },
     "noteCategories": {
-        "permissionLabel": "Quản lý danh mục ghi chú gia đình"
+        "categories": "Danh mục",
+        "filterLabel": "Lọc theo danh mục",
+        "empty": "Chưa có danh mục.",
+        "personal": "Cá nhân",
+        "household": "Gia đình",
+        "noResults": "Không có ghi chú nào thuộc tất cả danh mục đã chọn.",
+        "deleteDetail": "Danh mục bị xóa khỏi mọi ghi chú và bộ lọc bảng điều khiển. Nội dung ghi chú không thay đổi.",
+        "widgetHint": "Khi chọn nhiều danh mục, chỉ các ghi chú thuộc tất cả danh mục đó được hiển thị. Nếu không chọn, mọi ghi chú đều hiển thị.",
+        "permissionLabel": "Quản lý danh mục ghi chú gia đình",
+        "searchPlaceholder": "Tìm hoặc tạo danh mục...",
+        "searchResultsLabel": "Gợi ý danh mục",
+        "removeAction": "Gỡ danh mục {{name}}",
+        "createAction": "Tạo và gán “{{name}}”",
+        "scopeLabel": "Loại danh mục",
+        "scopeHelp": "Chỉ bạn có thể xem và quản lý danh mục cá nhân. Mọi thành viên đều có thể dùng danh mục gia đình; quyền truy cập quyết định ai được quản lý chúng.",
+        "moreAction": "Thêm {{count}} danh mục",
+        "moreAction_one": "Thêm {{count}} danh mục",
+        "moreAction_few": "Thêm {{count}} danh mục",
+        "personalManagementHint": "Bạn có thể quản lý các danh mục cá nhân tại đây. Danh mục gia đình vẫn có trong trình sửa ghi chú, nhưng bạn không có quyền quản lý chúng."
     },
     "notes": {
         "title": "Bảng ghi chú",
@@ -1823,6 +1841,7 @@
         },
         "ics": {
             "title": "Đăng ký ICS",
+            "holidayHint": "Mẹo: cách này cũng phù hợp với ngày lễ của một quốc gia chưa được đồng bộ ngày lễ trong cài đặt lịch hỗ trợ.",
             "add": "Thêm đăng ký",
             "addedToast": "Đăng ký đã thêm.",
             "deletedToast": "Đăng ký đã xóa.",
@@ -2214,6 +2233,8 @@
         "holidayGroupHint": "Một số bang đa ngôn ngữ có ngày nghỉ học khác nhau tùy theo vùng ngôn ngữ. Hãy chọn khu vực phù hợp để có ngày chính xác.",
         "holidayPublicLabel": "Hiển thị ngày lễ",
         "holidaySchoolLabel": "Hiển thị kỳ nghỉ học",
+        "holidaySchoolUnavailable": "Không có dữ liệu nghỉ học cho quốc gia này.",
+        "holidayAustraliaObservanceHint": "Đối với Úc, các ngày lễ được hiển thị theo ngày thực tế – ngày nghỉ bù cho các ngày lễ rơi vào cuối tuần khác nhau tùy bang và không được hiển thị.",
         "holidayPublicColor": "Màu ngày lễ",
         "holidaySchoolColor": "Màu kỳ nghỉ học",
         "holidaySaveBtn": "Lưu",
@@ -2332,6 +2353,9 @@
         "permAccessWrite": "Đầy đủ",
         "permWidgetBlocked": "Bị chặn",
         "permWidgetAllowed": "Khả dụng",
+        "permCapabilitiesHeading": "Quyền bổ sung",
+        "permCapabilityBlocked": "Không cho phép",
+        "permCapabilityAllowed": "Cho phép",
         "permInherit": "Kế thừa",
         "permInheritedHint": "Kế thừa: {{value}}",
         "permModuleLockedHint": "Mô-đun bị khóa",

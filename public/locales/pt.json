@@ -971,7 +971,25 @@
         "filterUnassigned": "Não atribuídos"
     },
     "noteCategories": {
-        "permissionLabel": "Gerir categorias de notas do agregado familiar"
+        "categories": "Categorias",
+        "filterLabel": "Filtrar por categorias",
+        "empty": "Ainda não há categorias.",
+        "personal": "Pessoal",
+        "household": "Casa",
+        "noResults": "Nenhuma nota pertence a todas as categorias selecionadas.",
+        "deleteDetail": "A categoria é removida de todas as notas e filtros do painel. As notas permanecem inalteradas.",
+        "widgetHint": "Ao selecionar várias categorias, só aparecem notas que pertencem a todas. Sem seleção, aparecem todas as notas.",
+        "permissionLabel": "Gerir categorias de notas do agregado familiar",
+        "searchPlaceholder": "Pesquisar ou criar uma categoria...",
+        "searchResultsLabel": "Sugestões de categorias",
+        "removeAction": "Remover a categoria {{name}}",
+        "createAction": "Criar e atribuir “{{name}}”",
+        "scopeLabel": "Tipo de categoria",
+        "scopeHelp": "Só você pode ver e gerir categorias pessoais. Todos os membros do agregado podem usar categorias do agregado; as permissões controlam quem pode geri-las.",
+        "moreAction": "{{count}} categorias adicionais",
+        "moreAction_one": "{{count}} categoria adicional",
+        "moreAction_few": "{{count}} categorias adicionais",
+        "personalManagementHint": "Pode gerir aqui as suas categorias pessoais. As categorias do agregado continuam disponíveis no editor de notas, mas não tem permissão para as gerir."
     },
     "notes": {
         "title": "Quadro de notas",
@@ -1806,6 +1824,7 @@
         },
         "ics": {
             "title": "Assinaturas ICS",
+            "holidayHint": "Dica: isto também funciona bem para os feriados de um país ainda não abrangido pela sincronização de feriados nas definições do calendário.",
             "add": "Adicionar assinatura",
             "addedToast": "Assinatura adicionada.",
             "deletedToast": "Assinatura excluída.",
@@ -2214,6 +2233,8 @@
         "holidayGroupHint": "Alguns cantões plurilingues têm datas de férias escolares diferentes consoante a região linguística. Escolha a região correspondente para datas corretas.",
         "holidayPublicLabel": "Mostrar feriados",
         "holidaySchoolLabel": "Mostrar férias escolares",
+        "holidaySchoolUnavailable": "Não há dados de férias escolares disponíveis para este país.",
+        "holidayAustraliaObservanceHint": "Para a Austrália, os feriados aparecem na sua data real – os dias substitutos de feriados que caem no fim de semana variam por estado e não são exibidos.",
         "holidayPublicColor": "Cor dos feriados",
         "holidaySchoolColor": "Cor das férias escolares",
         "holidaySaveBtn": "Salvar",
@@ -2332,6 +2353,9 @@
         "permAccessWrite": "Completo",
         "permWidgetBlocked": "Bloqueado",
         "permWidgetAllowed": "Disponível",
+        "permCapabilitiesHeading": "Permissões adicionais",
+        "permCapabilityBlocked": "Não permitido",
+        "permCapabilityAllowed": "Permitido",
         "permInherit": "Herdar",
         "permInheritedHint": "Herdado: {{value}}",
         "permModuleLockedHint": "Módulo bloqueado",

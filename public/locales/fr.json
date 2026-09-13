@@ -971,7 +971,25 @@
         "filterUnassigned": "Non attribués"
     },
     "noteCategories": {
-        "permissionLabel": "Gérer les catégories de notes du foyer"
+        "categories": "Catégories",
+        "filterLabel": "Filtrer par catégories",
+        "empty": "Aucune catégorie pour le moment.",
+        "personal": "Personnel",
+        "household": "Foyer",
+        "noResults": "Aucune note n’appartient à toutes les catégories sélectionnées.",
+        "deleteDetail": "La catégorie est retirée de toutes les notes et de tous les filtres du tableau de bord. Les notes restent inchangées.",
+        "widgetHint": "Si plusieurs catégories sont sélectionnées, seules les notes appartenant à toutes sont affichées. Sans sélection, toutes les notes apparaissent.",
+        "permissionLabel": "Gérer les catégories de notes du foyer",
+        "searchPlaceholder": "Rechercher ou créer une catégorie...",
+        "searchResultsLabel": "Suggestions de catégories",
+        "removeAction": "Retirer la catégorie {{name}}",
+        "createAction": "Créer et attribuer « {{name}} »",
+        "scopeLabel": "Type de catégorie",
+        "scopeHelp": "Vous seul pouvez voir et gérer vos catégories personnelles. Tous les membres du foyer peuvent utiliser les catégories du foyer ; les autorisations déterminent qui peut les gérer.",
+        "moreAction": "{{count}} catégories supplémentaires",
+        "moreAction_one": "{{count}} catégorie supplémentaire",
+        "moreAction_few": "{{count}} catégories supplémentaires",
+        "personalManagementHint": "Vous pouvez gérer ici vos catégories personnelles. Les catégories du foyer restent disponibles dans l’éditeur de notes, mais vous n’avez pas l’autorisation de les gérer."
     },
     "notes": {
         "title": "Notes",
@@ -1806,6 +1824,7 @@
         },
         "ics": {
             "title": "Abonnements ICS",
+            "holidayHint": "Astuce : cela fonctionne aussi bien pour les jours fériés d'un pays non encore couvert par la synchronisation des jours fériés dans les paramètres du calendrier.",
             "add": "Ajouter un abonnement",
             "addedToast": "Abonnement ajouté.",
             "deletedToast": "Abonnement supprimé.",
@@ -2214,6 +2233,8 @@
         "holidayGroupHint": "Certains cantons plurilingues ont des dates de vacances scolaires différentes selon la région linguistique. Choisissez la région correspondante pour des dates correctes.",
         "holidayPublicLabel": "Afficher les jours fériés",
         "holidaySchoolLabel": "Afficher les vacances scolaires",
+        "holidaySchoolUnavailable": "Aucune donnée de vacances scolaires n'est disponible pour ce pays.",
+        "holidayAustraliaObservanceHint": "Pour l'Australie, les jours fériés apparaissent à leur date réelle – les jours de remplacement des fériés tombant un week-end varient selon l'État et ne sont pas affichés.",
         "holidayPublicColor": "Couleur des jours fériés",
         "holidaySchoolColor": "Couleur des vacances scolaires",
         "holidaySaveBtn": "Enregistrer",
@@ -2332,6 +2353,9 @@
         "permAccessWrite": "Complet",
         "permWidgetBlocked": "Bloqué",
         "permWidgetAllowed": "Disponible",
+        "permCapabilitiesHeading": "Autorisations supplémentaires",
+        "permCapabilityBlocked": "Non autorisé",
+        "permCapabilityAllowed": "Autorisé",
         "permInherit": "Hériter",
         "permInheritedHint": "Hérité : {{value}}",
         "permModuleLockedHint": "Module verrouillé",

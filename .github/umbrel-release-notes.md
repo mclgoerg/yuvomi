@@ -1,8 +1,10 @@
-<!-- version: 2.65.3 -->
-This is a security release for the Housekeeping module, and it changes nothing about how Yuvomi looks day to day. Once a visit is marked paid, only an admin can change or delete it. A household member could get around that by unchecking the visit's payment task in Tasks, which marked the visit as unpaid again and opened it up for changes. Unchecking the payment task of a paid visit now needs an admin as well. Checking the task off stays open to everyone who could do so before.
+<!-- version: 2.66.0 -->
+This is an interface release: everything the interface gathered since the last one ships together here. Take a backup before you update. On its first start the app runs five database migrations; let it finish on its own and wait until it answers again before you open it. Migrations only run forward, so the way back is the backup you took before the update, not an older image.
 
-One thing to know after updating: if members of your household used to correct an accidental payment by unchecking its task, an admin now has to do that.
+The calendar grew the most. A new event now lands in the connected calendar of the person it is assigned to, the filter can hide a single connected calendar or subscription and show the events nobody is assigned to, and an event's location opens in your map app. The event detail names the day a multi-day event ends. Public holidays are now available for the United States, Canada, Australia, New Zealand and the United Kingdom, the last as England and Wales, Scotland and Northern Ireland. Several sync problems are gone: a recurring event from Google no longer shows an end time hours after its start, an edit made while a change is still on its way to Google is no longer lost, and an event moved to another CalDAV calendar can be edited or deleted right away.
 
-Nothing changes in the database with this update, so it is a plain container swap with no migration to wait for.
+Around the house: note categories can now be managed on the Notes board, picked in the note editor, and combined in a filter that shows the notes carrying every selected category. A shopping item can record its price and the shop it was bought at, a budget entry can name who is responsible for it, and inventory items and subscriptions can note the account they are registered under. The meal planner shows recipe pictures, and a household can give the four meal slots its own names. In Housekeeping, a housekeeper can check out again and work a second session on the same day, marking a visit as paid asks first, and an admin can take a payment back. An extra payment on a loan now shortens the remaining term.
 
-Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.65.3
+A few fixes are worth knowing about: a dismissed birthday reminder stays dismissed, keyboard focus returns to where it was after a confirmation or input dialog, dialog content on a phone scrolls again with Reduce Motion turned on, and scaling a recipe now reads and writes quantities the way your region writes numbers.
+
+Full release notes are available at https://github.com/ulsklyc/yuvomi/releases/tag/v2.66.0

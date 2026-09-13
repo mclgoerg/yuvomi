@@ -971,7 +971,25 @@
         "filterUnassigned": "Niet toegewezen"
     },
     "noteCategories": {
-        "permissionLabel": "Notitiecategorieën voor het huishouden beheren"
+        "categories": "Categorieën",
+        "filterLabel": "Filteren op categorieën",
+        "empty": "Nog geen categorieën.",
+        "personal": "Persoonlijk",
+        "household": "Huishouden",
+        "noResults": "Geen enkele notitie hoort bij alle geselecteerde categorieën.",
+        "deleteDetail": "De categorie wordt uit alle notities en dashboardfilters verwijderd. De notities zelf blijven ongewijzigd.",
+        "widgetHint": "Bij meerdere categorieën worden alleen notities getoond die bij alle categorieën horen. Zonder selectie worden alle notities getoond.",
+        "permissionLabel": "Notitiecategorieën voor het huishouden beheren",
+        "searchPlaceholder": "Categorie zoeken of maken...",
+        "searchResultsLabel": "Categoriesuggesties",
+        "removeAction": "Categorie {{name}} verwijderen",
+        "createAction": "‘{{name}}’ maken en toewijzen",
+        "scopeLabel": "Categorietype",
+        "scopeHelp": "Alleen jij kunt persoonlijke categorieën zien en beheren. Alle huishoudleden kunnen huishoudcategorieën gebruiken; rechten bepalen wie ze mag beheren.",
+        "moreAction": "{{count}} extra categorieën",
+        "moreAction_one": "{{count}} extra categorie",
+        "moreAction_few": "{{count}} extra categorieën",
+        "personalManagementHint": "Hier kun je je persoonlijke categorieën beheren. Huishoudcategorieën blijven beschikbaar in de notitie-editor, maar je hebt geen toestemming om ze te beheren."
     },
     "notes": {
         "title": "Bord",
@@ -1823,6 +1841,7 @@
         },
         "ics": {
             "title": "ICS-abonnementen",
+            "holidayHint": "Tip: dit werkt ook goed voor de feestdagen van een land dat nog niet wordt gedekt door de feestdagen-synchronisatie in de kalenderinstellingen.",
             "add": "Abonnement toevoegen",
             "addedToast": "Abonnement toegevoegd.",
             "deletedToast": "Abonnement verwijderd.",
@@ -2214,6 +2233,8 @@
         "holidayGroupHint": "Sommige meertalige kantons hebben verschillende schoolvakantiedata afhankelijk van de taalregio. Kies de juiste regio voor correcte datums.",
         "holidayPublicLabel": "Feestdagen weergeven",
         "holidaySchoolLabel": "Schoolvakanties weergeven",
+        "holidaySchoolUnavailable": "Voor dit land zijn geen schoolvakantiegegevens beschikbaar.",
+        "holidayAustraliaObservanceHint": "Voor Australië worden feestdagen op hun werkelijke datum getoond – vervangende dagen voor feestdagen in het weekend verschillen per staat en worden niet weergegeven.",
         "holidayPublicColor": "Kleur feestdagen",
         "holidaySchoolColor": "Kleur schoolvakanties",
         "holidaySaveBtn": "Opslaan",
@@ -2332,6 +2353,9 @@
         "permAccessWrite": "Volledig",
         "permWidgetBlocked": "Geblokkeerd",
         "permWidgetAllowed": "Beschikbaar",
+        "permCapabilitiesHeading": "Aanvullende rechten",
+        "permCapabilityBlocked": "Niet toegestaan",
+        "permCapabilityAllowed": "Toegestaan",
         "permInherit": "Overnemen",
         "permInheritedHint": "Overgenomen: {{value}}",
         "permModuleLockedHint": "Module vergrendeld",

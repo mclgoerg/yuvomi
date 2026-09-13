@@ -971,7 +971,25 @@
         "filterUnassigned": "Unassigned"
     },
     "noteCategories": {
-        "permissionLabel": "Manage household note categories"
+        "categories": "Categories",
+        "filterLabel": "Filter by categories",
+        "empty": "No categories yet.",
+        "personal": "Personal",
+        "household": "Household",
+        "noResults": "No notes match all selected categories.",
+        "deleteDetail": "This category is removed from every note and dashboard filter. The notes themselves stay unchanged.",
+        "widgetHint": "Select multiple categories to show only notes that have all of them. With none selected, all notes are shown.",
+        "permissionLabel": "Manage household note categories",
+        "searchPlaceholder": "Search or create a category...",
+        "searchResultsLabel": "Category suggestions",
+        "removeAction": "Remove category {{name}}",
+        "createAction": "Create and assign “{{name}}”",
+        "scopeLabel": "Category type",
+        "scopeHelp": "Only you can see and manage personal categories. Every household member can use household categories; permissions control who can manage them.",
+        "moreAction": "{{count}} more categories",
+        "moreAction_one": "{{count}} more category",
+        "moreAction_few": "{{count}} more categories",
+        "personalManagementHint": "You can manage your personal categories here. Household categories remain available in the note editor, but you do not have permission to manage them."
     },
     "notes": {
         "title": "Board",
@@ -1846,6 +1864,7 @@
         },
         "ics": {
             "title": "ICS Subscriptions",
+            "holidayHint": "Tip: you can also use this for a country's public holidays not yet covered by the Holidays sync under Calendar settings.",
             "add": "Add subscription",
             "addedToast": "Subscription added.",
             "deletedToast": "Subscription deleted.",
@@ -2237,6 +2256,8 @@
         "holidayGroupHint": "Some multilingual cantons have different school-holiday dates depending on the language region. Choose the matching region for correct dates.",
         "holidayPublicLabel": "Show public holidays",
         "holidaySchoolLabel": "Show school holidays",
+        "holidaySchoolUnavailable": "No school-holiday data is available for this country.",
+        "holidayAustraliaObservanceHint": "For Australia, public holidays are shown on their actual dates – substitute days for holidays falling on a weekend differ by state and are not shown.",
         "holidayPublicColor": "Public holiday color",
         "holidaySchoolColor": "School holiday color",
         "holidaySaveBtn": "Save",
@@ -2355,6 +2376,9 @@
         "permAccessWrite": "Full",
         "permWidgetBlocked": "Blocked",
         "permWidgetAllowed": "Available",
+        "permCapabilitiesHeading": "Additional permissions",
+        "permCapabilityBlocked": "Not allowed",
+        "permCapabilityAllowed": "Allowed",
         "permInherit": "Inherit",
         "permInheritedHint": "Inherited: {{value}}",
         "permModuleLockedHint": "Module locked",

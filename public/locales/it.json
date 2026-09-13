@@ -971,7 +971,25 @@
         "filterUnassigned": "Non assegnati"
     },
     "noteCategories": {
-        "permissionLabel": "Gestisci le categorie delle note di casa"
+        "categories": "Categorie",
+        "filterLabel": "Filtra per categorie",
+        "empty": "Nessuna categoria.",
+        "personal": "Personale",
+        "household": "Famiglia",
+        "noResults": "Nessuna nota appartiene a tutte le categorie selezionate.",
+        "deleteDetail": "La categoria viene rimossa da tutte le note e dai filtri della dashboard. Le note restano invariate.",
+        "widgetHint": "Selezionando più categorie vengono mostrate solo le note che appartengono a tutte. Senza selezione vengono mostrate tutte le note.",
+        "permissionLabel": "Gestisci le categorie delle note di casa",
+        "searchPlaceholder": "Cerca o crea una categoria...",
+        "searchResultsLabel": "Suggerimenti di categorie",
+        "removeAction": "Rimuovi la categoria {{name}}",
+        "createAction": "Crea e assegna “{{name}}”",
+        "scopeLabel": "Tipo di categoria",
+        "scopeHelp": "Solo tu puoi vedere e gestire le categorie personali. Tutti i membri della famiglia possono usare le categorie domestiche; le autorizzazioni stabiliscono chi può gestirle.",
+        "moreAction": "{{count}} categorie in più",
+        "moreAction_one": "{{count}} categoria in più",
+        "moreAction_few": "{{count}} categorie in più",
+        "personalManagementHint": "Qui puoi gestire le tue categorie personali. Le categorie domestiche restano disponibili nell’editor delle note, ma non hai il permesso di gestirle."
     },
     "notes": {
         "title": "Bacheca",
@@ -1806,6 +1824,7 @@
         },
         "ics": {
             "title": "Abbonamenti ICS",
+            "holidayHint": "Suggerimento: funziona bene anche per le festività di un paese non ancora coperto dalla sincronizzazione delle festività nelle impostazioni del calendario.",
             "add": "Aggiungi abbonamento",
             "addedToast": "Abbonamento aggiunto.",
             "deletedToast": "Abbonamento eliminato.",
@@ -2214,6 +2233,8 @@
         "holidayGroupHint": "Alcuni cantoni plurilingui hanno date delle vacanze scolastiche diverse a seconda della regione linguistica. Scegli la regione corretta per date accurate.",
         "holidayPublicLabel": "Mostra giorni festivi",
         "holidaySchoolLabel": "Mostra vacanze scolastiche",
+        "holidaySchoolUnavailable": "Per questo paese non sono disponibili dati sulle vacanze scolastiche.",
+        "holidayAustraliaObservanceHint": "Per l'Australia le festività compaiono nella loro data effettiva: i giorni sostitutivi per le festività che cadono nel fine settimana variano da stato a stato e non vengono mostrati.",
         "holidayPublicColor": "Colore giorni festivi",
         "holidaySchoolColor": "Colore vacanze scolastiche",
         "holidaySaveBtn": "Salva",
@@ -2332,6 +2353,9 @@
         "permAccessWrite": "Completo",
         "permWidgetBlocked": "Bloccato",
         "permWidgetAllowed": "Disponibile",
+        "permCapabilitiesHeading": "Autorizzazioni aggiuntive",
+        "permCapabilityBlocked": "Non consentito",
+        "permCapabilityAllowed": "Consentito",
         "permInherit": "Eredita",
         "permInheritedHint": "Ereditato: {{value}}",
         "permModuleLockedHint": "Modulo bloccato",

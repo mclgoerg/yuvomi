@@ -971,7 +971,25 @@
         "filterUnassigned": "Atanmamış"
     },
     "noteCategories": {
-        "permissionLabel": "Ev notu kategorilerini yönet"
+        "categories": "Kategoriler",
+        "filterLabel": "Kategorilere göre filtrele",
+        "empty": "Henüz kategori yok.",
+        "personal": "Kişisel",
+        "household": "Hane",
+        "noResults": "Tüm seçili kategorilere ait bir not yok.",
+        "deleteDetail": "Kategori tüm notlardan ve pano filtrelerinden kaldırılır. Notların kendisi değişmez.",
+        "widgetHint": "Birden fazla kategori seçildiğinde yalnızca hepsine ait notlar gösterilir. Seçim yapılmazsa tüm notlar gösterilir.",
+        "permissionLabel": "Ev notu kategorilerini yönet",
+        "searchPlaceholder": "Kategori ara veya oluştur...",
+        "searchResultsLabel": "Kategori önerileri",
+        "removeAction": "{{name}} kategorisini kaldır",
+        "createAction": "“{{name}}” oluştur ve ata",
+        "scopeLabel": "Kategori türü",
+        "scopeHelp": "Kişisel kategorileri yalnızca siz görebilir ve yönetebilirsiniz. Hane kategorilerini tüm üyeler kullanabilir; kimlerin yönetebileceğini izinler belirler.",
+        "moreAction": "{{count}} kategori daha",
+        "moreAction_one": "{{count}} kategori daha",
+        "moreAction_few": "{{count}} kategori daha",
+        "personalManagementHint": "Kişisel kategorilerinizi burada yönetebilirsiniz. Hane kategorileri not düzenleyicide kullanılmaya devam eder, ancak bunları yönetme izniniz yoktur."
     },
     "notes": {
         "title": "Notlar",
@@ -1806,6 +1824,7 @@
         },
         "ics": {
             "title": "ICS Abonelikleri",
+            "holidayHint": "İpucu: bu yöntem, takvim ayarlarındaki resmi tatil senkronizasyonunun henüz kapsamadığı bir ülkenin resmi tatilleri için de işe yarar.",
             "add": "Abonelik ekle",
             "addedToast": "Abonelik eklendi.",
             "deletedToast": "Abonelik silindi.",
@@ -2214,6 +2233,8 @@
         "holidayGroupHint": "Bazı çok dilli kantonlarda okul tatili tarihleri dil bölgesine göre değişir. Doğru tarihler için uygun bölgeyi seç.",
         "holidayPublicLabel": "Resmi tatilleri göster",
         "holidaySchoolLabel": "Okul tatillerini göster",
+        "holidaySchoolUnavailable": "Bu ülke için okul tatili verisi mevcut değil.",
+        "holidayAustraliaObservanceHint": "Avustralya için tatiller gerçek tarihlerinde gösterilir – hafta sonuna denk gelen tatillerin telafi günleri eyalete göre değişir ve gösterilmez.",
         "holidayPublicColor": "Resmi tatil rengi",
         "holidaySchoolColor": "Okul tatili rengi",
         "holidaySaveBtn": "Kaydet",
@@ -2332,6 +2353,9 @@
         "permAccessWrite": "Tam",
         "permWidgetBlocked": "Engellendi",
         "permWidgetAllowed": "Kullanılabilir",
+        "permCapabilitiesHeading": "Ek izinler",
+        "permCapabilityBlocked": "İzin yok",
+        "permCapabilityAllowed": "İzin var",
         "permInherit": "Devral",
         "permInheritedHint": "Devralındı: {{value}}",
         "permModuleLockedHint": "Modül kilitli",

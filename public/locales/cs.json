@@ -971,7 +971,25 @@
         "filterUnassigned": "Nepřiřazeno"
     },
     "noteCategories": {
-        "permissionLabel": "Spravovat domácí kategorie poznámek"
+        "categories": "Kategorie",
+        "filterLabel": "Filtrovat podle kategorií",
+        "empty": "Zatím žádné kategorie.",
+        "personal": "Osobní",
+        "household": "Domácnost",
+        "noResults": "Žádná poznámka nepatří do všech vybraných kategorií.",
+        "deleteDetail": "Kategorie se odstraní ze všech poznámek a filtrů nástěnky. Samotné poznámky zůstanou beze změny.",
+        "widgetHint": "Při výběru více kategorií se zobrazí jen poznámky, které patří do všech z nich. Bez výběru se zobrazí všechny poznámky.",
+        "permissionLabel": "Spravovat domácí kategorie poznámek",
+        "searchPlaceholder": "Vyhledat nebo vytvořit kategorii...",
+        "searchResultsLabel": "Návrhy kategorií",
+        "removeAction": "Odebrat kategorii {{name}}",
+        "createAction": "Vytvořit a přiřadit „{{name}}“",
+        "scopeLabel": "Typ kategorie",
+        "scopeHelp": "Osobní kategorie vidíte a spravujete jen vy. Domácí kategorie mohou používat všichni členové; jejich správu řídí oprávnění.",
+        "moreAction": "{{count}} dalších kategorií",
+        "moreAction_one": "{{count}} další kategorie",
+        "moreAction_few": "{{count}} další kategorie",
+        "personalManagementHint": "Zde můžete spravovat své osobní kategorie. Domácí kategorie zůstávají dostupné v editoru poznámek, ale nemáte oprávnění je spravovat."
     },
     "notes": {
         "title": "Nástěnka",
@@ -1849,6 +1867,7 @@
         },
         "ics": {
             "title": "ICS odběry",
+            "holidayHint": "Tip: tohle se hodí i pro státní svátky země, kterou synchronizace svátků v nastavení kalendáře ještě nepokrývá.",
             "add": "Přidat odběr",
             "form": {
                 "url": "ICS URL",
@@ -2214,6 +2233,8 @@
         "holidayGroupHint": "Některé vícejazyčné kantony mají různá data školních prázdnin podle jazykové oblasti. Vyberte odpovídající region pro správná data.",
         "holidayPublicLabel": "Zobrazit státní svátky",
         "holidaySchoolLabel": "Zobrazit školní prázdniny",
+        "holidaySchoolUnavailable": "Pro tuto zemi nejsou k dispozici žádné údaje o školních prázdninách.",
+        "holidayAustraliaObservanceHint": "U Austrálie se svátky zobrazují ve svém skutečném datu – náhradní dny za svátky připadající na víkend se v jednotlivých státech liší a nezobrazují se.",
         "holidayPublicColor": "Barva státních svátků",
         "holidaySchoolColor": "Barva školních prázdnin",
         "holidaySaveBtn": "Uložit",
@@ -2332,6 +2353,9 @@
         "permAccessWrite": "Plný",
         "permWidgetBlocked": "Blokováno",
         "permWidgetAllowed": "Dostupné",
+        "permCapabilitiesHeading": "Další oprávnění",
+        "permCapabilityBlocked": "Zakázáno",
+        "permCapabilityAllowed": "Povoleno",
         "permInherit": "Zdědit",
         "permInheritedHint": "Zděděno: {{value}}",
         "permModuleLockedHint": "Modul uzamčen",

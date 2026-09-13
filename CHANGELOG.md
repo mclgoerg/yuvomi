@@ -9,6 +9,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **New optional module: Waste collection** (#1063). Define your household's waste types
+  (recycling, organic, general, or your own, each with an icon and color) and a weekly or
+  fixed-day-of-month pickup schedule for each. A single calculated pickup can be moved to a
+  different date or skipped without touching the rest of the schedule, and moving one origin never
+  hides another - a manual one-off pickup recorded on the same day a schedule occurrence moved away
+  from still shows. One-off pickups cover irregular or special collections that are not part of any
+  recurring schedule. A type with schedules or pickups cannot be deleted (archive it instead), so a
+  season's history is never lost by accident. Off by default; a household turns it on in
+  Settings → Modules. A municipality's ICS calendar file can also be imported: preview its pickups,
+  map each label to a waste type (or create one on the spot, or ignore it), and commit - the file is
+  re-parsed on commit so nothing is trusted from the preview alone, and re-importing next year's file
+  diffs cleanly into additions/changes/removals without duplicating or losing manual data. A source
+  with no future mapped pickup is flagged for a refresh. An optional Dashboard widget shows the next
+  pickup per active type, soonest first, and carries the same "needs a refresh" flag as the module
+  page; hidden by default, like the module itself. A device-local Calendar layer, off by default,
+  shows every type's pickups in month, week, day, and agenda view; a pickup carries its type's icon
+  and color and opens the module directly, never the ordinary event editor. Beyond a one-time file
+  import, a source can also subscribe to an ICS URL: it refreshes itself automatically on a
+  configurable schedule (hourly to monthly), applying an update only once every label already has a
+  confirmed mapping - unrecognized content is flagged for review instead of guessed at, and a manual
+  "check now" is always available alongside the automatic schedule. Each household member can also opt
+  into their own pickup reminders per waste type, choosing how many days ahead and what time of day
+  (household-local) to be notified - personal, so a reminder never goes to someone who didn't ask for
+  it. A monthly schedule can now also follow an ordinal weekday - "the second Monday" or "the last
+  Friday" of every month - alongside the existing weekly and fixed-day-of-month rhythms; the
+  underlying shared recurrence engine gained this once and every existing recurring feature (Tasks,
+  Calendar, CalDAV/ICS import) benefits from it, not just Waste. A revocable, personal read-only ICS
+  feed of upcoming pickups is now available too (Settings → Feeds), with an optional per-type
+  selection; a source's label-to-type mapping decisions can be exported as a portable profile and
+  re-applied to another source or household, without the app ever shipping a municipal/provider
+  catalog. Waste types are now searchable from the global search bar, and the Calendar layer's filter
+  sheet gained a per-type visibility list nested under the one Waste toggle, so a rare collection is
+  never silently hidden while a noisy one can be tucked away.
+
+## [2.66.0] - 2026-09-13
+
+### Added
+
+- **Notes gain category management, a category picker and an AND filter.** Manage personal
+  categories and, when permitted, household categories on the Notes board, then select several
+  categories to show notes that belong to every selection. Household categories remain assignable
+  for members who cannot manage them. The dashboard Notes widget supports the same filter. Category
+  badges stay on one line; a +N control reveals and correctly announces the remaining categories on
+  hover, focus or tap, and category icons remain intact after switching between reading and editing.
+
+- **The holiday country list now includes the United States, Canada, the United Kingdom, Australia
+  and New Zealand** (#965). OpenHolidays, the free API behind Settings → Calendar's holiday sync,
+  doesn't cover these five - their public holidays are computed locally instead (fixed dates,
+  n-th-weekday rules, Easter offsets, and each country's own documented weekend-observance rule),
+  the same approach already used for Brazil. The United Kingdom is offered as three regions -
+  England & Wales, Scotland, and Northern Ireland - since their holidays genuinely differ, not just
+  their names. None of the five has school-holiday data available, so the school-holiday toggle is
+  disabled with an explanation when one of them is selected, rather than silently syncing nothing.
+  For any other country not covered by OpenHolidays or this local list, an ordinary ICS calendar
+  subscription (Settings → Personal → Calendar subscriptions) can still bring in its public
+  holidays - now mentioned there directly.
+
 - **A new event goes to the calendar of the person it is assigned to** (#1060). A Google or CalDAV
   calendar that names a default assignee in the sync settings now works in both directions: events
   imported from it get that person, and a new event assigned to exactly that person gets that
@@ -99,40 +156,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   follows both without extra work. Inventory's own search matches on it too, since "where is the
   device that runs on this address" is the question the field exists for.
 
-- **New optional module: Waste collection** (#1063). Define your household's waste types
-  (recycling, organic, general, or your own, each with an icon and color) and a weekly or
-  fixed-day-of-month pickup schedule for each. A single calculated pickup can be moved to a
-  different date or skipped without touching the rest of the schedule, and moving one origin never
-  hides another - a manual one-off pickup recorded on the same day a schedule occurrence moved away
-  from still shows. One-off pickups cover irregular or special collections that are not part of any
-  recurring schedule. A type with schedules or pickups cannot be deleted (archive it instead), so a
-  season's history is never lost by accident. Off by default; a household turns it on in
-  Settings → Modules. A municipality's ICS calendar file can also be imported: preview its pickups,
-  map each label to a waste type (or create one on the spot, or ignore it), and commit - the file is
-  re-parsed on commit so nothing is trusted from the preview alone, and re-importing next year's file
-  diffs cleanly into additions/changes/removals without duplicating or losing manual data. A source
-  with no future mapped pickup is flagged for a refresh. An optional Dashboard widget shows the next
-  pickup per active type, soonest first, and carries the same "needs a refresh" flag as the module
-  page; hidden by default, like the module itself. A device-local Calendar layer, off by default,
-  shows every type's pickups in month, week, day, and agenda view; a pickup carries its type's icon
-  and color and opens the module directly, never the ordinary event editor. Beyond a one-time file
-  import, a source can also subscribe to an ICS URL: it refreshes itself automatically on a
-  configurable schedule (hourly to monthly), applying an update only once every label already has a
-  confirmed mapping - unrecognized content is flagged for review instead of guessed at, and a manual
-  "check now" is always available alongside the automatic schedule. Each household member can also opt
-  into their own pickup reminders per waste type, choosing how many days ahead and what time of day
-  (household-local) to be notified - personal, so a reminder never goes to someone who didn't ask for
-  it. A monthly schedule can now also follow an ordinal weekday - "the second Monday" or "the last
-  Friday" of every month - alongside the existing weekly and fixed-day-of-month rhythms; the
-  underlying shared recurrence engine gained this once and every existing recurring feature (Tasks,
-  Calendar, CalDAV/ICS import) benefits from it, not just Waste. A revocable, personal read-only ICS
-  feed of upcoming pickups is now available too (Settings → Feeds), with an optional per-type
-  selection; a source's label-to-type mapping decisions can be exported as a portable profile and
-  re-applied to another source or household, without the app ever shipping a municipal/provider
-  catalog. Waste types are now searchable from the global search bar, and the Calendar layer's filter
-  sheet gained a per-type visibility list nested under the one Waste toggle, so a rare collection is
-  never silently hidden while a noisy one can be tucked away.
-
 - **Planned meals show their recipe's picture, for recipes mirrored from Mealie or Tandoor**
   (#1059, step one). The thumbnail proxy has existed since the provider sync landed, but only the
   recipe list used it; the meal planner and the "today's meals" tile rendered text. Both now show
@@ -215,7 +238,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   system, the same way the server does. Without that, this change would have produced data the app
   itself could no longer read.
 
-
 - **The recurring-payment dialog now says that editing a series also rewrites its first booking**
   (#1035). A series original is two things at once: the template every future occurrence is built
   from, and the first hand-entered booking. `PUT /budget/:id/series` writes title, amount, category
@@ -226,6 +248,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The delete dialog is unchanged: "Delete entire series" already says it.
 
 ### Fixed
+
+- **Split Expenses no longer shows three ways to add an expense at once, or a second page title
+  under Budget's own heading.** Viewed as Budget's Split Expenses tab, the tab used to offer its own
+  header button and its own floating button for adding an expense, on top of Budget's own generic
+  toolbar button and FAB - both of the latter only ever repeated the tab's own button under the
+  hood. Budget's generic add action is now switched off for this tab, the same way it already is for
+  Reports; the tab's own floating button is the one primary action, and its header button steps back
+  to a secondary one. The tab's own `<h1>` - a second page title stacked under Budget's - is now a
+  section heading instead, matching how it already looked in a lighter type size. Deleting a group
+  now gets the same restrained red treatment used for a destructive action elsewhere in the app,
+  instead of looking identical to editing or archiving it.
+
+- **The demo data's birthday reminders now come days ahead, not minutes before noon on the day.**
+  The demo seed wrote reminder lead times as `1d`, `3d` and `1w`, while Yuvomi stores them as
+  minutes and reads only the leading digits, so they became one minute, three minutes and one
+  minute again: every demo birthday reminded shortly before noon on the birthday itself, and the
+  birthday form showed a lead time it does not offer.
+  The seed now uses the form's own values (a day, two days, a week - the former three days became
+  two), and a guard keeps it to those. Only a database filled by `scripts/seed-demo.js` is
+  affected.
+
+- **A dismissed birthday reminder stays dismissed.** Dismissing a due birthday reminder only lasted
+  until the next check: the sync that keeps a birthday's reminder in step looked for an active row,
+  found none, removed the dismissed one and created the same reminder again - so it was back within
+  a minute, and could be pushed a second time. The reminder now stays dismissed until its time
+  actually changes: a different lead time, a changed date, or next year's birthday.
 
 - **A housekeeper can check out again, and work a second session on the same day** (#1133, #1138).
   The one button that carries both directions was disabled while someone was checked in, and it is
@@ -306,15 +354,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set to read-only or its account is gone - it changes nothing at the provider, and a move the user
   took back must not come back to life once writing is allowed again. Google and CalDAV alike.
 
-- **A review run that stopped at its gate is named as such, even when it first denied having
-  reviewed** (#1101). The check behind the automated review reads the run's closing text to say
-  why a silent run went red. It only looked at the first mention of "already reviewed", so a text
-  that negated it once and then affirmed it ("has not already reviewed this HEAD ... has already
-  reviewed this PR, so I should stop here") was diagnosed as unknown, pointing at a missing post
-  instead of the gate. Every mention now counts, the way every "stop" already did. The check was
-  red either way; only its message changes. The one exception that can turn it green still reads
-  the narrower way.
-
 - **The event detail names the day a multi-day event ends** (#1102). The "When" row showed the
   start date and, of the end, only the time: an event from 10 September 14:00 to 12 September 11:00
   read as "14:00 - 11:00" on a single day that ends before it begins, and an all-day event across
@@ -338,27 +377,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   still pull the sheet closed. A pull that has already started stays tracked when the finger
   reverses, so the panel still returns to rest. Under the same setting the swipe now ends
   500 to 675 px down.
-
-- **The automated review no longer loses its result on a later push.** On a pull request's second
-  push the review first reads what has already been said, and the tools it reached for - `gh api` on
-  the pull request's reviews and comments, `git show`, `git fetch` of a commit - were not in its
-  allowed list. The run on #1116 did the review, collected seven refusals and posted nothing, which
-  the evidence step rightly turned red; 17 of the last 40 runs carried refusals like these. The list
-  now lets it read the repository through `gh api` and through read-only git commands.
-
-  Writing through `gh api` stays blocked by a second list that denies every write form (`-X`,
-  `--method`, `-f`, `-F`, `--field`, `--raw-field`, `--input`), bundled short flags such as `-if`,
-  and `--hostname`, which would send the request - headers included - to another host. That list is
-  load-bearing, measured with the CLI: a rule on the path alone let a POST through. The same list
-  keeps the read-only git commands read-only: `git show`, `git log`, `git diff` and `git rev-list`
-  write a file with `--output`, and on a runner that file can be the environment of the next step. Running code from the checkout
-  (`node`, `npm`, the test suites), writing files and fetching web pages stay out, because the job
-  holds a token that can write to pull requests and the checkout is the pull request's own code. A
-  guard in `test:claude-review-workflow` holds both lists.
-
-  Worth knowing: a pull request that touches the review workflow makes the action skip itself, so
-  this one is not reviewed by it, and after the merge an older branch skips the review until it is
-  rebased.
 
 - **The Module options settings page describes what it actually contains.** Its description named
   only Budget, Health and Housekeeping - accurate when it was written, but Tasks and Schedule have
@@ -390,36 +408,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   follows the storage format of the start it belongs to. Locally created series are unaffected:
   there both sides read the same server zone and the conversion cancels out.
 
-- **A failing test in the three suites that start the server now turns the run red.** Those suites
-  import `server/index.js` as a program rather than reading it as a file, which opens a real HTTP
-  socket and starts the background schedulers. Their handles kept the process alive, so each suite
-  ended with `process.exit(0)` in its `after()` hook - and that call overwrites the exit code
-  node:test only sets when the process ends by itself. Measured on 2026-09-09: a deliberately wrong
-  assertion reported `exit=0` while two `✖` lines stood in the log and the summary was cut off. In
-  the `npm test` chain these suites could only ever turn red through a top-level error, never
-  through a failed `test()` block.
-
-  Forcing a better code does not work. Inside the `after()` hook `process.exitCode` is still
-  `undefined`, also after `setImmediate` and after `setTimeout(…, 50)` - both measured - so
-  `process.exit(process.exitCode ?? 0)` reads nothing there. The way out is to stop calling
-  `process.exit` at all and clear the handles instead. Exactly three held the process:
-  `getActiveResourcesInfo()` named a `TCPServerWrap` and two `Timeout`. The shared
-  `test/server-ready.js` now closes the server, the two auto-sync timers `unref()` like the four
-  schedulers that already did, and the backup cron stays off under the documented
-  `BACKUP_ENABLED=false`. The process then ends on its own and node:test sets the real code, which
-  also counts a failure in a hook or an uncaught exception rather than only one inside a `test()`.
-
-  The proof is a program, not a text search. `test:suite-exit-code` runs a fixture suite of exactly
-  that build twice, once green and once red, and demands 0 and 1 - both times with an end of its
-  own, no timeout. With the `unref()` taken out again the guard turns red on that timeout, while
-  the text guard beside it, which forbids `process.exit(` in a server-starting suite, stays green:
-  the wording would have survived what the behaviour did not.
-
-  Two things came along. The three suites no longer reserve fixed ports (13098-13100) and take
-  whichever one the kernel hands them, so two runs at the same time stop colliding. And the
-  database-isolation guard had to learn the same rule one file further out: it looked for `DB_PATH`
-  in the suite itself and would otherwise have reported all three for setting it through the shared
-  helper - which sets it earlier and more strictly than the form the guard knew.
+- **Late Notes saves no longer close a replacement dialog or hide a failed save.** A save response
+  now belongs to the editor that started it. If that editor has already closed or is waiting behind
+  a discard confirmation, the current dialog and its unsaved fields stay intact; network failures
+  remain visible in the global error toast. A late category-name conflict follows the same ownership
+  rule: it offers the rejected name again only while the page and dialog flow that requested the
+  rename are still current, and otherwise reports the conflict without replacing newer work.
 
 - **An ingredient written in the household's own digits now counts towards the shopping list.**
   Moving a meal plan to the shopping list adds up the same ingredient across meals. The server read
@@ -534,10 +528,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mirrored in from Mealie or Tandoor stayed "1.5" in a German kitchen. Both directions now follow the
   set region - the reading side through the same transliteration as prices and shopping quantities,
   the writing side through the same number format - so a scaled quantity comes back out in the
-  notation the household reads, and the app can read its own output again the next time. The digits
-  of a scaled amount stay ASCII on purpose: the text is saved into the ingredient row and read back
-  when the meal moves to the shopping list, and a quantity in native digits would not arrive there
-  and would drop out of the totals. The separator is presentation and follows the region wherever
+  notation the household reads, and the app can read its own output again the next time. The
+  separator is presentation and follows the region wherever
   the region uses one the server reads - a comma in German, French or Czech, a dot in US English or
   Swiss German. Persian and Arabic use a third one, and there readability wins and the dot is
   written.
@@ -717,8 +709,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the read-only ICS feed now exports the replacement with standard `RECURRENCE-ID` semantics.
   Imported series keep their existing whole-series behavior. Generated local series and local
   series targeted for outbound sync retain their previous standalone-edit and deletion scopes.
-  Historic detached edits are left unchanged rather than guessed back into a series. iCloud auto-sync excludes
-  linked replacements and their masters, without excluding ordinary deletion-only exceptions.
+  Historic detached edits are left unchanged rather than guessed back into a series. iCloud
+  auto-sync excludes linked replacements and their masters, without excluding ordinary
+  deletion-only exceptions.
   Detaching a linked replacement retains its original-slot exception, so outbound targeting or a
   recurrence-rule round trip cannot resurrect a duplicate master occurrence. Changing a whole-series
   recurrence rule no longer forgets previously deleted occurrences. Truncating a series likewise
@@ -730,7 +723,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   writable push targets before accepting linked-series auto-sync, and MCP upcoming results retain
   their unrestricted future horizon while recurrence generation stops at the requested result count.
   ICS deletion exceptions keep the series' local time across daylight-saving changes even when
-  the stored UTC day differs; each exception needs at most three local-date candidates, not a series scan.
+  the stored UTC day differs; each exception needs at most three local-date candidates, not a
+  series scan.
 
 ## [2.65.3] - 2026-09-12
 

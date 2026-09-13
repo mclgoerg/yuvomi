@@ -17,7 +17,7 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE        = '2.65.3';
+const APP_RELEASE        = '2.66.0';
 const APP_BUILD_REVISION = '__YUVOMI_BUILD_REVISION__';
 const CACHE_RELEASE      = `${APP_RELEASE}-${APP_BUILD_REVISION}`;
 const SHELL_CACHE        = `yuvomi-shell-${CACHE_RELEASE}`;
@@ -155,6 +155,10 @@ const APP_SHELL = [
   '/utils/metric-card.js',
   '/utils/money.js',
   '/utils/nav-badges.js',
+  '/utils/note-category-filter.js',
+  '/utils/note-category-name.js',
+  '/utils/note-category-overflow.js',
+  '/utils/note-category-picker.js',
   '/utils/overlay-history.js',
   '/utils/page-layout.js',
   '/utils/page-lifecycle.js',

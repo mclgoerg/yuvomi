@@ -971,7 +971,25 @@
         "filterUnassigned": "غير مُسندة"
     },
     "noteCategories": {
-        "permissionLabel": "إدارة فئات ملاحظات الأسرة"
+        "categories": "الفئات",
+        "filterLabel": "التصفية حسب الفئات",
+        "empty": "لا توجد فئات بعد.",
+        "personal": "شخصية",
+        "household": "المنزل",
+        "noResults": "لا توجد ملاحظة تنتمي إلى جميع الفئات المحددة.",
+        "deleteDetail": "تُزال الفئة من جميع الملاحظات وعوامل تصفية لوحة المعلومات. تبقى الملاحظات نفسها دون تغيير.",
+        "widgetHint": "عند تحديد عدة فئات، تظهر فقط الملاحظات التي تنتمي إليها جميعًا. وبدون تحديد تظهر كل الملاحظات.",
+        "permissionLabel": "إدارة فئات ملاحظات الأسرة",
+        "searchPlaceholder": "ابحث عن فئة أو أنشئ واحدة...",
+        "searchResultsLabel": "اقتراحات الفئات",
+        "removeAction": "إزالة الفئة {{name}}",
+        "createAction": "إنشاء «{{name}}» وإسنادها",
+        "scopeLabel": "نطاق الفئة",
+        "scopeHelp": "الفئات الشخصية لك وحدك. يمكن لجميع أفراد المنزل استخدام الفئات المنزلية، وتتحكم الأذونات في إدارتها.",
+        "moreAction": "الفئات الإضافية: {{count}}",
+        "moreAction_one": "{{count}} فئة إضافية",
+        "moreAction_few": "{{count}} فئات إضافية",
+        "personalManagementHint": "يمكنك إدارة فئاتك الشخصية هنا. تظل فئات المنزل متاحة في محرر الملاحظات، لكنك لا تملك إذنًا لإدارتها."
     },
     "notes": {
         "title": "لوحة الملاحظات",
@@ -1806,6 +1824,7 @@
         },
         "ics": {
             "title": "اشتراكات ICS",
+            "holidayHint": "نصيحة: يعمل هذا أيضًا بشكل جيد مع العطلات الرسمية لبلد لا تغطيه بعد مزامنة العطلات في إعدادات التقويم.",
             "add": "إضافة اشتراك",
             "addedToast": "تمت إضافة الاشتراك.",
             "deletedToast": "تم حذف الاشتراك.",
@@ -2214,6 +2233,8 @@
         "holidayGroupHint": "بعض الكانتونات متعددة اللغات لها مواعيد عطل مدرسية مختلفة حسب المنطقة اللغوية. اختر المنطقة المناسبة للحصول على تواريخ صحيحة.",
         "holidayPublicLabel": "إظهار العطلات الرسمية",
         "holidaySchoolLabel": "إظهار العطلات المدرسية",
+        "holidaySchoolUnavailable": "لا تتوفر بيانات عطلات مدرسية لهذا البلد.",
+        "holidayAustraliaObservanceHint": "بالنسبة لأستراليا تُعرض العطلات في تواريخها الفعلية – أيام التعويض عن العطلات التي تصادف عطلة نهاية الأسبوع تختلف من ولاية إلى أخرى ولا تُعرض.",
         "holidayPublicColor": "لون العطلات الرسمية",
         "holidaySchoolColor": "لون العطلات المدرسية",
         "holidaySaveBtn": "حفظ",
@@ -2332,6 +2353,9 @@
         "permAccessWrite": "كامل",
         "permWidgetBlocked": "محظور",
         "permWidgetAllowed": "متاح",
+        "permCapabilitiesHeading": "أذونات إضافية",
+        "permCapabilityBlocked": "غير مسموح",
+        "permCapabilityAllowed": "مسموح",
         "permInherit": "توريث",
         "permInheritedHint": "موروث: {{value}}",
         "permModuleLockedHint": "الوحدة مقفلة",

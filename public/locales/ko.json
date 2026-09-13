@@ -983,7 +983,25 @@
         "filterUnassigned": "할당되지 않음"
     },
     "noteCategories": {
-        "permissionLabel": "가정 메모 카테고리 관리"
+        "categories": "카테고리",
+        "filterLabel": "카테고리로 필터링",
+        "empty": "아직 카테고리가 없습니다.",
+        "personal": "개인",
+        "household": "가정",
+        "noResults": "선택한 모든 카테고리에 속하는 메모가 없습니다.",
+        "deleteDetail": "이 카테고리는 모든 메모와 대시보드 필터에서 제거됩니다. 메모 자체는 변경되지 않습니다.",
+        "widgetHint": "여러 카테고리를 선택하면 모든 카테고리에 속하는 메모만 표시됩니다. 선택하지 않으면 모든 메모가 표시됩니다.",
+        "permissionLabel": "가정 메모 카테고리 관리",
+        "searchPlaceholder": "카테고리 검색 또는 만들기...",
+        "searchResultsLabel": "카테고리 제안",
+        "removeAction": "{{name}} 카테고리 제거",
+        "createAction": "“{{name}}” 만들고 지정",
+        "scopeLabel": "카테고리 유형",
+        "scopeHelp": "개인 카테고리는 본인만 보고 관리할 수 있습니다. 가구 카테고리는 모든 구성원이 사용할 수 있으며, 관리 권한은 권한 설정으로 제어됩니다.",
+        "moreAction": "카테고리 {{count}}개 더",
+        "moreAction_one": "카테고리 {{count}}개 더",
+        "moreAction_few": "카테고리 {{count}}개 더",
+        "personalManagementHint": "여기에서 개인 카테고리를 관리할 수 있습니다. 가구 카테고리는 메모 편집기에서 계속 사용할 수 있지만 관리할 권한은 없습니다."
     },
     "notes": {
         "title": "메모",
@@ -1861,6 +1879,7 @@
         },
         "ics": {
             "title": "ICS 구독",
+            "holidayHint": "팁: 캘린더 설정의 공휴일 동기화가 아직 지원하지 않는 국가의 공휴일에도 이 기능을 활용할 수 있습니다.",
             "add": "구독 추가",
             "form": {
                 "url": "ICS URL",
@@ -2226,6 +2245,8 @@
         "holidayGroupHint": "일부 다국어 주에서는 언어 지역에 따라 학교 방학 날짜가 다릅니다. 올바른 날짜를 보려면 해당 지역을 선택하세요.",
         "holidayPublicLabel": "공휴일 표시",
         "holidaySchoolLabel": "방학 표시",
+        "holidaySchoolUnavailable": "이 국가에 대한 학교 방학 데이터가 없습니다.",
+        "holidayAustraliaObservanceHint": "호주의 공휴일은 실제 날짜에 표시됩니다. 주말과 겹치는 공휴일의 대체 휴일은 주마다 달라 표시되지 않습니다.",
         "holidayPublicColor": "공휴일 색상",
         "holidaySchoolColor": "방학 색상",
         "holidaySaveBtn": "저장",
@@ -2344,6 +2365,9 @@
         "permAccessWrite": "전체",
         "permWidgetBlocked": "차단됨",
         "permWidgetAllowed": "사용 가능",
+        "permCapabilitiesHeading": "추가 권한",
+        "permCapabilityBlocked": "허용 안 함",
+        "permCapabilityAllowed": "허용",
         "permInherit": "상속",
         "permInheritedHint": "상속됨: {{value}}",
         "permModuleLockedHint": "모듈 잠김",

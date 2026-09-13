@@ -971,7 +971,25 @@
         "filterUnassigned": "未分配"
     },
     "noteCategories": {
-        "permissionLabel": "管理家庭笔记分类"
+        "categories": "分类",
+        "filterLabel": "按分类筛选",
+        "empty": "暂无分类。",
+        "personal": "个人",
+        "household": "家庭",
+        "noResults": "没有同时属于所有所选分类的便笺。",
+        "deleteDetail": "该分类会从所有便笺和仪表板筛选器中移除，便笺本身不会改变。",
+        "widgetHint": "选择多个分类时，只显示同时属于所有分类的便笺；未选择时显示全部便笺。",
+        "permissionLabel": "管理家庭笔记分类",
+        "searchPlaceholder": "搜索或创建类别...",
+        "searchResultsLabel": "类别建议",
+        "removeAction": "移除类别 {{name}}",
+        "createAction": "创建并分配“{{name}}”",
+        "scopeLabel": "类别类型",
+        "scopeHelp": "个人类别仅由您查看和管理。所有家庭成员都可使用家庭类别；权限决定谁可以管理它们。",
+        "moreAction": "另外 {{count}} 个类别",
+        "moreAction_one": "另外 {{count}} 个类别",
+        "moreAction_few": "另外 {{count}} 个类别",
+        "personalManagementHint": "您可以在此管理个人类别。家庭类别仍可在笔记编辑器中使用，但您没有管理这些类别的权限。"
     },
     "notes": {
         "title": "便签板",
@@ -1806,6 +1824,7 @@
         },
         "ics": {
             "title": "ICS 订阅",
+            "holidayHint": "提示：如果日历设置中的假日同步尚未覆盖某个国家，也可以用这种方式添加该国的公共假日。",
             "add": "添加订阅",
             "addedToast": "订阅已添加。",
             "deletedToast": "订阅已删除。",
@@ -2214,6 +2233,8 @@
         "holidayGroupHint": "一些多语言州的学校假期日期因语言区域而异。请选择相应的地区以获得正确的日期。",
         "holidayPublicLabel": "显示法定节假日",
         "holidaySchoolLabel": "显示学校假期",
+        "holidaySchoolUnavailable": "该国家没有可用的学校假期数据。",
+        "holidayAustraliaObservanceHint": "澳大利亚的节假日按实际日期显示——周末节假日的补假日各州规定不同，因此不予显示。",
         "holidayPublicColor": "法定节假日颜色",
         "holidaySchoolColor": "学校假期颜色",
         "holidaySaveBtn": "保存",
@@ -2332,6 +2353,9 @@
         "permAccessWrite": "完全",
         "permWidgetBlocked": "已屏蔽",
         "permWidgetAllowed": "可用",
+        "permCapabilitiesHeading": "其他权限",
+        "permCapabilityBlocked": "不允许",
+        "permCapabilityAllowed": "允许",
         "permInherit": "继承",
         "permInheritedHint": "继承：{{value}}",
         "permModuleLockedHint": "模块已锁定",
