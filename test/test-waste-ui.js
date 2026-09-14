@@ -17,6 +17,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 global.HTMLElement = class HTMLElement {};
 global.customElements = { define() {}, get() { return undefined; } };
@@ -38,6 +39,17 @@ const {
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
   typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
 } = __test;
+
+// Quelltext-Schnappschuss fuer die Zusicherungen weiter unten. Er steht VOR dem
+// ersten test(): unter Node 22 beginnen registrierte Tests schon beim naechsten
+// Top-Level-await zu laufen, und ein spaeter definiertes const liegt dann noch in
+// der temporal dead zone (ReferenceError, nur in der 22er-CI).
+const WASTE_SRC = readFileSync(new URL('../public/pages/waste.js', import.meta.url), 'utf8');
+// Fuer die "das gibt es nicht mehr"-Zusagen: die Begruendungen im Quelltext
+// NENNEN die abgeschafften Dinge ausdruecklich (`toolbar-new-btn`,
+// `<input type="color">`), damit der naechste Leser weiss, warum sie fehlen.
+// Ohne diesen Schnitt wuerde ausgerechnet die Erklaerung den Test ausloesen.
+const WASTE_CODE = WASTE_SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 // -------------------------------------------------------------------------
 // findScheduleOrigin - backs move/skip/restore
@@ -485,14 +497,6 @@ test('WASTE_TYPE_COLORS: eine kuratierte Auswahl ohne Dubletten und ohne Extremw
 // den Rueckschritt ab, der hier teuer waere: einen Schreib-Weg, der einem
 // Nur-lesen-Mitglied ins Markup rutscht.
 // -------------------------------------------------------------------------
-
-const { readFileSync } = await import('node:fs');
-const WASTE_SRC = readFileSync(new URL('../public/pages/waste.js', import.meta.url), 'utf8');
-// Fuer die "das gibt es nicht mehr"-Zusagen: die Begruendungen im Quelltext
-// NENNEN die abgeschafften Dinge ausdruecklich (`toolbar-new-btn`,
-// `<input type="color">`), damit der naechste Leser weiss, warum sie fehlen.
-// Ohne diesen Schnitt wuerde ausgerechnet die Erklaerung den Test ausloesen.
-const WASTE_CODE = WASTE_SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 test('die Seite hat einen sichtbaren, beschrifteten Weg zur ersten Abfallart, und das Ueberlaufmenue bietet ihn nicht doppelt an', () => {
   // Vorher lagen ALLE vier Aktionen hinter dem unbeschrifteten "..." - eine
