@@ -978,7 +978,7 @@ test('Cycle-Import: importierte Perioden bleiben scoped wie jede andere - Bob si
 });
 
 // ========================================================
-// ZYKLUS v2: Zervixschleim/Tests/Intimacy, Mehrfach-Gefühle (Migrationen 195-196)
+// ZYKLUS v2: Zervixschleim/Tests/Intimacy, Mehrfach-Gefühle (Migrationen 210-211)
 // ========================================================
 
 test('Cycle-Log: neue Skalarfelder + feelings im Round-Trip', async () => {
@@ -994,7 +994,7 @@ test('Cycle-Log: neue Skalarfelder + feelings im Round-Trip', async () => {
   assert.equal(created.body.data.pregnancy_test, 'negative');
   assert.equal(created.body.data.intimacy, 'protected');
   assert.deepEqual(created.body.data.feelings, ['good', 'irritable']);
-  // Die mood-Spalte wird seit Migration 196 nie mehr beschrieben, auch nicht,
+  // Die mood-Spalte wird seit Migration 211 nie mehr beschrieben, auch nicht,
   // wenn nur `feelings` gesendet wird.
   assert.equal(created.body.data.mood, null);
 
@@ -1041,7 +1041,7 @@ test('Cycle-Log: ungültiger legacy mood-Wert wird abgelehnt wie ein ungültiges
 
 // Review-Runde Fix 2(a): der Upsert setzt `mood = NULL` jetzt auf BEIDEN
 // Pfaden (Insert und Conflict-Update) aktiv, statt die Spalte unangetastet zu
-// lassen - eine schon vor Migration 196 (oder direkt in der DB) eingefrorene
+// lassen - eine schon vor Migration 211 (oder direkt in der DB) eingefrorene
 // `mood` durfte sonst bei jedem weiteren Speichern desselben Tages bestehen
 // bleiben und im GET wieder auftauchen, sobald `feelings` geleert wurde
 // (siehe normalizeFeelingEntries()/`existingFeelings` in health-cycle.js/
@@ -1053,7 +1053,7 @@ test('Cycle-Log: ein direkt in der DB eingefrorener Legacy-mood-Wert wird beim n
   const id = created.body.data.id;
 
   // Legacy-Zustand simulieren: `mood` direkt setzen, wie es eine Zeile von vor
-  // Migration 196 (oder ein alter Client) getragen haette - die API selbst
+  // Migration 211 (oder ein alter Client) getragen haette - die API selbst
   // schreibt `mood` nie mehr.
   db.prepare('UPDATE cycle_day_logs SET mood = ? WHERE id = ?').run('sad', id);
   assert.equal(db.prepare('SELECT mood FROM cycle_day_logs WHERE id = ?').get(id).mood, 'sad');

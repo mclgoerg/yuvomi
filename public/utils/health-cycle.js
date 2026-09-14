@@ -740,14 +740,14 @@ export function symptomFrequencyByPhase(dayLogs, periods, settings = {}) {
  * Gefuehls-Eintraege EINES Tages-Logs, normalisiert auf dieselbe
  * `{key, intensity}`-Form wie normalizeSymptomEntries() (intensity ist hier
  * immer `null` - Gefuehle kennen keine Staerke). `feelings` (Array, seit
- * Migration 196) hat Vorrang - und zwar auch als LEERES Array: ein bewusst
+ * Migration 211) hat Vorrang - und zwar auch als LEERES Array: ein bewusst
  * geleertes `feelings: []` ist "keine Gefuehle mehr", nicht "keine Angabe",
  * und darf NICHT auf das eingefrorene `mood` zurueckfallen (Review-Runde
  * Fix 2 - vorher wurde ein geloeschtes Gefuehl beim naechsten Laden aus dem
  * alten `mood`-Wert wiederbelebt, weil `[].length` falsy ist). Der Fallback
  * auf das alte Einzelfeld `mood` als Ein-Element-Liste greift NUR, wenn
  * `feelings` ueberhaupt fehlt (kein Array ist) - also fuer Zeilen aus der Zeit
- * vor Migration 196, deren Formular `feelings` noch nie gesendet hat.
+ * vor Migration 211, deren Formular `feelings` noch nie gesendet hat.
  * Unbekannte/nicht in MOOD_VALUES enthaltene Werte werden still verworfen,
  * dieselbe Haltung wie normalizeSymptomEntries().
  * @param {Object} log

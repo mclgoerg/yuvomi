@@ -137,12 +137,12 @@ test('cycle_day_log_symptoms kaskadiert beim Loeschen des Tages-Logs', () => {
 });
 
 // --------------------------------------------------------------------------
-// Migration v196: cycle_day_log_feelings-Backfill aus der alten mood-Spalte
+// Migration v211: cycle_day_log_feelings-Backfill aus der alten mood-Spalte
 // --------------------------------------------------------------------------
 
-const V196 = MIGRATIONS.find((m) => m.version === 196);
+const V211 = MIGRATIONS.find((m) => m.version === 211);
 
-function seedPreV196() {
+function seedPreV211() {
   const db = new Database(join(mkdtempSync(join(tmpdir(), 'yuvomi-cyclefeelingsmig-')), 'db.sqlite'));
   db.exec(`
     CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL);
@@ -168,24 +168,24 @@ function seedPreV196() {
   return db;
 }
 
-function appliedV196() {
-  const db = seedPreV196();
-  // Anders als V178 ist v196s `up` reines SQL (kein Funktions-up) - die
+function appliedV211() {
+  const db = seedPreV211();
+  // Anders als V178 ist v211s `up` reines SQL (kein Funktions-up) - die
   // Zerlegung passiert hier nicht zeilenweise in JS, sondern per SQL-INSERT
-  // ... SELECT, siehe Migration 196 in server/db.js.
-  db.exec(V196.up);
+  // ... SELECT, siehe Migration 211 in server/db.js.
+  db.exec(V211.up);
   return db;
 }
 
-test('v196 legt cycle_day_log_feelings mit den erwarteten Spalten an', () => {
-  const db = appliedV196();
+test('v211 legt cycle_day_log_feelings mit den erwarteten Spalten an', () => {
+  const db = appliedV211();
   const cols = db.prepare('PRAGMA table_info(cycle_day_log_feelings)').all().map((c) => c.name);
   assert.deepEqual(cols.sort(), ['day_log_id', 'feeling_key', 'id'].sort());
   db.close();
 });
 
-test('v196 befuellt genau eine Zeile je Tages-Log mit gesetztem mood-Wert', () => {
-  const db = appliedV196();
+test('v211 befuellt genau eine Zeile je Tages-Log mit gesetztem mood-Wert', () => {
+  const db = appliedV211();
   const rows = db.prepare(
     'SELECT day_log_id, feeling_key FROM cycle_day_log_feelings ORDER BY day_log_id'
   ).all();
@@ -196,16 +196,16 @@ test('v196 befuellt genau eine Zeile je Tages-Log mit gesetztem mood-Wert', () =
   db.close();
 });
 
-test('v196 erzeugt keine Zeile fuer NULL oder leere mood-Spalten', () => {
-  const db = appliedV196();
+test('v211 erzeugt keine Zeile fuer NULL oder leere mood-Spalten', () => {
+  const db = appliedV211();
   const countFor = (id) => db.prepare('SELECT COUNT(*) AS c FROM cycle_day_log_feelings WHERE day_log_id = ?').get(id).c;
   assert.equal(countFor(3), 0);
   assert.equal(countFor(4), 0);
   db.close();
 });
 
-test('v196 laesst die alte mood-Spalte unveraendert stehen (kein Rebuild, keine Loeschung)', () => {
-  const db = appliedV196();
+test('v211 laesst die alte mood-Spalte unveraendert stehen (kein Rebuild, keine Loeschung)', () => {
+  const db = appliedV211();
   const rows = db.prepare('SELECT log_date, mood FROM cycle_day_logs ORDER BY log_date').all();
   assert.deepEqual(rows, [
     { log_date: '2030-01-01', mood: 'good' },
@@ -216,15 +216,15 @@ test('v196 laesst die alte mood-Spalte unveraendert stehen (kein Rebuild, keine 
   db.close();
 });
 
-test('v196 legt einen Index auf day_log_id an', () => {
-  const db = appliedV196();
+test('v211 legt einen Index auf day_log_id an', () => {
+  const db = appliedV211();
   const names = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'cycle_day_log_feelings'").all().map((r) => r.name);
   assert.ok(names.includes('idx_cycle_day_log_feelings_day_log'));
   db.close();
 });
 
 test('cycle_day_log_feelings hat UNIQUE(day_log_id, feeling_key)', () => {
-  const db = appliedV196();
+  const db = appliedV211();
   assert.throws(
     () => db.prepare("INSERT INTO cycle_day_log_feelings (day_log_id, feeling_key) VALUES (1, 'good')").run(),
     /UNIQUE constraint failed/,
@@ -233,7 +233,7 @@ test('cycle_day_log_feelings hat UNIQUE(day_log_id, feeling_key)', () => {
 });
 
 test('cycle_day_log_feelings kaskadiert beim Loeschen des Tages-Logs', () => {
-  const db = appliedV196();
+  const db = appliedV211();
   db.pragma('foreign_keys = ON');
   assert.equal(db.prepare('SELECT COUNT(*) AS c FROM cycle_day_log_feelings WHERE day_log_id = 1').get().c, 1);
   db.prepare('DELETE FROM cycle_day_logs WHERE id = 1').run();

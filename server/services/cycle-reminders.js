@@ -154,7 +154,7 @@ function syncPeriodReminder(database, userId, settings, today, prediction) {
  * mit derselben predictCycle()-Basis wie die eigene Perioden-Erinnerung oben -
  * kein zweites Vorhersagemodell für dieselbe Frage.
  *
- * EIGENE ANKER-ART ('partner_period', Migration 198): der Anker gehört
+ * EIGENE ANKER-ART ('partner_period', Migration 213): der Anker gehört
  * weiterhin dem EIGENTÜMER (anchor_date ist dessen vorhergesagter
  * Periodenbeginn) - anders waeren zwei verschiedene reminders-Zeilen (die
  * eigene und die der Partnerperson) nicht sauber auseinanderzuhalten, wenn

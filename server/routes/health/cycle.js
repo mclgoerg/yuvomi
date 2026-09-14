@@ -106,14 +106,14 @@ function replaceSymptoms(database, dayLogId, entries) {
   for (const entry of entries) insert.run(dayLogId, entry.key, entry.intensity);
 }
 
-// Geschlossene Werte-Listen fuer die seit Migration 195 nullbaren Spalten
+// Geschlossene Werte-Listen fuer die seit Migration 210 nullbaren Spalten
 // (kein CHECK auf der Spalte selbst, siehe dortiger Kommentar) - kommen seit
 // Review-Runde Fix 6 als Import von oben (health-cycle.js, EIN Zuhause statt
 // dreier Kopien), nicht mehr als lokale Konstanten hier.
 // D-6, hart privat (siehe GET /cycle/logs unten und DECISIONS.md): INTIMACY_VALUES.
 
 /**
- * Gefuehle eines Tages (Mehrfachauswahl, seit Migration 196) validieren +
+ * Gefuehle eines Tages (Mehrfachauswahl, seit Migration 211) validieren +
  * normalisieren. Anders als normalizeSymptomEntries() (offenes Schema, nur
  * eine Format-Regex) ist dies ein GESCHLOSSENES Set - MOOD_VALUES aus
  * health-cycle.js, dieselbe Quelle wie das Frontend-Preset - und ein
@@ -298,7 +298,7 @@ router.get('/cycle/logs', (req, res) => {
     // bzw. 196), nicht mehr aus den (nur noch historischen) Skalar-Spalten -
     // `SELECT l.*` liefert die alten Spalten zwar mit, der Überschreib unten
     // ersetzt `symptoms` in der Antwort und ergänzt `feelings`; `mood` bleibt
-    // als reiner Altlast-Lesewert stehen (siehe Migration 196). Batch statt
+    // als reiner Altlast-Lesewert stehen (siehe Migration 211). Batch statt
     // einer Abfrage je Zeile (symptomsForLogs()/feelingsForLogs(), je ein
     // `IN (...)`).
     const symptomsByLog = symptomsForLogs(database, rows.map((row) => row.id));
@@ -306,7 +306,7 @@ router.get('/cycle/logs', (req, res) => {
     res.json({ data: rows.map((row) => {
       // `intimacy` ist hart privat (D-6, siehe DECISIONS.md): unabhängig von
       // `visibility` nur für den Eigentümer selbst sichtbar, auch wenn diese
-      // Zeile familienweit geteilt ist - siehe Migration 195's Kommentar.
+      // Zeile familienweit geteilt ist - siehe Migration 210's Kommentar.
       const { intimacy, ...rest } = row;
       return {
         ...rest,
@@ -339,7 +339,7 @@ router.post('/cycle/logs', (req, res) => {
     // Legacy `mood` (Einzelwert) wird, wenn `feelings` fehlt, als
     // Ein-Element-Liste behandelt - siehe normalizeFeelings(). Die
     // `mood`-Spalte selbst wird beim Speichern aktiv auf NULL gesetzt (Review-
-    // Runde Fix 2): Migration 196 liess sie beim Umstieg unangetastet stehen
+    // Runde Fix 2): Migration 211 liess sie beim Umstieg unangetastet stehen
     // (die Migration selbst bleibt so - sie lief bereits auf Live-DBs), aber
     // dieser Schreibpfad hier liess sie seither ebenfalls unberuehrt, egal wie
     // oft ein Tag danach erneut gespeichert wurde. Dadurch konnte ein laengst
@@ -347,7 +347,7 @@ router.post('/cycle/logs', (req, res) => {
     // Altwert wieder auftauchen (siehe normalizeFeelingEntries() in
     // health-cycle.js, das GENAU diesen Fall beheben musste). `feelings` ist
     // ab hier die einzige Wahrheit; `mood` bleibt nur noch fuer Zeilen lesbar,
-    // die seit Migration 196 nie erneut gespeichert wurden.
+    // die seit Migration 211 nie erneut gespeichert wurden.
     const feelings      = normalizeFeelings(b.feelings, b.mood);
 
     const errors = v.collectErrors([logDate, flow, note, visibility, cervixMucus, lhTest, pregnancyTest, intimacy]);
@@ -427,7 +427,7 @@ router.delete('/cycle/logs/:id', (req, res) => {
 // ---- Einstellungen (nur eigene) ----
 
 // Verhuetungsmethode (D-9): geschlossene Auswahl, NULL = nicht angegeben.
-// Kein CHECK auf der Spalte (siehe Migration 197) - dieselbe Aufteilung wie
+// Kein CHECK auf der Spalte (siehe Migration 212) - dieselbe Aufteilung wie
 // ueberall sonst in diesem Modul. Die *hormonelle* Teilmenge (pill,
 // hormonal_iud, implant, injection, patch, ring) schaltet clientseitig die
 // Eisprung-/Fruchtbarkeitsvorhersage ab (siehe DECISIONS.md); Kupferspirale/

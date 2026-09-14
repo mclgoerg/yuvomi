@@ -7699,7 +7699,7 @@ const MIGRATIONS = [
       FROM calendar_events;    `,
   },
   {
-    version: 195,
+    version: 210,
     description: 'Health: cervical mucus, LH/pregnancy test results and intimacy as optional day-log scalars',
     // Vier weitere Skalarwerte je Tag, gleiche Bauart wie Migration 179
     // (basal_temp): ein ALTER TABLE kann - anders als das urspruengliche
@@ -7721,7 +7721,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 196,
+    version: 211,
     description: 'Health: multi-select feelings per day log - normalized cycle_day_log_feelings table, backfilled from the legacy mood column',
     // Gleiches Muster wie Migration 178 (cycle_day_log_symptoms): die alte
     // Skalar-Spalte (cycle_day_logs.mood) bleibt UNVERAENDERT stehen - kein
@@ -7749,7 +7749,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 197,
+    version: 212,
     description: 'Health: cycle_settings extensions - contraception, perimenopause mode, PMS toggle, opt-in partner notification',
     up: `
       -- Kein CHECK auf der Spalte: die Werte-Liste lebt in der Route (gleiche
@@ -7781,7 +7781,7 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 198,
+    version: 213,
     description: 'Health: widen cycle_reminder_anchors.kind to add partner_period (D-15)',
     // SQLite kennt kein ALTER auf einen CHECK - derselbe Tabellen-Rebuild wie
     // v137/v141/v148/v162/v177 fuer reminders.entity_type, nur hier fuer die

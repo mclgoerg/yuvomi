@@ -2674,11 +2674,11 @@ is writable by anyone for themselves.
 | log_date | TEXT | NOT NULL — YYYY-MM-DD |
 | flow | TEXT | `spotting` \| `light` \| `medium` \| `heavy` (nullable) |
 | symptoms | TEXT | **Legacy, frozen as of migration 178.** Comma-separated symptom keys; no longer written or read by the API — see `cycle_day_log_symptoms` below. Kept only so a raw DB backup from before that migration stays readable. |
-| mood | TEXT | **Legacy, frozen as of migration 196.** Single feeling key; no longer written — see `cycle_day_log_feelings` below. Still returned read-only and accepted as input (treated as `feelings: [mood]`) for older clients. |
-| cervix_mucus | TEXT | nullable (migration 195) — `dry` \| `sticky` \| `creamy` \| `watery` \| `eggwhite`, route-enforced like `basal_temp_unit` |
-| lh_test | TEXT | nullable (migration 195) — `negative` \| `positive` |
-| pregnancy_test | TEXT | nullable (migration 195) — `negative` \| `positive` |
-| intimacy | TEXT | nullable (migration 195) — `protected` \| `unprotected` \| `solo`. **Hard-private:** stripped from every non-owner read regardless of the row's `visibility`, and never exposed by the bulk visibility action — the per-row flag governs the day log as a whole, but this field never travels with it. |
+| mood | TEXT | **Legacy, frozen as of migration 211.** Single feeling key; no longer written — see `cycle_day_log_feelings` below. Still returned read-only and accepted as input (treated as `feelings: [mood]`) for older clients. |
+| cervix_mucus | TEXT | nullable (migration 210) — `dry` \| `sticky` \| `creamy` \| `watery` \| `eggwhite`, route-enforced like `basal_temp_unit` |
+| lh_test | TEXT | nullable (migration 210) — `negative` \| `positive` |
+| pregnancy_test | TEXT | nullable (migration 210) — `negative` \| `positive` |
+| intimacy | TEXT | nullable (migration 210) — `protected` \| `unprotected` \| `solo`. **Hard-private:** stripped from every non-owner read regardless of the row's `visibility`, and never exposed by the bulk visibility action — the per-row flag governs the day log as a whole, but this field never travels with it. |
 | note | TEXT | |
 | visibility | TEXT | `private` \| `family`, default `private` |
 | basal_temp | REAL | nullable (migration 179) — optional daily basal body temperature |
@@ -2714,14 +2714,14 @@ string or plain string array (both yield `intensity: null`).
 | default_visibility | TEXT | `private` \| `family`, default `private` (migration 96) — pre-selects the visibility for newly logged periods and day logs; per-entry override always available |
 | remind_period_days_before | INTEGER | nullable, 0–14 (migration 177) — NULL = off; days of lead time before the predicted next period for a `cycle_period` reminder |
 | remind_log_daily | INTEGER | 0/1, default 0 (migration 177) — daily nudge to log today, suppressed once a `cycle_day_logs` row exists for the day |
-| contraception | TEXT | nullable (migration 197) — `none` \| `pill` \| `hormonal_iud` \| `copper_iud` \| `implant` \| `injection` \| `patch` \| `ring` \| `condom` \| `other`. The hormonal subset (`pill`, `hormonal_iud`, `implant`, `injection`, `patch`, `ring`) suppresses fertile-window/ovulation prediction (`fertilitySuppressed: 'contraception'`), with an explanatory note where the fertile-window tile would be — hidden-but-explained, never silently broken. |
-| perimenopause_mode | INTEGER | 0/1, default 0 (migration 197) — next period becomes a min–max date range from the recent plausible gaps (`nextStartRange`), the Regular/Irregular judgement is suppressed (irregularity is expected, not an alarm) |
-| show_pms | INTEGER | 0/1, default 1 (migration 197) — toggles the derived PMS-window shading on the calendar; the window itself is computed, never stored (`pmsWindow()`) |
-| notify_partner_user_id | INTEGER | nullable (migration 197), FK → Users (SET NULL) — owner-opt-in partner reminder; must be another household member |
-| notify_partner_days_before | INTEGER | nullable, 0–14 (migration 197) — lead time for the partner's reminder |
+| contraception | TEXT | nullable (migration 212) — `none` \| `pill` \| `hormonal_iud` \| `copper_iud` \| `implant` \| `injection` \| `patch` \| `ring` \| `condom` \| `other`. The hormonal subset (`pill`, `hormonal_iud`, `implant`, `injection`, `patch`, `ring`) suppresses fertile-window/ovulation prediction (`fertilitySuppressed: 'contraception'`), with an explanatory note where the fertile-window tile would be — hidden-but-explained, never silently broken. |
+| perimenopause_mode | INTEGER | 0/1, default 0 (migration 212) — next period becomes a min–max date range from the recent plausible gaps (`nextStartRange`), the Regular/Irregular judgement is suppressed (irregularity is expected, not an alarm) |
+| show_pms | INTEGER | 0/1, default 1 (migration 212) — toggles the derived PMS-window shading on the calendar; the window itself is computed, never stored (`pmsWindow()`) |
+| notify_partner_user_id | INTEGER | nullable (migration 212), FK → Users (SET NULL) — owner-opt-in partner reminder; must be another household member |
+| notify_partner_days_before | INTEGER | nullable, 0–14 (migration 212) — lead time for the partner's reminder |
 | created_at / updated_at | TEXT | ISO 8601, default now |
 
-**`cycle_day_log_feelings`** (migration 196) — multi-select feelings for a day log, normalized out
+**`cycle_day_log_feelings`** (migration 211) — multi-select feelings for a day log, normalized out
 of the legacy scalar `mood` column exactly like migration 178 did for symptoms: backfill copies
 every non-empty `mood` into one row, the column freezes. The API's `feelings` field is this table's
 keys (validated against the 7 `MOOD_TYPES` values — unlike symptom keys, an unknown feeling is a
@@ -2734,7 +2734,7 @@ fall back to `mood` only when `feelings` is absent entirely, never when it is an
 | day_log_id | INTEGER | FK → `cycle_day_logs` (CASCADE delete), NOT NULL |
 | feeling_key | TEXT | NOT NULL — one of `MOOD_TYPES` (`public/utils/health-cycle.js`) |
 
-**Partner period reminder** (migration 198) widens `cycle_reminder_anchors.kind` with
+**Partner period reminder** (migration 213) widens `cycle_reminder_anchors.kind` with
 `partner_period`. The owner's opt-in (`notify_partner_user_id` + `notify_partner_days_before`)
 maintains one additional `cycle_period` reminder row whose recipient is the partner while the
 anchor identity stays with the owner — no fourth reminder entity type, zero new registry entries.

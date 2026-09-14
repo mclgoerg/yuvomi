@@ -6079,7 +6079,7 @@ const TEST_RESULT_CHOICES = TEST_RESULT_VALUES.map((v) => ({ value: v, labelKey:
 /**
  * Mehrfachauswahl-Variante von wireChoiceGroup(): jeder Chip schaltet nur
  * sich selbst um, ohne die anderen Chips derselben Gruppe abzuwaehlen -
- * Gefuehle sind (seit Migration 196) eine Mehrfachauswahl, keine
+ * Gefuehle sind (seit Migration 211) eine Mehrfachauswahl, keine
  * Einfachauswahl wie Blutungsstaerke oder die Testergebnisse.
  */
 function wireMultiChoiceGroup(root, group) {
@@ -6130,14 +6130,14 @@ function openDayLogModal(dateKey) {
       <i data-lucide="${esc(s.icon)}" aria-hidden="true"></i>${esc(t(s.labelKey))}${symptomIntensityDotsHTML(level)}</button>`;
   }).join('');
 
-  // Gefuehle (Migration 196, Mehrfachauswahl): vorbefuellt aus `feelings`,
+  // Gefuehle (Migration 211, Mehrfachauswahl): vorbefuellt aus `feelings`,
   // ersatzweise aus dem alten Einzelwert `mood` fuer Eintraege von vor der
   // Migration (Abwaertskompatibilitaet, siehe DECISIONS.md). Dieselben
   // MOOD_TYPES-Presets wie zuvor das Einzelauswahl-<select> - nur die
   // Verdrahtung (wireMultiChoiceGroup statt eines <select>) ist neu.
   //
   // Review-Runde Fix 2: der Fallback auf `mood` greift NUR, wenn `feelings`
-  // ueberhaupt kein Array ist (Zeilen von vor Migration 196) - ein bewusst
+  // ueberhaupt kein Array ist (Zeilen von vor Migration 211) - ein bewusst
   // GELEERTES `feelings: []` ist "keine Gefuehle mehr", nicht "keine Angabe",
   // und darf das laengst geleerte Gefuehl nicht aus dem eingefrorenen `mood`
   // wiederbeleben (dieselbe Regel wie normalizeFeelingEntries() in

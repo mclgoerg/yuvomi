@@ -268,7 +268,7 @@ test('D-6/D-10/D-11: der Tages-Log-Submit sendet cervix_mucus, lh_test, pregnanc
   for (const field of ['cervix_mucus', 'lh_test', 'pregnancy_test', 'feelings', 'intimacy']) {
     assert.match(fn, new RegExp(`${field}[,:]`), `Feld ${field} fehlt im Submit-Body`);
   }
-  // `mood` ist seit Migration 196 nur noch ein Lesewert (siehe DECISIONS.md,
+  // `mood` ist seit Migration 211 nur noch ein Lesewert (siehe DECISIONS.md,
   // "Feelings become multi-select") - der neue Body darf ihn nicht mehr
   // schreiben, `feelings` ersetzt ihn vollstaendig.
   assert.ok(!/body\s*=\s*\{[\s\S]*?mood:/.test(fn), 'mood darf im Submit-Body nicht mehr geschrieben werden');
