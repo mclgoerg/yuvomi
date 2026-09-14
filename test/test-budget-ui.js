@@ -32,6 +32,30 @@ const panelCss = read('../public/styles/panel.css');
 const subscriptionsCss = read('../public/styles/subscriptions.css');
 const splitCss = read('../public/styles/split-expenses.css');
 
+// Fuer den Verhaltenstest des Zeitraum-Kopfs (#1164) wird budget.js WIRKLICH
+// geladen (Browser-Loader, siehe npm-Skript), statt nur als Text gelesen -
+// geprueft werden gerendertes Markup und die echte Sync-Funktion. budget.js
+// zieht am Modulkopf echte Browser-Module (u. a. das Custom Element
+// category-manager.js); der Minimal-Stub deckt genau deren Modul-Ladezeit ab,
+// dasselbe Muster wie test-waste-ui.js/test-shopping-ux.js. Er steht VOR dem
+// ersten Top-Level-await: unter Node 22 beginnen registrierte Tests dort schon
+// zu laufen, und alles, was sie brauchen, muss dann initialisiert sein.
+global.HTMLElement = class HTMLElement {};
+global.customElements = { define() {}, get() { return undefined; } };
+global.window = { matchMedia: () => ({ matches: false }), addEventListener() {}, yuvomi: {} };
+global.document = {
+  getElementById: () => null,
+  createElement: () => Object.assign(new global.HTMLElement(), {
+    style: {}, setAttribute() {}, appendChild() {}, addEventListener() {},
+    classList: { add() {}, remove() {}, toggle() {} },
+  }),
+  addEventListener() {},
+  documentElement: { lang: 'de' },
+};
+global.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+const { __test: budgetUi } = await import('../public/pages/budget.js');
+const { todayKey } = await import('../public/utils/date.js');
+
 // --------------------------------------------------------
 // Monatsnavigation und Neu-Aktion je Untertab
 // --------------------------------------------------------
@@ -78,6 +102,58 @@ test('Monats-Bedienelemente werden als Block geschaltet, nicht einzeln', () => {
   const block = budget.match(/\['#budget-prev', '#budget-next', '#budget-today', '#budget-label'\][\s\S]{0,220}/);
   assert.ok(block, 'Monats-Bedienelemente werden nicht gemeinsam geschaltet');
   assert.match(block[0], /el\.hidden = !caps\.month/);
+});
+
+// #1164: EIN Positions- und EINE Sichtbarkeitsregel fuer den Zeitraum-Reset.
+// Verhaltensgetrieben: geprueft werden der GERENDERTE Kopf und die echte
+// Sync-Funktion, nicht der Quelltext.
+test('Zeitraum-Kopf: zurueck, Wert, vor - dahinter „Aktuell", verborgen im aktuellen Zeitraum (#1164)', () => {
+  // (a) Reihenfolge im gerenderten Markup: der Reset steht HINTER dem Stepper.
+  const ids = [...budgetUi.monthNavHtml().matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(
+    ids,
+    ['budget-prev', 'budget-label', 'budget-next', 'budget-today', 'budget-period-note'],
+    'erwartet zurueck, Wert, vor, Reset (und den Kontexttext-Slot)'
+  );
+
+  // (b) Sichtbarkeit: im aktuellen Monat bzw. auf dem heutigen Berichts-Anker
+  // ist der Reset `hidden`, behaelt aber sein Element (der Slot bleibt, die
+  // Kopfhoehe springt nicht).
+  const btn = { hidden: false };
+  const root = { querySelector: (sel) => (sel === '#budget-today' ? btn : null) };
+  const zuvor = {
+    activeTab: budgetUi.state.activeTab,
+    month: budgetUi.state.month,
+    reportAnchor: budgetUi.state.reportAnchor,
+  };
+  try {
+    budgetUi.state.activeTab = 'budget';
+    budgetUi.state.month = budgetUi.currentMonth();
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.hidden, true, 'im aktuellen Monat muss der Reset verborgen sein');
+    budgetUi.state.month = '2030-06';
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.hidden, false, 'in einem anderen Monat muss der Reset sichtbar sein');
+
+    // Berichte rechnen auf dem Anker, nicht dem Monat.
+    budgetUi.state.activeTab = 'reports';
+    budgetUi.state.reportAnchor = '2030-06-15';
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.hidden, false, 'Berichte: ein verschobener Anker zeigt den Reset');
+    budgetUi.state.reportAnchor = todayKey();
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.hidden, true, 'Berichte: auf dem heutigen Anker ist der Reset verborgen');
+
+    // Und der Tab-Block behaelt das letzte Wort: ohne Monatsnavigation bleibt
+    // der Reset verborgen, egal welcher Monat eingestellt ist.
+    budgetUi.state.activeTab = 'accounts';
+    budgetUi.state.month = '2030-06';
+    btn.hidden = false;
+    budgetUi.syncCurrentButton(root);
+    assert.equal(btn.hidden, true, 'ohne Monatsnavigation bleibt der Reset verborgen');
+  } finally {
+    Object.assign(budgetUi.state, zuvor);
+  }
 });
 
 test('das Modul führt genau eine Zeitachse', () => {

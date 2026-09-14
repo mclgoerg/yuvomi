@@ -20,6 +20,38 @@ function test(name, fn) {
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || 'Assertion fehlgeschlagen'); }
 
+// #1164: EIN Positions- und EINE Sichtbarkeitsregel fuer den Zeitraum-Reset.
+// Verhaltensgetrieben: geprueft werden der GERENDERTE Kopf und die echte
+// Sync-Funktion, nicht der Quelltext.
+test('Zeitraum-Kopf: zurueck, Wert, vor - dahinter „Heute", verborgen im angezeigten Zeitraum (#1164)', () => {
+  // (a) Reihenfolge im gerenderten Markup: der Reset steht HINTER dem Stepper.
+  const ids = [...calendarHelpers.periodNavHtml().matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  assert(JSON.stringify(ids) === JSON.stringify(['cal-prev', 'cal-label', 'cal-next', 'cal-today']),
+    `erwartet zurueck, Wert, vor, Reset - gerendert: ${ids.join(', ')}`);
+
+  // (b) Sichtbarkeit: im angezeigten Zeitraum ist der Reset `hidden`,
+  // behaelt aber sein Element (der Slot bleibt, die Kopfhoehe springt nicht).
+  const btn = { hidden: false };
+  const root = { querySelector: (sel) => (sel === '#cal-today' ? btn : null) };
+  const zuvor = {
+    view: calendarHelpers.state.view,
+    cursor: calendarHelpers.state.cursor,
+    today: calendarHelpers.state.today,
+  };
+  try {
+    calendarHelpers.state.view = 'month';
+    calendarHelpers.state.today = '2026-06-15';
+    calendarHelpers.state.cursor = '2026-06-15';
+    calendarHelpers.syncTodayButton(root);
+    assert(btn.hidden === true, 'im angezeigten Monat muss der Reset verborgen sein');
+    calendarHelpers.state.cursor = '2026-08-15';
+    calendarHelpers.syncTodayButton(root);
+    assert(btn.hidden === false, 'ausserhalb des angezeigten Monats muss der Reset sichtbar sein');
+  } finally {
+    Object.assign(calendarHelpers.state, zuvor);
+  }
+});
+
 test('Kalender-Speicherbestätigungen halten beide Editor-Save-Gates offen', () => {
   const source = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
   for (const [name, nextName] of [

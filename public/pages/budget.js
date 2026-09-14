@@ -422,6 +422,48 @@ async function loadBudgetMeta() {
 // Entry Point
 // --------------------------------------------------------
 
+/**
+ * Der Zeitraum-Kopf: zurueck, Wert, vor - und dahinter der Reset. „Aktuell"
+ * ist ein Reset, kein Navigationsschritt: hinter dem Stepper statt zwischen
+ * Pfeil und Wert. Seit #1164 ist das die Regel fuer alle drei Zeitraum-Koepfe
+ * (Kalender, Wochenplan, Budget). Als eigener Baustein, damit der
+ * Verhaltenstest die GERENDERTE Reihenfolge prueft (test-budget-ui.js),
+ * statt Quelltext zu lesen.
+ */
+function monthNavHtml() {
+  return `
+          <button class="btn btn--icon" id="budget-prev" aria-label="${t('budget.prevMonth')}">
+            <i data-lucide="chevron-left" aria-hidden="true"></i>
+          </button>
+          <span class="budget-nav__label" id="budget-label" aria-live="polite"></span>
+          <button class="btn btn--icon" id="budget-next" aria-label="${t('budget.nextMonth')}">
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--secondary budget-nav__today" id="budget-today">${t('budget.currentMonth')}</button>
+          <span class="budget-nav__note" id="budget-period-note" hidden></span>
+  `;
+}
+
+/**
+ * „Aktuell" erscheint nur, wenn der aktuelle Zeitraum nicht zu sehen ist -
+ * dieselbe Sichtbarkeitsregel wie syncTodayButton() im Kalender (#1164).
+ * `hidden` statt entfernen: der Slot bleibt bestehen und die Kopfhoehe
+ * springt beim Blaettern nicht; wer die Leiste mit einem Screenreader liest,
+ * hoert kein Bedienelement, das nichts bewirkt. Vorher war der Knopf auf dem
+ * aktuellen Monat ein stummer No-Op (der Handler kehrt frueh zurueck).
+ * Laeuft NACH dem Tab-Block in updateTabs(): der entscheidet, ob der Tab
+ * ueberhaupt Monatsnavigation traegt, hier wird nur verfeinert. Auf den
+ * Berichten ist der angezeigte Zeitraum der Anker, sonst der Monat.
+ */
+function syncCurrentButton(root = _container) {
+  const btn = root?.querySelector('#budget-today');
+  if (!btn) return;
+  const caps = tabCaps();
+  btn.hidden = !caps.month || (state.activeTab === 'reports'
+    ? state.reportAnchor === todayKey()
+    : state.month === currentMonth());
+}
+
 export async function render(container, { user }) {
   _container = container;
   _user = user;
@@ -461,19 +503,7 @@ export async function render(container, { user }) {
         <!-- Der Kopf-Slot bleibt auf jedem Tab besetzt: entweder Stepper oder
              ein ruhiger Kontexttext. Eine Lücke machte jeden Tabwechsel zur
              Neuorientierung (Critique 2026-07-30, P1). -->
-        <div class="page-toolbar__center budget-nav__month">
-          <button class="btn btn--icon" id="budget-prev" aria-label="${t('budget.prevMonth')}">
-            <i data-lucide="chevron-left" aria-hidden="true"></i>
-          </button>
-          <span class="budget-nav__label" id="budget-label" aria-live="polite"></span>
-          <button class="btn btn--icon" id="budget-next" aria-label="${t('budget.nextMonth')}">
-            <i data-lucide="chevron-right" aria-hidden="true"></i>
-          </button>
-          <!-- „Aktuell" ist ein Reset, kein Navigationsschritt: hinter dem
-               Stepper statt zwischen Pfeil und Wert. -->
-          <button class="btn btn--secondary budget-nav__today" id="budget-today">${t('budget.currentMonth')}</button>
-          <span class="budget-nav__note" id="budget-period-note" hidden></span>
-        </div>
+        <div class="page-toolbar__center budget-nav__month">${monthNavHtml()}</div>
         ${state.budgetMode === 'personal' ? `
         <div class="budget-scope" role="tablist" aria-label="${t('budget.scopeLabel')}">
           ${[['mine', t('budget.scopeMine')], ['household', t('budget.scopeHousehold')]].map(([id, label]) => {
@@ -948,6 +978,9 @@ function updateTabs() {
     const el = _container.querySelector(selector);
     if (el) el.hidden = !caps.month;
   });
+  // Verfeinerung fuer „Aktuell" (#1164): auf dem aktuellen Zeitraum bleibt der
+  // Reset verborgen, auch wenn der Tab Monatsnavigation traegt.
+  syncCurrentButton();
   // Wo kein Stepper steht, steht der Grund: der Slot bleibt besetzt, statt eine
   // Lücke zu hinterlassen, die der Nutzer als „Monat gilt noch" lesen könnte.
   const note = _container.querySelector('#budget-period-note');
@@ -3445,3 +3478,15 @@ async function deleteEntrySeries(id) {
     },
   });
 }
+
+// Nur fuer Tests (Muster wie calendar.js/meals.js): der Zeitraum-Kopf und die
+// Sichtbarkeitsregel des „Aktuell"-Resets sind verhaltensgetrieben gepinnt
+// (test-budget-ui.js, #1164) - gerendertes Markup und echte Sync-Funktion
+// statt Quelltext-Regex.
+export const __test = {
+  monthNavHtml,
+  syncCurrentButton,
+  tabCaps,
+  currentMonth,
+  state,
+};

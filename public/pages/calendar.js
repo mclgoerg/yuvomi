@@ -1685,6 +1685,27 @@ export async function render(container, { user }) {
 // Toolbar
 // --------------------------------------------------------
 
+/**
+ * Der Zeitraum-Kopf: zurueck, Wert, vor - und DAHINTER der Reset. „Heute" ist
+ * ein Reset, kein Navigationsschritt: hinter dem Stepper statt vor den
+ * Pfeilen. Das ist die Regel, die budget.js an „Aktuell" festhaelt, und seit
+ * #1164 gilt sie fuer alle drei Zeitraum-Koepfe (Kalender, Wochenplan,
+ * Budget). Als eigener Baustein, damit der Verhaltenstest die GERENDERTE
+ * Reihenfolge prueft (test-calendar.js), statt Quelltext zu lesen.
+ */
+function periodNavHtml() {
+  return `
+      <button class="btn btn--icon" id="cal-prev" aria-label="${t('calendar.back')}">
+        <i data-lucide="chevron-left" aria-hidden="true"></i>
+      </button>
+      <span class="cal-toolbar__label" id="cal-label"></span>
+      <button class="btn btn--icon" id="cal-next" aria-label="${t('calendar.forward')}">
+        <i data-lucide="chevron-right" aria-hidden="true"></i>
+      </button>
+      <button class="btn btn--secondary cal-toolbar__today" id="cal-today">${t('calendar.today')}</button>
+  `;
+}
+
 function renderToolbar() {
   const bar = _container.querySelector('#cal-toolbar');
   if (!bar) return;
@@ -1724,16 +1745,7 @@ function renderToolbar() {
   bar.replaceChildren();
   bar.insertAdjacentHTML('beforeend', `
     <h1 class="page-toolbar__title">${t('calendar.title')}</h1>
-    <div class="page-toolbar__center cal-toolbar__month">
-      <button class="btn btn--secondary cal-toolbar__today" id="cal-today">${t('calendar.today')}</button>
-      <button class="btn btn--icon" id="cal-prev" aria-label="${t('calendar.back')}">
-        <i data-lucide="chevron-left" aria-hidden="true"></i>
-      </button>
-      <span class="cal-toolbar__label" id="cal-label"></span>
-      <button class="btn btn--icon" id="cal-next" aria-label="${t('calendar.forward')}">
-        <i data-lucide="chevron-right" aria-hidden="true"></i>
-      </button>
-    </div>
+    <div class="page-toolbar__center cal-toolbar__month">${periodNavHtml()}</div>
     <div class="page-toolbar__actions">
       ${filterBtnHtml}
       <!-- KEIN aria-controls im geschlossenen Zustand: die Suchleiste entsteht
@@ -1877,8 +1889,8 @@ function syncViewPanel() {
  * vier, und eine zweite Rechnung daneben waere die naechste Stelle, an der
  * Monat und Agenda auseinanderlaufen.
  */
-function syncTodayButton() {
-  const btn = _container.querySelector('#cal-today');
+function syncTodayButton(root = _container) {
+  const btn = root?.querySelector('#cal-today');
   if (!btn) return;
   const { from, to } = getRangeForView(state.view, state.cursor);
   btn.hidden = state.today >= from && state.today <= to;
@@ -4003,6 +4015,8 @@ export const __test = {
   wasteTypeOptions,
   restoreWasteTypeFilter,
   buildLayerRowsHtml,
+  periodNavHtml,
+  syncTodayButton,
 };
 
 function renderAgendaEvent(ev, dayStr) {

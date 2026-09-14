@@ -205,6 +205,45 @@ async function loadPreferences() {
 // Render
 // --------------------------------------------------------
 
+/**
+ * Der Zeitraum-Kopf: zurueck, Wert, vor - und DAHINTER der Reset. „Heute" ist
+ * ein Reset, kein Navigationsschritt: hinter dem Stepper statt zwischen den
+ * Inhalts-Aktionen. Das ist die Regel, die budget.js an „Aktuell" festhaelt,
+ * und seit #1164 gilt sie fuer alle drei Zeitraum-Koepfe (Kalender,
+ * Wochenplan, Budget). Vorher stand „Heute" im Actions-Slot neben
+ * „Zufallsplan" und „+ Gericht" - Inhalts-Aktionen einer ganz anderen
+ * Gewichtung - und landete unter ~768px auf einer zweiten Zeile, getrennt vom
+ * Stepper, den es zuruecksetzt. Als eigener Baustein, damit der
+ * Verhaltenstest die GERENDERTE Reihenfolge prueft (test-meals.js), statt
+ * Quelltext zu lesen.
+ */
+function weekNavHtml() {
+  return `
+          <button class="btn btn--icon" id="week-prev" aria-label="${t('meals.prevWeek')}">
+            <i data-lucide="chevron-left" aria-hidden="true"></i>
+          </button>
+          <span class="week-nav__label" id="week-label"></span>
+          <button class="btn btn--icon" id="week-next" aria-label="${t('meals.nextWeek')}">
+            <i data-lucide="chevron-right" aria-hidden="true"></i>
+          </button>
+          <button class="btn btn--secondary week-nav__today" id="week-today">${t('meals.today')}</button>
+  `;
+}
+
+/**
+ * „Heute" erscheint nur, wenn die aktuelle Woche nicht zu sehen ist -
+ * dieselbe Sichtbarkeitsregel wie syncTodayButton() im Kalender (#1164).
+ * `hidden` statt entfernen: der Slot bleibt bestehen und die Kopfhoehe
+ * springt beim Blaettern nicht; wer die Leiste mit einem Screenreader liest,
+ * hoert kein Bedienelement, das nichts bewirkt. Durchgesetzt wird `hidden`
+ * von der geteilten Regel `.btn[hidden]` (layout.css).
+ */
+function syncTodayButton(root = _container) {
+  const btn = root?.querySelector('#week-today');
+  if (!btn) return;
+  btn.hidden = state.currentWeek === getMondayOf(todayKey());
+}
+
 export async function render(container, { user }) {
   _container = container;
   container.replaceChildren();
@@ -221,17 +260,8 @@ export async function render(container, { user }) {
            Aktionsblock dazwischen - mobil gemessen 80px und 705px, einhändig
            also nie beide erreichbar. -->
       <div class="page-toolbar page-toolbar--in-group page-toolbar--wrap">
-        <div class="page-toolbar__center week-nav">
-          <button class="btn btn--icon" id="week-prev" aria-label="${t('meals.prevWeek')}">
-            <i data-lucide="chevron-left" aria-hidden="true"></i>
-          </button>
-          <span class="week-nav__label" id="week-label"></span>
-          <button class="btn btn--icon" id="week-next" aria-label="${t('meals.nextWeek')}">
-            <i data-lucide="chevron-right" aria-hidden="true"></i>
-          </button>
-        </div>
+        <div class="page-toolbar__center week-nav">${weekNavHtml()}</div>
         <div class="page-toolbar__actions">
-          <button class="btn btn--secondary week-nav__today" id="week-today">${t('meals.today')}</button>
           <!-- Nur Desktop: klappt die Rezept-Spalte weg, damit alle sieben
                Tagesspalten in voller Breite ins Board passen. -->
           <button class="btn btn--icon week-nav__rail-toggle" id="rail-toggle"
@@ -350,6 +380,7 @@ function renderWeekGrid() {
 
   _container.querySelector('#week-label').textContent =
     formatWeekLabel(state.currentWeek);
+  syncTodayButton();
 
   // Fehlgeschlagene Woche: Fehlerzustand statt Leerzustand. Muss VOR der
   // Leer-Prüfung stehen - `state.meals` ist nach einem Fehler ebenfalls leer,
@@ -1805,6 +1836,12 @@ export const __test = {
   // Skalierte Zutatenmenge: haengt an der Format-Locale und ist deshalb nur
   // verhaltensgetrieben pruefbar (siehe test-meals.js).
   scaleQuantityText,
+  // Zeitraum-Kopf (#1164): Reihenfolge und Sichtbarkeitsregel des
+  // „Heute"-Resets sind verhaltensgetrieben gepinnt (test-meals.js).
+  weekNavHtml,
+  syncTodayButton,
+  getMondayOf,
+  state,
 };
 
 // --------------------------------------------------------

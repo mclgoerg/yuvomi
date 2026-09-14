@@ -11,6 +11,7 @@ import { MIGRATIONS_SQL } from '../server/db-schema-test.js';
 import { datesForTemplateInRange, mealWeekday } from '../server/services/meal-recurrence.js';
 import { __test as mealsUi } from '../public/pages/meals.js';
 import { toDecimalString } from '../public/utils/money.js';
+import { todayKey } from '../public/utils/date.js';
 import { parseQuantity } from '../server/services/shopping-import.js';
 
 let passed = 0;
@@ -794,6 +795,37 @@ test('Skalieren: eine mitten im Trenner abgeschnittene Zahl bleibt stehen', () =
   scaled('ar-EG', '١ ١/٢ cup', 2, '٣ cup');
   // Ein Leerzeichen trennt dagegen zwei Angaben und schneidet nichts ab.
   scaled('de', '2 x 500 g', 2, '4 x 500 g');
+});
+
+// --------------------------------------------------------
+// Zeitraum-Kopf (#1164)
+// --------------------------------------------------------
+
+// #1164: EIN Positions- und EINE Sichtbarkeitsregel fuer den Zeitraum-Reset.
+// Verhaltensgetrieben: geprueft werden der GERENDERTE Kopf und die echte
+// Sync-Funktion, nicht der Quelltext.
+test('Zeitraum-Kopf: zurueck, Wert, vor - dahinter „Heute", verborgen in der aktuellen Woche (#1164)', () => {
+  // (a) Reihenfolge im gerenderten Markup: der Reset steht HINTER dem Stepper,
+  // im week-nav-Slot - nicht mehr bei den Inhalts-Aktionen.
+  const ids = [...mealsUi.weekNavHtml().matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  assert(JSON.stringify(ids) === JSON.stringify(['week-prev', 'week-label', 'week-next', 'week-today']),
+    `erwartet zurueck, Wert, vor, Reset - gerendert: ${ids.join(', ')}`);
+
+  // (b) Sichtbarkeit: in der aktuellen Woche ist der Reset `hidden`,
+  // behaelt aber sein Element (der Slot bleibt, die Kopfhoehe springt nicht).
+  const btn = { hidden: false };
+  const root = { querySelector: (sel) => (sel === '#week-today' ? btn : null) };
+  const zuvor = mealsUi.state.currentWeek;
+  try {
+    mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey());
+    mealsUi.syncTodayButton(root);
+    assert(btn.hidden === true, 'in der aktuellen Woche muss der Reset verborgen sein');
+    mealsUi.state.currentWeek = '2000-01-03';
+    mealsUi.syncTodayButton(root);
+    assert(btn.hidden === false, 'in einer anderen Woche muss der Reset sichtbar sein');
+  } finally {
+    mealsUi.state.currentWeek = zuvor;
+  }
 });
 
 // --------------------------------------------------------

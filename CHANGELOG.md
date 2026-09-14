@@ -113,6 +113,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own taps do not cost a reload: the write routes answer with the counter before and after, and
   the page skips the reload when nothing else moved in between.
 
+### Changed
+
+- **The jump-to-now reset sits behind the period stepper in all three period-navigation headers,
+  and hides while the current period is on screen** (#1164). Calendar, Meals, and Budget each reset
+  their period a different way: Calendar's "Today" stood before the arrows, Meals' "Today" lived far
+  from its stepper among the content actions next to "Randomize plan" - and dropped onto a second
+  row, detached from the week it resets, on narrow screens - and only Budget had it right, behind
+  the stepper, where its code records the rule: a reset is not a navigation step. Calendar and Meals
+  now follow that rule; Budget's position is untouched. Visibility follows Calendar's rule
+  everywhere: the reset is hidden while the current period is displayed - a button that silently
+  does nothing on the current week or month tells a screen-reader user about a control that has no
+  effect - and it keeps its slot, so the header height never jumps while paging.
+
 ### Fixed
 
 - **A modules folder set through `MODULES_DIR` in `.env` is found again.** `docker-compose.yml`,
