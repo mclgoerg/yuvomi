@@ -116,18 +116,39 @@ async function getSubdivisions(countryIsoCode) {
  * Jura). Erst ab zwei Gruppen ist die Auswahl relevant; bei 0/1 Gruppe gibt es
  * keine Mehrdeutigkeit und der Picker bleibt ausgeblendet. Die API liefert für
  * diese Gruppen keinen lesbaren Namen, daher wird shortName als Label genutzt. (#434)
+ * Ohne Subdivision antwortet ein Land, das keine Subdivisionen fuehrt, mit
+ * seinen eigenen Gruppen (Belgien, D#1182); jedes andere mit [].
  * @param {string} countryIsoCode  z.B. 'CH'
- * @param {string} subdivisionCode z.B. 'CH-BE'
+ * @param {string|null} [subdivisionCode] z.B. 'CH-BE'
  * @returns {Promise<Array<{code: string, name: string}>>}
  */
-async function getGroups(countryIsoCode, subdivisionCode) {
+async function getGroups(countryIsoCode, subdivisionCode = null) {
   // GB hat keine Schulferien-Gruppen (kein Datenanbieter, siehe getCountries)
   // - ein Abruf gegen die echte API mit einem erfundenen Laendercode waere
   // sinnlos und koennte nur einen Fehlschlag ernten.
   if (countryIsoCode === 'GB') return [];
   const raw = await apiFetch(`/Subdivisions?countryIsoCode=${encodeURIComponent(countryIsoCode)}`);
-  const match = (raw ?? []).find((s) => (s.code ?? s.isoCode) === subdivisionCode);
-  const groups = Array.isArray(match?.groups) ? match.groups : [];
+  // NUR EIN ECHTES ARRAY IST EINE AUSKUNFT (wie beim Sync unten): eine 200 mit
+  // anderem Rumpf als "keine Gruppen" zu melden, liesse die Einstellungen die
+  // gespeicherte Gruppe beim naechsten Speichern loeschen (Review zu PR #1186).
+  if (!Array.isArray(raw)) throw new Error('Unexpected /Subdivisions response shape');
+  let groups;
+  if (subdivisionCode) {
+    const match = raw.find((s) => (s.code ?? s.isoCode) === subdivisionCode);
+    groups = Array.isArray(match?.groups) ? match.groups : [];
+  } else {
+    // LAND OHNE SUBDIVISIONEN, ABER MIT GRUPPEN (D#1182): Belgien fuehrt
+    // OpenHolidays ohne eine einzige Subdivision, trennt die Schulferien aber
+    // nach Sprachgemeinschaft (BE-DE/BE-FR/BE-NL). Die Gruppen haengen dort am
+    // Land - ohne diesen Zweig gab es nichts zu waehlen, und der Kalender
+    // zeigte alle drei Regime nebeneinander. Fuehrt ein Land Subdivisionen,
+    // gehoeren seine Gruppen zu ihnen (DE-MV-ABS, CH-BE-VS) und sind ohne
+    // gewaehlte Region keine Antwort.
+    if (raw.length > 0) return [];
+    const countryGroups = await apiFetch(`/Groups?countryIsoCode=${encodeURIComponent(countryIsoCode)}`);
+    if (!Array.isArray(countryGroups)) throw new Error('Unexpected /Groups response shape');
+    groups = countryGroups;
+  }
   return groups
     .map((g) => ({
       code: g.code ?? g.isoCode,
@@ -941,8 +962,13 @@ function getForRange(from, to) {
   // Feiertage) gezeigt. So bleibt genau EIN korrektes Ferien-Regime übrig und der
   // Union-Merge unten wird zum No-op. Ohne Gruppen-Auswahl greift der Merge als
   // Fallback und kollabiert überlappende Varianten wie bisher. (#434)
-  const groupClause = group ? 'AND (group_code IS NULL OR group_code = ?)' : '';
-  const groupArgs   = group ? [group] : [];
+  // Eine Gruppe filtert nur das Land, zu dem sie gehoert (CH-BE-VS -> CH, BE-FR
+  // -> BE). Steht nach einem Landwechsel noch eine fremde Gruppe in der
+  // Konfiguration, wird sie ignoriert, statt die Schulferien des neuen Landes
+  // leer zu filtern (Review zu PR #1186).
+  const groupApplies = group !== null && group.startsWith(`${country}-`);
+  const groupClause = groupApplies ? 'AND (group_code IS NULL OR group_code = ?)' : '';
+  const groupArgs   = groupApplies ? [group] : [];
 
   // GROUP BY kollabiert identische Feiertage, die aus mehreren Scopes im Cache
   // liegen (z. B. länderweite NULL-Zeilen aus der Zeit vor #434 neben dem heutigen

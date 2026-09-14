@@ -115,6 +115,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Belgian school holidays can be narrowed to one language community.** OpenHolidays lists Belgium
+  without any regions but splits its school holidays between the Flemish, French and German-speaking
+  Communities, so the calendar settings had nothing to choose from and the calendar showed all three
+  side by side. A country without regions now offers its school-holiday groups directly under
+  Settings > Modules > Calendar, and the hint there no longer speaks only of Swiss cantons.
+
 - **Housekeeping only offers visit actions you are allowed to take** (#1135). A paid visit is
   settled, and only an admin can change or delete it - but the Staff log and the recent visits on
   the Overview showed edit and delete on every visit, so a member found out at save. The server now
@@ -221,6 +227,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   appear. The Compare tab's day headers scrolled away with the hours beneath them; they now stay
   pinned to the top of the scroll area while the day's shifts scroll past, so a block halfway down a
   long day is never orphaned from the day it belongs to.
+
+## [2.66.1] - 2026-09-14
+
+### Security
+
+- **A member's module permissions now hold for every letter case of an API path
+  (GHSA-cvwj-hx37-3r7m).** The API routes `/api/v1/Notes` to the same place as `/api/v1/notes`,
+  but the check that enforces per-member module access compared the path letter for letter, found
+  no module for the capitalised spelling and let the request through. A member set to "no access"
+  for a module could read it that way, and a member with read-only access could write to it. This
+  affected every module since per-member module access arrived in v1.4.0; admins and members
+  without restrictions were never limited by it. Scoped API tokens were never let through, but were
+  refused for a capitalised path to a module they may use - that now works as well.
 
 ## [2.66.0] - 2026-09-13
 

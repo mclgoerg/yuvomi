@@ -134,11 +134,20 @@ function requiredAccess(method) {
 
 /**
  * Ermittelt den Modul-Schlüssel für einen /api/v1-Pfad (ohne führendes /api/v1).
+ *
+ * GROSS-/KLEINSCHREIBUNG WIRD HIER GEFALTET, WEIL EXPRESS SIE BEIM ROUTEN
+ * IGNORIERT. Express matcht Mount-Pfade und Routen standardmaessig ohne
+ * Beachtung der Schreibweise: `/Notes` landet im Notiz-Router wie `/notes`.
+ * Ohne das Falten fand diese Funktion fuer `/Notes` keinen Praefix und gab
+ * `null` zurueck - und die Modul-Deny-Liste in server/index.js laesst `null`
+ * durch. Ein Mitglied mit `notes: none` las so jede sichtbare Notiz, eines
+ * mit `tasks: read` schrieb Aufgaben. Alle Praefixe sind klein geschrieben
+ * (Kern-Module hier oben, Erweiterungen per `MODULE_ID_RE`).
  * @param {string} path z. B. "/health/cycle" oder "health/cycle"
  * @returns {string|null} Modul-Schlüssel oder null (unbekannt/nicht scopebar).
  */
 function moduleForPath(path) {
-  const cleaned = String(path || '').replace(/^\/+/, '');
+  const cleaned = String(path || '').replace(/^\/+/, '').toLowerCase();
   const parts = cleaned.split('/').filter(Boolean);
   if (parts[0] === 'extensions' && parts[1]) {
     const extKey = PREFIX_TO_MODULE.get(`extensions/${parts[1]}`);

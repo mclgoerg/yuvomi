@@ -1218,6 +1218,9 @@ router.put('/', (req, res) => {
           cfgDelete('holiday_subdivision');
           cfgDelete('holiday_group');
         } else {
+          // Anderes Land ohne mitgeschickte Gruppe: die gespeicherte gehoert zum
+          // alten Land (BE-FR) und darf das neue nicht filtern (Review zu PR #1186).
+          if (holiday_group === undefined && cfgGet('holiday_country') !== holiday_country) cfgDelete('holiday_group');
           cfgSet('holiday_country', holiday_country);
         }
       }
@@ -1225,10 +1228,15 @@ router.put('/', (req, res) => {
         if (holiday_subdivision !== null && !SUBDIVISION_RE.test(holiday_subdivision)) {
           return res.status(400).json({ error: 'Ungültiger Regionscode (z. B. DE-BY).', code: 400 });
         }
-        // Ohne Subdivision gibt es keine Schulferien-Gruppe mehr → mit aufräumen.
+        // Wird eine gespeicherte Subdivision entfernt, faellt ihre Schulferien-
+        // Gruppe mit (CH-BE-VS gehoert zu CH-BE). War gar keine gespeichert, gehoert
+        // eine gespeicherte Gruppe dem Land selbst (BE-FR, D#1182) und bleibt:
+        // sonst loeschte ein Teil-Update nur mit `holiday_subdivision: null` still
+        // die gewaehlte Gemeinschaft (Review zu PR #1186).
         if (holiday_subdivision === null) {
+          const hadSubdivision = cfgGet('holiday_subdivision') != null;
           cfgDelete('holiday_subdivision');
-          cfgDelete('holiday_group');
+          if (hadSubdivision) cfgDelete('holiday_group');
         } else {
           cfgSet('holiday_subdivision', holiday_subdivision);
         }
@@ -1389,6 +1397,24 @@ router.get('/holidays/subdivisions/:countryCode', async (req, res) => {
   } catch (err) {
     log.error('GET /holidays/subdivisions/:countryCode', err);
     res.status(502).json({ error: 'Fehler beim Abrufen der Regionsliste.', code: 502 });
+  }
+});
+
+// GET /api/v1/preferences/holidays/groups/:countryCode
+// Schulferien-Gruppen eines Landes ohne Subdivisionen (Belgien, D#1182). Leere
+// Liste fuer jedes Land, das Subdivisionen fuehrt - dort gehoeren die Gruppen
+// zur Region und kommen ueber die Route darunter.
+router.get('/holidays/groups/:countryCode', async (req, res) => {
+  const { countryCode } = req.params;
+  if (!COUNTRY_ISO_RE.test(countryCode)) {
+    return res.status(400).json({ error: 'Ungültiger Ländercode.', code: 400 });
+  }
+  try {
+    const groups = await holidays.getGroups(countryCode, null);
+    res.json({ data: groups });
+  } catch (err) {
+    log.error('GET /holidays/groups/:countryCode', err);
+    res.status(502).json({ error: 'Fehler beim Abrufen der Ferien-Gruppen.', code: 502 });
   }
 });
 
