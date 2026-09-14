@@ -25,7 +25,16 @@ export function shoppingPaths() {
     '/api/v1/shopping/categories/reorder': {
       patch: op({ summary: 'Reorder shopping categories', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
     },
-    '/api/v1/shopping/suggestions': { get: op({ summary: 'Get shopping suggestions', tag: 'Shopping' }) },
+    '/api/v1/shopping/suggestions': {
+      get: op({
+        summary: 'Get shopping suggestions',
+        description: 'Contract change (#1103): response items are now objects { name, category, quantity } instead of '
+          + 'plain name strings (string[] before), and the list is ordered by most recently used first instead of alphabetically. '
+          + 'Category and quantity come from the most recent item row with that name - the latest statement about '
+          + 'how the household files the article today.',
+        tag: 'Shopping',
+      }),
+    },
     '/api/v1/shopping/versions': {
       get: op({
         summary: 'Change counter of every shopping list',
@@ -54,6 +63,20 @@ export function shoppingPaths() {
     '/api/v1/shopping/{listId}': {
       put: op({ summary: 'Rename shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true }),
+    },
+    '/api/v1/shopping/{listId}/duplicate': {
+      post: op({
+        summary: 'Duplicate a shopping list',
+        description: 'Body: { name, resetChecked?, keepQuantities?, keepNotes? } - the three flags default to true. '
+          + 'Category assignment and manual per-category order are always carried over, since preserving them is '
+          + 'the point of duplicating. CalDAV sync fields, the meal-plan origin, the recorded price and the shop '
+          + 'are never copied: each is a fact about the ORIGINAL item (a synced remote object, a specific meal, a '
+          + 'price actually paid in a specific shop) that is not true of a fresh copy.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
     },
     '/api/v1/shopping/{listId}/items': {
       get: op({

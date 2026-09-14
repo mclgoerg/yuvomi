@@ -43,6 +43,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sheet gained a per-type visibility list nested under the one Waste toggle, so a rare collection is
   never silently hidden while a noisy one can be tucked away.
 
+- **Waste page UX: labelled add-type entry point, unified row actions, curated type colors** (#1146).
+  The page now leads with a labelled "Add waste type" button rather than hiding all four actions
+  behind one unlabelled menu, both empty states offer the step their own text describes, and the
+  pickup button no longer dead-ends on a fresh install - without a type it now opens the type dialog
+  instead of only saying that one is missing. Waste type, schedule, and source rows carry the same
+  single overflow menu with named entries that the pickup rows already used, so a destructive action
+  is no longer one stray tap away and an action whose meaning changes with the source finally says
+  which one it is; every one of those menus now sits at the trailing edge of its row, and every row
+  puts its icon beside the name instead of above it, so all four row types read the same way. A
+  paused schedule is now visually distinct from an archived type instead of wearing the same badge.
+  A type's color comes from a curated palette instead of a free color picker, which had happily
+  accepted a white or black icon that then disappeared against the light or dark background - an
+  existing color outside the palette is kept, not silently overwritten.
+
 - **A calendar's default assignee can now be applied to the events it already imported** (#1154).
   Until now the mapping only reached events that arrived after it was set, so the first thing
   anyone saw after mapping a calendar was a list of unassigned events. Settings → Sync gains a
@@ -57,6 +71,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   title, in the same order as Budget. The chosen month stays put while you work in it: marking a
   visit paid or editing one reloads that month instead of jumping back, and an empty month says
   which month it is.
+
+- **A shopping list can be duplicated** (#1103). "Duplicate" sits in the list menu next to
+  rename/delete and copies every item into a new list, with category assignment and the manual
+  per-category order always carried over - that is the point of duplicating, not a switch. Three
+  flags control the rest: reset checked state, keep quantities, and keep notes & links, all on by
+  default.
+
+  A duplicated item is a new, local item: CalDAV sync fields, the originating meal, any recorded
+  price or shop, and tags are never copied. The first three each name something true of the
+  *original* item only (a synced remote object, a specific meal, a price actually paid in a specific
+  shop), never of a fresh copy - and tags are mirrored VTODO categories, so they follow the same
+  rule as the sync fields they belong to.
+
+- **A shopping suggestion carries its category and quantity** (#1113, from discussion #1103).
+  Picking a suggestion while adding an item now also fills in that item's most recently used
+  category and quantity, instead of only its name - without the category, every picked suggestion
+  landed back in the fallback category and the aisle order had to be re-sorted on the next trip.
+  Suggestions are also now ordered by most recently used first, instead of alphabetically - a
+  household buys the same handful of things again and again, and the ones bought last stood out
+  less behind everything the alphabet puts first. For API users this is a contract change on
+  `GET /api/v1/shopping/suggestions`: the response items are now objects `{ name, category,
+  quantity }` ordered by recency, where they used to be plain name strings.
 
 - **A shopping list follows what the rest of the household does, while it is open** (#1108). Two people
   in the same shop used to see two different lists: what one ticked off stayed unticked on the
@@ -85,6 +121,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sends per visit whether the current user may edit or delete it. Where that is not allowed, the row
   offers the visit report instead and says that only an admin can change it. A calendar link to
   such a visit opens the report rather than a form that cannot be saved.
+
+- **An item added without a category lands in the misc category again** (#548). The item route had
+  drifted to defaulting to the *first* category ("Fruit & vegetables" in aisle order). It now
+  prefers the misc category by name as long as the household still has it, and only falls back to
+  the *last* category in aisle order once it has been renamed or removed - "last" alone would have
+  meant whatever category was added most recently, since new categories append at the end. The
+  pantry import follows the same rule, so the two stay in step. In the same corner, quick-add's
+  category selector resets to the default after every item added, instead of staying on whatever a
+  previous suggestion or manual pick set it to - an unrelated item typed right after could quietly
+  land in the wrong aisle.
 
 - **Household members and guests created as contacts now show the translated "Other" category
   instead of the German "Sonstiges"** (#1140). The contact that is mirrored when a household member
