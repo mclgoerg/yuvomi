@@ -5078,7 +5078,7 @@
         "owner": "Tao",
         "anchorDate": "Petsa ng simula",
         "cycleLength": "Haba ng cycle",
-        "cycleLengthTooShort": "May shift pa rin sa Araw {{from}}–{{to}}. I-clear muna ang mga ito, pagkatapos ay paikliin ang cycle.",
+        "cycleLengthTooShort": "May shift pa rin sa Araw {{from}}-{{to}}. I-clear muna ang mga ito, pagkatapos ay paikliin ang cycle.",
         "cycleLengthConflictGeneric": "Aalisin ng haba ng cycle na ito ang mga araw na may shift pa rin. I-clear muna ang mga ito, pagkatapos ay paikliin ang cycle.",
         "validFrom": "Balido mula",
         "validUntil": "Balido hanggang",

@@ -5078,7 +5078,7 @@
         "owner": "Người",
         "anchorDate": "Ngày bắt đầu",
         "cycleLength": "Độ dài chu kỳ",
-        "cycleLengthTooShort": "Ngày {{from}}–{{to}} vẫn còn ca làm việc. Hãy xóa chúng trước, sau đó rút ngắn chu kỳ.",
+        "cycleLengthTooShort": "Ngày {{from}}-{{to}} vẫn còn ca làm việc. Hãy xóa chúng trước, sau đó rút ngắn chu kỳ.",
         "cycleLengthConflictGeneric": "Độ dài chu kỳ này sẽ xóa các ngày vẫn còn ca làm việc. Hãy xóa chúng trước, sau đó rút ngắn chu kỳ.",
         "validFrom": "Hiệu lực từ",
         "validUntil": "Hiệu lực đến",

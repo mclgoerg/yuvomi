@@ -636,6 +636,33 @@ test('"Heute frei"/"Fuer heute alles erledigt" entfaellt neben einer sichtbaren 
   }
 });
 
+// Review of #1099, finding 11: scheduleWidgetVisible read only widgetShown('schedule')
+// (the layout config's `visible` flag), never isModuleDisabled('schedule') -
+// unlike domainInCockpit() above it, which checks both. A household that
+// disables the Schedule module can be left with a stale layout entry still
+// carrying `visible: true` (nothing prunes it on disable), which would
+// silently suppress "Heute frei"/"Fuer heute alles erledigt" forever, even
+// though no Schedule tile is actually rendering anything anymore.
+test('a disabled Schedule module cannot suppress "Heute frei" via a stale widget-layout entry (#1099 finding 11)', async () => {
+  const { __test } = await import('../public/pages/dashboard.js');
+  const prevWindow = global.window;
+  try {
+    // Modul aktiv + Kachel sichtbar (Ausgangslage von S-18 oben): weiterhin
+    // unterdrueckt.
+    global.window = { yuvomi: { isModuleDisabled: () => false } };
+    const enabledWithWidget = __test.renderTodayCockpit({}, [{ id: 'schedule', visible: true }]);
+    nodeAssert.ok(!/todayFree/.test(enabledWithWidget), 'bei aktivem Modul mit sichtbarer Kachel bleibt die Unterdrueckung');
+
+    // Modul deaktiviert, Layout traegt aber noch die alte `visible: true`-Zeile:
+    // die Kachel zeigt nichts mehr, "Heute frei" darf wieder erscheinen.
+    global.window = { yuvomi: { isModuleDisabled: (m) => m === 'schedule' } };
+    const disabledWithStaleWidget = __test.renderTodayCockpit({}, [{ id: 'schedule', visible: true }]);
+    nodeAssert.match(disabledWithStaleWidget, /todayFree/, 'ein abgeschaltetes Modul darf "Heute frei" nicht ueber eine stehengebliebene Layout-Zeile unterdruecken');
+  } finally {
+    global.window = prevWindow;
+  }
+});
+
 test('Notiz-Widget: nur der Auszug landet im DOM, nie der Volltext (Paket 3)', async () => {
   const { __test } = await import('../public/pages/dashboard.js');
   // line-clamp kürzt rein visuell - Screenreader lasen die komplette Notiz vor.

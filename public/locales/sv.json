@@ -5078,7 +5078,7 @@
         "owner": "Person",
         "anchorDate": "Startdatum",
         "cycleLength": "Cykellängd",
-        "cycleLengthTooShort": "Dag {{from}}–{{to}} har fortfarande skift. Töm dem först, förkorta sedan cykeln.",
+        "cycleLengthTooShort": "Dag {{from}}-{{to}} har fortfarande skift. Töm dem först, förkorta sedan cykeln.",
         "cycleLengthConflictGeneric": "Den här cykellängden skulle ta bort dagar som fortfarande har skift. Töm dem först, förkorta sedan cykeln.",
         "validFrom": "Gäller från",
         "validUntil": "Gäller till",

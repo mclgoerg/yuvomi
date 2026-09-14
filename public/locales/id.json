@@ -5078,7 +5078,7 @@
         "owner": "Orang",
         "anchorDate": "Tanggal mulai",
         "cycleLength": "Panjang siklus",
-        "cycleLengthTooShort": "Hari {{from}}–{{to}} masih memiliki shift. Kosongkan dulu, lalu perpendek siklusnya.",
+        "cycleLengthTooShort": "Hari {{from}}-{{to}} masih memiliki shift. Kosongkan dulu, lalu perpendek siklusnya.",
         "cycleLengthConflictGeneric": "Panjang siklus ini akan menghapus hari yang masih memiliki shift. Kosongkan dulu, lalu perpendek siklusnya.",
         "validFrom": "Berlaku sejak",
         "validUntil": "Berlaku sampai",

@@ -127,6 +127,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the personal reminder settings card, and a member with no schedule access no longer gets a
   dead "Schedule" calendar layer plus a guaranteed-403 request on every calendar load.
 
+- **A second pass on the Schedule module, this time on comprehension and everyday polish.** Deleting a
+  shift type now asks first, naming what it removes, like every other destructive action in the
+  module already did. Two raw server strings that used to reach the toast ("shift_type_id must be a
+  positive number.", "cycle_length cannot exclude existing pattern days.") are now plain sentences
+  that say what to do next, and an Extra with no shift types yet shows a hint instead of an empty,
+  submittable dropdown. Editing a pattern's cycle days and leaving the tab (or the card) without
+  saving now prompts to discard, matching the confirm every other unsaved-changes flow in the app
+  already has; merely switching the Add-entry modal's Pattern/Override/Extra segment no longer
+  counts as a change worth asking about. Each cycle-day position shows the actual next date it falls
+  on, with a one-line explanation of the repeating cycle; creating or reactivating a pattern that
+  overlaps another one now asks first and names the consequence, and the pattern currently in effect
+  carries a small marker. A household with no shift types yet opens on that tab instead of the
+  planning tab it would immediately dead-end on. Every schedule tab now has its own address
+  (`/schedule/patterns`, `/schedule/statistics`, ...), so reloading keeps the tab, the back button
+  walks between tabs instead of leaving the page, and the dashboard widget and a shift reminder both
+  link straight to the relevant tab instead of the bare module. Clicking a shift anywhere it appears
+  (the Today card, the Compare view, a week/day calendar block) now opens a small read-only detail
+  view instead of doing nothing; week/day calendar chips show the full time range instead of just
+  the start; and the "Free today" hero and the per-member status row on the dashboard no longer
+  contradict a schedule entry sitting right next to them. The Statistics owner picker is self-only
+  for non-admin members now - statistics remain a read-only summary of data everyone can already see
+  via the Today card and calendar, but the convenience of pulling up someone else's totals was never
+  meant to be open to everyone. Shift-type presets are grouped by template (Work/School/University)
+  instead of one flat list of fifteen, the reminder lead time accepts any custom value up to the
+  server's own 24-hour cap instead of the seven fixed presets, and an expanded shift-type card spans
+  the full row instead of leaving a gap beside it. Tracking overtime at all is now its own switch
+  next to the weekly-hours target, instead of that number being the only way to affect whether the
+  Statistics tab flags anything - turning it off removes the overtime card entirely rather than
+  requiring a number nobody's schedule will ever cross. All of the above is translated into all 24
+  languages.
+
 ## [2.66.0] - 2026-09-13
 
 ### Added
@@ -467,37 +498,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   since grown their own sections on the same page without the sentence ever being updated. Reworded
   to describe the page's purpose instead of enumerating its sections, so it can't go stale the same
   way again the next time a module gains a section here.
-
-  A second pass, this time on the module's comprehension and everyday polish, followed. Deleting a
-  shift type now asks first, naming what it removes, like every other destructive action in the
-  module already did. Two raw server strings that used to reach the toast ("shift_type_id must be a
-  positive number.", "cycle_length cannot exclude existing pattern days.") are now plain sentences
-  that say what to do next, and an Extra with no shift types yet shows a hint instead of an empty,
-  submittable dropdown. Editing a pattern's cycle days and leaving the tab (or the card) without
-  saving now prompts to discard, matching the confirm every other unsaved-changes flow in the app
-  already has; merely switching the Add-entry modal's Pattern/Override/Extra segment no longer
-  counts as a change worth asking about. Each cycle-day position shows the actual next date it falls
-  on, with a one-line explanation of the repeating cycle; creating or reactivating a pattern that
-  overlaps another one now asks first and names the consequence, and the pattern currently in effect
-  carries a small marker. A household with no shift types yet opens on that tab instead of the
-  planning tab it would immediately dead-end on. Every schedule tab now has its own address
-  (`/schedule/patterns`, `/schedule/statistics`, ...), so reloading keeps the tab, the back button
-  walks between tabs instead of leaving the page, and the dashboard widget and a shift reminder both
-  link straight to the relevant tab instead of the bare module. Clicking a shift anywhere it appears
-  (the Today card, the Compare view, a week/day calendar block) now opens a small read-only detail
-  view instead of doing nothing; week/day calendar chips show the full time range instead of just
-  the start; and the "Free today" hero and the per-member status row on the dashboard no longer
-  contradict a schedule entry sitting right next to them. The Statistics owner picker is self-only
-  for non-admin members now - statistics remain a read-only summary of data everyone can already see
-  via the Today card and calendar, but the convenience of pulling up someone else's totals was never
-  meant to be open to everyone. Shift-type presets are grouped by template (Work/School/University)
-  instead of one flat list of fifteen, the reminder lead time accepts any custom value up to the
-  server's own 24-hour cap instead of the seven fixed presets, and an expanded shift-type card spans
-  the full row instead of leaving a gap beside it. Tracking overtime at all is now its own switch
-  next to the weekly-hours target, instead of that number being the only way to affect whether the
-  Statistics tab flags anything - turning it off removes the overtime card entirely rather than
-  requiring a number nobody's schedule will ever cross. All of the above is translated into all 24
-  languages.
 
 - **The person filter in the task history is no longer a row of blank buttons on a phone** (#1068).
   Below 640px the label-loss rule removes every `.group-toggle__label`; it is built on the

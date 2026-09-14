@@ -152,6 +152,26 @@ function moduleForPath(path) {
   return PREFIX_TO_MODULE.get(parts[0]) || null;
 }
 
+/**
+ * Modul-Schlüssel + benötigtes Zugriffsniveau für eine Session-Anfrage
+ * (`moduleAccessVerdict()`'s zweites/drittes Argument). Anders als
+ * `moduleForPath()` + `requiredAccess()` allein senkt dies das Niveau auf
+ * `read` für genau `/schedule/preferences` (S-12, UX-Audit: die eigene
+ * Erinnerungsvorlaufzeit/Wochenstunden hängen an der EIGENEN users-Zeile,
+ * kein Admin-Gate) — ohne den Modul-Schlüssel selbst auf `null` zu setzen,
+ * was `moduleAccessVerdict()` unconditional auf "erlaubt" zwingen würde,
+ * auch für `none`-Zugriff. Exaktes `===`, kein `startsWith`, damit
+ * `/schedule/preferencesX` nicht mitgemeint ist.
+ * @param {string} path z. B. "/schedule/preferences"
+ * @param {string} method HTTP-Methode
+ * @returns {{ moduleKey: string|null, access: 'read'|'write' }}
+ */
+function sessionModuleAccessRequirement(path, method) {
+  const moduleKey = moduleForPath(path);
+  const access = path === '/schedule/preferences' ? 'read' : requiredAccess(method);
+  return { moduleKey, access };
+}
+
 /** All scope module keys including runtime extension modules. */
 function getModuleKeys() {
   return allScopeModules().map((m) => m.key);
@@ -188,6 +208,7 @@ export {
   serializeScopes,
   requiredAccess,
   moduleForPath,
+  sessionModuleAccessRequirement,
   tokenAllows,
   getModuleKeys,
   getAllScopes,

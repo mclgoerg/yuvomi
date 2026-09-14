@@ -5078,7 +5078,7 @@
         "owner": "成员",
         "anchorDate": "起始日期",
         "cycleLength": "周期长度",
-        "cycleLengthTooShort": "第 {{from}}–{{to}} 天仍有排班。请先清空它们，然后再缩短周期。",
+        "cycleLengthTooShort": "第 {{from}}-{{to}} 天仍有排班。请先清空它们，然后再缩短周期。",
         "cycleLengthConflictGeneric": "此周期长度会移除仍有排班的天数。请先清空它们，然后再缩短周期。",
         "validFrom": "生效日期",
         "validUntil": "失效日期",

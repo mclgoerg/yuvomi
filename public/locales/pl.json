@@ -5078,7 +5078,7 @@
         "owner": "Osoba",
         "anchorDate": "Data początkowa",
         "cycleLength": "Długość cyklu",
-        "cycleLengthTooShort": "Dni {{from}}–{{to}} nadal mają przypisane zmiany. Najpierw je wyczyść, potem skróć cykl.",
+        "cycleLengthTooShort": "Dni {{from}}-{{to}} nadal mają przypisane zmiany. Najpierw je wyczyść, potem skróć cykl.",
         "cycleLengthConflictGeneric": "Ta długość cyklu usunęłaby dni, które nadal mają przypisane zmiany. Najpierw je wyczyść, potem skróć cykl.",
         "validFrom": "Obowiązuje od",
         "validUntil": "Obowiązuje do",

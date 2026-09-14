@@ -2470,7 +2470,13 @@ function buildTodayCockpitModel(data, cfg = [], { cap = PROGRAM_ROW_CAP } = {}) 
   // sobald die Kachel selbst fuer Schichtplan spricht - kein neuer Programm-
   // Zeilen-Import noetig, das widerspraeche dem "genau eine Repraesentation
   // je Domaene" oben.
-  const scheduleWidgetVisible = widgetShown('schedule');
+  // isModuleDisabled() zusaetzlich zu widgetShown() (Review zu #1099, wie
+  // domainInCockpit() oben): eine abgeschaltete Schedule-Kachel kann in einem
+  // stehengebliebenen Layout weiterhin `visible: true` tragen, obwohl sie
+  // nichts mehr zeigt - ohne den Modul-Check wuerde das "Heute frei"/"Fuer
+  // heute alles erledigt" faelschlich unterdrueckt, obwohl gar keine
+  // Schichtplan-Kachel mehr etwas behauptet.
+  const scheduleWidgetVisible = !window.yuvomi?.isModuleDisabled('schedule') && widgetShown('schedule');
   let state = null;
   if (!program.rows.length && !scheduleWidgetVisible) {
     const sayAllDone = includeTasks && program.tasksDoneToday > 0;

@@ -51,6 +51,17 @@ import { wireScrollFade } from '/utils/ux.js';
  * @param {Function}    opts.onChange         - onChange(id) beim Wechsel
  * @param {string}      [opts.activeClass='sub-tab--active']
  * @param {'tabs'|'select'} [opts.mode='tabs']
+ * @param {boolean}     [opts.manualActivation=false] - Review zu #1099: OPT-IN,
+ *        Vorgabe bleibt automatische Aktivierung (Pfeiltasten wechseln SOFORT
+ *        die Sicht, wie bisher, fuer jeden bestehenden Aufrufer unveraendert).
+ *        Mit `true` bewegen Pfeiltasten/Home/End nur den Tastatur-Fokus
+ *        (rovierendes tabindex, sichtbarer :focus-visible-Ring) OHNE
+ *        onChange() aufzurufen oder die aktive Sicht zu wechseln - erst
+ *        Enter/Leertaste (oder ein Klick) aktiviert den fokussierten Tab.
+ *        Fuer eine Leiste, deren onChange() einen Tab-Wechsel navigiert/neu
+ *        laedt (z.B. Schedule: Statistik-Fetch, S-03-Nachfrage bei
+ *        ungespeicherten Aenderungen), waere sonst JEDER Pfeiltastendruck beim
+ *        blossen Durchblaettern ein echter Wechsel.
  * @returns {{ setActive: (id: string, opts?: { focus?: boolean }) => void }}
  */
 /**
@@ -69,7 +80,7 @@ function scrollTabIntoView(container, btn) {
   }
 }
 
-export function wireTablist(container, { activeId, onChange, activeClass = 'sub-tab--active', mode = 'tabs' } = {}) {
+export function wireTablist(container, { activeId, onChange, activeClass = 'sub-tab--active', mode = 'tabs', manualActivation = false } = {}) {
   if (!container) return { setActive() {} };
   let current = activeId;
 
@@ -114,9 +125,26 @@ export function wireTablist(container, { activeId, onChange, activeClass = 'sub-
     if (btn) setActive(btn.dataset.tabId);
   });
 
+  // Nur bei manualActivation gebraucht: bewegt das rovierende tabindex/den
+  // Fokus auf einen Tab, OHNE current/paint()/onChange anzufassen - die
+  // Sicht wechselt erst, wenn commitFocusedTab() (Enter/Leertaste) das
+  // ausdruecklich tut.
+  const focusTab = (btn) => {
+    buttons().forEach((b) => { b.tabIndex = b === btn ? 0 : -1; });
+    btn.focus();
+    scrollTabIntoView(container, btn);
+  };
+
   container.addEventListener('keydown', (e) => {
-    const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
-    if (!keys.includes(e.key)) return;
+    const moveKeys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
+    if (manualActivation && (e.key === 'Enter' || e.key === ' ')) {
+      const btn = e.target.closest('[data-tab-id]');
+      if (!btn) return;
+      e.preventDefault();
+      setActive(btn.dataset.tabId, { focus: true });
+      return;
+    }
+    if (!moveKeys.includes(e.key)) return;
     const b = buttons();
     if (!b.length) return;
     const focusedIndex = b.indexOf(document.activeElement);
@@ -128,7 +156,8 @@ export function wireTablist(container, { activeId, onChange, activeClass = 'sub-
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = b.length - 1;
     e.preventDefault();
-    setActive(b[next]?.dataset.tabId, { focus: true });
+    if (manualActivation) focusTab(b[next]);
+    else setActive(b[next]?.dataset.tabId, { focus: true });
   });
 
   // Aktiven Tab extern synchronisieren (ohne onChange) — für Zustandswechsel,

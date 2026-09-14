@@ -1733,10 +1733,10 @@ function renderShell() {
       <h1 class="page-toolbar__title">${esc(t('schedule.title'))}</h1>
       <div class="page-toolbar__actions"></div>
       <div class="sub-tabs-bar schedule-tabs page-toolbar__bar" role="tablist" aria-label="${esc(t('schedule.title'))}">
-        ${tabs.map(([id, label]) => `<button class="sub-tab${id === activeView ? ' sub-tab--active' : ''}" type="button" role="tab" data-tab-id="${id}" aria-selected="${id === activeView ? 'true' : 'false'}" tabindex="${id === activeView ? '0' : '-1'}">${esc(label)}</button>`).join('')}
+        ${tabs.map(([id, label]) => `<button class="sub-tab${id === activeView ? ' sub-tab--active' : ''}" id="schedule-tab-${id}" type="button" role="tab" data-tab-id="${id}" aria-controls="schedule-body" aria-selected="${id === activeView ? 'true' : 'false'}" tabindex="${id === activeView ? '0' : '-1'}">${esc(label)}</button>`).join('')}
       </div>
     </header>
-    <div class="schedule-body"></div>
+    <div class="schedule-body" id="schedule-body" role="tabpanel" tabindex="0"></div>
   </div>`);
   // Geteilte Tablist-Verhaltensschicht (Klick + Pfeiltasten/Home/End + Roving-
   // Tabindex + ARIA, utils/tablist.js) statt einer Handnachbildung ohne
@@ -1745,8 +1745,16 @@ function renderShell() {
   // aktiven Tab selbst (Klasse/aria-selected/tabindex) und bringt die
   // Scroll-Fade-Affordanz gleich mit - eine zusaetzliche wireScrollFade()-Zeile
   // hier waere seither doppelt verdrahtet.
+  // manualActivation (Review zu #1099): onChange() hier navigiert echt
+  // (window.yuvomi?.navigate), fetcht Statistik/Uebersicht neu und kann bei
+  // ungespeicherten Zyklustage-Aenderungen die S-03-Nachfrage ausloesen -
+  // ohne manualActivation loeste JEDER Pfeiltastendruck beim blossen
+  // Durchblaettern der Tableiste jeweils einen davon aus. Mit
+  // manualActivation bewegen Pfeiltasten/Home/End nur den Fokus; erst
+  // Enter/Leertaste (oder ein Klick) aktiviert den Tab wirklich.
   scheduleTablist = wireTablist(root.querySelector('.schedule-tabs'), {
     activeId: activeView,
+    manualActivation: true,
     onChange: (id) => { guardedActivateView(id); },
   });
   root.addEventListener('submit', submitForm);
@@ -2234,9 +2242,17 @@ async function saveCreatedSchedule(event) {
             // confirmOverModal statt confirmModal: dieses Anlege-Formular ist
             // noch offen (siehe der gleiche Grund am "replace"-Zweig unten) -
             // "Abbrechen" soll die getippten Felder nicht loeschen.
+            //
+            // closeOnConfirm: false (Review zu #1099) - der Schreibversuch
+            // (api.post weiter unten) laeuft ERST NACH der Bestaetigung.
+            // Schloesse confirmOverModal hier schon selbst, waere das
+            // Formular bei einem fehlgeschlagenen POST bereits weg, und der
+            // Fehler-Toast erschiene ueber einer leeren Seite statt ueber dem
+            // noch getippten Formular. Der gemeinsame Erfolgspfad am Ende von
+            // saveCreatedSchedule() schliesst stattdessen.
             const confirmed = await confirmOverModal(
               t('schedule.patternOverlapConfirmTitle', { user: userName(data.user_id) }),
-              { confirmLabel: t('schedule.patternOverlapConfirmAction'), detail: t('schedule.patternOverlapConfirmDetail', { name: overlap.name }) },
+              { confirmLabel: t('schedule.patternOverlapConfirmAction'), detail: t('schedule.patternOverlapConfirmDetail', { name: overlap.name }), closeOnConfirm: false },
             );
             if (!confirmed) return;
           }
@@ -2340,6 +2356,13 @@ async function saveCreatedSchedule(event) {
       }
     }
     await load();
+    // S-03 (Review zu #1099): dieser Speichervorgang baut JEDE Musterkarte neu
+    // auf, auch die einer ganz anderen Person/eines ganz anderen Musters -
+    // eine dort noch offene, ungespeicherte Zyklustage-Bearbeitung ist damit
+    // schon verworfen, ohne dass je gefragt wurde. Ohne dieses clear() bliebe
+    // ihre Id in dirtyPatternIds stehen und der naechste Tab-Wechsel fragte
+    // faelschlich nach dem Verwerfen von Aenderungen, die es nicht mehr gibt.
+    dirtyPatternIds.clear();
     renderPage();
     await closeModal({ force: true });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
@@ -2373,6 +2396,13 @@ async function saveCustomField(event, fieldId) {
     if (fieldId) await api.put(`/schedule/custom-fields/${fieldId}`, data);
     else await api.post('/schedule/custom-fields', data);
     await load();
+    // S-03 (Review zu #1099): dieser Speichervorgang baut JEDE Musterkarte neu
+    // auf, auch die einer ganz anderen Person/eines ganz anderen Musters -
+    // eine dort noch offene, ungespeicherte Zyklustage-Bearbeitung ist damit
+    // schon verworfen, ohne dass je gefragt wurde. Ohne dieses clear() bliebe
+    // ihre Id in dirtyPatternIds stehen und der naechste Tab-Wechsel fragte
+    // faelschlich nach dem Verwerfen von Aenderungen, die es nicht mehr gibt.
+    dirtyPatternIds.clear();
     renderPage();
     await closeModal({ force: true });
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
@@ -2465,6 +2495,14 @@ async function submitForm(event) {
       dirtyPatternIds.delete(String(form.dataset.id)); // S-03: gespeichert, nichts mehr zu verwerfen
     }
     await load();
+    // S-03 (Review zu #1099): dieser gemeinsame Speicherpfad (shift-update,
+    // pattern-update, ...) baut JEDE Musterkarte neu auf, nicht nur die des
+    // eben abgeschickten Formulars - eine woanders noch offene, ungespeicherte
+    // Zyklustage-Bearbeitung ist damit schon verworfen, ohne dass je gefragt
+    // wurde. Ohne dieses clear() bliebe ihre Id in dirtyPatternIds stehen und
+    // der naechste Tab-Wechsel fragte faelschlich nach dem Verwerfen von
+    // Aenderungen, die es nicht mehr gibt.
+    dirtyPatternIds.clear();
     renderPage();
     // Nur nach der Ueberlappungs-Rueckfrage: ohne Dialog griffe refocusAfterRender()
     // auf den Merker eines frueheren Dialogs zurueck und setzte den Fokus dorthin (#1083).
@@ -2537,6 +2575,7 @@ async function action(event) {
         }
       } finally {
         await load();
+        dirtyPatternIds.clear(); // S-03 (Review zu #1099): siehe Kommentar am naechsten load()+renderPage()-Paar unten
         renderPage();
       }
       // Zaehlend statt "Gespeichert." fuer beide Faelle (S-11): ein erneuter
@@ -2558,7 +2597,15 @@ async function action(event) {
       return;
     }
     if (button.dataset.action === 'statistics-range') {
-      statistics = { ...statistics, range: button.dataset.range, entries: [], bounds: null, loading: false };
+      // Review zu #1099: ++statisticsRequestId hier, aus demselben Grund wie
+      // beim Wochenwechsel in Overview (++overviewRequestId) - ohne den
+      // Zaehler weiterzudrehen, besteht eine noch laufende Anfrage von VOR
+      // dem Range-Wechsel ihren statisticsRequest === statisticsRequestId-
+      // Vergleich weiterhin und zeichnet die Zahlen des ALTEN Bereichs unter
+      // der neu gewaehlten Spanne. `error: false` daneben, sonst ueberlebt ein
+      // Fehlerzustand vom vorigen Bereich den Wechsel.
+      statistics = { ...statistics, range: button.dataset.range, entries: [], bounds: null, loading: false, error: false };
+      ++statisticsRequestId;
       renderPage();
       return;
     }
@@ -2702,6 +2749,7 @@ async function action(event) {
         // entfernt, bevor der Fehler auftrat. Ohne Neuladen bliebe die alte
         // (jetzt falsche) Liste stehen und taeuschte vor, nichts sei passiert.
         await load();
+        dirtyPatternIds.clear(); // S-03 (Review zu #1099): siehe Kommentar am naechsten load()+renderPage()-Paar unten
         renderPage();
         refocusAfterRender();
         window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
@@ -2779,6 +2827,14 @@ async function action(event) {
       dirtyPatternIds.delete(String(button.dataset.id)); // S-03: gespeichert, nichts mehr zu verwerfen
     }
     await load();
+    // S-03 (Review zu #1099): dieser gemeinsame Pfad deckt u.a.
+    // delete-override-range/delete-pattern/save-days und baut JEDE
+    // Musterkarte neu auf - eine woanders noch offene, ungespeicherte
+    // Zyklustage-Bearbeitung ist damit schon verworfen, ohne dass je gefragt
+    // wurde. Ohne dieses clear() bliebe ihre Id in dirtyPatternIds stehen und
+    // der naechste Tab-Wechsel fragte faelschlich nach dem Verwerfen von
+    // Aenderungen, die es nicht mehr gibt.
+    dirtyPatternIds.clear();
     renderPage();
     if (gefragt) refocusAfterRender();
     window.yuvomi?.showToast(button.dataset.action.startsWith('delete') ? t('schedule.deleted') : t('schedule.saved'), 'success');

@@ -5078,7 +5078,7 @@
         "owner": "Személy",
         "anchorDate": "Kezdő dátum",
         "cycleLength": "Ciklushossz",
-        "cycleLengthTooShort": "A(z) {{from}}–{{to}}. napokon még vannak műszakok. Előbb törölje őket, majd rövidítse le a ciklust.",
+        "cycleLengthTooShort": "A(z) {{from}}-{{to}}. napokon még vannak műszakok. Előbb törölje őket, majd rövidítse le a ciklust.",
         "cycleLengthConflictGeneric": "Ez a ciklushossz olyan napokat törölne, amelyeken még vannak műszakok. Előbb törölje őket, majd rövidítse le a ciklust.",
         "validFrom": "Érvényes ettől",
         "validUntil": "Érvényes eddig",

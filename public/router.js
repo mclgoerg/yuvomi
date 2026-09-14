@@ -473,7 +473,10 @@ function topLevelSection(path) {
   // seitliche Seitentransition) — analog zu den Settings-Blättern.
   if (typeof path === 'string' && path.startsWith('/health')) return '/health';
   // /schedule/* Sub-Tabs ebenso (S-10) — derselbe Grund wie bei /health.
-  if (typeof path === 'string' && path.startsWith('/schedule')) return '/schedule';
+  // Exaktes '/schedule' ODER '/schedule/...' (Review zu #1099): ein blosses
+  // startsWith('/schedule') traefe auch einen hypothetischen kuenftigen Pfad
+  // wie '/schedules...', der zu keinem echten Schedule-Tab gehoert.
+  if (typeof path === 'string' && (path === '/schedule' || path.startsWith('/schedule/'))) return '/schedule';
   return path ?? '/';
 }
 

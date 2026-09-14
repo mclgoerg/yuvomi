@@ -82,7 +82,7 @@ import scheduleRouter from './routes/schedule.js';
 import scheduleFeedRouter from './routes/schedule-feed.js';
 import schedulePreferencesRouter from './routes/schedule-preferences.js';
 import scheduleExtrasRouter from './routes/schedule-extras.js';
-import { moduleForPath, requiredAccess, tokenAllows } from './scopes.js';
+import { moduleForPath, requiredAccess, sessionModuleAccessRequirement, tokenAllows } from './scopes.js';
 import { moduleAccessVerdict, MODULE_ACCESS_DENIED, MODULE_ACCESS_READ_ONLY } from './permissions.js';
 import { BODY_LIMIT, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './utils/upload-limit.js';
 import { createServiceWorkerResponseLoader } from './utils/service-worker.js';
@@ -542,17 +542,18 @@ app.use('/api/v1', (req, res, next) => {
   // Wochenstunden hängen an der EIGENEN users-Zeile (siehe
   // routes/schedule-preferences.js' eigener Kommentar, "keine Admin-Gate") -
   // ein Mitglied mit `schedule: read` darf nur FREMDE Schichtplan-Daten nicht
-  // schreiben, seine eigene Erinnerungsvorlaufzeit ist keine davon. `null`
-  // statt des sonstigen Modulschlüssels zwingt moduleAccessVerdict() auf
-  // "erlaubt" (dieselbe Deny-Listen-Regel, unter der jeder NICHT gelistete
-  // Pfad ohnehin durchgeht) - ausdrücklich nur für diesen Session-Pfad, die
+  // schreiben, seine eigene Erinnerungsvorlaufzeit ist keine davon.
+  // `sessionModuleAccessRequirement()` senkt dafür nur das benötigte Niveau
+  // auf `read` (exakt für diesen Pfad, kein `startsWith`) - der Modul-
+  // Schlüssel bleibt `schedule`, damit `none` weiterhin verweigert wird; die
   // API-Token-Scope-Prüfung oben bleibt unveraendert an `schedule:write`
   // gebunden.
-  const scopedModuleKey = req.path.startsWith('/schedule/preferences') ? null : moduleForPath(req.path);
+  const { moduleKey: scopedModuleKey, access: scopedAccess } =
+    sessionModuleAccessRequirement(req.path, req.method);
   const verdict = moduleAccessVerdict(
     req.sessionModuleAccess,
     scopedModuleKey,
-    requiredAccess(req.method),
+    scopedAccess,
   );
   if (verdict === MODULE_ACCESS_DENIED) {
     return res.status(403).json({ error: 'You do not have access to this module.', code: 403 });

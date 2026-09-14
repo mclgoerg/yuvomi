@@ -5078,7 +5078,7 @@
         "owner": "Kişi",
         "anchorDate": "Başlangıç tarihi",
         "cycleLength": "Döngü uzunluğu",
-        "cycleLengthTooShort": "{{from}}–{{to}}. günlerde hâlâ vardiyalar var. Önce bunları temizleyin, sonra döngüyü kısaltın.",
+        "cycleLengthTooShort": "{{from}}-{{to}}. günlerde hâlâ vardiyalar var. Önce bunları temizleyin, sonra döngüyü kısaltın.",
         "cycleLengthConflictGeneric": "Bu döngü uzunluğu hâlâ vardiyaları olan günleri kaldırır. Önce bunları temizleyin, sonra döngüyü kısaltın.",
         "validFrom": "Geçerlilik başlangıcı",
         "validUntil": "Geçerlilik bitişi",

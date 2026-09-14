@@ -5078,7 +5078,7 @@
         "owner": "Pessoa",
         "anchorDate": "Data de início",
         "cycleLength": "Duração do ciclo",
-        "cycleLengthTooShort": "Os dias {{from}}–{{to}} ainda têm turnos. Limpe-os primeiro e depois encurte o ciclo.",
+        "cycleLengthTooShort": "Os dias {{from}}-{{to}} ainda têm turnos. Limpe-os primeiro e depois encurte o ciclo.",
         "cycleLengthConflictGeneric": "Esta duração do ciclo removeria dias que ainda têm turnos. Limpe-os primeiro e depois encurte o ciclo.",
         "validFrom": "Válido desde",
         "validUntil": "Válido até",

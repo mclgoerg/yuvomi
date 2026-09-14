@@ -998,7 +998,7 @@ test('the Overrides section groups consecutive same-type days and edits/deletes 
   assert.match(schedulePage, /data-form="override-edit"/);
   assert.match(schedulePage, /data-action="delete-override-range"/);
   assert.match(schedulePage, /overrideGroups\(\)\.find\(/);
-  const editBranch = schedulePage.slice(schedulePage.indexOf("form.dataset.form === 'override-edit'"), schedulePage.indexOf("await load();\n    renderPage();"));
+  const editBranch = schedulePage.slice(schedulePage.indexOf("form.dataset.form === 'override-edit'"), schedulePage.indexOf("await load();\n    // S-03 (Review zu #1099): dieser Speichervorgang baut JEDE Musterkarte neu"));
   // confirmOverModal(), not confirmModal(): the create/edit form is still open
   // behind this confirm, and confirmModal() force-closes whatever modal is
   // already open (no stacking) before opening its own - it would have silently
@@ -1773,6 +1773,37 @@ test('an inverted or incomplete custom statistics range never fetches and never 
   assert.match(schedulePage, /formField\(t\('schedule\.rangeTo'\), '<yuvomi-datepicker required name="to"/);
 });
 
+// Review of #1099, finding 5: switching the statistics-range preset reset
+// range/entries/bounds but never bumped statisticsRequestId nor `error` -
+// an in-flight request from BEFORE the switch still passed its
+// `statisticsRequest === statisticsRequestId` check in refreshStatistics()
+// and drew the OLD range's numbers under the NEW range choice, and a prior
+// error state survived the switch. Fix mirrors the Overview tab's own
+// week-flip race (++overviewRequestId), which the review's "Verified"
+// section already confirmed correct - same pattern, same file, so this test
+// checks BOTH branches carry it, not just the new one, to catch either
+// regressing independently.
+test('switching the statistics range outdates any request in flight, matching the Overview week-flip race (S-06/S-14, #1099 finding 5)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const rangeBranch = schedulePage.slice(
+    schedulePage.indexOf("if (button.dataset.action === 'statistics-range')"),
+    schedulePage.indexOf("if (button.dataset.action === 'retry-statistics')"),
+  );
+  // Comments stripped before matching - this test's own explanatory comment
+  // right above the code (added alongside the fix) uses the words
+  // "++overviewRequestId" and "error: false" in prose, which would otherwise
+  // satisfy the regexes below even if the real code regressed.
+  const rangeCode = rangeBranch.replace(/^\s*\/\/.*$/gm, '');
+  assert.match(rangeCode, /\+\+statisticsRequestId/, 'the range switch must bump the request generation counter, exactly like overview-week bumps ++overviewRequestId');
+  assert.match(rangeCode, /error:\s*false/, 'a stale error state from before the switch must not survive it');
+
+  const overviewBranch = schedulePage.slice(
+    schedulePage.indexOf("if (button.dataset.action === 'overview-week')"),
+    schedulePage.indexOf("if (button.dataset.action === 'overview-view-mode')"),
+  );
+  assert.match(overviewBranch, /await activateView\('overview'\)/, 'overview-week must route back through activateView(), which itself owns ++overviewRequestId - unlike statistics-range it does not need its own bump here');
+});
+
 test('switching Planning sub-tabs while a pattern editor is dirty asks before discarding, and clears on save (S-03)', () => {
   const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
   assert.match(schedulePage, /async function guardedActivateView\(id\)/);
@@ -1898,6 +1929,7 @@ test('a new ACTIVE pattern creation and re-activating one via the Active toggle 
   );
   assert.match(createBranch, /findOverlappingActivePattern\(state\.patterns, data\.user_id, data\.valid_from \|\| null, data\.valid_until \|\| null\)/);
   assert.match(createBranch, /confirmOverModal\(/, 'the Add-entry modal is still open, so the guard must park it (confirmOverModal), not destroy it');
+  assert.match(createBranch, /confirmOverModal\([\s\S]*closeOnConfirm:\s*false/, 'a failed POST /schedule/patterns must find the Add-entry modal still parked, not already closed by the confirmation itself');
   assert.ok(createBranch.indexOf('if (!confirmed) return;') < createBranch.indexOf("await api.post('/schedule/patterns', data);"));
 
   const updateBranch = schedulePage.slice(
@@ -1907,6 +1939,41 @@ test('a new ACTIVE pattern creation and re-activating one via the Active toggle 
   assert.match(updateBranch, /data\.is_active && !pattern\?\.is_active/, 'the guard must only fire on an off -> on transition, not on every save');
   assert.match(updateBranch, /findOverlappingActivePattern\(state\.patterns, pattern\?\.user_id, data\.valid_from \|\| null, data\.valid_until \|\| null, pattern\?\.id\)/);
   assert.match(updateBranch, /confirmModal\(/, 'this form is inline (no modal open), so the plain confirmModal is correct here');
+});
+
+// Review of #1099, finding 4: dirtyPatternIds only used to clear on the
+// tab-switch discard, a save/delete of THAT SAME card, and the page-level
+// reset - saving a DIFFERENT pattern, deleting an override range, or a
+// successful create-modal save all run load()+renderPage() and silently
+// rebuild every pattern card, discarding another card's unsaved cycle-day
+// edits without ever asking, while its id stayed behind in the set (the next
+// tab switch then wrongly asked to discard edits that no longer exist).
+// Minimum accepted fix per the review: clear the set whenever the cards are
+// rebuilt this way. Every `await load();` outside the page-level render()
+// (which already gets a fresh `dirtyPatternIds = new Set()`) must clear it
+// before the matching renderPage() call.
+test('every load()+renderPage() rebuild outside the page reset clears dirtyPatternIds (S-03, #1099 finding 4)', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const renderStart = schedulePage.indexOf('export async function render(container');
+  assert.ok(renderStart !== -1, 'render() must exist');
+  const beforeRender = schedulePage.slice(0, renderStart);
+  const afterRenderLoads = [...schedulePage.slice(renderStart).matchAll(/^\s*await load\(\);$/gm)];
+  // render() itself calls load() exactly once, followed by its own full
+  // `dirtyPatternIds = new Set()` reset rather than a `.clear()` call -
+  // excluded on purpose, it is not one of the rebuild sites this finding is
+  // about.
+  assert.equal(afterRenderLoads.length, 1, 'render() itself must call load() exactly once');
+
+  const loadSites = [...beforeRender.matchAll(/^\s*await load\(\);$/gm)];
+  assert.ok(loadSites.length >= 6, 'expected at least six load()+renderPage() rebuild sites before render()');
+  for (const match of loadSites) {
+    const after = beforeRender.slice(match.index, match.index + 700);
+    assert.match(
+      after,
+      /dirtyPatternIds\.clear\(\);[\s\S]*?renderPage\(\);/,
+      `load() at offset ${match.index} must clear dirtyPatternIds before its renderPage() rebuild`,
+    );
+  }
 });
 
 test('the initial tab lands on Shift types when the household has no shift types yet, otherwise stays on Planning (S-07)', () => {
@@ -1943,6 +2010,22 @@ test('switching tabs navigates through the router (URL + history entry), and the
   // it would shadow SCHEDULE_PAGE_ROUTES's own '/schedule' entry and, worse, register
   // the module without its four sub-tab routes.
   assert.ok(!/\{ path: '\/schedule', page: '\/pages\/schedule\.js'/.test(routerJs));
+
+  // Review of #1099, finding 13: topLevelSection()'s nav-highlight/direction
+  // mapping used a bare path.startsWith('/schedule'), which also matches a
+  // hypothetical future route like '/schedules...' that is not one of ours.
+  // Must match exactly '/schedule' or a '/schedule/'-prefixed path.
+  assert.match(routerJs, /path === '\/schedule' \|\| path\.startsWith\('\/schedule\/'\)\)\) return '\/schedule'/);
+  assert.ok(!/\(typeof path === 'string' && path\.startsWith\('\/schedule'\)\) return '\/schedule'/.test(routerJs), 'must not regress to a bare startsWith, which also matches /schedules...');
+});
+
+// Review of #1099, nice-to-have: budget.js's equivalent tab-content container
+// (#budget-body) carries role="tabpanel" - .schedule-body did not.
+test('.schedule-body carries the same tabpanel ARIA wiring as budget.js\'s #budget-body', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const shellFn = schedulePage.slice(schedulePage.indexOf('function renderShell()'), schedulePage.indexOf('scheduleTablist = wireTablist'));
+  assert.match(shellFn, /<div class="schedule-body" id="schedule-body" role="tabpanel" tabindex="0"><\/div>/);
+  assert.match(shellFn, /id="schedule-tab-\$\{id\}"[\s\S]{0,80}aria-controls="schedule-body"/, 'each tab button must point at the panel it controls, like budget.js\'s tab buttons do at #budget-body');
 });
 
 test('the schedule-tabs helper resolves a path to exactly one of the four known tab ids, and back again (S-10)', async () => {
@@ -2010,13 +2093,26 @@ test('a read-only Schedule member can still save their own reminder offset and w
   assert.ok(!fnBody.includes('const locked'), 'the old client-side lock variable must be fully removed, not just unused');
   assert.match(fnBody, /toggleRowHtml\(\{ label: t\('schedule\.reminderToggle'\), checked: active, attrs: \{ id: 'schedule-reminder-toggle' \} \}\)/, 'the toggle must no longer pass a disabled flag');
 
-  // Server side: the blanket module read-only/denied gate must exempt exactly
-  // this path, computing a null module key so moduleAccessVerdict() falls
-  // through to its own "unlisted path -> allow" rule - the API-token scope
-  // check above it (still keyed on moduleForPath(), unchanged) is untouched.
+  // Server side: the blanket module read-only/denied gate must lower the
+  // REQUIRED ACCESS LEVEL to 'read' for exactly this path (review of #1099:
+  // a null module key made moduleAccessVerdict() allow unconditionally, even
+  // for a member with `none` access - and a startsWith comparison would also
+  // have caught a longer path like '/schedule/preferencesX'). The module key
+  // itself stays 'schedule' (moduleForPath()), so `none` is still denied; the
+  // decision lives in the small named helper next to moduleForPath() in
+  // scopes.js, not inlined here. The API-token scope check above it (still
+  // keyed on moduleForPath()/requiredAccess(), unchanged) is untouched.
+  const scopesSrc = readFileSync(new URL('../server/scopes.js', import.meta.url), 'utf8');
+  const helperStart = scopesSrc.indexOf('function sessionModuleAccessRequirement(');
+  assert.ok(helperStart !== -1, 'sessionModuleAccessRequirement() must exist next to moduleForPath()');
+  const helperBody = scopesSrc.slice(helperStart, scopesSrc.indexOf('\n}\n', helperStart));
+  assert.match(helperBody, /moduleForPath\(path\)/);
+  assert.match(helperBody, /path === '\/schedule\/preferences' \? 'read' : requiredAccess\(method\)/);
+  assert.match(scopesSrc, /export \{[\s\S]*sessionModuleAccessRequirement,[\s\S]*\};/, 'the helper must be exported for server/index.js to use');
+
   const serverIndex = readFileSync(new URL('../server/index.js', import.meta.url), 'utf8');
-  assert.match(serverIndex, /const scopedModuleKey = req\.path\.startsWith\('\/schedule\/preferences'\) \? null : moduleForPath\(req\.path\);/);
-  assert.match(serverIndex, /moduleAccessVerdict\(\s*\n\s*req\.sessionModuleAccess,\s*\n\s*scopedModuleKey,/);
+  assert.match(serverIndex, /sessionModuleAccessRequirement\(req\.path, req\.method\)/);
+  assert.ok(!/req\.path\.startsWith\('\/schedule\/preferences'\)/.test(serverIndex), 'a startsWith comparison would also match a longer path like /schedule/preferencesX');
 });
 
 test('the Statistics owner select is self-only for non-admins, full list for admins (S-13)', () => {

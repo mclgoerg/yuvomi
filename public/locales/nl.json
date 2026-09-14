@@ -5078,7 +5078,7 @@
         "owner": "Persoon",
         "anchorDate": "Startdatum",
         "cycleLength": "Cycluslengte",
-        "cycleLengthTooShort": "Dag {{from}}–{{to}} heeft nog diensten. Maak deze eerst leeg en verkort daarna de cyclus.",
+        "cycleLengthTooShort": "Dag {{from}}-{{to}} heeft nog diensten. Maak deze eerst leeg en verkort daarna de cyclus.",
         "cycleLengthConflictGeneric": "Deze cycluslengte zou dagen verwijderen die nog diensten hebben. Maak deze eerst leeg en verkort daarna de cyclus.",
         "validFrom": "Geldig vanaf",
         "validUntil": "Geldig tot",
