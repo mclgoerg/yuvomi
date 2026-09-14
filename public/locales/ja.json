@@ -4330,7 +4330,8 @@
                 "noPrediction": "予測するには生理を記録してください。",
                 "fertilitySuppressedNote": "妊娠可能期間は一時停止中: ホルモン避妊のため。",
                 "nextPeriodRangeSub": "平均: {{date}}",
-                "partnerNextPeriod": "{{name}}さんの生理"
+                "partnerNextPeriod": "{{name}}さんの生理は{{date}}に始まる見込みです。",
+                "partnerNextPeriodNeutral": "パートナー通知 - 生理"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "詳細",
                 "feelingFrequency": "気分の頻度",
                 "flowLoad": "周期ごとの経血量の推移",
-                "flowLoadCaption": "経血量の記録に基づきます — 記録が詳しいほど、この情報の意味が増します。",
+                "flowLoadCaption": "経血量の記録に基づきます - 記録が詳しいほど、この情報の意味が増します。",
                 "flowLoadColumn": "経血量の合計",
                 "flowLoadValue": "{{load}}（{{days}}記録）",
-                "heavyBleedingHintHeavy": "直近の月経が繰り返し「多い」と記録されています — 医師への相談時に伝える価値があります。",
-                "heavyBleedingHintLong": "直近の月経のうち少なくとも1回が1週間以上続きました — 医師への相談時に伝える価値があります。",
+                "heavyBleedingHintHeavy": "直近の月経が繰り返し「多い」と記録されています - 医師への相談時に伝える価値があります。",
+                "heavyBleedingHintLong": "直近の月経のうち少なくとも1回が1週間以上続きました - 医師への相談時に伝える価値があります。",
                 "painTitle": "痛み",
                 "painCurrentCycleLabel": "今周期の痛みのある日数",
                 "painAvgPerCycleLabel": "周期あたりの平均痛み日数",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "生理を記録",
                 "edit": "生理を編集",
-                "warningFuture": "開始日が未来の日付です — 予測は過去の周期のみに基づきます。",
+                "warningFuture": "開始日が未来の日付です - 予測は過去の周期のみに基づきます。",
                 "warningOverlap": "すでに記録済みの周期と重なっています。"
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "PMS期間を表示",
                 "notifyPartner": "パートナーに通知",
                 "notifyPartnerHint": "選択された相手には予測日のみが伝わり、症状やメモなどの記録は一切共有されません。",
+                "notifyPartnerNoEligible": "通知できる対象者がいません - ヘルスモジュールへのアクセス権を持つメンバーのみ通知できます。",
                 "notifyPartnerDaysBefore": "パートナーへのリマインダー"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "今日のサイクル状況",
                 "line1": "サイクル{{day}}日目 · {{phase}}",
-                "periodToday": "今日生理が予測されています — 今すぐ開始しますか?",
-                "periodOverdue": "生理が{{count}}日遅れています — 今すぐ開始しますか?",
-                "periodOverdue_one": "生理が{{count}}日遅れています — 今すぐ開始しますか?",
-                "periodStillOpen": "記録上、生理がまだ続いているようです — 今すぐ終了しますか?",
+                "periodToday": "今日生理が予測されています - 今すぐ開始しますか?",
+                "periodOverdue": "生理が{{count}}日遅れています - 今すぐ開始しますか?",
+                "periodOverdue_one": "生理が{{count}}日遅れています - 今すぐ開始しますか?",
+                "periodStillOpen": "記録上、生理がまだ続いているようです - 今すぐ終了しますか?",
                 "peakPainDay": "あなたのパターンによると、今日は痛みが最も強くなりやすい日です({{symptom}})。",
                 "likelySymptomsToday": "今日起こりやすい: {{symptoms}}",
                 "pmsWindow": "PMS期間はおそらく{{weekday}}から",

@@ -4330,7 +4330,8 @@
                 "noPrediction": "Registreer een menstruatie voor voorspellingen.",
                 "fertilitySuppressedNote": "Vruchtbaar venster gepauzeerd: hormonale anticonceptie.",
                 "nextPeriodRangeSub": "Gemiddeld: {{date}}",
-                "partnerNextPeriod": "Menstruatie van {{name}}"
+                "partnerNextPeriod": "De menstruatie van {{name}} begint naar verwachting op {{date}}.",
+                "partnerNextPeriodNeutral": "Partnerherinnering: menstruatie"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Details",
                 "feelingFrequency": "Gevoelens-frequentie",
                 "flowLoad": "Bloedingsintensiteit per cyclus",
-                "flowLoadCaption": "Gebaseerd op je bloedingsregistraties — hoe vollediger je bijhoudt, hoe zinvoller dit is.",
+                "flowLoadCaption": "Gebaseerd op je bloedingsregistraties - hoe vollediger je bijhoudt, hoe zinvoller dit is.",
                 "flowLoadColumn": "Bloedingslast",
                 "flowLoadValue": "{{load}} ({{days}} geregistreerd)",
-                "heavyBleedingHintHeavy": "Je laatste menstruaties zijn herhaaldelijk als \"hevig\" geregistreerd — dit is het bespreken met een arts waard.",
-                "heavyBleedingHintLong": "Minstens één van je laatste menstruaties duurde langer dan een week — dit is het bespreken met een arts waard.",
+                "heavyBleedingHintHeavy": "Je laatste menstruaties zijn herhaaldelijk als \"hevig\" geregistreerd - dit is het bespreken met een arts waard.",
+                "heavyBleedingHintLong": "Minstens één van je laatste menstruaties duurde langer dan een week - dit is het bespreken met een arts waard.",
                 "painTitle": "Pijn",
                 "painCurrentCycleLabel": "Pijndagen deze cyclus",
                 "painAvgPerCycleLabel": "Gem. pijndagen per cyclus",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Menstruatie registreren",
                 "edit": "Menstruatie bewerken",
-                "warningFuture": "Startdatum ligt in de toekomst — voorspellingen zijn alleen gebaseerd op eerdere cycli.",
+                "warningFuture": "Startdatum ligt in de toekomst - voorspellingen zijn alleen gebaseerd op eerdere cycli.",
                 "warningOverlap": "Overlapt met een al geregistreerde cyclus."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "PMS-venster tonen",
                 "notifyPartner": "Partner op de hoogte stellen",
                 "notifyPartnerHint": "De gekozen persoon ontvangt alleen de voorspelde datum, nooit symptomen, notities of andere gegevens.",
+                "notifyPartnerNoEligible": "Geen geschikt huishoudlid beschikbaar - alleen leden met toegang tot de module Gezondheid kunnen worden geïnformeerd.",
                 "notifyPartnerDaysBefore": "Herinnering voor partner"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Cyclusstatus vandaag",
                 "line1": "Cyclusdag {{day}} · {{phase}}",
-                "periodToday": "Menstruatie vandaag verwacht — nu starten?",
-                "periodOverdue": "Menstruatie is {{count}} dagen over tijd — nu starten?",
-                "periodOverdue_one": "Menstruatie is {{count}} dag over tijd — nu starten?",
-                "periodStillOpen": "Je menstruatie staat nog als lopend geregistreerd — nu beëindigen?",
+                "periodToday": "Menstruatie vandaag verwacht - nu starten?",
+                "periodOverdue": "Menstruatie is {{count}} dagen over tijd - nu starten?",
+                "periodOverdue_one": "Menstruatie is {{count}} dag over tijd - nu starten?",
+                "periodStillOpen": "Je menstruatie staat nog als lopend geregistreerd - nu beëindigen?",
                 "peakPainDay": "Volgens je patroon is vandaag vaak je dag met de sterkste pijn ({{symptom}}).",
                 "likelySymptomsToday": "Vandaag waarschijnlijk: {{symptoms}}",
                 "pmsWindow": "PMS-venster waarschijnlijk vanaf {{weekday}}",

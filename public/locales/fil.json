@@ -4330,7 +4330,8 @@
                 "noPrediction": "Magtala ng regla para makita ang mga hula.",
                 "fertilitySuppressedNote": "Naka-pause ang fertile window: hormonal na contraception.",
                 "nextPeriodRangeSub": "Katamtaman: {{date}}",
-                "partnerNextPeriod": "Regla ni {{name}}"
+                "partnerNextPeriod": "Inaasahang magsisimula ang regla ni {{name}} sa {{date}}.",
+                "partnerNextPeriodNeutral": "Paalala para sa partner: regla"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Mga detalye",
                 "feelingFrequency": "Dalas ng damdamin",
                 "flowLoad": "Tindi ng daloy bawat siklo",
-                "flowLoadCaption": "Base sa iyong mga tala ng daloy — kung mas kumpleto ang pagta-tala mo, mas makabuluhan ito.",
+                "flowLoadCaption": "Base sa iyong mga tala ng daloy - kung mas kumpleto ang pagta-tala mo, mas makabuluhan ito.",
                 "flowLoadColumn": "Bigat ng daloy",
                 "flowLoadValue": "{{load}} ({{days}} naitala)",
-                "heavyBleedingHintHeavy": "Ang iyong mga huling regla ay paulit-ulit na naitala bilang \"malakas\" — sulit itong banggitin sa isang konsultasyong medikal.",
-                "heavyBleedingHintLong": "Kahit isa sa iyong mga huling regla ay tumagal nang higit sa isang linggo — sulit itong banggitin sa isang konsultasyong medikal.",
+                "heavyBleedingHintHeavy": "Ang iyong mga huling regla ay paulit-ulit na naitala bilang \"malakas\" - sulit itong banggitin sa isang konsultasyong medikal.",
+                "heavyBleedingHintLong": "Kahit isa sa iyong mga huling regla ay tumagal nang higit sa isang linggo - sulit itong banggitin sa isang konsultasyong medikal.",
                 "painTitle": "Sakit",
                 "painCurrentCycleLabel": "Mga araw ng sakit sa siklong ito",
                 "painAvgPerCycleLabel": "Avg. araw ng sakit bawat siklo",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Itala ang regla",
                 "edit": "I-edit ang regla",
-                "warningFuture": "Ang petsa ng simula ay nasa hinaharap — batay lang ang hula sa nakaraang mga siklo.",
+                "warningFuture": "Ang petsa ng simula ay nasa hinaharap - batay lang ang hula sa nakaraang mga siklo.",
                 "warningOverlap": "Nagsasapawan sa isang siklo na naitala na."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "Ipakita ang PMS window",
                 "notifyPartner": "Abisuhan ang isang partner",
                 "notifyPartnerHint": "Ang piniling tao ay tatanggap lamang ng inaasahang petsa, hindi kailanman ng mga sintomas, tala, o iba pang entry.",
+                "notifyPartnerNoEligible": "Walang kwalipikadong miyembro ng sambahayan - tanging mga miyembrong may access sa Health module lang ang maaabisuhan.",
                 "notifyPartnerDaysBefore": "Paalala para sa partner"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Estado ng cycle ngayon",
                 "line1": "Araw {{day}} ng cycle · {{phase}}",
-                "periodToday": "Inaasahan ang regla ngayon — simulan na?",
-                "periodOverdue": "Naantala na ng {{count}} araw ang regla — simulan na?",
-                "periodOverdue_one": "Naantala na ng {{count}} araw ang regla — simulan na?",
-                "periodStillOpen": "Naka-log pa rin ang iyong regla bilang kasalukuyan — tapusin na ngayon?",
+                "periodToday": "Inaasahan ang regla ngayon - simulan na?",
+                "periodOverdue": "Naantala na ng {{count}} araw ang regla - simulan na?",
+                "periodOverdue_one": "Naantala na ng {{count}} araw ang regla - simulan na?",
+                "periodStillOpen": "Naka-log pa rin ang iyong regla bilang kasalukuyan - tapusin na ngayon?",
                 "peakPainDay": "Ayon sa iyong pattern, madalas na ngayon ang pinakamatinding araw ng sakit ({{symptom}}).",
                 "likelySymptomsToday": "Malamang ngayon: {{symptoms}}",
                 "pmsWindow": "Malamang magkaroon ng PMS window simula {{weekday}}",

@@ -4330,7 +4330,8 @@
                 "noPrediction": "예측을 위해 생리를 기록하세요.",
                 "fertilitySuppressedNote": "가임기 일시 중지됨: 호르몬 피임.",
                 "nextPeriodRangeSub": "평균: {{date}}",
-                "partnerNextPeriod": "{{name}}님의 생리"
+                "partnerNextPeriod": "{{name}}님의 생리는 {{date}}에 시작될 것으로 예상됩니다.",
+                "partnerNextPeriodNeutral": "파트너 알림 - 생리"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "세부정보",
                 "feelingFrequency": "기분 빈도",
                 "flowLoad": "주기별 생리량 추이",
-                "flowLoadCaption": "생리량 기록을 기반으로 합니다 — 기록이 자세할수록 더 의미 있는 정보입니다.",
+                "flowLoadCaption": "생리량 기록을 기반으로 합니다 - 기록이 자세할수록 더 의미 있는 정보입니다.",
                 "flowLoadColumn": "생리량 합계",
                 "flowLoadValue": "{{load}} ({{days}} 기록됨)",
-                "heavyBleedingHintHeavy": "최근 생리가 반복적으로 \"과다\"로 기록되었습니다 — 진료 상담 시 언급해 볼 만합니다.",
-                "heavyBleedingHintLong": "최근 생리 중 적어도 한 번은 일주일 이상 지속되었습니다 — 진료 상담 시 언급해 볼 만합니다.",
+                "heavyBleedingHintHeavy": "최근 생리가 반복적으로 \"과다\"로 기록되었습니다 - 진료 상담 시 언급해 볼 만합니다.",
+                "heavyBleedingHintLong": "최근 생리 중 적어도 한 번은 일주일 이상 지속되었습니다 - 진료 상담 시 언급해 볼 만합니다.",
                 "painTitle": "통증",
                 "painCurrentCycleLabel": "이번 주기의 통증 일수",
                 "painAvgPerCycleLabel": "주기당 평균 통증 일수",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "생리 기록",
                 "edit": "생리 편집",
-                "warningFuture": "시작일이 미래입니다 — 예측은 과거 주기만을 기준으로 합니다.",
+                "warningFuture": "시작일이 미래입니다 - 예측은 과거 주기만을 기준으로 합니다.",
                 "warningOverlap": "이미 기록된 주기와 겹칩니다."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "PMS 기간 표시",
                 "notifyPartner": "파트너에게 알리기",
                 "notifyPartnerHint": "선택한 사람은 예측 날짜만 받을 뿐, 증상이나 메모 등 다른 기록은 전혀 받지 않습니다.",
+                "notifyPartnerNoEligible": "알림을 받을 수 있는 가족 구성원이 없습니다 - 건강 모듈에 접근 권한이 있는 구성원만 알림을 받을 수 있습니다.",
                 "notifyPartnerDaysBefore": "파트너 알림"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "오늘의 주기 상태",
                 "line1": "주기 {{day}}일차 · {{phase}}",
-                "periodToday": "오늘 생리가 예상됩니다 — 지금 시작할까요?",
-                "periodOverdue": "생리가 {{count}}일 지연되었습니다 — 지금 시작할까요?",
-                "periodOverdue_one": "생리가 {{count}}일 지연되었습니다 — 지금 시작할까요?",
-                "periodStillOpen": "기록상 생리가 아직 진행 중인 것 같아요 — 지금 종료할까요?",
+                "periodToday": "오늘 생리가 예상됩니다 - 지금 시작할까요?",
+                "periodOverdue": "생리가 {{count}}일 지연되었습니다 - 지금 시작할까요?",
+                "periodOverdue_one": "생리가 {{count}}일 지연되었습니다 - 지금 시작할까요?",
+                "periodStillOpen": "기록상 생리가 아직 진행 중인 것 같아요 - 지금 종료할까요?",
                 "peakPainDay": "당신의 패턴에 따르면 오늘은 통증이 가장 심한 날인 경우가 많아요 ({{symptom}}).",
                 "likelySymptomsToday": "오늘 발생 가능성: {{symptoms}}",
                 "pmsWindow": "PMS 기간이 {{weekday}}부터 예상됩니다",

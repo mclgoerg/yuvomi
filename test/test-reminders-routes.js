@@ -212,7 +212,7 @@ test('GET /pending materialisiert Geburtstags-Artefakte (Seiteneffekt)', async (
 });
 
 // --------------------------------------------------------------------------
-// GET /pending - cycle_anchor_kind / cycle_owner_name (Befund 2, D-15)
+// GET /pending - cycle_anchor_kind / cycle_owner_name (Partner-Erinnerung)
 //
 // Ohne diese Felder sagt der In-App-Toast der Partnerperson "Nächste Periode -
 // <Datum>", als wäre es die eigene - der Push-Weg (notifications.js) trägt

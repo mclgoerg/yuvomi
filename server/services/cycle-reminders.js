@@ -4,8 +4,8 @@
  *        EINEN Nutzer herstellen - höchstens eine Zeile je Art, nicht ein
  *        rollierendes Fenster wie beim Schichtplan: der Zyklus hat je Nutzer
  *        immer nur EINEN nächsten vorhergesagten Periodenbeginn und EIN
- *        "heute", nicht viele Tage mit je eigenem Inhalt. Seit D-15 gehört
- *        dazu auch eine optionale VIERTE Zeilen-Art ('partner_period', teilt
+ *        "heute", nicht viele Tage mit je eigenem Inhalt. Dazu gehört auch
+ *        eine optionale VIERTE Zeilen-Art ('partner_period', teilt
  *        sich `entity_type` mit 'period_predicted' - siehe
  *        syncPartnerReminder()): eine Benachrichtigung für eine andere Person
  *        (`cycle_settings.notify_partner_user_id`), die der Eigentümer
@@ -39,7 +39,13 @@ import { resolvePermissions } from '../permissions.js';
 import { createLogger } from '../logger.js';
 import { predictCycle } from '../../public/utils/health-cycle.js';
 import { healthCycleViews } from '../routes/preferences.js';
-import { isHouseholdMember } from './member-email.js';
+import { isHouseholdMember, listHouseholdMembers } from './member-email.js';
+
+// Einzige Familienrolle, die als Kind gilt (server/auth.js FAMILY_ROLES:
+// dad/mom/parent/child/grandparent/relative/other) - eine Konstante statt
+// eines String-Literals an jeder Vergleichsstelle, falls das je mehr als eine
+// Rolle wird.
+const CHILD_FAMILY_ROLE = 'child';
 
 const log = createLogger('CycleReminders');
 
@@ -61,6 +67,38 @@ function lacksHealth(database, userId) {
   return resolvePermissions(database, user).modules.health === 'none';
 }
 
+/**
+ * Ist `candidateId` ein zulässiges Ziel für die Partner-Benachrichtigung?
+ * Echtes Haushaltsmitglied MIT Zugriff auf das Health-Modul, kein Kind
+ * (`family_role = 'child'` - die einzige kindliche Rolle in `FAMILY_ROLES`,
+ * server/auth.js). Der EIGENE Zyklus-Tab-Status der Partnerperson zählt
+ * bewusst NICHT mehr dazu: die typische Empfängerin hat selbst
+ * keinen Zyklus und den Tab darum abgeschaltet - genau das darf sie nicht von
+ * der Meldung ausschließen. `cycleTabEnabled()` bleibt trotzdem oben stehen,
+ * für das EIGENE Gate der Eigentümer-Erinnerungen (syncCycleRemindersForUser).
+ *
+ * EINE Funktion für den Sync (unten) UND die Auswahlliste in GET /cycle/settings
+ * (server/routes/health/cycle.js) - dieselbe Regel an beiden Stellen, statt
+ * einer zweiten Abschrift, die auseinanderlaufen könnte (siehe DECISIONS.md
+ * "eine Regel lebt an einem Ort").
+ */
+export function isEligibleCyclePartner(database, candidateId) {
+  const row = database.prepare('SELECT family_role FROM users WHERE id = ?').get(candidateId);
+  if (!row || row.family_role === CHILD_FAMILY_ROLE) return false;
+  return isHouseholdMember(candidateId, { db: database }) && !lacksHealth(database, candidateId);
+}
+
+/**
+ * Andere Haushaltsmitglieder, die als Partner-Ziel taugen würden (nicht die
+ * anfragende Person selbst) - für die Auswahlliste, exakt gefiltert mit
+ * `isEligibleCyclePartner()` oben.
+ */
+export function eligibleCyclePartners(database, viewerId) {
+  return listHouseholdMembers({ db: database })
+    .filter((m) => m.id !== viewerId && isEligibleCyclePartner(database, m.id))
+    .map((m) => ({ id: m.id, display_name: m.display_name }));
+}
+
 /** Anker + zugehörige Erinnerung einer Art abräumen, falls vorhanden. */
 function dropAnchorAndReminder(database, userId, kind, entityType) {
   const anchor = database.prepare('SELECT id FROM cycle_reminder_anchors WHERE user_id = ? AND kind = ?').get(userId, kind);
@@ -77,9 +115,8 @@ function dropAnchorAndReminder(database, userId, kind, entityType) {
  * `recipientUserId` (Standard: `userId`) ist, wer die Meldung EMPFAENGT
  * (reminders.created_by - siehe notifications.js#processDueNotifications,
  * das darüber Push-Ziel/Kanäle auflöst). Der Anker selbst bleibt immer bei
- * `userId` verankert, weil `anchor_date` dessen Datum ist (D-15, Partner-
- * Erinnerung: der Anker gehört weiter dem Eigentümer, empfangen tut sie die
- * Partnerperson).
+ * `userId` verankert, weil `anchor_date` dessen Datum ist (Partner-Erinnerung:
+ * der Anker gehört weiter dem Eigentümer, empfangen tut sie die Partnerperson).
  */
 function upsertCycleReminder(database, userId, kind, entityType, targetDate, offsetDays, today, recipientUserId = userId) {
   const remindAt = reminderDateBefore(targetDate, offsetDays);
@@ -148,7 +185,7 @@ function syncPeriodReminder(database, userId, settings, today, prediction) {
 }
 
 /**
- * Partner-Benachrichtigung (D-15, Eigentümer-Opt-in): EINE zusätzliche
+ * Partner-Benachrichtigung (Eigentümer-Opt-in): EINE zusätzliche
  * Erinnerungs-Zeile FÜR DIE PARTNERPERSON (`notify_partner_user_id`), sofern
  * der Eigentümer sie in den eigenen cycle_settings eingetragen hat. Rechnet
  * mit derselben predictCycle()-Basis wie die eigene Perioden-Erinnerung oben -
@@ -165,17 +202,20 @@ function syncPeriodReminder(database, userId, settings, today, prediction) {
  * für einen fremden Periodenbeginn ist inhaltlich dieselbe Herkunft wie die
  * eigene, und die Wiederverwendung braucht keinen dritten Eintrag in den drei
  * Herkunfts-Registern (server/routes/reminders.js, public/reminders.js,
- * server/services/notifications.js) - siehe DECISIONS.md.
+ * server/services/notifications.js).
  *
  * `prediction` kommt fertig vom Aufrufer (syncCycleRemindersForUser) - dieselbe
  * Vorhersage wie syncPeriodReminder() oben, EIN Periods-Query/predictCycle()-
  * Aufruf je Durchlauf statt zweier identischer.
  *
- * "BEIDE SEITEN" (Abraeum-Regel): die Partnerperson muss weiterhin ein
- * echtes Haushaltsmitglied mit Zugriff auf das Health-Modul UND
- * freigeschaltetem Zyklus-Tab sein - verliert SIE eines davon (nicht nur der
+ * ABRAEUM-REGEL: die Partnerperson muss weiterhin ein echtes
+ * Haushaltsmitglied mit Zugriff auf das Health-Modul sein und darf kein Kind
+ * sein (`isEligibleCyclePartner()` oben) - verliert SIE das (nicht nur der
  * Eigentuemer), faellt die Meldung weg, auch wenn die Einstellung des
- * Eigentuemers selbst unangetastet blieb. Ein voller periodischer Durchlauf
+ * Eigentuemers selbst unangetastet blieb. Der EIGENE Zyklus-Tab-Status der
+ * Partnerperson zaehlt bewusst NICHT mehr dazu: die typische Empfaengerin hat
+ * selbst keinen Zyklus und den Tab darum abgeschaltet, und genau das darf sie
+ * nicht von der Meldung ausschliessen. Ein voller periodischer Durchlauf
  * (syncAllCycleReminders) faengt eine Aenderung auf der Partnerseite auf,
  * genau wie er das fuer jede andere entzogene Berechtigung schon tut.
  *
@@ -193,7 +233,7 @@ function syncPartnerReminder(database, userId, settings, today, prediction) {
     return;
   }
 
-  if (!isHouseholdMember(partnerId, { db: database }) || lacksHealth(database, partnerId) || !cycleTabEnabled(database, partnerId)) {
+  if (!isEligibleCyclePartner(database, partnerId)) {
     dropAnchorAndReminder(database, userId, 'partner_period', 'cycle_period');
     return;
   }
@@ -265,6 +305,32 @@ export function syncCycleRemindersForUser(database, userId, now = new Date()) {
 }
 
 /**
+ * Räumt verwaiste Zyklus-Erinnerungen weg: eine `reminders`-Zeile, deren
+ * Anker (`entity_id` → `cycle_reminder_anchors.id`) nicht mehr existiert.
+ *
+ * Der Normalfall räumt das selbst ab (dropAnchorAndReminder() löscht immer
+ * beides zusammen) - aber ein ADMIN KANN DEN EIGENTÜMER EINES ANKERS LÖSCHEN.
+ * `cycle_reminder_anchors.user_id` hat ON DELETE CASCADE, die Anker-Zeile
+ * verschwindet also mit. Die zugehörige `reminders`-Zeile aber gehört
+ * (`created_by`) bei einer Partner-Erinnerung NICHT dem Eigentümer, sondern
+ * der Partnerperson - und `reminders.entity_id` trägt keinen Fremdschlüssel
+ * (dasselbe polymorphe Muster wie jede andere Erinnerungs-Herkunft), die
+ * Kaskade erreicht sie also nicht. Ohne dieses Aufräumen behielte die
+ * Partnerperson für immer eine Erinnerung auf ein Datum, das es nicht mehr
+ * gibt ("Nächste Periode" mit leerem Titel). Läuft vor jedem vollen
+ * Sync-Durchlauf, nicht nur bei Bedarf - billig (ein Index-Scan über zwei
+ * kleine Tabellen) und macht eine künftige zweite Löschstelle für Anker
+ * überflüssig, an die dieses Aufräumen sonst erneut angehängt werden müsste.
+ */
+function cleanupOrphanedCycleReminders(database) {
+  database.prepare(`
+    DELETE FROM reminders
+    WHERE entity_type IN ('cycle_period', 'cycle_log_nudge')
+      AND entity_id NOT IN (SELECT id FROM cycle_reminder_anchors)
+  `).run();
+}
+
+/**
  * Für jeden Nutzer mit einer aktivierten Zyklus-Erinnerung (oder noch
  * bestehenden Ankern einer inzwischen abgeschalteten) den Soll-Zustand
  * herstellen. Läuft periodisch, gleiche Stelle wie der Vorrats- und
@@ -274,6 +340,8 @@ export function syncCycleRemindersForUser(database, userId, now = new Date()) {
  * @param {Date} [now]
  */
 export function syncAllCycleReminders(database, now = new Date()) {
+  cleanupOrphanedCycleReminders(database);
+
   const withSettings = database.prepare(`
     SELECT user_id FROM cycle_settings
     WHERE remind_period_days_before IS NOT NULL OR remind_log_daily = 1 OR notify_partner_user_id IS NOT NULL

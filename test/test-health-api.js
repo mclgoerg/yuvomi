@@ -774,7 +774,7 @@ test('Cycle-Settings: ungültiger contraception-Wert wird abgelehnt', async () =
   assert.equal(res.status, 400);
 });
 
-test('Cycle-Settings: Partner-Benachrichtigung (D-15) – gültiges Haushaltsmitglied, dann per Voll-Ersetzen wieder gelöscht', async () => {
+test('Cycle-Settings: Partner-Benachrichtigung - gültiges Haushaltsmitglied, dann per Voll-Ersetzen wieder gelöscht', async () => {
   asA();
   const saved = await call('PUT', '/cycle/settings', {
     notify_partner_user_id: userB, notify_partner_days_before: 2,
@@ -805,6 +805,41 @@ test('Cycle-Settings: notify_partner_user_id lehnt die aufrufende Person selbst 
 test('Cycle-Settings: notify_partner_days_before außerhalb 0-14 wird abgelehnt', async () => {
   asA();
   const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: userB, notify_partner_days_before: 30 });
+  assert.equal(res.status, 400);
+});
+
+// eligible_partners - nur wer die Meldung tatsaechlich bekaeme
+// (Haushaltsmitglied, Health-Zugriff, kein Kind), nie die aufrufende Person
+// selbst.
+const userChild = db.prepare(`INSERT INTO users (username, display_name, password_hash, role, family_role)
+  VALUES ('junior', 'Junior', '$2b$12$x', 'member', 'child')`).run().lastInsertRowid;
+const userNoHealth = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+  VALUES ('nora', 'Nora', '$2b$12$x', 'member')`).run().lastInsertRowid;
+db.prepare(`INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
+  VALUES ('user', ?, 'module', 'health', 'none')`).run(String(userNoHealth));
+
+test('Cycle-Settings: eligible_partners nennt Haushaltsmitglieder mit Health-Zugriff, nie sich selbst, nie Kinder, nie Health-gesperrte', async () => {
+  asA();
+  const res = await call('GET', '/cycle/settings');
+  assert.equal(res.status, 200);
+  const ids = res.body.data.eligible_partners.map((p) => p.id);
+  assert.ok(ids.includes(userB), 'Bob hat Health-Zugriff und ist kein Kind - muss auftauchen');
+  assert.ok(!ids.includes(userA), 'die aufrufende Person selbst darf nicht in ihrer eigenen Liste stehen');
+  assert.ok(!ids.includes(userChild), 'ein Kind darf nicht als Partner-Ziel angeboten werden');
+  assert.ok(!ids.includes(userNoHealth), 'wer keinen Health-Zugriff hat, bekaeme die Meldung nie und darf nicht auftauchen');
+  const bobEntry = res.body.data.eligible_partners.find((p) => p.id === userB);
+  assert.equal(bobEntry.display_name, 'Bob');
+});
+
+test('Cycle-Settings: notify_partner_user_id lehnt ein Kind ab (400)', async () => {
+  asA();
+  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: userChild });
+  assert.equal(res.status, 400);
+});
+
+test('Cycle-Settings: notify_partner_user_id lehnt ein Haushaltsmitglied ohne Health-Zugriff ab (400)', async () => {
+  asA();
+  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: userNoHealth });
   assert.equal(res.status, 400);
 });
 
@@ -851,7 +886,7 @@ test('Export cycle: CSV mit Perioden- und Zykluslänge', async () => {
 });
 
 // ========================================================
-// ZYKLUS: Perioden-Historie-Import (D-13)
+// ZYKLUS: Perioden-Historie-Import
 // ========================================================
 
 test('Cycle-Import: ohne csv-Feld -> 400', async () => {
@@ -1039,8 +1074,8 @@ test('Cycle-Log: ungültiger legacy mood-Wert wird abgelehnt wie ein ungültiges
   assert.equal(res.status, 400);
 });
 
-// Review-Runde Fix 2(a): der Upsert setzt `mood = NULL` jetzt auf BEIDEN
-// Pfaden (Insert und Conflict-Update) aktiv, statt die Spalte unangetastet zu
+// Der Upsert setzt `mood = NULL` auf BEIDEN Pfaden (Insert und
+// Conflict-Update) aktiv, statt die Spalte unangetastet zu
 // lassen - eine schon vor Migration 211 (oder direkt in der DB) eingefrorene
 // `mood` durfte sonst bei jedem weiteren Speichern desselben Tages bestehen
 // bleiben und im GET wieder auftauchen, sobald `feelings` geleert wurde
@@ -1067,7 +1102,7 @@ test('Cycle-Log: ein direkt in der DB eingefrorener Legacy-mood-Wert wird beim n
   assert.equal(db.prepare('SELECT mood FROM cycle_day_logs WHERE id = ?').get(id).mood, null);
 });
 
-test('Cycle-Log: intimacy ist hart privat – Eigentümer sieht es, family-Mitglied nicht (D-6)', async () => {
+test('Cycle-Log: intimacy ist hart privat – Eigentümer sieht es, family-Mitglied nicht', async () => {
   asA();
   const created = await call('POST', '/cycle/logs', {
     log_date: '2030-01-06', flow: 'medium', intimacy: 'unprotected', visibility: 'family',
@@ -1096,6 +1131,80 @@ test('Cycle: Bulk-Sichtbarkeit auf family lässt intimacy trotzdem verborgen', a
   const bobRow = asBob.body.data.find((l) => l.log_date === '2030-01-07');
   assert.ok(bobRow, 'nach dem Bulk-Umschalten sollte Bob die jetzt family-sichtbare Zeile sehen');
   assert.ok(!('intimacy' in bobRow));
+});
+
+// Owner-only wie intimacy: cervix_mucus, lh_test und pregnancy_test sind
+// ebenfalls hart privat, unabhängig von der Zeilen-Sichtbarkeit - dieselbe
+// Erwartung, drei Felder, je ein eigener Test.
+test('Cycle-Log: cervix_mucus ist hart privat – Eigentümer sieht es, family-Mitglied nicht', async () => {
+  asA();
+  const created = await call('POST', '/cycle/logs', {
+    log_date: '2030-01-08', flow: 'medium', cervix_mucus: 'eggwhite', visibility: 'family',
+  });
+  assert.equal(created.body.data.cervix_mucus, 'eggwhite');
+
+  asB();
+  const asBob = await call('GET', `/cycle/logs?user_id=${userA}&from=2030-01-08&to=2030-01-08`);
+  const bobRow = asBob.body.data.find((l) => l.log_date === '2030-01-08');
+  assert.ok(bobRow, 'Bob sollte die family-Zeile sehen');
+  assert.ok(!('cervix_mucus' in bobRow), 'cervix_mucus darf für Bob nicht einmal als Schlüssel auftauchen');
+
+  asA();
+  const asAlice = await call('GET', '/cycle/logs?from=2030-01-08&to=2030-01-08');
+  assert.equal(asAlice.body.data.find((l) => l.log_date === '2030-01-08').cervix_mucus, 'eggwhite');
+});
+
+test('Cycle-Log: lh_test ist hart privat – Eigentümer sieht es, family-Mitglied nicht', async () => {
+  asA();
+  const created = await call('POST', '/cycle/logs', {
+    log_date: '2030-01-09', flow: 'medium', lh_test: 'positive', visibility: 'family',
+  });
+  assert.equal(created.body.data.lh_test, 'positive');
+
+  asB();
+  const asBob = await call('GET', `/cycle/logs?user_id=${userA}&from=2030-01-09&to=2030-01-09`);
+  const bobRow = asBob.body.data.find((l) => l.log_date === '2030-01-09');
+  assert.ok(bobRow, 'Bob sollte die family-Zeile sehen');
+  assert.ok(!('lh_test' in bobRow), 'lh_test darf für Bob nicht einmal als Schlüssel auftauchen');
+
+  asA();
+  const asAlice = await call('GET', '/cycle/logs?from=2030-01-09&to=2030-01-09');
+  assert.equal(asAlice.body.data.find((l) => l.log_date === '2030-01-09').lh_test, 'positive');
+});
+
+test('Cycle-Log: pregnancy_test ist hart privat – Eigentümer sieht es, family-Mitglied nicht', async () => {
+  asA();
+  const created = await call('POST', '/cycle/logs', {
+    log_date: '2030-01-10', flow: 'medium', pregnancy_test: 'negative', visibility: 'family',
+  });
+  assert.equal(created.body.data.pregnancy_test, 'negative');
+
+  asB();
+  const asBob = await call('GET', `/cycle/logs?user_id=${userA}&from=2030-01-10&to=2030-01-10`);
+  const bobRow = asBob.body.data.find((l) => l.log_date === '2030-01-10');
+  assert.ok(bobRow, 'Bob sollte die family-Zeile sehen');
+  assert.ok(!('pregnancy_test' in bobRow), 'pregnancy_test darf für Bob nicht einmal als Schlüssel auftauchen');
+
+  asA();
+  const asAlice = await call('GET', '/cycle/logs?from=2030-01-10&to=2030-01-10');
+  assert.equal(asAlice.body.data.find((l) => l.log_date === '2030-01-10').pregnancy_test, 'negative');
+});
+
+test('Cycle: Bulk-Sichtbarkeit auf family lässt cervix_mucus/lh_test/pregnancy_test trotzdem verborgen', async () => {
+  asA();
+  await call('POST', '/cycle/logs', {
+    log_date: '2030-01-11', cervix_mucus: 'watery', lh_test: 'negative', pregnancy_test: 'negative', visibility: 'private',
+  });
+  const bulk = await call('PATCH', '/cycle/visibility', { visibility: 'family' });
+  assert.equal(bulk.status, 200);
+
+  asB();
+  const asBob = await call('GET', `/cycle/logs?user_id=${userA}&from=2030-01-11&to=2030-01-11`);
+  const bobRow = asBob.body.data.find((l) => l.log_date === '2030-01-11');
+  assert.ok(bobRow, 'nach dem Bulk-Umschalten sollte Bob die jetzt family-sichtbare Zeile sehen');
+  assert.ok(!('cervix_mucus' in bobRow));
+  assert.ok(!('lh_test' in bobRow));
+  assert.ok(!('pregnancy_test' in bobRow));
 });
 
 // ========================================================

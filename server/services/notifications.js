@@ -13,7 +13,7 @@ import { webhookProvider } from './notification-providers/webhook.js';
 import { emailProvider } from './notification-providers/email.js';
 import { guardedFetch } from './notification-providers/guarded-fetch.js';
 import { syncAllBirthdayReminders } from './birthdays.js';
-import { resolveHouseholdLocale, translate } from '../utils/i18n.js';
+import { resolveHouseholdFormats, formatDateKey, translate } from '../utils/i18n.js';
 import { warrantyEndDate } from './inventory-deadlines.js';
 import { syncAllPantryExpiryReminders } from './pantry-reminders.js';
 import { syncAllCycleReminders } from './cycle-reminders.js';
@@ -171,27 +171,31 @@ function pantryExpiryBody(reminder) {
  * Server kennt die Empfaengersprache nicht), Satzbau fuer den Body ist
  * dieselbe Ausnahme, kein neues Prinzip.
  *
- * PARTNER-BENACHRICHTIGUNG (D-15): `entity_type` bleibt 'cycle_period' (siehe
+ * PARTNER-BENACHRICHTIGUNG: `entity_type` bleibt 'cycle_period' (siehe
  * cycle-reminders.js#syncPartnerReminder - bewusste Wiederverwendung statt
  * einer vierten Herkunft), aber der Empfänger ist hier NICHT der Eigentümer
  * des Zyklus. `cycle_anchor_kind`/`cycle_owner_name` (siehe SQL unten)
- * unterscheiden den Fall: der Text muss die Person NENNEN ("Annas Periode"),
- * sonst läse die Partnerperson dieselbe "Deine Periode..."-Meldung wie der
- * Eigentümer selbst - und Datum ist hier bewusst das EINZIGE, was preisgegeben
- * wird, kein Flow-/Symptom-/Log-Inhalt (siehe DECISIONS.md D-15/D-6).
- *
- * TODO(W6): `health.cycle.status.partnerNextPeriod` existiert in den Locale-
- * Dateien noch nicht (public/locales/*.json gehört diesem Worker nicht) -
- * translate() faellt bis dahin auf den rohen Key zurück. Vorgeschlagener Text
- * im Abschlussbericht dieses Workers.
+ * unterscheiden den Fall: der Text muss die Person NENNEN und einen echten
+ * Satz bilden ("Annas Periode beginnt voraussichtlich am ..."), sonst läse
+ * die Partnerperson dieselbe "Deine Periode..."-Meldung wie der Eigentümer
+ * selbst. Fehlt der Name (aelterer Anker-Datensatz, oder die Person wurde
+ * inzwischen geloescht), faellt der Text auf einen NEUTRALEN Platzhalter
+ * zurueck statt faelschlich die eigene Periode der Partnerperson zu behaupten.
+ * Preisgegeben wird dabei bewusst nur das Datum, kein Flow-/Symptom-/
+ * Log-Inhalt.
  */
-function cycleBody(reminder, locale) {
+function cycleBody(reminder, locale, dateFormat) {
   if (reminder.entity_type === 'cycle_log_nudge') {
     return translate(locale, 'health.cycle.settings.remindLogDaily');
   }
   if (reminder.cycle_anchor_kind === 'partner_period') {
-    const label = translate(locale, 'health.cycle.status.partnerNextPeriod', { name: reminder.cycle_owner_name || '' });
-    return `${label} - ${reminder.entity_title}`;
+    if (reminder.cycle_owner_name) {
+      return translate(locale, 'health.cycle.status.partnerNextPeriod', {
+        name: reminder.cycle_owner_name,
+        date: formatDateKey(reminder.entity_title, dateFormat),
+      });
+    }
+    return `${translate(locale, 'health.cycle.status.partnerNextPeriodNeutral')} - ${reminder.entity_title}`;
   }
   return `${translate(locale, 'health.cycle.status.nextPeriod')} - ${reminder.entity_title}`;
 }
@@ -212,7 +216,7 @@ function wastePickupBody(reminder) {
   return `${reminder.entity_title} - ${reminder.waste_date_key}`;
 }
 
-function reminderPayload(reminder, locale) {
+function reminderPayload(reminder, locale, dateFormat) {
   const title = reminder.entity_title || FALLBACK_BODY;
   const origin = REMINDER_ORIGINS[reminder.entity_type];
   let body = title;
@@ -225,7 +229,7 @@ function reminderPayload(reminder, locale) {
   } else if (reminder.entity_type === 'pantry_item' && reminder.entity_title) {
     body = pantryExpiryBody(reminder);
   } else if ((reminder.entity_type === 'cycle_period' || reminder.entity_type === 'cycle_log_nudge') && reminder.entity_title) {
-    body = cycleBody(reminder, locale);
+    body = cycleBody(reminder, locale, dateFormat);
   } else if ((reminder.entity_type === 'schedule_entry' || reminder.entity_type === 'schedule_extra_entry') && reminder.entity_title) {
     body = scheduleEntryBody(reminder);
   } else if (reminder.entity_type === 'waste_pickup' && reminder.entity_title) {
@@ -441,7 +445,7 @@ export async function processDueNotifications({
           WHERE e.id = r.entity_id
         )
       END AS entity_title,
-      -- D-15: unterscheidet die eigene Perioden-Erinnerung von der an eine
+      -- Unterscheidet die eigene Perioden-Erinnerung von der an eine
       -- Partnerperson weitergereichten (gleicher entity_type, siehe
       -- cycleBody() oben). Der Anzeigename des Zyklus-Eigentümers selbst wird
       -- BEWUSST NICHT hier mitgeholt (kein JOIN auf users in dieser
@@ -488,10 +492,12 @@ export async function processDueNotifications({
 
   const counters = { due: due.length, attempted: 0, sent: 0, failed: 0, skipped: 0 };
   const markPushed = activeDb.prepare('UPDATE reminders SET pushed_at = ? WHERE id = ?');
-  // Einmal je Lauf, nicht je Meldung: die Datensprache gehoert dem Haushalt.
-  const locale = resolveHouseholdLocale(activeDb);
+  // Einmal je Lauf, nicht je Meldung: die Datensprache und das Datumsformat
+  // gehoeren dem Haushalt (cycleBody() braucht beide fuer die
+  // Partner-Erinnerung, siehe dort).
+  const { locale, dateFormat } = resolveHouseholdFormats(activeDb);
 
-  // Nur fuer eine tatsaechliche Partner-Erinnerung (D-15) geholt - siehe
+  // Nur fuer eine tatsaechliche Partner-Erinnerung geholt - siehe
   // Kommentar an cycle_anchor_kind oben. Ein eigener kleiner Query statt Teil
   // der Sammelabfrage, damit die (in Produktion immer vorhandene)
   // users.display_name-Spalte nicht in JEDEM Lauf mitgeprepared werden muss.
@@ -509,7 +515,7 @@ export async function processDueNotifications({
 
   for (const reminder of due) {
     reminder.cycle_owner_name = cycleOwnerName(reminder);
-    const payload = reminderPayload(reminder, locale);
+    const payload = reminderPayload(reminder, locale, dateFormat);
     const channels = store.listEnabledChannelsForUser(reminder.created_by);
     const pushCount = activeDb.prepare('SELECT COUNT(*) AS c FROM push_subscriptions WHERE user_id = ?').get(reminder.created_by).c;
     const targets = [];

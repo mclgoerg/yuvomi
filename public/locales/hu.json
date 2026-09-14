@@ -4330,7 +4330,8 @@
                 "noPrediction": "Rögzíts egy menstruációt az előrejelzésekhez.",
                 "fertilitySuppressedNote": "Termékeny időszak szüneteltetve: hormonális fogamzásgátlás.",
                 "nextPeriodRangeSub": "Átlag: {{date}}",
-                "partnerNextPeriod": "{{name}} menstruációja"
+                "partnerNextPeriod": "{{name}} menstruációja várhatóan {{date}}-én kezdődik.",
+                "partnerNextPeriodNeutral": "Partner-emlékeztető: menstruáció"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Részletek",
                 "feelingFrequency": "Hangulat gyakorisága",
                 "flowLoad": "Vérzés intenzitása ciklusonként",
-                "flowLoadCaption": "A rögzített vérzésadatokon alapul — minél teljesebb a naplózás, annál informatívabb.",
+                "flowLoadCaption": "A rögzített vérzésadatokon alapul - minél teljesebb a naplózás, annál informatívabb.",
                 "flowLoadColumn": "Vérzésterhelés",
                 "flowLoadValue": "{{load}} ({{days}} rögzítve)",
-                "heavyBleedingHintHeavy": "Az utóbbi ciklusaid ismétlődően „erős” vérzésként lettek rögzítve — érdemes ezt megemlíteni egy orvosi konzultáción.",
-                "heavyBleedingHintLong": "Legalább egy utóbbi ciklusod egy hétnél tovább tartott — érdemes ezt megemlíteni egy orvosi konzultáción.",
+                "heavyBleedingHintHeavy": "Az utóbbi ciklusaid ismétlődően „erős” vérzésként lettek rögzítve - érdemes ezt megemlíteni egy orvosi konzultáción.",
+                "heavyBleedingHintLong": "Legalább egy utóbbi ciklusod egy hétnél tovább tartott - érdemes ezt megemlíteni egy orvosi konzultáción.",
                 "painTitle": "Fájdalom",
                 "painCurrentCycleLabel": "Fájdalmas napok ebben a ciklusban",
                 "painAvgPerCycleLabel": "Átl. fájdalmas napok ciklusonként",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Menstruáció rögzítése",
                 "edit": "Menstruáció szerkesztése",
-                "warningFuture": "A kezdő dátum a jövőben van — az előrejelzések csak a korábbi ciklusokon alapulnak.",
+                "warningFuture": "A kezdő dátum a jövőben van - az előrejelzések csak a korábbi ciklusokon alapulnak.",
                 "warningOverlap": "Átfedésben van egy már rögzített ciklussal."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "PMS-időszak megjelenítése",
                 "notifyPartner": "Partner értesítése",
                 "notifyPartnerHint": "A kiválasztott személy csak az előre jelzett dátumot kapja meg, sosem tüneteket, jegyzeteket vagy más bejegyzéseket.",
+                "notifyPartnerNoEligible": "Nincs jogosult háztartástag - csak az Egészség modulhoz hozzáféréssel rendelkező tagok értesíthetők.",
                 "notifyPartnerDaysBefore": "Emlékeztető a partnernek"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Mai ciklusállapot",
                 "line1": "{{day}}. ciklusnap · {{phase}}",
-                "periodToday": "A menstruáció ma várható — elindítod most?",
-                "periodOverdue": "A menstruáció {{count}} napja késik — elindítod most?",
-                "periodOverdue_one": "A menstruáció {{count}} napja késik — elindítod most?",
-                "periodStillOpen": "A bejegyzés szerint a menstruációd még mindig tart — befejezed most?",
+                "periodToday": "A menstruáció ma várható - elindítod most?",
+                "periodOverdue": "A menstruáció {{count}} napja késik - elindítod most?",
+                "periodOverdue_one": "A menstruáció {{count}} napja késik - elindítod most?",
+                "periodStillOpen": "A bejegyzés szerint a menstruációd még mindig tart - befejezed most?",
                 "peakPainDay": "A mintázatod szerint ma gyakran a legerősebb fájdalom napja van ({{symptom}}).",
                 "likelySymptomsToday": "Ma valószínű: {{symptoms}}",
                 "pmsWindow": "PMS-időszak valószínűleg {{weekday}}-tól",

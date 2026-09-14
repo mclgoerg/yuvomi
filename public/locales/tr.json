@@ -4330,7 +4330,8 @@
                 "noPrediction": "Tahminler için bir adet dönemi kaydet.",
                 "fertilitySuppressedNote": "Doğurgan pencere duraklatıldı: hormonal doğum kontrolü.",
                 "nextPeriodRangeSub": "Ortalama: {{date}}",
-                "partnerNextPeriod": "{{name}} adlı kişinin adeti"
+                "partnerNextPeriod": "{{name}} adlı kişinin adetinin {{date}} tarihinde başlaması bekleniyor.",
+                "partnerNextPeriodNeutral": "Partner hatırlatması: adet"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Ayrıntılar",
                 "feelingFrequency": "Duygu sıklığı",
                 "flowLoad": "Döngü başına kanama yoğunluğu",
-                "flowLoadCaption": "Kanama kayıtlarına dayanır — kayıtların ne kadar eksiksiz olursa, bu o kadar anlamlı olur.",
+                "flowLoadCaption": "Kanama kayıtlarına dayanır - kayıtların ne kadar eksiksiz olursa, bu o kadar anlamlı olur.",
                 "flowLoadColumn": "Kanama yükü",
                 "flowLoadValue": "{{load}} ({{days}} kaydedildi)",
-                "heavyBleedingHintHeavy": "Son adet dönemlerin tekrar tekrar \"yoğun\" olarak kaydedildi — bunu bir doktor görüşmesinde belirtmekte fayda var.",
-                "heavyBleedingHintLong": "Son adet dönemlerinden en az biri bir haftadan uzun sürdü — bunu bir doktor görüşmesinde belirtmekte fayda var.",
+                "heavyBleedingHintHeavy": "Son adet dönemlerin tekrar tekrar \"yoğun\" olarak kaydedildi - bunu bir doktor görüşmesinde belirtmekte fayda var.",
+                "heavyBleedingHintLong": "Son adet dönemlerinden en az biri bir haftadan uzun sürdü - bunu bir doktor görüşmesinde belirtmekte fayda var.",
                 "painTitle": "Ağrı",
                 "painCurrentCycleLabel": "Bu döngüdeki ağrılı gün sayısı",
                 "painAvgPerCycleLabel": "Döngü başına ort. ağrılı gün",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Adeti kaydet",
                 "edit": "Adeti düzenle",
-                "warningFuture": "Başlangıç tarihi gelecekte — tahminler yalnızca geçmiş döngülere dayanır.",
+                "warningFuture": "Başlangıç tarihi gelecekte - tahminler yalnızca geçmiş döngülere dayanır.",
                 "warningOverlap": "Zaten kaydedilmiş bir döngüyle çakışıyor."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "PMS penceresini göster",
                 "notifyPartner": "Bir partnere bildir",
                 "notifyPartnerHint": "Seçilen kişi yalnızca tahmini tarihi alır, asla semptomları, notları veya diğer kayıtları almaz.",
+                "notifyPartnerNoEligible": "Uygun bir hane üyesi yok - yalnızca Sağlık modülüne erişimi olan üyelere bildirim gönderilebilir.",
                 "notifyPartnerDaysBefore": "Partner hatırlatması"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Bugünkü döngü durumu",
                 "line1": "Döngü günü {{day}} · {{phase}}",
-                "periodToday": "Adet bugün bekleniyor — şimdi başlatılsın mı?",
-                "periodOverdue": "Adet {{count}} gündür gecikti — şimdi başlatılsın mı?",
-                "periodOverdue_one": "Adet {{count}} gündür gecikti — şimdi başlatılsın mı?",
-                "periodStillOpen": "Kayda göre adetin hâlâ devam ediyor — şimdi bitirilsin mi?",
+                "periodToday": "Adet bugün bekleniyor - şimdi başlatılsın mı?",
+                "periodOverdue": "Adet {{count}} gündür gecikti - şimdi başlatılsın mı?",
+                "periodOverdue_one": "Adet {{count}} gündür gecikti - şimdi başlatılsın mı?",
+                "periodStillOpen": "Kayda göre adetin hâlâ devam ediyor - şimdi bitirilsin mi?",
                 "peakPainDay": "Örüntüne göre bugün genellikle en yoğun ağrı günün oluyor ({{symptom}}).",
                 "likelySymptomsToday": "Bugün muhtemel: {{symptoms}}",
                 "pmsWindow": "PMS penceresi muhtemelen {{weekday}} itibarıyla",

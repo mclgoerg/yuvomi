@@ -244,11 +244,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The cycle tab grows into a full tracker: visible flow strength, feelings, more fertility
   signals, hard-private intimacy logging, PMS patterns, and a "today" insight bubble.** The day log
   gains cervical mucus, LH and pregnancy tests, multi-select feelings (replacing the single mood),
-  and intimacy — the latter is never shown to anyone but yourself, even on days shared with the
-  family, enforced by the server. Flow strength finally shows up everywhere it matters: a four-step
+  and intimacy - cervical mucus, the two test results and intimacy are never shown to anyone but
+  yourself, even on days shared with the family, enforced by the server. On `POST
+  /api/v1/health/cycle/logs`, `mood` (kept for older clients) and `feelings` now both accept only
+  the fixed feelings list - an out-of-list value is a 400 instead of being stored as free text.
+  Flow strength finally shows up everywhere it matters: a four-step
   dot scale on the calendar, a heaviest-flow chip per period in the history, a per-cycle flow
   intensity chart, and a calm hint when recent periods run repeatedly heavy or over a week. A
-  bubble at the top answers the daily question at a glance — cycle day and phase, plus whichever of
+  bubble at the top answers the daily question at a glance - cycle day and phase, plus whichever of
   these applies: period expected today (start it right there), symptoms likely today, a PMS window
   approaching, or the fertile window. Predictions got more honest along the way: a
   temperature-confirmed ovulation now also moves the month calendar (ring and calendar can no
@@ -258,7 +261,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only backwards. New per-person settings: contraception (hormonal methods pause the fertile-window
   prediction, with the reason shown instead of an empty tile), a perimenopause mode that predicts a
   date range rather than a false-precision single day, a PMS-window toggle, and an opt-in partner
-  reminder that shares only the predicted date — never any log content. Period history can be
+  reminder that shares only the predicted date - never any log content. Period history can be
   imported from CSV (German date and separator formats included), the Health overview shows the
   next period at a glance, and the trends section was restructured around one expander per symptom
   with an added feelings-by-phase view and a pain summary.

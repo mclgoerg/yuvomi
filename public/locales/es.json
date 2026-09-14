@@ -4330,7 +4330,8 @@
                 "noPrediction": "Registra un periodo para ver predicciones.",
                 "fertilitySuppressedNote": "Ventana fértil pausada: anticoncepción hormonal.",
                 "nextPeriodRangeSub": "Media: {{date}}",
-                "partnerNextPeriod": "Regla de {{name}}"
+                "partnerNextPeriod": "Se prevé que la regla de {{name}} comience el {{date}}.",
+                "partnerNextPeriodNeutral": "Recordatorio de pareja: regla"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Detalles",
                 "feelingFrequency": "Frecuencia de estados de ánimo",
                 "flowLoad": "Intensidad del sangrado por ciclo",
-                "flowLoadCaption": "Se basa en tus registros de flujo — cuanto más completo sea tu registro, más significativo será.",
+                "flowLoadCaption": "Se basa en tus registros de flujo - cuanto más completo sea tu registro, más significativo será.",
                 "flowLoadColumn": "Carga de sangrado",
                 "flowLoadValue": "{{load}} ({{days}} registrados)",
-                "heavyBleedingHintHeavy": "Tus últimos períodos se registraron varias veces como «abundantes» — vale la pena comentarlo en una consulta médica.",
-                "heavyBleedingHintLong": "Al menos uno de tus últimos períodos duró más de una semana — vale la pena comentarlo en una consulta médica.",
+                "heavyBleedingHintHeavy": "Tus últimos períodos se registraron varias veces como «abundantes» - vale la pena comentarlo en una consulta médica.",
+                "heavyBleedingHintLong": "Al menos uno de tus últimos períodos duró más de una semana - vale la pena comentarlo en una consulta médica.",
                 "painTitle": "Dolor",
                 "painCurrentCycleLabel": "Días de dolor en este ciclo",
                 "painAvgPerCycleLabel": "Prom. días de dolor por ciclo",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Registrar periodo",
                 "edit": "Editar periodo",
-                "warningFuture": "La fecha de inicio está en el futuro — las predicciones solo se basan en periodos pasados.",
+                "warningFuture": "La fecha de inicio está en el futuro - las predicciones solo se basan en periodos pasados.",
                 "warningOverlap": "Se solapa con un periodo ya registrado."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "Mostrar ventana de SPM",
                 "notifyPartner": "Avisar a la pareja",
                 "notifyPartnerHint": "La persona elegida solo recibe la fecha prevista, nunca síntomas, notas ni otros registros.",
+                "notifyPartnerNoEligible": "No hay ningún miembro del hogar apto - solo se puede notificar a quienes tengan acceso al módulo Salud.",
                 "notifyPartnerDaysBefore": "Aviso a la pareja"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Estado del ciclo de hoy",
                 "line1": "Día {{day}} del ciclo · {{phase}}",
-                "periodToday": "Regla esperada hoy — ¿la iniciamos ahora?",
-                "periodOverdue": "La regla lleva {{count}} días de retraso — ¿la iniciamos ahora?",
-                "periodOverdue_one": "La regla lleva {{count}} día de retraso — ¿la iniciamos ahora?",
-                "periodStillOpen": "Tu periodo sigue registrado como en curso — ¿lo finalizamos ahora?",
+                "periodToday": "Regla esperada hoy - ¿la iniciamos ahora?",
+                "periodOverdue": "La regla lleva {{count}} días de retraso - ¿la iniciamos ahora?",
+                "periodOverdue_one": "La regla lleva {{count}} día de retraso - ¿la iniciamos ahora?",
+                "periodStillOpen": "Tu periodo sigue registrado como en curso - ¿lo finalizamos ahora?",
                 "peakPainDay": "Según tu patrón, hoy suele ser tu día de dolor más intenso ({{symptom}}).",
                 "likelySymptomsToday": "Probable hoy: {{symptoms}}",
                 "pmsWindow": "Ventana premenstrual probable desde el {{weekday}}",

@@ -4330,7 +4330,8 @@
                 "noPrediction": "Log a period to see predictions.",
                 "fertilitySuppressedNote": "Fertile window paused: hormonal contraception.",
                 "nextPeriodRangeSub": "Average: {{date}}",
-                "partnerNextPeriod": "{{name}}'s period"
+                "partnerNextPeriod": "{{name}}'s period is predicted to start on {{date}}.",
+                "partnerNextPeriodNeutral": "Partner reminder: period"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Details",
                 "feelingFrequency": "Feelings frequency",
                 "flowLoad": "Flow intensity per cycle",
-                "flowLoadCaption": "Based on your flow entries — the more complete your logging, the more meaningful this is.",
+                "flowLoadCaption": "Based on your flow entries - the more complete your logging, the more meaningful this is.",
                 "flowLoadColumn": "Flow load",
                 "flowLoadValue": "{{load}} ({{days}} logged)",
-                "heavyBleedingHintHeavy": "Your recent periods were repeatedly logged as \"heavy\" — worth mentioning at your next medical check-up.",
-                "heavyBleedingHintLong": "At least one of your recent periods lasted longer than a week — worth mentioning at your next medical check-up.",
+                "heavyBleedingHintHeavy": "Your recent periods were repeatedly logged as \"heavy\" - worth mentioning at your next medical check-up.",
+                "heavyBleedingHintLong": "At least one of your recent periods lasted longer than a week - worth mentioning at your next medical check-up.",
                 "painTitle": "Pain",
                 "painCurrentCycleLabel": "Pain days this cycle",
                 "painAvgPerCycleLabel": "Avg. pain days per cycle",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Log period",
                 "edit": "Edit period",
-                "warningFuture": "Start date is in the future — predictions are based only on past periods.",
+                "warningFuture": "Start date is in the future - predictions are based only on past periods.",
                 "warningOverlap": "Overlaps with an already logged period."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "Show PMS window",
                 "notifyPartner": "Notify a partner",
                 "notifyPartnerHint": "The chosen person only receives the predicted date, never symptoms, notes, or any other entries.",
+                "notifyPartnerNoEligible": "No eligible household member available - only members with access to the Health module can be notified.",
                 "notifyPartnerDaysBefore": "Partner reminder timing"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Today's cycle status",
                 "line1": "Cycle day {{day}} · {{phase}}",
-                "periodToday": "Period expected today — start it now?",
-                "periodOverdue": "Period is {{count}} days overdue — start it now?",
-                "periodOverdue_one": "Period is {{count}} day overdue — start it now?",
-                "periodStillOpen": "Your period is still logged as ongoing — end it now?",
+                "periodToday": "Period expected today - start it now?",
+                "periodOverdue": "Period is {{count}} days overdue - start it now?",
+                "periodOverdue_one": "Period is {{count}} day overdue - start it now?",
+                "periodStillOpen": "Your period is still logged as ongoing - end it now?",
                 "peakPainDay": "Today is often your strongest pain day ({{symptom}}), based on your pattern.",
                 "likelySymptomsToday": "Likely today: {{symptoms}}",
                 "pmsWindow": "PMS window likely from {{weekday}}",

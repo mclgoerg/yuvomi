@@ -6,7 +6,7 @@
  */
 
 import { api } from '/api.js';
-import { t } from '/i18n.js';
+import { t, formatDate } from '/i18n.js';
 import { isPushSubscribed } from '/push.js';
 import { moduleIconEl } from '/nav-icons.js';
 import { toastSurface } from '/utils/toast-surface.js';
@@ -241,24 +241,31 @@ function processReminders(reminders) {
  * server/services/notifications.js#cycleBody für den Push-Body, hier mit der
  * Locale des Empfängers statt der Haushaltssprache, weil der Client sie kennt.
  *
- * D-15/Review-Runde Fix 7 (Partner-Erinnerung): server/services/
- * notifications.js#cycleBody unterscheidet den Partner-Fall ("Periode von
- * {{name}}" statt "Nächste Periode") über `reminder.cycle_anchor_kind ===
- * 'partner_period'`. `GET /reminders/pending` (server/routes/reminders.js,
- * vom parallelen Server-Arbeitsschritt dieser Review-Runde erweitert) liefert
- * dieselben zwei Felder inzwischen auch hier mit: `cycle_anchor_kind`
- * (dieselben Anker-Arten wie server/services/cycle-reminders.js, der Partner-
- * Anker heisst 'partner_period') und `cycle_owner_name` (nur bei
- * 'partner_period' gesetzt). Ein aelterer Server ohne dieses Feld liefert
- * schlicht `undefined` - dann bleibt es beim bisherigen (eigenen) Text, kein
- * Absturz auf einen fehlenden Namen.
+ * PARTNER-ERINNERUNG: server/services/notifications.js#cycleBody
+ * unterscheidet den Partner-Fall (ein ganzer Satz mit Name + Datum statt
+ * "Nächste Periode") über `reminder.cycle_anchor_kind === 'partner_period'`.
+ * `GET /reminders/pending` (server/routes/reminders.js) liefert dieselben
+ * zwei Felder auch hier mit: `cycle_anchor_kind` (dieselben Anker-Arten wie
+ * server/services/cycle-reminders.js, der Partner-Anker heisst
+ * 'partner_period') und `cycle_owner_name` (nur bei 'partner_period'
+ * gesetzt). Ein aelterer Server ohne dieses Feld liefert schlicht
+ * `undefined` - dann bleibt es beim bisherigen (eigenen) Text, kein Absturz
+ * auf einen fehlenden Namen.
+ *
+ * FEHLT DER NAME TROTZ 'partner_period': der Text darf dann
+ * NICHT auf den eigenen "Nächste Periode"-Text zurueckfallen - das behauptet
+ * faelschlich die eigene Periode der empfangenden Person. Ein neutraler
+ * Platzhaltertext (`partnerNextPeriodNeutral`) nennt niemanden.
  * @returns {string|null} null für jede andere Erinnerungsart - Aufrufer fällt dann auf entity_title zurück.
  */
 function cycleReminderBody(reminder) {
   if (reminder.entity_type === 'cycle_log_nudge') return t('health.cycle.settings.remindLogDaily');
   if (reminder.entity_type === 'cycle_period') {
-    if (reminder.cycle_anchor_kind === 'partner_period' && reminder.cycle_owner_name) {
-      return `${t('health.cycle.status.partnerNextPeriod', { name: reminder.cycle_owner_name })} - ${reminder.entity_title}`;
+    if (reminder.cycle_anchor_kind === 'partner_period') {
+      if (reminder.cycle_owner_name) {
+        return t('health.cycle.status.partnerNextPeriod', { name: reminder.cycle_owner_name, date: formatDate(reminder.entity_title) });
+      }
+      return `${t('health.cycle.status.partnerNextPeriodNeutral')} - ${reminder.entity_title}`;
     }
     return `${t('health.cycle.status.nextPeriod')} - ${reminder.entity_title}`;
   }

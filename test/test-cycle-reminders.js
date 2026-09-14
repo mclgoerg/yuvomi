@@ -204,7 +204,7 @@ test('syncAllCycleReminders erreicht auch Nutzer, die nur noch Anker tragen (abg
 });
 
 // --------------------------------------------------------------------------
-// D-15: Partner-Benachrichtigung (Eigentümer-Opt-in)
+// Partner-Benachrichtigung (Eigentümer-Opt-in)
 // --------------------------------------------------------------------------
 
 test('Partner-Erinnerung: eigene Anker-Art, aber die Erinnerung geht an die Partnerperson', () => {
@@ -277,7 +277,7 @@ test('Partner-Erinnerung raeumt ab, sobald der Eigentuemer in den Schwangerschaf
   assert.deepEqual(remindersFor(partner, 'cycle_period'), []);
 });
 
-test('Partner-Erinnerung raeumt ab, wenn die Partnerperson selbst den Zyklus-Tab abgeschaltet hat', () => {
+test('Partner-Erinnerung bleibt bestehen, wenn die Partnerperson selbst den Zyklus-Tab abgeschaltet hat - Health-Zugriff allein entscheidet', () => {
   const owner = makeUser();
   const partner = makeUser();
   seedFourPeriods(owner);
@@ -290,9 +290,12 @@ test('Partner-Erinnerung raeumt ab, wenn die Partnerperson selbst den Zyklus-Tab
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `).run(`health_cycle_enabled:user:${partner}`);
 
+  // Anders als vorher: die Partnerperson hat selbst keinen Zyklus und darum
+  // ihren eigenen Zyklus-Tab abgeschaltet - genau das ist der haeufigste Fall
+  // und darf sie nicht von der Meldung ausschliessen. Health-Zugriff allein
+  // entscheidet (isEligibleCyclePartner()).
   syncCycleRemindersForUser(db, owner, NOW);
-  assert.deepEqual(anchorsFor(owner).filter((a) => a.kind === 'partner_period'), []);
-  assert.deepEqual(remindersFor(partner, 'cycle_period'), []);
+  assert.equal(remindersFor(partner, 'cycle_period').length, 1, 'die Erinnerung bleibt trotz abgeschaltetem eigenen Zyklus-Tab bestehen');
 
   db.prepare("DELETE FROM sync_config WHERE key = ?").run(`health_cycle_enabled:user:${partner}`);
 });
@@ -315,7 +318,28 @@ test('Partner-Erinnerung raeumt ab, wenn der Partnerperson das Health-Modul entz
   assert.deepEqual(remindersFor(partner, 'cycle_period'), []);
 });
 
-test('Partner-Erinnerung: der Anker traegt nur ein Datum, keinen Log-Inhalt (Datumsschaerfe, D-15/D-6)', () => {
+test('Verwaiste Partner-Erinnerung wird beim Voll-Sync geloescht, wenn der Eigentuemer geloescht wurde (R-5)', () => {
+  const owner = makeUser();
+  const partner = makeUser();
+  seedFourPeriods(owner);
+  upsertSettings(owner, { notify_partner_user_id: partner, notify_partner_days_before: 2 });
+  syncCycleRemindersForUser(db, owner, NOW);
+  assert.equal(remindersFor(partner, 'cycle_period').length, 1);
+
+  // Ein Admin loescht den Eigentuemer direkt (kein API-Aufruf noetig fuer
+  // diesen Test) - die Anker-Zeile faellt per ON DELETE CASCADE mit weg, die
+  // reminders-Zeile (gehoert der Partnerperson, kein Fremdschluessel auf
+  // entity_id) aber nicht: genau der verwaiste Zustand, den syncAllCycleReminders
+  // abraeumen muss.
+  db.prepare('DELETE FROM users WHERE id = ?').run(owner);
+  assert.deepEqual(anchorsFor(owner), [], 'die Anker-Zeile ist per CASCADE weg');
+  assert.equal(remindersFor(partner, 'cycle_period').length, 1, 'die reminders-Zeile ist noch da - verwaist');
+
+  syncAllCycleReminders(db, NOW);
+  assert.deepEqual(remindersFor(partner, 'cycle_period'), [], 'der Voll-Sync raeumt die verwaiste Erinnerung weg');
+});
+
+test('Partner-Erinnerung: der Anker traegt nur ein Datum, keinen Log-Inhalt (Datumsschaerfe)', () => {
   const owner = makeUser();
   const partner = makeUser();
   seedFourPeriods(owner);

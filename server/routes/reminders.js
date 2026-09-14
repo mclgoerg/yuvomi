@@ -141,8 +141,8 @@ function readableOrigins(req) {
 }
 
 /**
- * Anzeigename des Zyklus-Eigentümers zu einer 'partner_period'-Zeile (D-15,
- * siehe server/services/cycle-reminders.js#syncPartnerReminder). Ein eigener
+ * Anzeigename des Zyklus-Eigentümers zu einer 'partner_period'-Zeile (siehe
+ * server/services/cycle-reminders.js#syncPartnerReminder). Ein eigener
  * kleiner Nachschlag statt eines JOINs in der Sammelabfrage unten - die gilt
  * für sechs Herkünfte, und `users.display_name` braucht nur die seltene
  * Partner-Zeile. Gleiche Begründung und gleiche Form wie

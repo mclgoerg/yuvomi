@@ -4330,7 +4330,8 @@
                 "noPrediction": "Registrera en mens för prognoser.",
                 "fertilitySuppressedNote": "Fertilt fönster pausat: hormonell preventivmetod.",
                 "nextPeriodRangeSub": "Medel: {{date}}",
-                "partnerNextPeriod": "{{name}}s mens"
+                "partnerNextPeriod": "{{name}}s mens beräknas börja {{date}}.",
+                "partnerNextPeriodNeutral": "Partnerpåminnelse: mens"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Detaljer",
                 "feelingFrequency": "Känslofrekvens",
                 "flowLoad": "Blödningsintensitet per cykel",
-                "flowLoadCaption": "Baserat på dina blödningsregistreringar — ju mer komplett din loggning är, desto mer meningsfullt är detta.",
+                "flowLoadCaption": "Baserat på dina blödningsregistreringar - ju mer komplett din loggning är, desto mer meningsfullt är detta.",
                 "flowLoadColumn": "Blödningsbelastning",
                 "flowLoadValue": "{{load}} ({{days}} loggade)",
-                "heavyBleedingHintHeavy": "Dina senaste menscykler har upprepade gånger loggats som \"kraftiga\" — värt att nämna vid nästa läkarbesök.",
-                "heavyBleedingHintLong": "Minst en av dina senaste mensperioder varade längre än en vecka — värt att nämna vid nästa läkarbesök.",
+                "heavyBleedingHintHeavy": "Dina senaste menscykler har upprepade gånger loggats som \"kraftiga\" - värt att nämna vid nästa läkarbesök.",
+                "heavyBleedingHintLong": "Minst en av dina senaste mensperioder varade längre än en vecka - värt att nämna vid nästa läkarbesök.",
                 "painTitle": "Smärta",
                 "painCurrentCycleLabel": "Smärtdagar denna cykel",
                 "painAvgPerCycleLabel": "Snitt smärtdagar per cykel",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Registrera mens",
                 "edit": "Redigera mens",
-                "warningFuture": "Startdatumet ligger i framtiden — prognoser baseras endast på tidigare cykler.",
+                "warningFuture": "Startdatumet ligger i framtiden - prognoser baseras endast på tidigare cykler.",
                 "warningOverlap": "Överlappar en redan loggad cykel."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "Visa PMS-fönster",
                 "notifyPartner": "Meddela en partner",
                 "notifyPartnerHint": "Den valda personen får bara det förutsagda datumet, aldrig symtom, anteckningar eller andra poster.",
+                "notifyPartnerNoEligible": "Ingen berättigad hushållsmedlem tillgänglig - endast medlemmar med åtkomst till modulen Hälsa kan meddelas.",
                 "notifyPartnerDaysBefore": "Påminnelse till partner"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Dagens cykelstatus",
                 "line1": "Cykeldag {{day}} · {{phase}}",
-                "periodToday": "Mens väntas idag — starta nu?",
-                "periodOverdue": "Mens är {{count}} dagar försenad — starta nu?",
-                "periodOverdue_one": "Mens är {{count}} dag försenad — starta nu?",
-                "periodStillOpen": "Din mens verkar fortfarande pågå enligt loggen — avsluta nu?",
+                "periodToday": "Mens väntas idag - starta nu?",
+                "periodOverdue": "Mens är {{count}} dagar försenad - starta nu?",
+                "periodOverdue_one": "Mens är {{count}} dag försenad - starta nu?",
+                "periodStillOpen": "Din mens verkar fortfarande pågå enligt loggen - avsluta nu?",
                 "peakPainDay": "Enligt ditt mönster är idag ofta din dag med starkast smärta ({{symptom}}).",
                 "likelySymptomsToday": "Troligt idag: {{symptoms}}",
                 "pmsWindow": "PMS-fönster troligt från {{weekday}}",

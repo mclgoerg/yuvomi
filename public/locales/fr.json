@@ -4330,7 +4330,8 @@
                 "noPrediction": "Enregistrez des règles pour obtenir des prévisions.",
                 "fertilitySuppressedNote": "Fenêtre fertile suspendue : contraception hormonale.",
                 "nextPeriodRangeSub": "Moyenne : {{date}}",
-                "partnerNextPeriod": "Règles de {{name}}"
+                "partnerNextPeriod": "Les règles de {{name}} devraient commencer le {{date}}.",
+                "partnerNextPeriodNeutral": "Rappel partenaire - règles"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Détails",
                 "feelingFrequency": "Fréquence des ressentis",
                 "flowLoad": "Intensité des règles par cycle",
-                "flowLoadCaption": "Basé sur tes entrées de flux — plus ton suivi est complet, plus c'est significatif.",
+                "flowLoadCaption": "Basé sur tes entrées de flux - plus ton suivi est complet, plus c'est significatif.",
                 "flowLoadColumn": "Intensité cumulée",
                 "flowLoadValue": "{{load}} ({{days}} enregistrés)",
-                "heavyBleedingHintHeavy": "Tes dernières règles ont été plusieurs fois notées comme « abondantes » — cela vaut la peine d'en parler lors d'une consultation médicale.",
-                "heavyBleedingHintLong": "Au moins une de tes dernières règles a duré plus d'une semaine — cela vaut la peine d'en parler lors d'une consultation médicale.",
+                "heavyBleedingHintHeavy": "Tes dernières règles ont été plusieurs fois notées comme « abondantes » - cela vaut la peine d'en parler lors d'une consultation médicale.",
+                "heavyBleedingHintLong": "Au moins une de tes dernières règles a duré plus d'une semaine - cela vaut la peine d'en parler lors d'une consultation médicale.",
                 "painTitle": "Douleurs",
                 "painCurrentCycleLabel": "Jours de douleur ce cycle",
                 "painAvgPerCycleLabel": "Moy. jours de douleur par cycle",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Enregistrer les règles",
                 "edit": "Modifier les règles",
-                "warningFuture": "La date de début est dans le futur — les prévisions ne se basent que sur les cycles passés.",
+                "warningFuture": "La date de début est dans le futur - les prévisions ne se basent que sur les cycles passés.",
                 "warningOverlap": "Chevauche un cycle déjà enregistré."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "Afficher la fenêtre prémenstruelle",
                 "notifyPartner": "Prévenir un·e partenaire",
                 "notifyPartnerHint": "La personne choisie ne reçoit que la date prévue, jamais les symptômes, notes ou autres entrées.",
+                "notifyPartnerNoEligible": "Aucun membre du foyer éligible - seuls les membres ayant accès au module Santé peuvent être notifiés.",
                 "notifyPartnerDaysBefore": "Rappel au/à la partenaire"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "État du cycle aujourd'hui",
                 "line1": "Jour {{day}} du cycle · {{phase}}",
-                "periodToday": "Règles attendues aujourd'hui — les commencer maintenant ?",
-                "periodOverdue": "Règles en retard de {{count}} jours — les commencer maintenant ?",
-                "periodOverdue_one": "Règles en retard de {{count}} jour — les commencer maintenant ?",
-                "periodStillOpen": "Tes règles sont toujours enregistrées comme en cours — les terminer maintenant ?",
+                "periodToday": "Règles attendues aujourd'hui - les commencer maintenant ?",
+                "periodOverdue": "Règles en retard de {{count}} jours - les commencer maintenant ?",
+                "periodOverdue_one": "Règles en retard de {{count}} jour - les commencer maintenant ?",
+                "periodStillOpen": "Tes règles sont toujours enregistrées comme en cours - les terminer maintenant ?",
                 "peakPainDay": "D'après votre historique, aujourd'hui est souvent votre jour de douleur le plus intense ({{symptom}}).",
                 "likelySymptomsToday": "Probable aujourd'hui : {{symptoms}}",
                 "pmsWindow": "Fenêtre prémenstruelle probable à partir de {{weekday}}",

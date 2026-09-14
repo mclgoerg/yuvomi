@@ -4330,7 +4330,8 @@
                 "noPrediction": "Ghi một kỳ kinh để có dự đoán.",
                 "fertilitySuppressedNote": "Cửa sổ thụ thai đang tạm dừng: tránh thai nội tiết.",
                 "nextPeriodRangeSub": "Trung bình: {{date}}",
-                "partnerNextPeriod": "Kinh nguyệt của {{name}}"
+                "partnerNextPeriod": "Kinh nguyệt của {{name}} dự kiến bắt đầu vào {{date}}.",
+                "partnerNextPeriodNeutral": "Nhắc nhở cho đối tác: kinh nguyệt"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Chi tiết",
                 "feelingFrequency": "Tần suất cảm xúc",
                 "flowLoad": "Cường độ ra máu theo chu kỳ",
-                "flowLoadCaption": "Dựa trên các mục ghi lượng máu của bạn — bạn ghi càng đầy đủ, dữ liệu này càng có ý nghĩa.",
+                "flowLoadCaption": "Dựa trên các mục ghi lượng máu của bạn - bạn ghi càng đầy đủ, dữ liệu này càng có ý nghĩa.",
                 "flowLoadColumn": "Mức độ ra máu",
                 "flowLoadValue": "{{load}} (đã ghi {{days}})",
-                "heavyBleedingHintHeavy": "Các kỳ kinh gần đây của bạn nhiều lần được ghi là \"ra nhiều\" — điều này đáng để đề cập khi khám bác sĩ.",
-                "heavyBleedingHintLong": "Ít nhất một trong các kỳ kinh gần đây của bạn kéo dài hơn một tuần — điều này đáng để đề cập khi khám bác sĩ.",
+                "heavyBleedingHintHeavy": "Các kỳ kinh gần đây của bạn nhiều lần được ghi là \"ra nhiều\" - điều này đáng để đề cập khi khám bác sĩ.",
+                "heavyBleedingHintLong": "Ít nhất một trong các kỳ kinh gần đây của bạn kéo dài hơn một tuần - điều này đáng để đề cập khi khám bác sĩ.",
                 "painTitle": "Đau",
                 "painCurrentCycleLabel": "Số ngày đau trong chu kỳ này",
                 "painAvgPerCycleLabel": "TB số ngày đau mỗi chu kỳ",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Ghi kỳ kinh",
                 "edit": "Sửa kỳ kinh",
-                "warningFuture": "Ngày bắt đầu nằm trong tương lai — dự đoán chỉ dựa trên các chu kỳ trong quá khứ.",
+                "warningFuture": "Ngày bắt đầu nằm trong tương lai - dự đoán chỉ dựa trên các chu kỳ trong quá khứ.",
                 "warningOverlap": "Trùng với một chu kỳ đã được ghi lại."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "Hiển thị khung PMS",
                 "notifyPartner": "Thông báo cho bạn đời",
                 "notifyPartnerHint": "Người được chọn chỉ nhận được ngày dự đoán, không bao giờ nhận triệu chứng, ghi chú hay mục nhập khác.",
+                "notifyPartnerNoEligible": "Không có thành viên hộ gia đình phù hợp - chỉ những thành viên có quyền truy cập mô-đun Sức khỏe mới có thể được thông báo.",
                 "notifyPartnerDaysBefore": "Nhắc nhở cho bạn đời"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Trạng thái chu kỳ hôm nay",
                 "line1": "Ngày {{day}} của chu kỳ · {{phase}}",
-                "periodToday": "Dự kiến có kinh hôm nay — bắt đầu ngay?",
-                "periodOverdue": "Kinh nguyệt trễ {{count}} ngày — bắt đầu ngay?",
-                "periodOverdue_one": "Kinh nguyệt trễ {{count}} ngày — bắt đầu ngay?",
-                "periodStillOpen": "Kỳ kinh của bạn vẫn được ghi nhận là đang diễn ra — kết thúc ngay?",
+                "periodToday": "Dự kiến có kinh hôm nay - bắt đầu ngay?",
+                "periodOverdue": "Kinh nguyệt trễ {{count}} ngày - bắt đầu ngay?",
+                "periodOverdue_one": "Kinh nguyệt trễ {{count}} ngày - bắt đầu ngay?",
+                "periodStillOpen": "Kỳ kinh của bạn vẫn được ghi nhận là đang diễn ra - kết thúc ngay?",
                 "peakPainDay": "Theo mẫu hình của bạn, hôm nay thường là ngày đau nhiều nhất ({{symptom}}).",
                 "likelySymptomsToday": "Có khả năng hôm nay: {{symptoms}}",
                 "pmsWindow": "Khung PMS có khả năng bắt đầu từ {{weekday}}",

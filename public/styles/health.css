@@ -1290,8 +1290,8 @@ button.health-med-card:hover {
   min-width: 0;
 }
 
-/* D-12: die Zyklus-Kachel ist ein <button>, keine <section> - die ganze
- * Kachel klickt zum Zyklus-Tab durch (Aufgabenvorgabe), statt nur eine
+/* Die Zyklus-Kachel ist ein <button>, keine <section> - die ganze
+ * Kachel klickt zum Zyklus-Tab durch, statt nur eine
  * Detailzeile darin wie bei den Vitalwerte-Karten. Rest der Optik bleibt
  * identisch zu den Nachbarn (.health-overview__card): nur die Button-
  * Grundformatierung wird zurückgesetzt, Ausrichtung bleibt linksbündig wie
@@ -1847,7 +1847,7 @@ button.health-med-card:hover {
   gap: var(--space-1);
 }
 
-/* D-9: Hinweiskachel, wenn hormonelle Verhuetung das fruchtbare Fenster
+/* Hinweiskachel, wenn hormonelle Verhuetung das fruchtbare Fenster
  * pausiert - reine Meldung (Ton in Schrift/Icon, KEINE getoente Flaeche),
  * damit die freigewordene Kachel-Luecke nicht wie ein Fehler wirkt. */
 .cycle-stat--note {
@@ -2085,11 +2085,12 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   background-color: color-mix(in oklab, var(--cycle-fertile) calc(var(--tint-raised) * var(--cycle-marker-alpha, 1)), transparent);
 }
 
-/* D-7: Intimitäts-Marker - eigene Ecke (oben links), damit er weder mit dem
+/* Intimitäts-Marker - eigene Ecke (oben links), damit er weder mit dem
  * Flow-Punkt (unten mittig) noch mit dem Symptom-Overlay (oben rechts, s.u.)
  * kollidiert. Bewusst NEUTRAL (--color-text-tertiary), nicht im Periodenton -
- * dieses Feld ist hart-privat (siehe DECISIONS.md) und soll nicht wie ein
- * weiterer Phasen-/Blutungsmarker wirken, nur "still" auf den Tag hinweisen. */
+ * dieses Feld ist hart-privat (siehe docs/SPEC.md, "Owner-only axis") und soll
+ * nicht wie ein weiterer Phasen-/Blutungsmarker wirken, nur "still" auf den
+ * Tag hinweisen. */
 .cycle-cal__intimacy-icon {
   position: absolute;
   top: var(--space-1);
@@ -2098,7 +2099,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   color: color-mix(in oklab, var(--color-text-tertiary) calc(100% * var(--cycle-marker-alpha, 1)), transparent);
 }
 
-/* D-8-UI: PMS-Fenster (aus dem Symptom-Muster abgeleitet, s. pmsWindow()) -
+/* PMS-Fenster (aus dem Symptom-Muster abgeleitet, s. pmsWindow()) -
  * eine schwache Waschung des Modultons, bewusst nur --tint-wash (die
  * schwächste Stufe der Skala) und NUR auf Zellen ohne eigene Phase
  * (cycleCalendarMarkup() filtert das) - so bleibt Menstruation/fruchtbar/
@@ -2260,7 +2261,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   background: var(--cycle-period);
 }
 
-/* D-8-UI: PMS-Legendenswatch spiegelt die schwache Modulton-Waschung des
+/* PMS-Legendenswatch spiegelt die schwache Modulton-Waschung des
  * Kalenders 1:1. */
 .cycle-legend__swatch.is-pms { background: color-mix(in oklab, var(--module-health) var(--tint-wash), transparent); }
 
@@ -2292,7 +2293,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   border-radius: 50%;
 }
 
-/* D-7: Herz-Icon in der Legende - derselbe stille, nicht-phasenfarbene Ton
+/* Herz-Icon in der Legende - derselbe stille, nicht-phasenfarbene Ton
  * wie der Kalender-Marker (siehe .cycle-cal__intimacy-icon). */
 .cycle-legend__heart-icon { color: var(--color-text-tertiary); }
 
@@ -2446,7 +2447,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   box-shadow: inset 0 0 0 2px var(--color-text-primary);
 }
 
-/* D-1: kleines Gefuehls-Icon vor dem Zeilennamen (MOOD_TYPES-Icon) - Symptome
+/* Kleines Gefuehls-Icon vor dem Zeilennamen (MOOD_TYPES-Icon) - Symptome
  * tragen an derselben Stelle keins, hier eins, weil MOOD_TYPES.icon ohnehin
  * existiert und ein Gefuehl (anders als ein Textpreset) von einem
  * wiedererkennbaren Icon profitiert (dieselben Icons wie im Tages-Log). */
@@ -2458,8 +2459,8 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   color: var(--color-text-tertiary);
 }
 
-/* D-4: Schmerz-Kachel am Kopf des Trends-Bereichs - drei Werte NEBENEINANDER
- * statt als Chart, "eine Kachel, kein Diagramm" laut Vorgabe. Dieselbe
+/* Schmerz-Kachel am Kopf des Trends-Bereichs - drei Werte NEBENEINANDER
+ * statt als Chart, bewusst eine Kachel, kein Diagramm. Dieselbe
  * .health-chart-section-Hülle wie jeder andere Trend-Block (ein-System-Optik),
  * nur mit einer Statistik-Reihe statt eines SVG als Inhalt. */
 .cycle-pain-tile__stats {
@@ -2539,7 +2540,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   margin-top: var(--space-4);
 }
 
-/* D-18: eine ruhige Hinweiszeile unter der Fußleiste - trägt .cycle-hint
+/* Eine ruhige Hinweiszeile unter der Fußleiste - trägt .cycle-hint
  * (dieselbe leise, tertiäre Textfarbe wie überall im Zyklus-Tab), nur mit
  * etwas Abstand nach oben, weil sie zwischen zwei Blöcken (Fußleiste,
  * Disclaimer) ohne eigenes Flex-Gap steht. Ihr Textinhalt kommt roh (nicht
@@ -2550,7 +2551,7 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   margin-top: var(--space-2);
 }
 
-/* D-13-UI: Server-Fehlerliste beim CSV-Import (bis zu zehn Zeilen, siehe
+/* Server-Fehlerliste beim CSV-Import (bis zu zehn Zeilen, siehe
  * server/routes/health/cycle.js) - schlichte Liste in der bestehenden
  * .form-error-Box statt einer neuen Fehlerkomponente. */
 .cycle-import-errors ul {
@@ -2659,11 +2660,11 @@ button.cycle-cal__day:not(:disabled):hover { background: var(--color-surface-2);
   border-radius: var(--radius-sm);
 }
 
-/* Schloss-Symbol vor dem Intimitaets-Label (D-6): `.label` ist block, das Icon
+/* Schloss-Symbol vor dem Intimitaets-Label: `.label` ist block, das Icon
  * soll aber in derselben Zeile wie der Text stehen. */
 .cycle-intimacy-label { display: inline-flex; align-items: center; gap: var(--space-1); }
 
-/* D-5/D-16: Schnellzugriffs-Links unter der Symptome-Gruppe im Tages-Log -
+/* Schnellzugriffs-Links unter der Symptome-Gruppe im Tages-Log -
  * bewusst leise (btn--ghost btn--sm), keine zweite Aktionsebene neben Speichern. */
 .cycle-quick-links { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 

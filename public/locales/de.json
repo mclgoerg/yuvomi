@@ -4330,7 +4330,8 @@
                 "noPrediction": "Erfasse eine Periode für Vorhersagen.",
                 "fertilitySuppressedNote": "Fruchtbares Fenster pausiert: hormonelle Verhütung.",
                 "nextPeriodRangeSub": "Mittel: {{date}}",
-                "partnerNextPeriod": "Periode von {{name}}"
+                "partnerNextPeriod": "Periode von {{name}}: voraussichtlicher Beginn am {{date}}.",
+                "partnerNextPeriodNeutral": "Partner-Erinnerung: Periode"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Details",
                 "feelingFrequency": "Gefühls-Häufigkeit",
                 "flowLoad": "Blutungsintensität je Zyklus",
-                "flowLoadCaption": "Beruht auf deinen Blutungs-Einträgen — je vollständiger du protokollierst, desto aussagekräftiger.",
+                "flowLoadCaption": "Beruht auf deinen Blutungs-Einträgen - je vollständiger du protokollierst, desto aussagekräftiger.",
                 "flowLoadColumn": "Blutungslast",
                 "flowLoadValue": "{{load}} ({{days}} protokolliert)",
-                "heavyBleedingHintHeavy": "Deine letzten Perioden wurden mehrfach als „stark“ eingetragen — ärztliche Beratung dazu kann sinnvoll sein.",
-                "heavyBleedingHintLong": "Mindestens eine deiner letzten Perioden dauerte länger als eine Woche — ärztliche Beratung dazu kann sinnvoll sein.",
+                "heavyBleedingHintHeavy": "Deine letzten Perioden wurden mehrfach als „stark“ eingetragen - ärztliche Beratung dazu kann sinnvoll sein.",
+                "heavyBleedingHintLong": "Mindestens eine deiner letzten Perioden dauerte länger als eine Woche - ärztliche Beratung dazu kann sinnvoll sein.",
                 "painTitle": "Schmerzen",
                 "painCurrentCycleLabel": "Schmerztage in diesem Zyklus",
                 "painAvgPerCycleLabel": "Ø Schmerztage je Zyklus",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Periode erfassen",
                 "edit": "Periode bearbeiten",
-                "warningFuture": "Startdatum liegt in der Zukunft — Vorhersagen basieren nur auf vergangenen Perioden.",
+                "warningFuture": "Startdatum liegt in der Zukunft - Vorhersagen basieren nur auf vergangenen Perioden.",
                 "warningOverlap": "Überschneidet sich mit einer bereits erfassten Periode."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "PMS-Fenster anzeigen",
                 "notifyPartner": "Partner/-in benachrichtigen",
                 "notifyPartnerHint": "Die gewählte Person erhält nur das vorhergesagte Datum, nie Symptome, Notizen oder andere Einträge.",
+                "notifyPartnerNoEligible": "Kein geeignetes Haushaltsmitglied verfügbar - benachrichtigt werden können nur Mitglieder mit Zugriff auf das Health-Modul.",
                 "notifyPartnerDaysBefore": "Erinnerung an Partner/-in"
             },
             "mucus": {

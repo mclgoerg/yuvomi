@@ -4330,7 +4330,8 @@
                 "noPrediction": "记录一次月经以获得预测。",
                 "fertilitySuppressedNote": "易孕期已暂停：激素避孕。",
                 "nextPeriodRangeSub": "平均：{{date}}",
-                "partnerNextPeriod": "{{name}}的月经"
+                "partnerNextPeriod": "{{name}}的月经预计将于{{date}}开始。",
+                "partnerNextPeriodNeutral": "伴侣提醒-月经"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "详情",
                 "feelingFrequency": "情绪频率",
                 "flowLoad": "每个周期的经量强度",
-                "flowLoadCaption": "基于你记录的经量 — 记录越完整，这项数据就越有参考价值。",
+                "flowLoadCaption": "基于你记录的经量 - 记录越完整，这项数据就越有参考价值。",
                 "flowLoadColumn": "经量负荷",
                 "flowLoadValue": "{{load}}（已记录{{days}}）",
-                "heavyBleedingHintHeavy": "你最近的月经多次被记录为「量多」——值得在就医时提一提。",
-                "heavyBleedingHintLong": "你最近至少有一次月经持续超过一周——值得在就医时提一提。",
+                "heavyBleedingHintHeavy": "你最近的月经多次被记录为「量多」-值得在就医时提一提。",
+                "heavyBleedingHintLong": "你最近至少有一次月经持续超过一周-值得在就医时提一提。",
                 "painTitle": "疼痛",
                 "painCurrentCycleLabel": "本周期的疼痛天数",
                 "painAvgPerCycleLabel": "平均每周期疼痛天数",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "记录月经",
                 "edit": "编辑月经",
-                "warningFuture": "开始日期在未来 — 预测仅基于过去的周期。",
+                "warningFuture": "开始日期在未来 - 预测仅基于过去的周期。",
                 "warningOverlap": "与已记录的周期重叠。"
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "显示 PMS 窗口",
                 "notifyPartner": "通知伴侣",
                 "notifyPartnerHint": "所选的人只会收到预测日期，绝不会收到症状、备注或其他记录。",
+                "notifyPartnerNoEligible": "没有符合条件的家庭成员-只有拥有健康模块访问权限的成员才能收到通知。",
                 "notifyPartnerDaysBefore": "伴侣提醒"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "今日周期状态",
                 "line1": "周期第{{day}}天 · {{phase}}",
-                "periodToday": "预计今天来月经——现在开始记录？",
-                "periodOverdue": "月经已延迟{{count}}天——现在开始记录？",
-                "periodOverdue_one": "月经已延迟{{count}}天——现在开始记录？",
-                "periodStillOpen": "记录显示你的月经似乎还在进行中——现在结束吗？",
+                "periodToday": "预计今天来月经-现在开始记录？",
+                "periodOverdue": "月经已延迟{{count}}天-现在开始记录？",
+                "periodOverdue_one": "月经已延迟{{count}}天-现在开始记录？",
+                "periodStillOpen": "记录显示你的月经似乎还在进行中-现在结束吗？",
                 "peakPainDay": "根据你的规律,今天常常是疼痛最严重的一天({{symptom}})。",
                 "likelySymptomsToday": "今天可能出现：{{symptoms}}",
                 "pmsWindow": "PMS 窗口可能从{{weekday}}开始",

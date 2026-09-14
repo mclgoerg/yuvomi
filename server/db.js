@@ -8318,10 +8318,14 @@ const MIGRATIONS = [
     version: 210,
     description: 'Health: cervical mucus, LH/pregnancy test results and intimacy as optional day-log scalars',
     // Vier weitere Skalarwerte je Tag, gleiche Bauart wie Migration 179
-    // (basal_temp): ein ALTER TABLE kann - anders als das urspruengliche
-    // CREATE TABLE - keinen CHECK mehr an eine bestehende Tabelle anfuegen,
-    // ohne sie neu aufzubauen. Die Werte-Liste lebt deshalb in der Route,
-    // genau wie bei basal_temp_unit.
+    // (basal_temp): ein ALTER TABLE ADD COLUMN KANN durchaus einen
+    // spalten-eigenen CHECK tragen (siehe Migration 212, perimenopause_mode/
+    // show_pms) - das ist hier nicht der Grund, warum diese vier Werte-Listen
+    // stattdessen in der Route leben. Der eigentliche Grund ist Konsistenz mit
+    // dem bestehenden Vorbild `basal_temp_unit` (Migration 179): dieselbe Zeile
+    // (cycle_day_logs) validiert alle ihre geschlossenen, aber nullbaren
+    // Text-Skalare an derselben Stelle, statt manche per CHECK und manche per
+    // Route zu pruefen.
     //
     // `intimacy` ist bewusst KEIN sichtbarkeitsgesteuertes Feld wie die
     // anderen drei: die Route liefert es nur an den Eigentuemer selbst zurueck,
@@ -8347,6 +8351,18 @@ const MIGRATIONS = [
     // Wert wandert nach dieser Migration nie wieder in die Datenbank. Ein
     // rohes Backup von vor dieser Migration bleibt trotzdem lesbar, ohne einen
     // zweiten Migrationspfad zu brauchen.
+    //
+    // DER BACKFILL NORMALISIERT UND FILTERT: `mood` war freier Text (keine
+    // Werte-Liste erzwungen), `feelings` ist seit dieser Migration ein
+    // GESCHLOSSENES Set (MOOD_VALUES, sieben Schluessel: great/good/neutral/
+    // sensitive/sad/irritable/anxious - public/utils/health-cycle.js). Nur
+    // Werte, die (nach LOWER(TRIM(...))) in dieser Liste stehen, werden
+    // uebernommen; alles andere bleibt AUSSCHLIESSLICH in der eingefrorenen
+    // `mood`-Spalte lesbar. Zwei Gruende, keine Kompromisse: freier Text war
+    // als Chip nie darstellbar (die UI kennt nur die sieben Presets), und eine
+    // erfundene Zuordnung (z. B. "tired" -> "sensitive") waere ein Datensatz,
+    // den die Person nie eingetragen hat - eine fabrizierte Aussage ist
+    // schlimmer als eine fehlende.
     up: `
       CREATE TABLE cycle_day_log_feelings (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8357,11 +8373,13 @@ const MIGRATIONS = [
       CREATE INDEX idx_cycle_day_log_feelings_day_log ON cycle_day_log_feelings(day_log_id);
 
       -- Rueckwirkend aus der alten Skalar-Spalte befuellen: genau eine Zeile
-      -- je Tages-Log mit gesetztem mood-Wert. Anders als bei Migration 178
-      -- (Komma-Liste, mehrere Symptome je Zeile) ist hier keine Zerlegung
-      -- noetig - mood trug schon immer genau einen Wert.
+      -- je Tages-Log mit gesetztem, GUELTIGEM mood-Wert. Anders als bei
+      -- Migration 178 (Komma-Liste, mehrere Symptome je Zeile) ist hier keine
+      -- Zerlegung noetig - mood trug schon immer genau einen Wert.
       INSERT INTO cycle_day_log_feelings (day_log_id, feeling_key)
-      SELECT id, TRIM(mood) FROM cycle_day_logs WHERE mood IS NOT NULL AND TRIM(mood) <> '';
+      SELECT id, LOWER(TRIM(mood)) FROM cycle_day_logs
+      WHERE mood IS NOT NULL AND TRIM(mood) <> ''
+        AND LOWER(TRIM(mood)) IN ('great', 'good', 'neutral', 'sensitive', 'sad', 'irritable', 'anxious');
     `,
   },
   {
@@ -8371,7 +8389,8 @@ const MIGRATIONS = [
       -- Kein CHECK auf der Spalte: die Werte-Liste lebt in der Route (gleiche
       -- Aufteilung wie basal_temp_unit/flow ueberall sonst in diesem Modul).
       -- Eine Teilmenge dieser Werte (hormonell) schaltet clientseitig die
-      -- Eisprung-/Fruchtbarkeitsvorhersage ab - siehe DECISIONS.md.
+      -- Eisprung-/Fruchtbarkeitsvorhersage ab (siehe public/utils/health-cycle.js,
+      -- suppressesFertility()).
       ALTER TABLE cycle_settings ADD COLUMN contraception TEXT;
 
       -- Standard 0 (aus): ein Bestandshaushalt sieht ohne aktives Zutun keine
@@ -8380,17 +8399,17 @@ const MIGRATIONS = [
         CHECK(perimenopause_mode IN (0, 1));
 
       -- Standard 1 (an): die PMS-Einblendung ist rein abgeleitet (kein
-      -- gespeicherter Zeitraum, siehe DECISIONS.md) und rendert ohnehin nur
-      -- bei einem echten erkannten Muster - ein Bestandshaushalt sieht also
-      -- nur dann ueberhaupt etwas Neues, wenn die eigenen Daten es hergeben.
+      -- gespeicherter Zeitraum) und rendert ohnehin nur bei einem echten
+      -- erkannten Muster - ein Bestandshaushalt sieht also nur dann ueberhaupt
+      -- etwas Neues, wenn die eigenen Daten es hergeben.
       ALTER TABLE cycle_settings ADD COLUMN show_pms INTEGER NOT NULL DEFAULT 1
         CHECK(show_pms IN (0, 1));
 
-      -- Opt-in-Benachrichtigung (D-15): der Eigentuemer veroeffentlicht, die
-      -- Partnerperson braucht keine eigene Freigabe (siehe DECISIONS.md) -
-      -- deshalb genuegt ein einfacher Verweis ohne Gegenzeichnung. SET NULL
-      -- statt CASCADE: verlaesst die verwiesene Person den Haushalt, verliert
-      -- die Einstellung nur ihr Ziel, nicht die eigene Zeile.
+      -- Opt-in-Benachrichtigung: der Eigentuemer veroeffentlicht, die
+      -- Partnerperson braucht keine eigene Freigabe - deshalb genuegt ein
+      -- einfacher Verweis ohne Gegenzeichnung. SET NULL statt CASCADE:
+      -- verlaesst die verwiesene Person den Haushalt, verliert die
+      -- Einstellung nur ihr Ziel, nicht die eigene Zeile.
       ALTER TABLE cycle_settings ADD COLUMN notify_partner_user_id INTEGER
         REFERENCES users(id) ON DELETE SET NULL;
       ALTER TABLE cycle_settings ADD COLUMN notify_partner_days_before INTEGER;
@@ -8398,7 +8417,7 @@ const MIGRATIONS = [
   },
   {
     version: 213,
-    description: 'Health: widen cycle_reminder_anchors.kind to add partner_period (D-15)',
+    description: 'Health: widen cycle_reminder_anchors.kind to add partner_period',
     // SQLite kennt kein ALTER auf einen CHECK - derselbe Tabellen-Rebuild wie
     // v137/v141/v148/v162/v177 fuer reminders.entity_type, nur hier fuer die
     // Anker-Art. `foreignKeysOff` ist NICHT noetig: anders als reminders (an

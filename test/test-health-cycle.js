@@ -86,9 +86,9 @@ test('SYMPTOM_TYPES / MOOD_TYPES: vollständige labelKeys + icons', () => {
   assert.equal(moodType('unknown'), null);
 });
 
-// Review-Runde Fix 6: CERVIX_MUCUS_TYPES/TEST_RESULT_VALUES/INTIMACY_TYPES/
-// CONTRACEPTION_TYPES sind jetzt EIN Zuhause hier statt dreier Kopien
-// (server/routes/health/cycle.js + public/pages/health.js importieren sie).
+// CERVIX_MUCUS_TYPES/TEST_RESULT_VALUES/INTIMACY_TYPES/CONTRACEPTION_TYPES
+// haben EIN Zuhause hier statt mehrerer Kopien (server/routes/health/cycle.js
+// + public/pages/health.js importieren sie).
 test('CERVIX_MUCUS_TYPES/INTIMACY_TYPES: vollständige labelKeys, Werte einmalig', () => {
   for (const m of CERVIX_MUCUS_TYPES) assert.ok(m.labelKey.startsWith('health.cycle.mucus.'));
   assert.deepEqual(CERVIX_MUCUS_VALUES, CERVIX_MUCUS_TYPES.map((m) => m.value));
@@ -330,7 +330,7 @@ test('cycleGaps: ohne todayKey-Argument Default "heute" - unplausible Lücken bl
   assert.deepEqual(cycleGaps(hist, '2026-06-01'), [28, 28]);
 });
 
-// Review-Runde Fix 4: eine harte 90-Tage-Obergrenze schnitt bislang JEDE
+// Eine harte 90-Tage-Obergrenze schnitt bislang JEDE
 // Lücke einer Person mit konsistent langen (~95-100 Tage, PCOS-/oligomeno-
 // rrhoe-typischen) Zyklen weg - der Mittelwert fiel trotz konsistenter
 // Historie auf den 28-Tage-Default zurück. Reichen PLAUSIBEL (10-90 Tage)
@@ -423,7 +423,7 @@ test('predictCycle: überfällig, wenn heute nach vorhergesagtem Start', () => {
   assert.ok(p.daysUntilNext < 0);
 });
 
-// D-9: hormonelle Verhütung (Untermenge, siehe server/routes/health/cycle.js
+// Hormonelle Verhütung (Untermenge, siehe server/routes/health/cycle.js
 // CONTRACEPTION_VALUES) schaltet Eisprung/fruchtbares Fenster ab wie
 // track_fertility=0, dokumentiert aber zusätzlich WARUM.
 test('predictCycle: hormonelle Verhütung unterdrückt die Fruchtbarkeits-Vorhersage, mit Grund-Flag', () => {
@@ -459,7 +459,7 @@ test('cycleRing: hormonelle Verhütung - keine Eisprung-/Fruchtbarkeits-Segmente
   assert.equal(ring.ovulationFrac, null);
 });
 
-// D-14: Perimenopause-Modus - eine Spanne aus dem TATSAECHLICHEN Min/Max der
+// Perimenopause-Modus: eine Spanne aus dem TATSAECHLICHEN Min/Max der
 // juengsten plausiblen Lücken, zusätzlich zum unveränderten Mittelwert-
 // `nextStart`. Historie: Lücken 24 (01-01 -> 01-25), 32 (01-25 -> 02-26), 28
 // (02-26 -> 03-26) - Ø (24+32+28)/3 = 28, Variation 32-24=8 (> 7, wäre ohne
@@ -1011,7 +1011,7 @@ test('projectFutureCycles: leer im Schwangerschafts-Modus (keine Prognose ohne B
   assert.deepEqual(projectFutureCycles(hist, settings, '2026-03-01'), []);
 });
 
-// Review-Runde Fix 5: projectFutureCycles() ankerte bisher IMMER auf den
+// projectFutureCycles() ankerte bisher IMMER auf den
 // allerletzten Periodenstart, auch wenn der in der Zukunft lag (eine bereits
 // im Voraus geloggte Periode) - predictCycle() ankert dagegen seit jeher auf
 // den jüngsten NICHT-zukünftigen Start. Mit zwei verschiedenen Ankern zeigte
@@ -1176,7 +1176,7 @@ test('buildCycleCalendar: ohne BBT-Bestätigung bleibt das aktuelle Fenster wie 
   assert.equal(at('2026-06-15').confirmed, false);
 });
 
-// D-9: hormonelle Verhütung muss auch im Kalender konsistent mit dem Ring
+// Hormonelle Verhütung muss auch im Kalender konsistent mit dem Ring
 // sein (siehe cycleRing()-Test) - sonst zeigt der Kalender ein Fenster, das
 // Hero/Ring bereits als unterdrückt behandeln.
 test('buildCycleCalendar: hormonelle Verhütung zeigt keine Eisprung-/Fruchtbarkeits-Zellen', () => {
@@ -1342,7 +1342,7 @@ test('die Wochentage im Zyklus-Kalender passen in sieben feste Spalten', () => {
 });
 
 // --------------------------------------------------------
-// pmsWindow (D-8)
+// pmsWindow
 // --------------------------------------------------------
 
 // Historie: 4 Perioden, Lücken 28/28/28 (Ø-Zyklus 28) -> letzter Start
@@ -1410,7 +1410,7 @@ test('pmsWindow: die dem nächsten Start nähere Grenze wird auf mindestens 2 Ta
 });
 
 // --------------------------------------------------------
-// periodFlowStats (Review-Runde Fix 8) — EIN Durchlauf statt zweier fast
+// periodFlowStats - EIN Durchlauf statt zweier fast
 // identischer Schleifen (periodFlowSummary()/periodFlowLoad() bleiben als
 // dünne Wrapper bestehen, s. u.)
 // --------------------------------------------------------
@@ -1443,7 +1443,7 @@ test('periodFlowSummary/periodFlowLoad: dünne Wrapper um periodFlowStats() - ko
 });
 
 // --------------------------------------------------------
-// periodFlowSummary (v2, B-2) — Blutungsstärke-Zusammenfassung je Periode
+// periodFlowSummary (v2, B-2) - Blutungsstärke-Zusammenfassung je Periode
 // --------------------------------------------------------
 
 test('periodFlowSummary: stärkster Flow-Wert + Anzahl geloggter Tage einer abgeschlossenen Periode', () => {
@@ -1496,7 +1496,7 @@ test('periodFlowSummary: ein unbekannter flow-Wert zählt den Tag mit, bestimmt 
 });
 
 // --------------------------------------------------------
-// feelingFrequencyByPhase (v2, D-1)
+// feelingFrequencyByPhase
 // --------------------------------------------------------
 
 test('feelingFrequencyByPhase: klassifiziert Menstruation/Luteal/Sonstige wie symptomFrequencyByPhase, aber über `feelings`', () => {
@@ -1514,7 +1514,7 @@ test('feelingFrequencyByPhase: klassifiziert Menstruation/Luteal/Sonstige wie sy
   ]);
 });
 
-// Review-Runde Fix 2: ein bewusst GELEERTES `feelings: []` ist "keine Gefühle
+// Ein bewusst GELEERTES `feelings: []` ist "keine Gefühle
 // mehr" und darf NICHT auf das eingefrorene `mood` zurückfallen - nur wenn
 // `feelings` als Schlüssel ganz fehlt (kein Array ist), greift der Fallback.
 // Vorher machte `.length` das leere Array ununterscheidbar von "fehlt".
@@ -1634,7 +1634,7 @@ test('heavyBleedingSignal: betrachtet nur die letzten 5 abgeschlossenen Episoden
 });
 
 // --------------------------------------------------------
-// painSummary (v2, D-4)
+// painSummary
 // --------------------------------------------------------
 
 test('painSummary: die vier schmerzbezogenen Symptom-Presets', () => {

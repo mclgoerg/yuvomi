@@ -9,7 +9,8 @@
  *  - Modul abschaltbar (Server-Allowlist + Settings-Toggle-Definition)
  *  - i18n-Parität der neuen Keys über ALLE Locales
  *  - Zyklus-Tagebuch-Modal (health.js): Quelltext-Guards ohne DOM/Browser fuer
- *    den A-2/A-3/A-4/A-5-Fixblock und die D-5/D-6/D-10/D-11/D-16-Felder -
+ *    die Quick-Links-Verhaltenskorrekturen und die neuen Tages-Log-Felder
+ *    (Zervixschleim, LH-/Schwangerschaftstest, Intimitaet, Gefuehle) -
  *    siehe Abschnitt am Dateiende.
  */
 import { test } from 'node:test';
@@ -209,7 +210,7 @@ test('i18n: nav.health, shortcuts.goHealth und health.* in allen Locales', () =>
 // --------------------------------------------------------
 // Dieselbe Technik wie oben (Regex gegen den rohen Quelltext), diesmal gegen
 // public/pages/health.js. Das eigentliche Verhalten wurde manuell im Browser
-// verifiziert (siehe Arbeitsauftrag) - diese Guards verhindern nur, dass eine
+// verifiziert - diese Guards verhindern nur, dass eine
 // spaetere, unbeabsichtigte Aenderung den jeweiligen Fix wieder einreisst,
 // ohne dass eine gruene Suite das meldet.
 
@@ -262,15 +263,14 @@ test('A-5: cycleStatsSourceText() unterscheidet Eigen- und Fremdansicht fuer die
   assert.match(fn, /health\.cycle\.stats\.source\.historyOther/, 'Person-neutrale Variante fehlt');
 });
 
-test('D-6/D-10/D-11: der Tages-Log-Submit sendet cervix_mucus, lh_test, pregnancy_test, feelings, intimacy - nicht mehr mood', () => {
+test('Tages-Log-Submit sendet cervix_mucus, lh_test, pregnancy_test, feelings, intimacy - nicht mehr mood', () => {
   const fn = functionSource('openDayLogModal');
   assert.ok(fn, 'openDayLogModal() nicht gefunden');
   for (const field of ['cervix_mucus', 'lh_test', 'pregnancy_test', 'feelings', 'intimacy']) {
     assert.match(fn, new RegExp(`${field}[,:]`), `Feld ${field} fehlt im Submit-Body`);
   }
-  // `mood` ist seit Migration 211 nur noch ein Lesewert (siehe DECISIONS.md,
-  // "Feelings become multi-select") - der neue Body darf ihn nicht mehr
-  // schreiben, `feelings` ersetzt ihn vollstaendig.
+  // `mood` ist seit Migration 211 nur noch ein Lesewert - der neue Body darf
+  // ihn nicht mehr schreiben, `feelings` ersetzt ihn vollstaendig.
   assert.ok(!/body\s*=\s*\{[\s\S]*?mood:/.test(fn), 'mood darf im Submit-Body nicht mehr geschrieben werden');
 });
 
@@ -295,7 +295,7 @@ test('T2: bestätigtes Fenster (BBT) traegt eine eigene Klasse, getrennt von "pr
   assert.match(legendFn, /health\.cycle\.status\.ovulationConfirmed/, 'Legendeneintrag "Eisprung bestätigt" fehlt');
 });
 
-test('D-7: Intimitäts-Marker nur in der eigenen Ansicht, eigene Kalender-Ecke', () => {
+test('Intimitäts-Marker nur in der eigenen Ansicht, eigene Kalender-Ecke', () => {
   const fn = functionSource('cycleCalendarMarkup');
   assert.ok(fn, 'cycleCalendarMarkup() nicht gefunden');
   assert.match(fn, /own\s*\?\s*\n?\s*new Set/, 'intimacyDates darf nur in der eigenen Ansicht befuellt werden');
@@ -305,11 +305,11 @@ test('D-7: Intimitäts-Marker nur in der eigenen Ansicht, eigene Kalender-Ecke',
   assert.match(legendFn, /own\s*\n?\s*\?\s*`<span class="cycle-legend__item">.*heart/, 'Legendeneintrag muss own-gated sein');
 });
 
-// Review-Runde Fix 3: pmsWindow() wird nicht mehr INNERHALB von
-// cycleCalendarMarkup() aufgerufen - renderCycleShell() berechnet `pms`
-// EINMAL pro Render (own-gated) und reicht es als Parameter an Bubble UND
-// Kalender weiter (vorher zweimal berechnet, u.a. ohne Own-Gate im Kalender).
-test('D-8-UI/Fix3: PMS-Fenster wird EINMAL (own-gated) in renderCycleShell berechnet und an Bubble+Kalender weitergereicht', () => {
+// pmsWindow() wird nicht mehr INNERHALB von cycleCalendarMarkup() aufgerufen -
+// renderCycleShell() berechnet `pms` EINMAL pro Render (own-gated) und reicht
+// es als Parameter an Bubble UND Kalender weiter (vorher zweimal berechnet,
+// u.a. ohne Own-Gate im Kalender).
+test('PMS-Fenster wird EINMAL (own-gated) in renderCycleShell berechnet und an Bubble+Kalender weitergereicht', () => {
   const shellFn = functionSource('renderCycleShell');
   assert.ok(shellFn, 'renderCycleShell() nicht gefunden');
   assert.match(shellFn, /const pms = own\s*\?\s*pmsWindow\(cycle\.logs,\s*cycle\.periods,\s*cycleSettings\(\),\s*todayKey\(\)\)\s*:\s*null;/,
@@ -329,7 +329,7 @@ test('D-8-UI/Fix3: PMS-Fenster wird EINMAL (own-gated) in renderCycleShell berec
   assert.match(legendFn, /health\.cycle\.legend\.pms/, 'PMS-Legendeneintrag fehlt');
 });
 
-test('D-5/D-16: die Schnellzugriffs-Links schliessen ueber den regulaeren (Dirty-Check-)Pfad, bevor sie navigieren', () => {
+test('Schnellzugriffs-Links schliessen ueber den regulaeren (Dirty-Check-)Pfad, bevor sie navigieren', () => {
   const fn = functionSource('openDayLogModal');
   assert.ok(fn, 'openDayLogModal() nicht gefunden');
   // Ein erzwungenes closeModal({ force: true }) vor der Navigation wuerde den
@@ -343,11 +343,11 @@ test('D-5/D-16: die Schnellzugriffs-Links schliessen ueber den regulaeren (Dirty
 });
 
 // --------------------------------------------------------
-// Review-Runde: Fix 1 (offene Periode + fällige Vorhersage), Fix 7 (Partner-
-// Erinnerung im Client), Fix 8 (cycleBubbleShell-Icon-Param)
+// Today-Bubble: offene Periode + fällige Vorhersage, Partner-Erinnerung im
+// Client, cycleBubbleShell()s icon-Parameter
 // --------------------------------------------------------
 
-test('Fix 1: die Bubble bietet "Periode starten" NICHT an, solange eine Periode noch offen ist', () => {
+test('Bubble bietet "Periode starten" NICHT an, solange eine Periode noch offen ist', () => {
   const fn = functionSource('cycleBubbleMarkup');
   assert.ok(fn, 'cycleBubbleMarkup() nicht gefunden');
   assert.match(fn, /const openPeriod = cycleOpenPeriod\(\);/, 'muss cycleOpenPeriod() bei faelliger/ueberfaelliger Vorhersage abfragen');
@@ -365,16 +365,17 @@ test('Fix 1: die Bubble bietet "Periode starten" NICHT an, solange eine Periode 
     'der Bubble-Beenden-Knopf muss cycleEndPeriodToday() aufrufen (kein zweiter Codepfad)');
 });
 
-test('Fix 7: cycleReminderBody() erkennt eine Partner-Periodenerinnerung ueber cycle_anchor_kind/cycle_owner_name', () => {
+test('cycleReminderBody() erkennt eine Partner-Periodenerinnerung ueber cycle_anchor_kind/cycle_owner_name', () => {
   const remindersJs = read('public/reminders.js');
   const fn = remindersJs.match(/function cycleReminderBody[\s\S]*?\n}\n/)?.[0];
   assert.ok(fn, 'cycleReminderBody() nicht gefunden');
   assert.match(fn, /cycle_anchor_kind === 'partner_period'/, 'muss den Partner-Anker erkennen');
-  assert.match(fn, /health\.cycle\.status\.partnerNextPeriod/, 'muss die bestehende partnerNextPeriod-Übersetzung nutzen');
+  assert.match(fn, /health\.cycle\.status\.partnerNextPeriod\b/, 'muss die partnerNextPeriod-Übersetzung nutzen, wenn der Name bekannt ist');
   assert.match(fn, /cycle_owner_name/, 'muss den Namen des Zyklus-Eigentümers verwenden');
+  assert.match(fn, /health\.cycle\.status\.partnerNextPeriodNeutral/, 'muss einen neutralen Fallback nennen, wenn der Name fehlt - nie faelschlich die eigene "Naechste Periode"');
 });
 
-test('Fix 8: cycleBubbleShell() nimmt einen icon-Parameter, der Schwangerschafts-Zweig nutzt ihn statt eigener Wrapper-HTML', () => {
+test('cycleBubbleShell() nimmt einen icon-Parameter, der Schwangerschafts-Zweig nutzt ihn statt eigener Wrapper-HTML', () => {
   const shellSrc = HEALTH_JS.match(/function cycleBubbleShell[\s\S]*?\n}\n/)?.[0];
   assert.ok(shellSrc, 'cycleBubbleShell() nicht gefunden');
   assert.match(shellSrc, /icon\s*=\s*'sparkles'/, 'icon-Parameter mit Sparkles-Default fehlt');

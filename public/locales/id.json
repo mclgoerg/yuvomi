@@ -4330,7 +4330,8 @@
                 "noPrediction": "Catat menstruasi untuk mendapatkan prediksi.",
                 "fertilitySuppressedNote": "Masa subur dijeda: kontrasepsi hormonal.",
                 "nextPeriodRangeSub": "Rata-rata: {{date}}",
-                "partnerNextPeriod": "Menstruasi {{name}}"
+                "partnerNextPeriod": "Menstruasi {{name}} diperkirakan mulai pada {{date}}.",
+                "partnerNextPeriodNeutral": "Pengingat pasangan: menstruasi"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Detail",
                 "feelingFrequency": "Frekuensi perasaan",
                 "flowLoad": "Intensitas aliran per siklus",
-                "flowLoadCaption": "Berdasarkan catatan aliranmu — semakin lengkap pencatatanmu, semakin bermakna data ini.",
+                "flowLoadCaption": "Berdasarkan catatan aliranmu - semakin lengkap pencatatanmu, semakin bermakna data ini.",
                 "flowLoadColumn": "Beban aliran",
                 "flowLoadValue": "{{load}} ({{days}} tercatat)",
-                "heavyBleedingHintHeavy": "Menstruasi terakhirmu berulang kali tercatat sebagai \"deras\" — ada baiknya disampaikan saat konsultasi medis.",
-                "heavyBleedingHintLong": "Setidaknya satu menstruasi terakhirmu berlangsung lebih dari seminggu — ada baiknya disampaikan saat konsultasi medis.",
+                "heavyBleedingHintHeavy": "Menstruasi terakhirmu berulang kali tercatat sebagai \"deras\" - ada baiknya disampaikan saat konsultasi medis.",
+                "heavyBleedingHintLong": "Setidaknya satu menstruasi terakhirmu berlangsung lebih dari seminggu - ada baiknya disampaikan saat konsultasi medis.",
                 "painTitle": "Nyeri",
                 "painCurrentCycleLabel": "Hari nyeri pada siklus ini",
                 "painAvgPerCycleLabel": "Rata-rata hari nyeri per siklus",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Catat menstruasi",
                 "edit": "Edit menstruasi",
-                "warningFuture": "Tanggal mulai berada di masa depan — prediksi hanya didasarkan pada siklus sebelumnya.",
+                "warningFuture": "Tanggal mulai berada di masa depan - prediksi hanya didasarkan pada siklus sebelumnya.",
                 "warningOverlap": "Tumpang tindih dengan siklus yang sudah tercatat."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "Tampilkan jendela PMS",
                 "notifyPartner": "Beri tahu pasangan",
                 "notifyPartnerHint": "Orang yang dipilih hanya menerima tanggal prediksi, tidak pernah gejala, catatan, atau entri lainnya.",
+                "notifyPartnerNoEligible": "Tidak ada anggota rumah tangga yang memenuhi syarat - hanya anggota dengan akses ke modul Kesehatan yang dapat diberi tahu.",
                 "notifyPartnerDaysBefore": "Pengingat untuk pasangan"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Status siklus hari ini",
                 "line1": "Hari siklus {{day}} · {{phase}}",
-                "periodToday": "Menstruasi diperkirakan hari ini — mulai sekarang?",
-                "periodOverdue": "Menstruasi terlambat {{count}} hari — mulai sekarang?",
-                "periodOverdue_one": "Menstruasi terlambat {{count}} hari — mulai sekarang?",
-                "periodStillOpen": "Menstruasimu masih tercatat sedang berlangsung — akhiri sekarang?",
+                "periodToday": "Menstruasi diperkirakan hari ini - mulai sekarang?",
+                "periodOverdue": "Menstruasi terlambat {{count}} hari - mulai sekarang?",
+                "periodOverdue_one": "Menstruasi terlambat {{count}} hari - mulai sekarang?",
+                "periodStillOpen": "Menstruasimu masih tercatat sedang berlangsung - akhiri sekarang?",
                 "peakPainDay": "Berdasarkan polamu, hari ini sering menjadi hari nyeri paling parah ({{symptom}}).",
                 "likelySymptomsToday": "Kemungkinan hari ini: {{symptoms}}",
                 "pmsWindow": "Jendela PMS kemungkinan mulai {{weekday}}",

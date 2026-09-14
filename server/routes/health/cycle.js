@@ -5,8 +5,8 @@
  *        (cycle_periods), Tages-Logs (cycle_day_logs, genau ein Eintrag je
  *        Person/Tag → Upsert) und die per-Person-Einstellungen (cycle_settings,
  *        nur der Eigentümer selbst) plus der Perioden-CSV-Export/-Import
- *        (D-13, POST /cycle/import - Alles-oder-nichts, siehe dortiger
- *        Kommentar). Die
+ *        (POST /cycle/import - Alles-oder-nichts, siehe dortiger Kommentar).
+ *        Die
  *        Vorhersage-Logik (nächste Periode, Eisprung, fruchtbares Fenster) liegt
  *        bewusst in EINER Datei, public/utils/health-cycle.js, absichtlich
  *        DOM-frei geschrieben, damit sie auch außerhalb des Browsers läuft.
@@ -28,13 +28,11 @@ import express from 'express';
 import * as db from '../../db.js';
 import * as v from '../../middleware/validate.js';
 import { cycleToCsv } from '../../services/health-export.js';
-import { syncCycleRemindersForUser } from '../../services/cycle-reminders.js';
-import { isHouseholdMember } from '../../services/member-email.js';
-// Review-Runde Fix 6: die vier geschlossenen Wertelisten kommen jetzt aus
-// health-cycle.js (dasselbe Muster wie der bestehende MOOD_VALUES-Import) -
-// vorher hielt diese Datei drei eigene Kopien (CERVIX_MUCUS_VALUES/
-// TEST_RESULT_VALUES/INTIMACY_VALUES weiter unten, CONTRACEPTION_VALUES bei
-// den Einstellungen), health.js eine vierte.
+import { syncCycleRemindersForUser, isEligibleCyclePartner, eligibleCyclePartners } from '../../services/cycle-reminders.js';
+// Die vier geschlossenen Wertelisten kommen aus health-cycle.js (dasselbe
+// Muster wie der bestehende MOOD_VALUES-Import) - EIN Zuhause statt mehrerer
+// Kopien (CERVIX_MUCUS_VALUES/TEST_RESULT_VALUES/INTIMACY_VALUES,
+// CONTRACEPTION_VALUES), die sonst auseinanderlaufen koennten.
 import {
   normalizeSymptomEntries, MOOD_VALUES,
   CERVIX_MUCUS_VALUES, TEST_RESULT_VALUES, INTIMACY_VALUES, CONTRACEPTION_VALUES,
@@ -107,10 +105,12 @@ function replaceSymptoms(database, dayLogId, entries) {
 }
 
 // Geschlossene Werte-Listen fuer die seit Migration 210 nullbaren Spalten
-// (kein CHECK auf der Spalte selbst, siehe dortiger Kommentar) - kommen seit
-// Review-Runde Fix 6 als Import von oben (health-cycle.js, EIN Zuhause statt
-// dreier Kopien), nicht mehr als lokale Konstanten hier.
-// D-6, hart privat (siehe GET /cycle/logs unten und DECISIONS.md): INTIMACY_VALUES.
+// (kein CHECK auf der Spalte selbst, siehe dortiger Kommentar) - kommen als
+// Import von oben (health-cycle.js, EIN Zuhause statt dreier Kopien), nicht
+// mehr als lokale Konstanten hier.
+// intimacy, cervix_mucus, lh_test und pregnancy_test sind hart privat (siehe
+// GET /cycle/logs unten und docs/SPEC.md): INTIMACY_VALUES/CERVIX_MUCUS_VALUES/
+// TEST_RESULT_VALUES.
 
 /**
  * Gefuehle eines Tages (Mehrfachauswahl, seit Migration 211) validieren +
@@ -304,15 +304,19 @@ router.get('/cycle/logs', (req, res) => {
     const symptomsByLog = symptomsForLogs(database, rows.map((row) => row.id));
     const feelingsByLog = feelingsForLogs(database, rows.map((row) => row.id));
     res.json({ data: rows.map((row) => {
-      // `intimacy` ist hart privat (D-6, siehe DECISIONS.md): unabhängig von
-      // `visibility` nur für den Eigentümer selbst sichtbar, auch wenn diese
-      // Zeile familienweit geteilt ist - siehe Migration 210's Kommentar.
-      const { intimacy, ...rest } = row;
+      // Vier Felder sind hart privat: unabhängig von `visibility` nur für den
+      // Eigentümer selbst sichtbar, auch wenn diese Zeile familienweit geteilt
+      // ist - siehe Migration 210's Kommentar und docs/SPEC.md. Sex-Leben
+      // (intimacy), Zyklusmonitor-Testergebnisse (lh_test, pregnancy_test) und
+      // Zervixschleim (cervix_mucus) sind Dinge, die man teilt, indem man sie
+      // ausdruecklich TEILT - nicht als Nebenwirkung davon, dass der restliche
+      // Tag family-sichtbar ist.
+      const { intimacy, cervix_mucus, lh_test, pregnancy_test, ...rest } = row;
       return {
         ...rest,
         symptoms: symptomsByLog.get(row.id),
         feelings: feelingsByLog.get(row.id),
-        ...(row.user_id === viewer ? { intimacy } : {}),
+        ...(row.user_id === viewer ? { intimacy, cervix_mucus, lh_test, pregnancy_test } : {}),
       };
     }) });
   } catch (err) {
@@ -338,8 +342,8 @@ router.post('/cycle/logs', (req, res) => {
     const intimacy      = v.oneOf(b.intimacy, INTIMACY_VALUES, 'intimacy');
     // Legacy `mood` (Einzelwert) wird, wenn `feelings` fehlt, als
     // Ein-Element-Liste behandelt - siehe normalizeFeelings(). Die
-    // `mood`-Spalte selbst wird beim Speichern aktiv auf NULL gesetzt (Review-
-    // Runde Fix 2): Migration 211 liess sie beim Umstieg unangetastet stehen
+    // `mood`-Spalte selbst wird beim Speichern aktiv auf NULL gesetzt:
+    // Migration 211 liess sie beim Umstieg unangetastet stehen
     // (die Migration selbst bleibt so - sie lief bereits auf Live-DBs), aber
     // dieser Schreibpfad hier liess sie seither ebenfalls unberuehrt, egal wie
     // oft ein Tag danach erneut gespeichert wurde. Dadurch konnte ein laengst
@@ -426,15 +430,14 @@ router.delete('/cycle/logs/:id', (req, res) => {
 
 // ---- Einstellungen (nur eigene) ----
 
-// Verhuetungsmethode (D-9): geschlossene Auswahl, NULL = nicht angegeben.
+// Verhuetungsmethode: geschlossene Auswahl, NULL = nicht angegeben.
 // Kein CHECK auf der Spalte (siehe Migration 212) - dieselbe Aufteilung wie
 // ueberall sonst in diesem Modul. Die *hormonelle* Teilmenge (pill,
 // hormonal_iud, implant, injection, patch, ring) schaltet clientseitig die
-// Eisprung-/Fruchtbarkeitsvorhersage ab (siehe DECISIONS.md); Kupferspirale/
-// Kondom/keine aendern daran nichts - das entscheidet public/utils/health-cycle.js,
-// nicht diese Route. CONTRACEPTION_VALUES kommt seit Review-Runde Fix 6 als
-// Import von oben (aus CONTRACEPTION_TYPES abgeleitet), nicht mehr als lokale
-// Kopie hier.
+// Eisprung-/Fruchtbarkeitsvorhersage ab; Kupferspirale/Kondom/keine aendern
+// daran nichts - das entscheidet public/utils/health-cycle.js, nicht diese
+// Route. CONTRACEPTION_VALUES kommt als Import von oben (aus
+// CONTRACEPTION_TYPES abgeleitet), nicht mehr als lokale Kopie hier.
 
 /** Voreinstellungen, falls die Person noch keine Zeile hat. */
 function defaultCycleSettings(userId) {
@@ -448,11 +451,17 @@ function defaultCycleSettings(userId) {
 }
 
 // GET /cycle/settings  (immer die eigenen; Vorhersagen sind persönlich)
+// `eligible_partners`: andere Haushaltsmitglieder, die die
+// Partner-Auswahl unten tatsaechlich anzeigen darf - derselbe Praedikat wie der
+// Sync (isEligibleCyclePartner()/eligibleCyclePartners() in cycle-reminders.js,
+// EINE Regel statt einer zweiten Abschrift). Ohne dieses Feld muesste das
+// Frontend raten, wer eine Meldung tatsaechlich bekaeme.
 router.get('/cycle/settings', (req, res) => {
   try {
     const viewer = viewerId(req);
-    const row = db.get().prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(viewer);
-    res.json({ data: row || defaultCycleSettings(viewer) });
+    const database = db.get();
+    const row = database.prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(viewer);
+    res.json({ data: { ...(row || defaultCycleSettings(viewer)), eligible_partners: eligibleCyclePartners(database, viewer) } });
   } catch (err) {
     log.error('Error loading cycle settings:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
@@ -488,13 +497,13 @@ router.put('/cycle/settings', (req, res) => {
     const showPms          = toBit(b.show_pms);
     const partnerDaysBefore = intInRange(b.notify_partner_days_before, 'notify_partner_days_before', 0, 14);
 
-    // notify_partner_user_id: muss ein echtes Haushaltsmitglied sein (die eine
-    // gemeinsame Regel dafuer, isHouseholdMember() - siehe DECISIONS.md "eine
-    // Regel lebt an einem Ort", nicht als eigener Vergleich hier nachgebaut)
-    // und darf nicht die aufrufende Person selbst sein: der Eigentuemer
-    // veroeffentlicht, eine Benachrichtigung an sich selbst waere sinnlos
-    // (siehe DECISIONS.md, D-15). Leer/undefined loescht - gleiche
-    // Voll-Ersetzen-Semantik wie jedes andere Feld dieser Route.
+    // notify_partner_user_id: muss in der eligible_partners-Menge stehen, die
+    // GET /cycle/settings dem Frontend liefert - derselbe Praedikat
+    // (isEligibleCyclePartner(), cycle-reminders.js), damit die Route niemanden
+    // annimmt, den die Auswahlliste gar nicht erst zeigt. Darf ausserdem nicht
+    // die aufrufende Person selbst sein: der Eigentuemer veroeffentlicht, eine
+    // Benachrichtigung an sich selbst waere sinnlos. Leer/undefined loescht -
+    // gleiche Voll-Ersetzen-Semantik wie jedes andere Feld dieser Route.
     let notifyPartnerUserId = null;
     let notifyPartnerError = null;
     if (b.notify_partner_user_id !== undefined && b.notify_partner_user_id !== null && b.notify_partner_user_id !== '') {
@@ -503,8 +512,8 @@ router.put('/cycle/settings', (req, res) => {
         notifyPartnerError = 'notify_partner_user_id must be a valid user id.';
       } else if (candidate === viewer) {
         notifyPartnerError = 'notify_partner_user_id must not be the caller themselves.';
-      } else if (!isHouseholdMember(candidate, { db: db.get() })) {
-        notifyPartnerError = 'notify_partner_user_id must be an existing household member.';
+      } else if (!isEligibleCyclePartner(db.get(), candidate)) {
+        notifyPartnerError = 'notify_partner_user_id must be an eligible household member (health module access, not a child).';
       } else {
         notifyPartnerUserId = candidate;
       }
@@ -615,7 +624,7 @@ router.get('/export/cycle', (req, res) => {
   }
 });
 
-// ---- Perioden-Historie-Import (D-13) ----
+// ---- Perioden-Historie-Import ----
 // Wer von Flo/Clue/Papier umzieht, hat seine Historie meist als CSV - dieselbe
 // Spaltenreihenfolge wie der eigene Export (CYCLE_HEADER, health-export.js:
 // start_date zuerst, end_date zweitens), damit ein Export dieser App selbst
@@ -626,7 +635,7 @@ router.get('/export/cycle', (req, res) => {
 
 const IMPORT_MAX_BYTES = 100 * 1024; // 100 KB
 const IMPORT_MAX_ROWS = 500; // Datenzeilen, ohne Kopfzeile
-const IMPORT_MAX_ERRORS = 10; // siehe Task-Vorgabe: nur die ersten zehn Fehler
+const IMPORT_MAX_ERRORS = 10; // nur die ersten zehn Fehler in der Antwort, nicht alle
 
 /**
  * Trennzeichen erkennen: ein deutscher Excel-Export trennt mit Semikolon
@@ -686,7 +695,7 @@ function normalizeImportDate(raw) {
   return null;
 }
 
-// POST /cycle/import  (Perioden-Historie aus CSV, D-13)
+// POST /cycle/import  (Perioden-Historie aus CSV)
 // Body: { csv: string }. Alles-oder-nichts: eine einzige ungueltige Zeile
 // verwirft den gesamten Import (Transaktion), mit einer Fehlerliste (max.
 // IMPORT_MAX_ERRORS Eintraege) statt eines pauschalen Fehlertexts - passend

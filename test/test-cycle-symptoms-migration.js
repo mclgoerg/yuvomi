@@ -164,6 +164,10 @@ function seedPreV211() {
     -- NULL und leerer String duerfen keine Geisterzeile erzeugen.
     INSERT INTO cycle_day_logs (user_id, log_date, mood) VALUES (1, '2030-01-03', NULL);
     INSERT INTO cycle_day_logs (user_id, log_date, mood) VALUES (1, '2030-01-04', '');
+    -- Gemischte Gross-/Kleinschreibung wird uebernommen, aber normalisiert.
+    INSERT INTO cycle_day_logs (user_id, log_date, mood) VALUES (1, '2030-01-05', 'Good');
+    -- Ausserhalb der sieben Feelings-Schluessel: bleibt nur in mood stehen.
+    INSERT INTO cycle_day_logs (user_id, log_date, mood) VALUES (1, '2030-01-06', 'tired');
   `);
   return db;
 }
@@ -184,7 +188,7 @@ test('v211 legt cycle_day_log_feelings mit den erwarteten Spalten an', () => {
   db.close();
 });
 
-test('v211 befuellt genau eine Zeile je Tages-Log mit gesetztem mood-Wert', () => {
+test('v211 befuellt genau eine Zeile je Tages-Log mit gesetztem, gueltigem mood-Wert', () => {
   const db = appliedV211();
   const rows = db.prepare(
     'SELECT day_log_id, feeling_key FROM cycle_day_log_feelings ORDER BY day_log_id'
@@ -192,6 +196,7 @@ test('v211 befuellt genau eine Zeile je Tages-Log mit gesetztem mood-Wert', () =
   assert.deepEqual(rows, [
     { day_log_id: 1, feeling_key: 'good' },
     { day_log_id: 2, feeling_key: 'irritable' },
+    { day_log_id: 5, feeling_key: 'good' },
   ]);
   db.close();
 });
@@ -204,6 +209,22 @@ test('v211 erzeugt keine Zeile fuer NULL oder leere mood-Spalten', () => {
   db.close();
 });
 
+test('v211 normalisiert Gross-/Kleinschreibung beim Backfill ("Good" -> "good")', () => {
+  const db = appliedV211();
+  const row = db.prepare('SELECT feeling_key FROM cycle_day_log_feelings WHERE day_log_id = 5').get();
+  assert.equal(row.feeling_key, 'good');
+  db.close();
+});
+
+test('v211 uebernimmt keinen Wert ausserhalb der sieben Feelings-Schluessel ("tired" bleibt nur in mood)', () => {
+  const db = appliedV211();
+  const countFor6 = db.prepare('SELECT COUNT(*) AS c FROM cycle_day_log_feelings WHERE day_log_id = 6').get().c;
+  assert.equal(countFor6, 0, '"tired" ist kein Feelings-Schluessel und darf keine Zeile erzeugen');
+  const mood = db.prepare('SELECT mood FROM cycle_day_logs WHERE id = 6').get().mood;
+  assert.equal(mood, 'tired', 'die alte mood-Spalte bleibt unangetastet, auch fuer nicht uebernommene Werte');
+  db.close();
+});
+
 test('v211 laesst die alte mood-Spalte unveraendert stehen (kein Rebuild, keine Loeschung)', () => {
   const db = appliedV211();
   const rows = db.prepare('SELECT log_date, mood FROM cycle_day_logs ORDER BY log_date').all();
@@ -212,6 +233,8 @@ test('v211 laesst die alte mood-Spalte unveraendert stehen (kein Rebuild, keine 
     { log_date: '2030-01-02', mood: '  irritable  ' },
     { log_date: '2030-01-03', mood: null },
     { log_date: '2030-01-04', mood: '' },
+    { log_date: '2030-01-05', mood: 'Good' },
+    { log_date: '2030-01-06', mood: 'tired' },
   ]);
   db.close();
 });

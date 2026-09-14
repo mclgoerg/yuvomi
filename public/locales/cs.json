@@ -4330,7 +4330,8 @@
                 "noPrediction": "Zaznamenej menstruaci pro předpovědi.",
                 "fertilitySuppressedNote": "Plodné okno pozastaveno: hormonální antikoncepce.",
                 "nextPeriodRangeSub": "Průměr: {{date}}",
-                "partnerNextPeriod": "Menstruace osoby {{name}}"
+                "partnerNextPeriod": "Menstruace osoby {{name}} by měla podle predikce začít {{date}}.",
+                "partnerNextPeriodNeutral": "Připomenutí pro partnera: menstruace"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Podrobnosti",
                 "feelingFrequency": "Četnost nálad",
                 "flowLoad": "Intenzita krvácení podle cyklu",
-                "flowLoadCaption": "Vychází z tvých záznamů o krvácení — čím úplnější záznamy, tím vypovídavější údaj.",
+                "flowLoadCaption": "Vychází z tvých záznamů o krvácení - čím úplnější záznamy, tím vypovídavější údaj.",
                 "flowLoadColumn": "Zátěž krvácení",
                 "flowLoadValue": "{{load}} ({{days}} zaznamenáno)",
-                "heavyBleedingHintHeavy": "Tvé poslední menstruace byly opakovaně označeny jako „silné“ — stojí za to to zmínit při lékařské konzultaci.",
-                "heavyBleedingHintLong": "Alespoň jedna z tvých posledních menstruací trvala déle než týden — stojí za to to zmínit při lékařské konzultaci.",
+                "heavyBleedingHintHeavy": "Tvé poslední menstruace byly opakovaně označeny jako „silné“ - stojí za to to zmínit při lékařské konzultaci.",
+                "heavyBleedingHintLong": "Alespoň jedna z tvých posledních menstruací trvala déle než týden - stojí za to to zmínit při lékařské konzultaci.",
                 "painTitle": "Bolest",
                 "painCurrentCycleLabel": "Dny s bolestí v tomto cyklu",
                 "painAvgPerCycleLabel": "Prům. dnů s bolestí na cyklus",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Zaznamenat menstruaci",
                 "edit": "Upravit menstruaci",
-                "warningFuture": "Datum zahájení je v budoucnosti — předpovědi vycházejí jen z minulých cyklů.",
+                "warningFuture": "Datum zahájení je v budoucnosti - předpovědi vycházejí jen z minulých cyklů.",
                 "warningOverlap": "Překrývá se s již zaznamenaným cyklem."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "Zobrazit PMS okno",
                 "notifyPartner": "Upozornit partnera",
                 "notifyPartnerHint": "Zvolená osoba dostane pouze předpovězené datum, nikdy příznaky, poznámky ani jiné záznamy.",
+                "notifyPartnerNoEligible": "Není k dispozici žádný způsobilý člen domácnosti - upozornit lze jen členy s přístupem k modulu Zdraví.",
                 "notifyPartnerDaysBefore": "Připomenutí pro partnera"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Dnešní stav cyklu",
                 "line1": "Den cyklu {{day}} · {{phase}}",
-                "periodToday": "Menstruace se dnes očekává — začít teď?",
-                "periodOverdue": "Menstruace mešká {{count}} dní — začít teď?",
-                "periodOverdue_one": "Menstruace mešká {{count}} den — začít teď?",
-                "periodStillOpen": "Podle záznamu tvoje menstruace stále probíhá — ukončit teď?",
+                "periodToday": "Menstruace se dnes očekává - začít teď?",
+                "periodOverdue": "Menstruace mešká {{count}} dní - začít teď?",
+                "periodOverdue_one": "Menstruace mešká {{count}} den - začít teď?",
+                "periodStillOpen": "Podle záznamu tvoje menstruace stále probíhá - ukončit teď?",
                 "peakPainDay": "Podle vašeho vzorce bývá dnešek často dnem s nejsilnější bolestí ({{symptom}}).",
                 "likelySymptomsToday": "Dnes pravděpodobně: {{symptoms}}",
                 "pmsWindow": "PMS okno pravděpodobně od {{weekday}}",

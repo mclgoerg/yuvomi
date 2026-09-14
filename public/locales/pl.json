@@ -4330,7 +4330,8 @@
                 "noPrediction": "Zapisz miesiączkę, aby uzyskać prognozy.",
                 "fertilitySuppressedNote": "Okno płodności wstrzymane: antykoncepcja hormonalna.",
                 "nextPeriodRangeSub": "Średnio: {{date}}",
-                "partnerNextPeriod": "Okres osoby {{name}}"
+                "partnerNextPeriod": "Okres osoby {{name}} powinien rozpocząć się {{date}}.",
+                "partnerNextPeriodNeutral": "Przypomnienie dla partnera: okres"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Szczegóły",
                 "feelingFrequency": "Częstość nastrojów",
                 "flowLoad": "Intensywność krwawienia w cyklu",
-                "flowLoadCaption": "Na podstawie Twoich wpisów o krwawieniu — im pełniejsze zapisy, tym bardziej miarodajny wynik.",
+                "flowLoadCaption": "Na podstawie Twoich wpisów o krwawieniu - im pełniejsze zapisy, tym bardziej miarodajny wynik.",
                 "flowLoadColumn": "Nasilenie krwawienia",
                 "flowLoadValue": "{{load}} ({{days}} odnotowanych)",
-                "heavyBleedingHintHeavy": "Twoje ostatnie okresy były wielokrotnie oznaczone jako „obfite” — warto o tym wspomnieć podczas wizyty lekarskiej.",
-                "heavyBleedingHintLong": "Co najmniej jeden z Twoich ostatnich okresów trwał dłużej niż tydzień — warto o tym wspomnieć podczas wizyty lekarskiej.",
+                "heavyBleedingHintHeavy": "Twoje ostatnie okresy były wielokrotnie oznaczone jako „obfite” - warto o tym wspomnieć podczas wizyty lekarskiej.",
+                "heavyBleedingHintLong": "Co najmniej jeden z Twoich ostatnich okresów trwał dłużej niż tydzień - warto o tym wspomnieć podczas wizyty lekarskiej.",
                 "painTitle": "Ból",
                 "painCurrentCycleLabel": "Dni z bólem w tym cyklu",
                 "painAvgPerCycleLabel": "Śr. dni z bólem na cykl",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Zapisz miesiączkę",
                 "edit": "Edytuj miesiączkę",
-                "warningFuture": "Data rozpoczęcia jest w przyszłości — prognozy opierają się tylko na minionych cyklach.",
+                "warningFuture": "Data rozpoczęcia jest w przyszłości - prognozy opierają się tylko na minionych cyklach.",
                 "warningOverlap": "Nakłada się na już zapisany cykl."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "Pokaż okno PMS",
                 "notifyPartner": "Powiadom partnera",
                 "notifyPartnerHint": "Wybrana osoba otrzymuje tylko przewidywaną datę, nigdy objawy, notatki ani inne wpisy.",
+                "notifyPartnerNoEligible": "Brak uprawnionego członka gospodarstwa domowego - powiadamiani mogą być tylko członkowie z dostępem do modułu Zdrowie.",
                 "notifyPartnerDaysBefore": "Przypomnienie dla partnera"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Dzisiejszy stan cyklu",
                 "line1": "Dzień cyklu {{day}} · {{phase}}",
-                "periodToday": "Okres oczekiwany dziś — rozpocząć teraz?",
-                "periodOverdue": "Okres jest opóźniony o {{count}} dni — rozpocząć teraz?",
-                "periodOverdue_one": "Okres jest opóźniony o {{count}} dzień — rozpocząć teraz?",
-                "periodStillOpen": "Twój okres nadal widnieje jako trwający — zakończyć teraz?",
+                "periodToday": "Okres oczekiwany dziś - rozpocząć teraz?",
+                "periodOverdue": "Okres jest opóźniony o {{count}} dni - rozpocząć teraz?",
+                "periodOverdue_one": "Okres jest opóźniony o {{count}} dzień - rozpocząć teraz?",
+                "periodStillOpen": "Twój okres nadal widnieje jako trwający - zakończyć teraz?",
                 "peakPainDay": "Według Twojego wzorca dzisiaj często występuje najsilniejszy ból ({{symptom}}).",
                 "likelySymptomsToday": "Dziś prawdopodobnie: {{symptoms}}",
                 "pmsWindow": "Okno PMS prawdopodobnie od {{weekday}}",

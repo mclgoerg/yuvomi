@@ -18,7 +18,7 @@
  *                          `{key, intensity}[]`, Intensität 1-3 optional.
  *        - predictSymptomLikelihood() (v2): projiziert zusätzlich auf den
  *                          NÄCHSTEN Zyklus, nicht nur den laufenden.
- *        - pmsWindow() (v2, D-8): abgeleitetes PMS-Fenster aus dem
+ *        - pmsWindow() (v2): abgeleitetes PMS-Fenster aus dem
  *                          Symptom-Zyklustag-Muster.
  *        - periodFlowSummary() (v2, B-2): stärkster Flow-Wert + geloggte Tage
  *                          EINER Periode, für den Historie-Chip.
@@ -26,9 +26,9 @@
  *                          für den Blutungslast-Trend.
  *        - heavyBleedingSignal() (v2, B-4): Muster-Prädikat für den ruhigen
  *                          "mit Ärztin/Arzt besprechen"-Hinweis.
- *        - feelingFrequencyByPhase() (v2, D-1): wie symptomFrequencyByPhase(),
+ *        - feelingFrequencyByPhase() (v2): wie symptomFrequencyByPhase(),
  *                          über `feelings` statt `symptoms`.
- *        - painSummary() (v2, D-4): Schmerztage aktueller Zyklus vs. Ø +
+ *        - painSummary() (v2): Schmerztage aktueller Zyklus vs. Ø +
  *                          Ø-Intensität über die schmerzbezogenen Symptome.
  *        - peakPainDay() (v2, Nutzer-Feedback): welcher Zyklustag laut
  *                          Historie im Mittel am staerksten schmerzt, fuer die
@@ -172,7 +172,7 @@ export function moodType(value) {
 }
 
 // --------------------------------------------------------
-// D-10/D-11/D-6/D-9 (Review-Runde Fix 6): geschlossene Wertelisten, EIN
+// Geschlossene Wertelisten, EIN
 // Zuhause statt DREIER Kopien (server/routes/health/cycle.js +
 // public/pages/health.js hielten je eine eigene, plus die hormonelle
 // Teilmenge unten in dieser Datei) - dasselbe Vorbild wie FLOW_LEVELS/
@@ -190,14 +190,14 @@ export const CERVIX_MUCUS_TYPES = Object.freeze([
 ]);
 export const CERVIX_MUCUS_VALUES = Object.freeze(CERVIX_MUCUS_TYPES.map((m) => m.value));
 
-// LH- UND Schwangerschaftstest (D-11) teilen sich dieselben zwei Ergebnisse
+// LH- und Schwangerschaftstest teilen sich dieselben zwei Ergebnisse
 // und denselben labelKey-Namensraum (health.cycle.test.<value>) - kein
 // eigenes _TYPES-Objekt noetig, der labelKey ist aus dem Wert selbst
 // ableitbar (siehe Aufrufstellen in health.js).
 export const TEST_RESULT_VALUES = Object.freeze(['negative', 'positive']);
 
-// D-6, hart privat (siehe server/routes/health/cycle.js GET /cycle/logs und
-// DECISIONS.md).
+// Hart privat (siehe server/routes/health/cycle.js GET /cycle/logs und
+// docs/SPEC.md, Abschnitt "Owner-only axis").
 export const INTIMACY_TYPES = Object.freeze([
   { value: 'protected',   labelKey: 'health.cycle.intimacy.protected' },
   { value: 'unprotected', labelKey: 'health.cycle.intimacy.unprotected' },
@@ -205,7 +205,7 @@ export const INTIMACY_TYPES = Object.freeze([
 ]);
 export const INTIMACY_VALUES = Object.freeze(INTIMACY_TYPES.map((i) => i.value));
 
-// D-9: dieselbe geschlossene Auswahl wie zuvor server/routes/health/cycle.js#
+// Dieselbe geschlossene Auswahl wie zuvor server/routes/health/cycle.js#
 // CONTRACEPTION_VALUES (Quelle der Wahrheit fuer die Validierung bleibt hier) -
 // 'none' ist ein bewusst gewaehlter Wert ("keine Verhuetung", explizit
 // angegeben) und bleibt von der leeren Option ("nicht angegeben", `null` in
@@ -225,7 +225,7 @@ export const CONTRACEPTION_TYPES = Object.freeze([
   { value: 'other',        labelKey: 'health.cycle.settings.contraceptionOptions.other',        hormonal: false },
 ]);
 export const CONTRACEPTION_VALUES = Object.freeze(CONTRACEPTION_TYPES.map((c) => c.value));
-// D-9: die HORMONELLE Teilmenge unterdrueckt typischerweise den Eisprung -
+// Die HORMONELLE Teilmenge unterdrueckt typischerweise den Eisprung -
 // eine Kupferspirale, Kondom, "keine" oder "andere" aendern am Zyklus selbst
 // nichts. `null`/unbekannt zaehlt nicht dazu. suppressesFertility() (unten)
 // liest ausschliesslich diese abgeleitete Liste.
@@ -325,7 +325,7 @@ export function sortPeriodsAsc(periods) {
 // statt still verschlucken kann.
 const PLAUSIBLE_GAP_MIN_DAYS = 10;
 const PLAUSIBLE_GAP_MAX_DAYS = 90;
-// Review-Runde Fix 4: eine harte 90-Tage-Obergrenze schnitt bislang JEDE Lücke
+// Eine harte 90-Tage-Obergrenze schnitt bislang JEDE Lücke
 // einer Person mit echten (PCOS-/oligomenorrhoe-typischen) ~95-100-Tage-
 // Zyklen weg - der Mittelwert fiel dann trotz konsistenter Historie auf den
 // 28-Tage-Default zurück (source 'insufficient_history' statt 'history'), und
@@ -444,7 +444,7 @@ export function cycleStats(periods, settings = {}, todayKey = householdToday()) 
     plausible: allPlausible, long: allLong, chronological, trulyExcludedCount, rawCount,
   } = classifyCycleGaps(asc, todayKey);
 
-  // Review-Runde Fix 4: reichen die PLAUSIBLEN (10-90 Tage) Luecken allein
+  // Reichen die PLAUSIBLEN (10-90 Tage) Luecken allein
   // schon fuer MIN_HISTORY_GAPS, bleibt es dabei - eine einzelne lange Luecke
   // bei sonst normalen Zyklen ist weiterhin ein Ausreisser, kein Signal fuer
   // einen generell langen Zyklus (Beispiel: drei 28-Tage-Luecken + eine
@@ -487,7 +487,7 @@ export function cycleStats(periods, settings = {}, todayKey = householdToday()) 
   const variation = minCycle != null ? maxCycle - minCycle : null;
   // „Regelmäßig", wenn die Schwankung der letzten (plausiblen) Zyklen ≤ 7 Tage liegt.
   const regularFromGaps = gaps.length >= 2 ? variation <= 7 : null;
-  // D-14: im Perimenopause-Modus ist Unregelmäßigkeit ERWARTET - das
+  // Im Perimenopause-Modus ist Unregelmäßigkeit ERWARTET - das
   // Regelmäßig/Unregelmäßig-Urteil wäre hier keine falsche Berechnung, aber
   // eine irreführende Aussage, deshalb explizit unterdrückt (null) statt eines
   // vermeidbaren "unregelmäßig"-Alarms. Ob/wie die UI stattdessen ein
@@ -676,7 +676,7 @@ function classifyDayPhase(cyc, dateKey) {
 
 /**
  * Generischer Kern von symptomFrequencyByPhase()/feelingFrequencyByPhase()
- * (v2, D-1) - beide zaehlen Vorkommen einer Tages-Log-Eigenschaft
+ * (v2) - beide zaehlen Vorkommen einer Tages-Log-Eigenschaft
  * (Symptome bzw. Gefuehle) je Zyklus-Phase; die einzige Abweichung ist, WELCHE
  * Eintraege ein Log traegt. `extractEntries(log)` liefert dieselbe
  * `{key, intensity}[]`-Form wie normalizeSymptomEntries() (intensity darf
@@ -742,9 +742,9 @@ export function symptomFrequencyByPhase(dayLogs, periods, settings = {}) {
  * immer `null` - Gefuehle kennen keine Staerke). `feelings` (Array, seit
  * Migration 211) hat Vorrang - und zwar auch als LEERES Array: ein bewusst
  * geleertes `feelings: []` ist "keine Gefuehle mehr", nicht "keine Angabe",
- * und darf NICHT auf das eingefrorene `mood` zurueckfallen (Review-Runde
- * Fix 2 - vorher wurde ein geloeschtes Gefuehl beim naechsten Laden aus dem
- * alten `mood`-Wert wiederbelebt, weil `[].length` falsy ist). Der Fallback
+ * und darf NICHT auf das eingefrorene `mood` zurueckfallen (vorher wurde ein
+ * geloeschtes Gefuehl beim naechsten Laden aus dem alten `mood`-Wert
+ * wiederbelebt, weil `[].length` falsy ist). Der Fallback
  * auf das alte Einzelfeld `mood` als Ein-Element-Liste greift NUR, wenn
  * `feelings` ueberhaupt fehlt (kein Array ist) - also fuer Zeilen aus der Zeit
  * vor Migration 211, deren Formular `feelings` noch nie gesendet hat.
@@ -769,7 +769,7 @@ export function normalizeFeelingEntries(log) {
 }
 
 /**
- * Gefühls-Häufigkeit je Zyklus-Phase (v2, D-1) - dieselbe Frage wie
+ * Gefühls-Häufigkeit je Zyklus-Phase (v2) - dieselbe Frage wie
  * symptomFrequencyByPhase(), nur über `feelings` statt `symptoms` (siehe
  * normalizeFeelingEntries() für die Legacy-`mood`-Rückfalllogik).
  * @param {Array<Object>} dayLogs
@@ -1031,14 +1031,18 @@ export function detectTemperatureShift(dayLogs, cycleStart) {
 // --------------------------------------------------------
 
 /** Unterdrückt die eingestellte Verhütungsmethode die Fruchtbarkeits-Vorhersage?
- * HORMONAL_CONTRACEPTION_VALUES (Fix 6, oben bei den Preset-Definitionen aus
- * CONTRACEPTION_TYPES abgeleitet) ist die einzige Quelle dieser Teilmenge. */
-function suppressesFertility(settings = {}) {
+ * HORMONAL_CONTRACEPTION_VALUES (oben bei den Preset-Definitionen aus
+ * CONTRACEPTION_TYPES abgeleitet) ist die einzige Quelle dieser Teilmenge.
+ * Exportiert, damit server/services/cycle-ics.js dieselbe Regel anwendet wie
+ * predictCycle() unten - der abonnierte Feed soll nicht weiter Eisprung-/
+ * Fruchtbares-Fenster-Termine verschicken, waehrend der Zyklus-Tab selbst die
+ * Vorhersage pausiert. */
+export function suppressesFertility(settings = {}) {
   return HORMONAL_CONTRACEPTION_VALUES.includes(settings?.contraception);
 }
 
 /**
- * Review-Runde Fix 5: EINE Regel für den Anker-Periodenstart, den sowohl
+ * EINE Regel für den Anker-Periodenstart, den sowohl
  * predictCycle() als auch projectFutureCycles() brauchen - der jüngste
  * Periodenstart, der NICHT in der Zukunft liegt (sonst, mangels eines
  * vergangenen Starts, der jüngste überhaupt). Vorher hatte projectFutureCycles()
@@ -1069,14 +1073,14 @@ function latestNonFutureStart(asc, today) {
  * true`); künftige Zyklen bleiben Kalendermethode, da es für sie noch keine
  * Messwerte geben kann.
  *
- * D-9 (Verhütung): eine HORMONELLE Verhütungsmethode (siehe
+ * Verhütung: eine HORMONELLE Verhütungsmethode (siehe
  * HORMONAL_CONTRACEPTION_VALUES) schaltet Eisprung/fruchtbares Fenster genauso
  * ab wie `track_fertility: 0` - `trackFertility` bleibt der EINE Schalter, den
  * cycleRing()/buildCycleCalendar() schon abfragen, `fertilitySuppressed`
  * dokumentiert zusätzlich WARUM ('contraception' oder `null`), damit das UI
  * das nicht einfach kommentarlos verschwinden lässt.
  *
- * D-14 (Perimenopause): ist `settings.perimenopause_mode` gesetzt UND liegen
+ * Perimenopause: ist `settings.perimenopause_mode` gesetzt UND liegen
  * mindestens MIN_HISTORY_GAPS plausible Lücken vor (cycleStats().
  * plausibleGapCount - siehe dort), kommt zusätzlich `nextStartRange` dazu:
  * eine Spanne aus dem TATSÄCHLICHEN Min/Max der jüngsten plausiblen Lücken
@@ -1133,7 +1137,7 @@ export function predictCycle(periods, settings = {}, todayKey = householdToday()
     return daysBetween(s, today) >= 0 && daysBetween(today, e) >= 0;
   });
 
-  // D-9: hormonelle Verhütung schaltet die Fruchtbarkeits-Ausgabe genauso ab
+  // Hormonelle Verhütung schaltet die Fruchtbarkeits-Ausgabe genauso ab
   // wie track_fertility=0 - beide fließen in DENSELBEN Schalter ein, den
   // cycleRing()/buildCycleCalendar() bereits abfragen (siehe HORMONAL_
   // CONTRACEPTION_VALUES-Dokblock oben).
@@ -1161,7 +1165,7 @@ export function predictCycle(periods, settings = {}, todayKey = householdToday()
     phase = PHASE.FOLLICULAR;
   }
 
-  // D-14: Perimenopause-Bereich - zusätzlich zum mittelwert-basierten
+  // Perimenopause-Bereich - zusätzlich zum mittelwert-basierten
   // `nextStart` (unverändert, Abwärtskompatibilität) eine Spanne aus dem
   // TATSÄCHLICHEN Min/Max der jüngsten plausiblen Lücken (cycleStats(), keine
   // zweite Berechnung), erst ab MIN_HISTORY_GAPS plausiblen Lücken - sonst
@@ -1226,7 +1230,7 @@ function loggedPeriodPhase(dateKey, periodsAsc, avgPeriod) {
 }
 
 /**
- * B-2/B-3 (Review-Runde Fix 8): Blutungsstärke-Kennzahlen EINER Periode in
+ * B-2/B-3: Blutungsstärke-Kennzahlen EINER Periode in
  * EINEM Durchlauf über ihre Log-Spanne (periodDateRange(), dieselbe "offene
  * Episode laeuft avgPeriod Tage"-Regel wie loggedPeriodPhase()) - stärkster
  * geloggter Flow-Wert (B-2, Historie-Chip) UND die Summe der FLOW_LEVELS-
@@ -1315,13 +1319,13 @@ export function heavyBleedingSignal(periods, logs) {
   return false;
 }
 
-// D-4: die vier schmerzbezogenen Symptom-Presets - eine feste, kleine Liste
+// Die vier schmerzbezogenen Symptom-Presets - eine feste, kleine Liste
 // (kein weiteres Preset-Feld auf SYMPTOM_TYPES, das jedes andere Symptom auch
 // bräuchte, nur um an EINER Stelle vier Werte auszuzeichnen).
 export const PAIN_SYMPTOM_VALUES = Object.freeze(['cramps', 'headache', 'backache', 'joint_pain']);
 
 /**
- * D-4: Schmerz-Zusammenfassung über die vier schmerzbezogenen Symptome
+ * Schmerz-Zusammenfassung über die vier schmerzbezogenen Symptome
  * (PAIN_SYMPTOM_VALUES) - EIN kompaktes Feld statt vier Einzel-Trends.
  * "Schmerztage" zählt TAGE, nicht Einzel-Einträge: ein Tag mit zwei
  * Schmerz-Symptomen zählt trotzdem nur einmal (dieselbe Zählweise wie
@@ -1538,7 +1542,7 @@ export function projectFutureCycles(periods, settings = {}, todayKey = household
  * Folgezyklen unverändert Kalendermethode - ein bestätigter Eisprung bestätigt
  * nur den Eisprung, nie den nächsten Periodenbeginn.
  *
- * D-9: eine hormonelle Verhütungsmethode unterdrückt die Fruchtbarkeits-
+ * Eine hormonelle Verhütungsmethode unterdrückt die Fruchtbarkeits-
  * Anzeige genauso wie im Ring/Hero (siehe predictCycle()) - dieselbe Prüfung
  * gilt hier auch für die reine Kalender-Projektion der Folgezyklen, sonst
  * widerspräche der Kalender dem Ring in genau demselben Fall.
@@ -1572,7 +1576,7 @@ export function buildCycleCalendar(anchorKey, { periods = [], logs = [], setting
   // predictCycle() (s. Dokblock); die übrigen (k>=2) bleiben reine Projektion.
   const currentPrediction = predictCycle(asc, settings, today, logs);
   const futureFertileWindows = projected.slice(1);
-  // Review-Runde Fix 8: predictCycle() liefert `trackFertility` bereits in
+  // predictCycle() liefert `trackFertility` bereits in
   // JEDEM Zweig korrekt (auch hasData=false und Schwangerschaft, siehe dessen
   // Dokblock/Rückgaben) - die vorige Ternary hier duplizierte dieselbe
   // Umschaltung (Einstellung UND Verhütungs-Unterdrückung) ein zweites Mal.
@@ -1704,7 +1708,7 @@ export function cycleRing(prediction) {
 }
 
 // --------------------------------------------------------
-// PMS-Fenster (D-8)
+// PMS-Fenster
 // --------------------------------------------------------
 
 /**
@@ -1714,7 +1718,7 @@ export function cycleRing(prediction) {
  * ALLE SYMPTOM_TYPES statt eines einzelnen Schlüssels, um die insgesamt
  * beobachtete prämenstruelle Spanne zu finden statt nur die eines Symptoms.
  *
- * BEWUSST NUR SYMPTOME, KEINE GEFÜHLE: seit D-8 tragen Tages-Logs zusätzlich
+ * BEWUSST NUR SYMPTOME, KEINE GEFÜHLE: Tages-Logs tragen zusätzlich
  * `feelings` (Array, dieselben Werte wie MOOD_VALUES) - negative Gefühle
  * ('sad', 'irritable', 'anxious', 'sensitive') wären inhaltlich ein
  * naheliegendes zweites Signal. symptomCyclePattern() prüft `normalize

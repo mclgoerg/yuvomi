@@ -4330,7 +4330,8 @@
                 "noPrediction": "Registra un ciclo per le previsioni.",
                 "fertilitySuppressedNote": "Finestra fertile sospesa: contraccezione ormonale.",
                 "nextPeriodRangeSub": "Media: {{date}}",
-                "partnerNextPeriod": "Ciclo di {{name}}"
+                "partnerNextPeriod": "Il ciclo di {{name}} dovrebbe iniziare il {{date}}.",
+                "partnerNextPeriodNeutral": "Promemoria partner: ciclo"
             },
             "stats": {
                 "source": {
@@ -4409,11 +4410,11 @@
                 "details": "Dettagli",
                 "feelingFrequency": "Frequenza degli stati d'animo",
                 "flowLoad": "Intensità del flusso per ciclo",
-                "flowLoadCaption": "Si basa sulle tue registrazioni del flusso — più il tuo diario è completo, più questo dato è significativo.",
+                "flowLoadCaption": "Si basa sulle tue registrazioni del flusso - più il tuo diario è completo, più questo dato è significativo.",
                 "flowLoadColumn": "Carico di flusso",
                 "flowLoadValue": "{{load}} ({{days}} registrati)",
-                "heavyBleedingHintHeavy": "Le tue ultime mestruazioni sono state segnate più volte come «abbondanti» — vale la pena parlarne con un medico.",
-                "heavyBleedingHintLong": "Almeno una delle tue ultime mestruazioni è durata più di una settimana — vale la pena parlarne con un medico.",
+                "heavyBleedingHintHeavy": "Le tue ultime mestruazioni sono state segnate più volte come «abbondanti» - vale la pena parlarne con un medico.",
+                "heavyBleedingHintLong": "Almeno una delle tue ultime mestruazioni è durata più di una settimana - vale la pena parlarne con un medico.",
                 "painTitle": "Dolore",
                 "painCurrentCycleLabel": "Giorni di dolore in questo ciclo",
                 "painAvgPerCycleLabel": "Media giorni di dolore per ciclo",
@@ -4487,7 +4488,7 @@
             "period": {
                 "add": "Registra ciclo",
                 "edit": "Modifica ciclo",
-                "warningFuture": "La data di inizio è nel futuro — le previsioni si basano solo sui cicli passati.",
+                "warningFuture": "La data di inizio è nel futuro - le previsioni si basano solo sui cicli passati.",
                 "warningOverlap": "Si sovrappone a un ciclo già registrato."
             },
             "dayLog": {
@@ -4548,6 +4549,7 @@
                 "showPms": "Mostra finestra PMS",
                 "notifyPartner": "Avvisa un partner",
                 "notifyPartnerHint": "La persona scelta riceve solo la data prevista, mai sintomi, note o altre voci.",
+                "notifyPartnerNoEligible": "Nessun membro della famiglia idoneo - possono essere avvisati solo i membri con accesso al modulo Salute.",
                 "notifyPartnerDaysBefore": "Promemoria per il partner"
             },
             "mucus": {
@@ -4586,10 +4588,10 @@
             "bubble": {
                 "ariaLabel": "Stato del ciclo di oggi",
                 "line1": "Giorno {{day}} del ciclo · {{phase}}",
-                "periodToday": "Mestruazioni previste oggi — iniziarle ora?",
-                "periodOverdue": "Mestruazioni in ritardo di {{count}} giorni — iniziarle ora?",
-                "periodOverdue_one": "Mestruazioni in ritardo di {{count}} giorno — iniziarle ora?",
-                "periodStillOpen": "Il tuo ciclo risulta ancora in corso — terminarlo ora?",
+                "periodToday": "Mestruazioni previste oggi - iniziarle ora?",
+                "periodOverdue": "Mestruazioni in ritardo di {{count}} giorni - iniziarle ora?",
+                "periodOverdue_one": "Mestruazioni in ritardo di {{count}} giorno - iniziarle ora?",
+                "periodStillOpen": "Il tuo ciclo risulta ancora in corso - terminarlo ora?",
                 "peakPainDay": "Secondo il tuo andamento, oggi è spesso il giorno con il dolore più intenso ({{symptom}}).",
                 "likelySymptomsToday": "Probabile oggi: {{symptoms}}",
                 "pmsWindow": "Finestra premestruale probabile da {{weekday}}",
