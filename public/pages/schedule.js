@@ -2426,6 +2426,9 @@ async function submitForm(event) {
     // document.body, nicht in `root`), das direkt an saveCreatedSchedule()
     // verdrahtet - dieser Delegierte an `root` sieht so ein Formular nie.
     // Nur die INLINE-Bearbeitungsformulare (Update) leben in `root`.
+    // Ob unten die Ueberlappungs-Rueckfrage geschlossen wurde - nur dann darf der
+    // Fokus nach dem Neuaufbau nachgezogen werden (siehe `gefragt` in action()).
+    let gefragt = false;
     if (form.dataset.form === 'shift-update') await api.put(`/schedule/shift-types/${form.dataset.id}`, data);
     if (form.dataset.form === 'pattern-update') {
       data.cycle_length = Number(data.cycle_length);
@@ -2455,6 +2458,7 @@ async function submitForm(event) {
             { confirmLabel: t('schedule.patternOverlapConfirmAction'), detail: t('schedule.patternOverlapConfirmDetail', { name: overlap.name }) },
           );
           if (!confirmed) return;
+          gefragt = true;
         }
       }
       await api.put(`/schedule/patterns/${form.dataset.id}`, data);
@@ -2462,9 +2466,9 @@ async function submitForm(event) {
     }
     await load();
     renderPage();
-    // Die Ueberlappungs-Rueckfrage oben schliesst vor dem Speichern; ihr
-    // Fokus-Restore wird hier weggerendert (#1083).
-    refocusAfterRender();
+    // Nur nach der Ueberlappungs-Rueckfrage: ohne Dialog griffe refocusAfterRender()
+    // auf den Merker eines frueheren Dialogs zurueck und setzte den Fokus dorthin (#1083).
+    if (gefragt) refocusAfterRender();
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
     if (form.dataset.form === 'statistics' && statisticsRequest === statisticsRequestId) {
