@@ -249,7 +249,7 @@ function occurrenceRowHtml(occurrence) {
   // sehen"). Dieselbe Bedingung traegt deshalb jetzt beides: Knopf und Menue.
   const actions = (readOnly() || !menuItems) ? '' : `
       <div class="row-actions">
-        <button type="button" class="row-action" popovertarget="${menuId}" aria-label="${esc(t('waste.moreActions'))}">
+        <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
           <i data-lucide="more-horizontal" aria-hidden="true"></i>
         </button>
         <!-- Das geteilte .popover-menu (utils/popover-menu.js + layout.css), nicht
@@ -414,7 +414,7 @@ function scheduleRowHtml(schedule) {
       </div>
       ${ro ? '' : `
         <div class="row-actions">
-          <button type="button" class="row-action" popovertarget="${menuId}" aria-label="${esc(t('waste.moreActions'))}">
+          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
             <i data-lucide="more-horizontal" aria-hidden="true"></i>
           </button>
           <div class="popover-menu" id="${menuId}" popover role="menu">
@@ -455,7 +455,7 @@ function typeCardHtml(type, index, total) {
         </div>
         ${ro ? '' : `
           <div class="row-actions">
-            <button type="button" class="row-action" popovertarget="${menuId}" aria-label="${esc(t('waste.moreActions'))}">
+            <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
               <i data-lucide="more-horizontal" aria-hidden="true"></i>
             </button>
             <div class="popover-menu" id="${menuId}" popover role="menu">
@@ -545,7 +545,7 @@ function sourceRowHtml(source) {
       </div>
       ${readOnly() ? '' : `
         <div class="row-actions">
-          <button type="button" class="row-action" popovertarget="${menuId}" aria-label="${esc(t('waste.moreActions'))}">
+          <button type="button" class="row-action" popovertarget="${menuId}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('waste.moreActions'))}">
             <i data-lucide="more-horizontal" aria-hidden="true"></i>
           </button>
           <div class="popover-menu" id="${menuId}" popover role="menu">
@@ -685,6 +685,55 @@ async function pickTypeIcon(button) {
   setTypeIconButtonIcon(button, chosen);
 }
 
+/**
+ * Pure: liest die Farbe des aktuell aktiven Swatch aus einem Dialog-Panel,
+ * mit Rueckfall auf die Farbe, mit der der Dialog geoeffnet wurde (kein
+ * Swatch aktiv waere ein Zustand, den die Tastatur-/Klick-Verdrahtung oben
+ * eigentlich nie zulaesst - der Rueckfall ist trotzdem kein leerer Wert).
+ *
+ * Eigens herausgezogen (Review-Nice-to-have), weil die Speicherlogik sonst
+ * nirgends bindend testbar war: ein Gegenbeweis am PR-Kopf zeigte, dass das
+ * Speichern immer die Oeffnungsfarbe schicken konnte, ohne dass
+ * `test:waste-ui` das bemerkt haette.
+ *
+ * @param {ParentNode} panel
+ * @param {string} fallback
+ * @returns {string}
+ */
+function activeSwatchColor(panel, fallback) {
+  return panel.querySelector('.waste-color-swatch--active')?.dataset.color ?? fallback;
+}
+
+/**
+ * Pure: welche Swatches der Farb-Dialog zeigt, und mit welchem (gross-
+ * geschriebenen) Wert der aktive Swatch verglichen wird.
+ *
+ * GROSS-/KLEINSCHREIBUNG: `<input type="color">` liefert seinen Wert laut
+ * HTML-Spec IMMER klein geschrieben zurueck - auch fuer eine Preset-Farbe,
+ * die selbst genau diesen Weg gesetzt hat. Abfallarten aus der Zeit vor
+ * diesem Umbau (und jede ueber ein Preset angelegte) tragen deshalb z.B.
+ * `#16a34a`, waehrend `WASTE_TYPE_COLORS` grossgeschrieben ist. Ein
+ * case-sensitiver Vergleich faende hier nie eine Uebereinstimmung und haengte
+ * einen elften, optisch identischen "Aktuelle Farbe"-Swatch an. Der Vergleich
+ * normalisiert deshalb auf Grossschreibung; das Raster selbst bleibt in
+ * seiner eigenen Schreibweise, die im `data-color`/`style` unveraendert bleibt.
+ *
+ * EINE BESTEHENDE FARBE AUSSERHALB DER PALETTE WIRD NICHT STILL UEBERSCHRIEBEN.
+ * Abfallarten aus der Zeit des freien Waehlers tragen beliebige Hex-Werte;
+ * stuenden sie nicht im Raster, waere beim ersten Speichern die Farbe des
+ * Nutzers weg, ohne dass er es angefasst hat. Derselbe Weg, den Notizen und
+ * Kalender fuer ihren Altbestand gehen: der Wert bekommt einen eigenen
+ * Swatch am Ende und heisst dort „Aktuelle Farbe".
+ *
+ * @param {string} selColor
+ * @returns {{ swatchColors: string[], selColorUpper: string }}
+ */
+function resolveSwatchColors(selColor) {
+  const selColorUpper = selColor.toUpperCase();
+  const swatchColors = WASTE_TYPE_COLORS.includes(selColorUpper) ? WASTE_TYPE_COLORS : [...WASTE_TYPE_COLORS, selColor];
+  return { swatchColors, selColorUpper };
+}
+
 function openTypeModal(type = null) {
   const isEdit = !!type;
   const presetOptions = TYPE_PRESETS.map((p) => `<option value="${p.key}">${esc(t(`waste.preset${p.key.charAt(0).toUpperCase()}${p.key.slice(1)}`))}</option>`).join('');
@@ -692,13 +741,7 @@ function openTypeModal(type = null) {
   // (vorher `#22C55E`, das in keinem Raster auftauchte und den Dialog damit
   // ohne aktiven Swatch geoeffnet haette).
   const selColor = isEdit ? (type.color || WASTE_TYPE_COLORS[0]) : WASTE_TYPE_COLORS[2];
-  // EINE BESTEHENDE FARBE AUSSERHALB DER PALETTE WIRD NICHT STILL UEBERSCHRIEBEN.
-  // Abfallarten aus der Zeit des freien Waehlers tragen beliebige Hex-Werte;
-  // stuenden sie nicht im Raster, waere beim ersten Speichern die Farbe des
-  // Nutzers weg, ohne dass er es angefasst hat. Derselbe Weg, den Notizen und
-  // Kalender fuer ihren Altbestand gehen: der Wert bekommt einen eigenen
-  // Swatch am Ende und heisst dort „Aktuelle Farbe".
-  const swatchColors = WASTE_TYPE_COLORS.includes(selColor) ? WASTE_TYPE_COLORS : [...WASTE_TYPE_COLORS, selColor];
+  const { swatchColors, selColorUpper } = resolveSwatchColors(selColor);
 
   const content = `
     ${isEdit ? '' : `
@@ -720,15 +763,25 @@ function openTypeModal(type = null) {
     <div class="form-group">
       <label class="form-label" id="wtm-color-label">${t('waste.typeColorLabel')}</label>
       <div class="waste-color-picker" role="radiogroup" aria-labelledby="wtm-color-label">
-        ${swatchColors.map((c) => `
-          <div class="waste-color-swatch${c === selColor ? ' waste-color-swatch--active' : ''}"
+        ${(() => {
+          // Ein Kartenaufbau je Renderdurchlauf statt je Swatch (Nice-to-have,
+          // Review): `WASTE_TYPE_COLOR_NAMES()` ruft `t()` fuer alle zehn
+          // Farben auf, egal welcher Swatch gerade dran ist - das gehoert vor
+          // die Schleife, nicht in sie hinein.
+          const colorNames = WASTE_TYPE_COLOR_NAMES();
+          return swatchColors.map((c) => {
+            const active = c.toUpperCase() === selColorUpper;
+            return `
+          <div class="waste-color-swatch${active ? ' waste-color-swatch--active' : ''}"
                data-color="${esc(c)}"
                style="background-color:${esc(c)}"
                role="radio"
-               tabindex="${c === selColor ? '0' : '-1'}"
-               aria-checked="${c === selColor ? 'true' : 'false'}"
-               aria-label="${esc(WASTE_TYPE_COLOR_NAMES()[c] ?? t('waste.colorCurrent'))}"></div>
-        `).join('')}
+               tabindex="${active ? '0' : '-1'}"
+               aria-checked="${active ? 'true' : 'false'}"
+               aria-label="${esc(colorNames[c.toUpperCase()] ?? t('waste.colorCurrent'))}"></div>
+        `;
+          }).join('');
+        })()}
       </div>
     </div>
     <div class="modal-panel__footer modal-panel__footer--plain">
@@ -835,7 +888,7 @@ function openTypeModal(type = null) {
           // Der Rueckfall greift nur, wenn gar kein Swatch aktiv ist - dann
           // gilt der Stand, mit dem der Dialog geoeffnet wurde, nicht etwa
           // eine leere Farbe.
-          color: panel.querySelector('.waste-color-swatch--active')?.dataset.color ?? selColor,
+          color: activeSwatchColor(panel, selColor),
         };
         try {
           if (isEdit) await api.put(`/waste/types/${type.id}`, body);
@@ -2121,4 +2174,5 @@ export const __test = {
   // nicht mehr am Markup ablesen kann - welcher Eintrag bei welcher Position
   // im Menue steht, und dass die Preset-Farben allesamt im Raster liegen.
   typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
+  activeSwatchColor, resolveSwatchColors,
 };

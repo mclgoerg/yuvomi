@@ -38,6 +38,7 @@ const {
   defaultLabelDecision, unresolvedBlockingDiagnostics, buildMappingDecisions, sourceHealthBadgeInfo,
   splitUpcomingByType, deepLinkNeedsExpand, nearestOrdinalAnchorDateKey,
   typeCardHtml, scheduleRowHtml, sourceRowHtml, TYPE_PRESETS, WASTE_TYPE_COLORS,
+  activeSwatchColor, resolveSwatchColors,
 } = __test;
 
 // Quelltext-Schnappschuss fuer die Zusicherungen weiter unten. Er steht VOR dem
@@ -331,6 +332,10 @@ test('typeCardHtml: die drei nackten Icon-Knoepfe sind einem einzigen "..."-Menu
   assert.equal((html.match(/class="row-action"/g) ?? []).length, 1);
   assert.match(html, /popovertarget="waste-type-menu-7"/);
   assert.match(html, /<div class="popover-menu" id="waste-type-menu-7" popover role="menu">/);
+  // Review PR #1146 ("nice to have"): der Knopf muss ein geschlossenes Menue
+  // ankuendigen, nicht gar keins - dieselben zwei Attribute, die
+  // popoverMenuHtml() fuer sein eigenes Menue setzt.
+  assert.match(html, /class="row-action" popovertarget="waste-type-menu-7" aria-haspopup="menu" aria-expanded="false"/);
   // Die Aktionen liegen jetzt als beschriftete Eintraege im Menue, nicht mehr
   // als aria-label an einem Icon.
   for (const action of ['move-type-up', 'move-type-down', 'add-schedule']) {
@@ -373,6 +378,7 @@ test('scheduleRowHtml: die Loeschung liegt hinter dem Menue und ist als gefaehrl
   assert.equal((html.match(/class="row-action"/g) ?? []).length, 1);
   assert.match(html, /popovertarget="waste-schedule-menu-42"/);
   assert.match(html, /<div class="popover-menu" id="waste-schedule-menu-42" popover role="menu">/);
+  assert.match(html, /class="row-action" popovertarget="waste-schedule-menu-42" aria-haspopup="menu" aria-expanded="false"/);
   assert.match(html, /class="popover-menu__item popover-menu__item--danger" data-action="delete-schedule" data-id="42"/);
   // Der nackte Muelltonnen-Knopf direkt in der Zeile ist weg - ein Fehlgriff
   // daneben loeschte vorher sofort eine ganze Serie.
@@ -393,6 +399,7 @@ test('sourceRowHtml: die wechselnde Zeilenaktion traegt im Menue endlich ihren S
   assert.match(url, /popovertarget="waste-source-menu-3"/);
   assert.match(url, /data-action="refresh-source" data-id="3"/);
   assert.match(url, /waste\.refreshNowAction/, 'der Eintrag traegt seine eigene Beschriftung');
+  assert.match(url, /class="row-action" popovertarget="waste-source-menu-3" aria-haspopup="menu" aria-expanded="false"/);
 
   const needsMapping = sourceRowHtml({ id: 4, kind: 'url', name: 'Stadt', needs_mapping: true });
   assert.match(needsMapping, /data-action="review-source-mapping" data-id="4"/);
@@ -429,6 +436,20 @@ test('sourceRowHtml: jede Quelle bekommt ihr eigenes Menue', () => {
 // entstehen KANN, lassen sich hier festnageln - und es ist die Art Fehler,
 // die beim naechsten Umbau still zurueckkommt.
 // -------------------------------------------------------------------------
+
+test('alle vier "..."-Knoepfe kuendigen ein Menue an, auch der vorbestehende der Abholzeile (Review PR #1146)', () => {
+  // popoverMenuHtml() setzt aria-haspopup="menu" aria-expanded="false" fuer
+  // sein eigenes Menue; die vier `.row-action`-Knoepfe (Abholung, Serie,
+  // Abfallart, Quelle) bauen ihr Markup separat und hatten diese zwei
+  // Attribute keiner von ihnen - auch der Abholzeilen-Knopf nicht, der schon
+  // vor diesem PR auf `main` stand.
+  const rowActionButtons = WASTE_SRC.match(/<button type="button" class="row-action"[^>]*>/g) ?? [];
+  assert.equal(rowActionButtons.length, 4, 'Abholung, Serie, Abfallart und Quelle');
+  for (const btn of rowActionButtons) {
+    assert.match(btn, /aria-haspopup="menu"/, `${btn} kuendigt kein Menue an`);
+    assert.match(btn, /aria-expanded="false"/, `${btn} traegt keinen Anfangszustand`);
+  }
+});
 
 test('jede Zeile des Moduls traegt die gemeinsame Marke waste-row', () => {
   // Ohne sie greift keine der beiden Grammatik-Regeln in waste.css, denn sie
@@ -569,5 +590,65 @@ test('der freie Farbwaehler ist aus dem Abfallart-Dialog verschwunden', () => {
   // Die gespeicherte Farbe gewinnt ihren eigenen Swatch, statt still ersetzt
   // zu werden - Abfallarten aus der Zeit des freien Waehlers tragen beliebige
   // Hex-Werte.
-  assert.match(WASTE_SRC, /WASTE_TYPE_COLORS\.includes\(selColor\) \? WASTE_TYPE_COLORS : \[\.\.\.WASTE_TYPE_COLORS, selColor\]/);
+  assert.match(WASTE_SRC, /WASTE_TYPE_COLORS\.includes\(selColorUpper\) \? WASTE_TYPE_COLORS : \[\.\.\.WASTE_TYPE_COLORS, selColor\]/);
+});
+
+// -------------------------------------------------------------------------
+// resolveSwatchColors - Gross-/Kleinschreibung des gespeicherten Hex-Werts
+// (Review PR #1146, "should fix" 1). `<input type="color">` liefert seinen
+// Wert laut HTML-Spec IMMER kleingeschrieben - jede Abfallart von vor diesem
+// Umbau (und jede ueber ein Preset angelegte) traegt deshalb z.B. `#16a34a`,
+// waehrend `WASTE_TYPE_COLORS` grossgeschrieben ist. Ein case-sensitiver
+// Vergleich fand da nie eine Uebereinstimmung: keiner der zehn Swatches
+// zeigte sich aktiv, und ein optisch identischer elfter "Aktuelle Farbe"-
+// Swatch haengte sich an - bei JEDER bestehenden Abfallart.
+// -------------------------------------------------------------------------
+
+test('resolveSwatchColors: ein kleingeschriebener gespeicherter Wert trifft seinen Palette-Swatch statt einen elften anzuhaengen', () => {
+  const { swatchColors, selColorUpper } = resolveSwatchColors('#16a34a');
+  assert.equal(selColorUpper, '#16A34A');
+  assert.deepEqual(swatchColors, WASTE_TYPE_COLORS, 'kein elfter "Aktuelle Farbe"-Swatch fuer eine Palettenfarbe, nur anders geschrieben');
+  assert.ok(swatchColors.some((c) => c.toUpperCase() === selColorUpper), 'ein Swatch des Rasters muss auf den Wert passen');
+});
+
+test('resolveSwatchColors: eine Farbe ausserhalb der Palette bekommt weiterhin genau einen zusaetzlichen Swatch', () => {
+  const { swatchColors, selColorUpper } = resolveSwatchColors('#123456');
+  assert.equal(selColorUpper, '#123456');
+  assert.equal(swatchColors.length, WASTE_TYPE_COLORS.length + 1);
+  assert.equal(swatchColors.at(-1), '#123456', 'der Altwert bleibt in seiner eigenen Schreibweise erhalten');
+});
+
+test('resolveSwatchColors: bereits grossgeschriebene Palettenfarben verhalten sich unveraendert', () => {
+  const { swatchColors } = resolveSwatchColors('#2563EB');
+  assert.deepEqual(swatchColors, WASTE_TYPE_COLORS);
+});
+
+// -------------------------------------------------------------------------
+// activeSwatchColor - Speichern liest den TATSAECHLICH aktiven Swatch
+// (Review PR #1146, "nice to have"). Der Gegenbeweis am PR-Kopf zeigte: ein
+// Speichern, das immer die Oeffnungsfarbe schickt, liess test:waste-ui grün.
+// Die Funktion ist die kleinste testbare Einheit dieses Lese-Schritts - mit
+// einem gestellten Panel-Stub statt einem echten Dialog (siehe Kommentar am
+// Dateikopf: Full modal open/save braucht einen echten DOM).
+// -------------------------------------------------------------------------
+
+function stubSwatchPanel(activeColor) {
+  return {
+    querySelector(selector) {
+      if (selector === '.waste-color-swatch--active') {
+        return activeColor === null ? null : { dataset: { color: activeColor } };
+      }
+      return null;
+    },
+  };
+}
+
+test('activeSwatchColor: liest die Farbe des aktiven Swatch, nicht die Oeffnungsfarbe', () => {
+  const panel = stubSwatchPanel('#DC2626');
+  assert.equal(activeSwatchColor(panel, '#16A34A'), '#DC2626', 'ein neu angeklickter Swatch muss gewinnen, nicht der Stand beim Oeffnen');
+});
+
+test('activeSwatchColor: faellt ohne aktiven Swatch auf die uebergebene Oeffnungsfarbe zurueck', () => {
+  const panel = stubSwatchPanel(null);
+  assert.equal(activeSwatchColor(panel, '#16A34A'), '#16A34A');
 });

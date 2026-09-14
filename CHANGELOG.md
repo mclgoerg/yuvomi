@@ -41,19 +41,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-applied to another source or household, without the app ever shipping a municipal/provider
   catalog. Waste types are now searchable from the global search bar, and the Calendar layer's filter
   sheet gained a per-type visibility list nested under the one Waste toggle, so a rare collection is
-  never silently hidden while a noisy one can be tucked away. The page now leads with a labelled
-  "Add waste type" button rather than hiding all four actions behind one unlabelled menu, both empty
-  states offer the step their own text describes, and the pickup button no longer dead-ends on a
-  fresh install - without a type it now opens the type dialog instead of only saying that one is
-  missing. Waste type, schedule, and source rows carry the same single overflow menu with named
-  entries that the pickup rows already used, so a destructive action is no longer one stray tap away
-  and an action whose meaning changes with the source finally says which one it is; every one of those
-  menus now sits at the trailing edge of its row, and every row puts its icon beside the name instead
-  of above it, so all four row types read the same way. A paused schedule
-  is now visually distinct from an archived type instead of wearing the same badge. A type's colour
-  comes from a curated palette instead of a free colour picker, which had happily accepted a white or
-  black icon that then disappeared against the light or dark background - an existing colour outside
-  the palette is kept, not silently overwritten.
+  never silently hidden while a noisy one can be tucked away.
+
+- **Waste page UX: labelled add-type entry point, unified row actions, curated type colors** (#1146).
+  The page now leads with a labelled "Add waste type" button rather than hiding all four actions
+  behind one unlabelled menu, both empty states offer the step their own text describes, and the
+  pickup button no longer dead-ends on a fresh install - without a type it now opens the type dialog
+  instead of only saying that one is missing. Waste type, schedule, and source rows carry the same
+  single overflow menu with named entries that the pickup rows already used, so a destructive action
+  is no longer one stray tap away and an action whose meaning changes with the source finally says
+  which one it is; every one of those menus now sits at the trailing edge of its row, and every row
+  puts its icon beside the name instead of above it, so all four row types read the same way. A
+  paused schedule is now visually distinct from an archived type instead of wearing the same badge.
+  A type's color comes from a curated palette instead of a free color picker, which had happily
+  accepted a white or black icon that then disappeared against the light or dark background - an
+  existing color outside the palette is kept, not silently overwritten.
 
 - **A calendar's default assignee can now be applied to the events it already imported** (#1154).
   Until now the mapping only reached events that arrived after it was set, so the first thing
