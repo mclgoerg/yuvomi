@@ -227,6 +227,17 @@ router.get('/pending', (req, res) => {
         AND r.dismissed   = 0
         AND r.remind_at  <= ?
         AND r.entity_type IN (${origins.map(() => '?').join(', ')})
+        -- Eine 'cycle_period'/'cycle_log_nudge'-Zeile, deren Anker bereits
+        -- geloescht wurde (Eigentuemer geloescht, Einstellung geaendert, o.ae.),
+        -- aber deren periodischer Sync noch nicht wieder gelaufen ist, darf
+        -- hier nicht auftauchen - ohne Anker fehlt cycle_anchor_kind, und die
+        -- Zeile faellt im Client auf die eigene "naechste Periode"-Darstellung
+        -- zurueck (Falschzuordnung an eine Partnerperson, schlimmer als vorher).
+        -- Lieber kurz gar nicht zeigen, bis der Sync sie ohnehin loescht.
+        AND (
+          r.entity_type NOT IN ('cycle_period', 'cycle_log_nudge')
+          OR EXISTS (SELECT 1 FROM cycle_reminder_anchors WHERE id = r.entity_id)
+        )
       ORDER BY r.remind_at ASC
     `).all(userId, now, ...origins);
 

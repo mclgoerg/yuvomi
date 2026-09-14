@@ -18,7 +18,7 @@
  * (predictCycle(), rein berechnet) noch "heute noch nicht geloggt" (die
  * Abwesenheit einer cycle_day_logs-Zeile) ist eine gespeicherte Zeile mit
  * eigener Id. `cycle_reminder_anchors` (Migration 177, `kind` seit Migration
- * 198 auch 'partner_period') gibt beiden einen stabilen Ankerpunkt je
+ * 213 auch 'partner_period') gibt beiden einen stabilen Ankerpunkt je
  * (Nutzer, Datum, Art), an den reminders.entity_id zeigen kann - gleicher
  * Grund wie schedule_reminder_entries für Musterzyklus-Tage (Schedule v3).
  *

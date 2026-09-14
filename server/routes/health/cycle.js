@@ -295,7 +295,7 @@ router.get('/cycle/logs', (req, res) => {
     const database = db.get();
     const rows = database.prepare(sql).all(...params);
     // `symptoms`/`feelings` kommen aus je einer eigenen Tabelle (Migration 178
-    // bzw. 196), nicht mehr aus den (nur noch historischen) Skalar-Spalten -
+    // bzw. 211), nicht mehr aus den (nur noch historischen) Skalar-Spalten -
     // `SELECT l.*` liefert die alten Spalten zwar mit, der Überschreib unten
     // ersetzt `symptoms` in der Antwort und ergänzt `feelings`; `mood` bleibt
     // als reiner Altlast-Lesewert stehen (siehe Migration 211). Batch statt
@@ -342,17 +342,21 @@ router.post('/cycle/logs', (req, res) => {
     const intimacy      = v.oneOf(b.intimacy, INTIMACY_VALUES, 'intimacy');
     // Legacy `mood` (Einzelwert) wird, wenn `feelings` fehlt, als
     // Ein-Element-Liste behandelt - siehe normalizeFeelings(). Die
-    // `mood`-Spalte selbst wird beim Speichern aktiv auf NULL gesetzt:
-    // Migration 211 liess sie beim Umstieg unangetastet stehen
-    // (die Migration selbst bleibt so - sie lief bereits auf Live-DBs), aber
-    // dieser Schreibpfad hier liess sie seither ebenfalls unberuehrt, egal wie
-    // oft ein Tag danach erneut gespeichert wurde. Dadurch konnte ein laengst
-    // im UI geleertes Gefuehl beim naechsten Laden aus dem eingefrorenen
-    // Altwert wieder auftauchen (siehe normalizeFeelingEntries() in
-    // health-cycle.js, das GENAU diesen Fall beheben musste). `feelings` ist
-    // ab hier die einzige Wahrheit; `mood` bleibt nur noch fuer Zeilen lesbar,
-    // die seit Migration 211 nie erneut gespeichert wurden.
-    const feelings      = normalizeFeelings(b.feelings, b.mood);
+    // `mood`-Spalte selbst wird nur dann aktiv auf NULL gesetzt (und die
+    // Gefuehls-Zeilen nur dann ersetzt), wenn der Request `feelings` oder das
+    // alte Einzelfeld `mood` ueberhaupt als Schluessel enthaelt - also einen
+    // dieser beiden Werte tatsaechlich ersetzen will. Ein Save, der nur Flow,
+    // Notiz oder Temperatur aendert und keinen der beiden Schluessel mitschickt,
+    // darf einen eingefrorenen Altwert in `mood` nicht zerstoeren (siehe
+    // Review: sonst loescht JEDE unbeteiligte Aenderung an einem Tag mit
+    // vor-migriertem Freitext-Mood diesen dauerhaft). `feelings: []` bleibt
+    // dabei weiterhin massgeblich zum Leeren - der Schluessel ist ja vorhanden,
+    // nur sein Wert ist leer (siehe normalizeFeelings()).
+    const feelingsProvided = Object.prototype.hasOwnProperty.call(b, 'feelings')
+      || Object.prototype.hasOwnProperty.call(b, 'mood');
+    const feelings = feelingsProvided
+      ? normalizeFeelings(b.feelings, b.mood)
+      : { keys: null, error: null };
 
     const errors = v.collectErrors([logDate, flow, note, visibility, cervixMucus, lhTest, pregnancyTest, intimacy]);
     if (symptoms.length > MAX_SYMPTOMS_COUNT) errors.push(`symptoms may include at most ${MAX_SYMPTOMS_COUNT} entries.`);
@@ -374,8 +378,8 @@ router.post('/cycle/logs', (req, res) => {
           flow = excluded.flow, note = excluded.note, visibility = excluded.visibility,
           basal_temp = excluded.basal_temp, basal_temp_unit = excluded.basal_temp_unit,
           cervix_mucus = excluded.cervix_mucus, lh_test = excluded.lh_test,
-          pregnancy_test = excluded.pregnancy_test, intimacy = excluded.intimacy,
-          mood = NULL
+          pregnancy_test = excluded.pregnancy_test, intimacy = excluded.intimacy
+          ${feelingsProvided ? ', mood = NULL' : ''}
       `).run(
         viewer, logDate.value, flow.value, note.value, visibility.value || 'private',
         basalTemp.temp, basalTemp.unit,
@@ -383,7 +387,7 @@ router.post('/cycle/logs', (req, res) => {
       );
       const id = database.prepare('SELECT id FROM cycle_day_logs WHERE user_id = ? AND log_date = ?').get(viewer, logDate.value).id;
       replaceSymptoms(database, id, symptoms);
-      replaceFeelings(database, id, feelings.keys);
+      if (feelingsProvided) replaceFeelings(database, id, feelings.keys);
       return id;
     })();
 
@@ -507,7 +511,12 @@ router.put('/cycle/settings', (req, res) => {
     let notifyPartnerUserId = null;
     let notifyPartnerError = null;
     if (b.notify_partner_user_id !== undefined && b.notify_partner_user_id !== null && b.notify_partner_user_id !== '') {
-      const candidate = parseInt(b.notify_partner_user_id, 10);
+      // Striktes Parsen wie intInRange() oben statt parseInt(): parseInt('12abc', 10)
+      // liest still den führenden Ziffernteil und liefert 12 zurück, statt den
+      // Wert als Ganzes abzulehnen - ein vertipptes/manipuliertes Feld würde so
+      // stillschweigend auf eine andere, zufällig gültige Person zeigen.
+      const n = Number(b.notify_partner_user_id);
+      const candidate = Number.isInteger(n) ? n : NaN;
       if (!candidate) {
         notifyPartnerError = 'notify_partner_user_id must be a valid user id.';
       } else if (candidate === viewer) {
@@ -573,7 +582,17 @@ router.put('/cycle/settings', (req, res) => {
       log.error('Error syncing cycle reminders after settings change:', err.message);
     }
 
-    res.json({ data: db.get().prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(viewer) });
+    // eligible_partners auch hier mitschicken (gleiche Hilfsfunktion wie GET) -
+    // sonst baut das Frontend nach diesem Save die Partner-Auswahl aus einer
+    // leeren Liste neu auf und der naechste Save wuerde einen echten Partner
+    // stillschweigend loeschen.
+    const database = db.get();
+    res.json({
+      data: {
+        ...database.prepare('SELECT * FROM cycle_settings WHERE user_id = ?').get(viewer),
+        eligible_partners: eligibleCyclePartners(database, viewer),
+      },
+    });
   } catch (err) {
     log.error('Error saving cycle settings:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });

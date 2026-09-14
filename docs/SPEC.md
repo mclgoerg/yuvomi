@@ -3064,10 +3064,10 @@ string or plain string array (both yield `intensity: null`).
 | remind_period_days_before | INTEGER | nullable, 0–14 (migration 177) — NULL = off; days of lead time before the predicted next period for a `cycle_period` reminder |
 | remind_log_daily | INTEGER | 0/1, default 0 (migration 177) — daily nudge to log today, suppressed once a `cycle_day_logs` row exists for the day |
 | contraception | TEXT | nullable (migration 212) - `none` \| `pill` \| `hormonal_iud` \| `copper_iud` \| `implant` \| `injection` \| `patch` \| `ring` \| `condom` \| `other`. The hormonal subset (`pill`, `hormonal_iud`, `implant`, `injection`, `patch`, `ring`) suppresses fertile-window/ovulation prediction (`fertilitySuppressed: 'contraception'`), with an explanatory note where the fertile-window tile would be - hidden-but-explained, never silently broken. |
-| perimenopause_mode | INTEGER | 0/1, default 0 (migration 212) - next period becomes a min–max date range from the recent plausible gaps (`nextStartRange`), the Regular/Irregular judgement is suppressed (irregularity is expected, not an alarm) |
+| perimenopause_mode | INTEGER | 0/1, default 0 (migration 212) - next period becomes a min-max date range from the recent plausible gaps (`nextStartRange`), the Regular/Irregular judgement is suppressed (irregularity is expected, not an alarm) |
 | show_pms | INTEGER | 0/1, default 1 (migration 212) - toggles the derived PMS-window shading on the calendar; the window itself is computed, never stored (`pmsWindow()`) |
 | notify_partner_user_id | INTEGER | nullable (migration 212), FK → Users (SET NULL) - owner-opt-in partner reminder; must be another household member |
-| notify_partner_days_before | INTEGER | nullable, 0–14 (migration 212) - lead time for the partner's reminder |
+| notify_partner_days_before | INTEGER | nullable, 0-14 (migration 212) - lead time for the partner's reminder |
 | created_at / updated_at | TEXT | ISO 8601, default now |
 
 **`cycle_day_log_feelings`** (migration 211) - multi-select feelings for a day log, normalized out
@@ -3265,7 +3265,7 @@ client-side in `public/utils/health-cycle.js` / rendered in `public/pages/health
   measured-vs-guessed grammar as the ring), with a legend row appended only when visible.
 - **Prediction inputs are gap-guarded**: cycle gaps under 10 days, over 365 days, or involving a
   future-dated start are always excluded from the averages (`stats.excludedGaps` counts them); gaps
-  of 90–365 days are excluded only when enough 10–90-day gaps exist on their own - a user with
+  of 90-365 days are excluded only when enough 10-90-day gaps exist on their own - a user with
   consistently long cycles (oligomenorrhea) keeps a history-derived average instead of silently
   falling back to the 28-day default. The period modal warns (non-blocking) on a future start date
   or an overlap. `projectFutureCycles()` and `predictCycle()` share one anchor rule
@@ -3287,7 +3287,7 @@ client-side in `public/utils/health-cycle.js` / rendered in `public/pages/health
   ranks summed over logged days) and a calm, non-diagnostic hint when recent episodes are
   repeatedly heavy or longer than a week (`heavyBleedingSignal()`).
 - **Trends v2**: the BBT chart is date-proportional and breaks its line across logging gaps > 5
-  days; the severity chart pins its ordinal axis to exactly 1–3; feelings get their own
+  days; the severity chart pins its ordinal axis to exactly 1-3; feelings get their own
   frequency-by-phase list (`feelingFrequencyByPhase()`, sharing `reconstructCycles()`); a pain
   summary tile aggregates the four pain symptoms; each symptom row has one details expander
   (pattern + severity) instead of two stacked disclosures.

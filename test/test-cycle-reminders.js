@@ -318,7 +318,7 @@ test('Partner-Erinnerung raeumt ab, wenn der Partnerperson das Health-Modul entz
   assert.deepEqual(remindersFor(partner, 'cycle_period'), []);
 });
 
-test('Verwaiste Partner-Erinnerung wird beim Voll-Sync geloescht, wenn der Eigentuemer geloescht wurde (R-5)', () => {
+test('Verwaiste Partner-Erinnerung wird beim Voll-Sync geloescht, wenn der Eigentuemer geloescht wurde', () => {
   const owner = makeUser();
   const partner = makeUser();
   seedFourPeriods(owner);

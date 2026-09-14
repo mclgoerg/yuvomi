@@ -3841,7 +3841,7 @@ function overviewCycleTileMarkup() {
     // Zyklus-Tab selbst (siehe dort für die ausführliche Begründung).
     const range = (prediction.perimenopause && prediction.nextStartRange) ? prediction.nextStartRange : null;
     value = range
-      ? `${formatDate(range.min)} – ${formatDate(range.max)}`
+      ? `${formatDate(range.min)} - ${formatDate(range.max)}`
       : formatDate(prediction.nextStart);
     sub = range
       ? t('health.cycle.status.nextPeriodRangeSub', { date: formatDate(prediction.nextStart) })
@@ -4560,8 +4560,9 @@ function cycleBubbleMarkup(prediction, pms) {
     return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t('health.cycle.bubble.upcomingSymptom', { weekday, symptom }))}</p>`);
   }
 
-  // Prioritaet 6: fruchtbares Fenster (nur wenn ueberhaupt verfolgt - D-9
-  // schaltet trackFertility unter hormoneller Verhuetung bereits ab).
+  // Prioritaet 6: fruchtbares Fenster (nur wenn ueberhaupt verfolgt - die
+  // Verhuetungs-Einstellung (contraception) schaltet trackFertility unter
+  // hormoneller Verhuetung bereits ab).
   if (prediction.trackFertility && prediction.fertileStart && today >= prediction.fertileStart && today <= prediction.fertileEnd) {
     const key = prediction.ovulationConfirmed ? 'health.cycle.bubble.fertileConfirmed' : 'health.cycle.bubble.fertile';
     return cycleBubbleShell(line1, `<p class="cycle-bubble__line2">${esc(t(key, { date: formatDate(prediction.fertileEnd) }))}</p>`);
@@ -4738,7 +4739,7 @@ function cycleStatsMarkup(prediction) {
     icon: 'calendar-heart',
     labelKey: 'health.cycle.status.nextPeriod',
     value: perimenopauseRange
-      ? `${formatDate(perimenopauseRange.min)} – ${formatDate(perimenopauseRange.max)}`
+      ? `${formatDate(perimenopauseRange.min)} - ${formatDate(perimenopauseRange.max)}`
       : formatDate(prediction.nextStart),
     sub: perimenopauseRange
       ? t('health.cycle.status.nextPeriodRangeSub', { date: formatDate(prediction.nextStart) })
@@ -5605,12 +5606,12 @@ function heavyBleedingHintMarkup(signal) {
  * kein Chart) - painSummary() (health-cycle.js) liefert die drei Zahlen
  * bereits fertig gerechnet, hier nur Layout/i18n. `avgPainDaysPerCycle`/
  * `avgIntensity` können `null` sein (noch keine abgeschlossenen Zyklen bzw.
- * keine gradierte Auswahl) - dann steht ein "–" statt einer erfundenen Zahl.
+ * keine gradierte Auswahl) - dann steht ein "-" statt einer erfundenen Zahl.
  */
 function painSummaryTileMarkup(summary) {
   if (!summary) return '';
-  const avgDaysText = summary.avgPainDaysPerCycle != null ? fmtNum(summary.avgPainDaysPerCycle) : '–';
-  const intensityText = summary.avgIntensity != null ? fmtNum(summary.avgIntensity, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '–';
+  const avgDaysText = summary.avgPainDaysPerCycle != null ? fmtNum(summary.avgPainDaysPerCycle) : '-';
+  const intensityText = summary.avgIntensity != null ? fmtNum(summary.avgIntensity, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '-';
   return `
     <div class="health-chart-section cycle-pain-tile">
       <div class="health-chart-section__head"><div class="health-chart-section__title">${esc(t('health.cycle.trends.painTitle'))}</div></div>

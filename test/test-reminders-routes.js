@@ -250,6 +250,30 @@ test('GET /pending traegt cycle_anchor_kind ohne cycle_owner_name an einer eigen
   assert.ok(!('cycle_owner_name' in row), 'die eigene Erinnerung nennt keinen Namen - es ist ja die eigene');
 });
 
+// Luecke zwischen der Loeschung des Ankers (z. B. der Eigentuemer wird
+// geloescht oder aendert die Einstellung) und dem naechsten periodischen
+// Sync, der die verwaiste Zeile eigentlich aufraeumt: bis dahin darf
+// GET /pending eine 'cycle_period'/'cycle_log_nudge'-Zeile ohne Anker nicht
+// ausliefern - ohne cycle_anchor_kind faellt der Client auf die eigene
+// "naechste Periode"-Darstellung zurueck, was bei einer Partner-Erinnerung
+// eine Falschzuordnung waere (schlimmer als gar nichts zu zeigen).
+test('GET /pending zeigt eine verwaiste cycle_period-Erinnerung nicht, solange ihr Anker fehlt', async () => {
+  const owner = freshUser('member');
+  const partner = freshUser('member');
+
+  const anchorId = insertCycleAnchor(owner, 'partner_period', '2026-06-29');
+  insertReminder(partner, 'cycle_period', anchorId, PAST);
+
+  // Die Luecke simulieren: Anker direkt geloescht, ohne dass der Sync schon
+  // gelaufen waere und auch die reminders-Zeile mit entfernt haette.
+  db.prepare('DELETE FROM cycle_reminder_anchors WHERE id = ?').run(anchorId);
+
+  currentUid = partner;
+  const res = await call('GET', '/pending');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.length, 0, 'eine Erinnerung ohne Anker darf nicht auftauchen, egal welchen Inhalt sie noch traegt');
+});
+
 // --------------------------------------------------------
 // GET / (single) - Validierung
 // --------------------------------------------------------

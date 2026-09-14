@@ -747,7 +747,7 @@ test('Cycle-Settings: default_visibility – Default privat, Upsert, Validierung
   assert.equal(bad.status, 400);
 });
 
-test('Cycle-Settings: neue Felder – Default, Upsert (Verhütung, Perimenopause, PMS)', async () => {
+test('Cycle-Settings: neue Felder - Default, Upsert (Verhütung, Perimenopause, PMS)', async () => {
   asB();
   const def = await call('GET', '/cycle/settings');
   assert.equal(def.body.data.contraception, null);
@@ -788,6 +788,33 @@ test('Cycle-Settings: Partner-Benachrichtigung - gültiges Haushaltsmitglied, da
   const cleared = await call('PUT', '/cycle/settings', {});
   assert.equal(cleared.status, 200);
   assert.equal(cleared.body.data.notify_partner_user_id, null);
+});
+
+test('Cycle-Settings: PUT liefert eligible_partners mit, damit zwei Saves hintereinander den Partner nicht verlieren', async () => {
+  asA();
+  const first = await call('PUT', '/cycle/settings', {
+    notify_partner_user_id: userB, notify_partner_days_before: 2,
+  });
+  assert.equal(first.status, 200);
+  assert.ok(Array.isArray(first.body.data.eligible_partners), 'PUT muss eligible_partners wie GET mitliefern');
+  assert.ok(first.body.data.eligible_partners.some((p) => p.id === userB));
+
+  // Zweiter Save wie es das Frontend tatsaechlich tut: das im Speicher
+  // gehaltene cycle.settings-Objekt (aus der ersten Antwort) wird vollstaendig
+  // erneut gesendet, nur ein unbeteiligtes Feld (show_pms) aendert sich. Ohne
+  // eligible_partners in der ersten Antwort waere die Partner-Auswahl im
+  // Modal beim erneuten Oeffnen leer gewesen und ein Save haette
+  // notify_partner_user_id stillschweigend auf null gesetzt.
+  const second = await call('PUT', '/cycle/settings', {
+    notify_partner_user_id: first.body.data.notify_partner_user_id,
+    notify_partner_days_before: first.body.data.notify_partner_days_before,
+    show_pms: false,
+  });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.data.notify_partner_user_id, userB, 'der Partner muss den zweiten Save unveraendert ueberleben');
+  assert.equal(second.body.data.show_pms, 0);
+  assert.ok(Array.isArray(second.body.data.eligible_partners), 'auch die zweite Antwort muss eligible_partners tragen');
+  assert.ok(second.body.data.eligible_partners.some((p) => p.id === userB));
 });
 
 test('Cycle-Settings: notify_partner_user_id lehnt eine unbekannte Person ab (400)', async () => {
@@ -1074,14 +1101,14 @@ test('Cycle-Log: ungültiger legacy mood-Wert wird abgelehnt wie ein ungültiges
   assert.equal(res.status, 400);
 });
 
-// Der Upsert setzt `mood = NULL` auf BEIDEN Pfaden (Insert und
-// Conflict-Update) aktiv, statt die Spalte unangetastet zu
-// lassen - eine schon vor Migration 211 (oder direkt in der DB) eingefrorene
-// `mood` durfte sonst bei jedem weiteren Speichern desselben Tages bestehen
-// bleiben und im GET wieder auftauchen, sobald `feelings` geleert wurde
-// (siehe normalizeFeelingEntries()/`existingFeelings` in health-cycle.js/
-// health.js).
-test('Cycle-Log: ein direkt in der DB eingefrorener Legacy-mood-Wert wird beim naechsten Speichern aktiv genullt', async () => {
+// Der Upsert setzt `mood = NULL` nur dann aktiv, wenn der Request `feelings`
+// oder das legacy `mood`-Feld tatsaechlich als Schluessel enthaelt - er will
+// dann diesen Wert ersetzen. Ein Save, der keinen der beiden Schluessel
+// mitschickt (z. B. nur `flow` aendert), darf einen schon vor Migration 211
+// (oder direkt in der DB) eingefrorenen Legacy-Wert nicht zerstoeren, sonst
+// vernichtet JEDE unbeteiligte Aenderung an einem solchen Tag dauerhaft einen
+// echten Freitext-Mood.
+test('Cycle-Log: ein eingefrorener Legacy-mood-Wert wird genullt, wenn feelings/mood explizit mitgeschickt werden', async () => {
   asA();
   const created = await call('POST', '/cycle/logs', { log_date: '2030-01-06', flow: 'light' });
   assert.equal(created.status, 201);
@@ -1093,16 +1120,43 @@ test('Cycle-Log: ein direkt in der DB eingefrorener Legacy-mood-Wert wird beim n
   db.prepare('UPDATE cycle_day_logs SET mood = ? WHERE id = ?').run('sad', id);
   assert.equal(db.prepare('SELECT mood FROM cycle_day_logs WHERE id = ?').get(id).mood, 'sad');
 
-  // Erneutes Speichern desselben Tages - auch ohne `feelings`/`mood` im Body -
-  // muss die Spalte jetzt aktiv leeren.
-  const updated = await call('POST', '/cycle/logs', { log_date: '2030-01-06', flow: 'heavy' });
+  // Erneutes Speichern desselben Tages MIT `feelings` im Body (auch ein
+  // leeres Array zaehlt, siehe normalizeFeelings()) - muss die Spalte jetzt
+  // aktiv leeren.
+  const updated = await call('POST', '/cycle/logs', { log_date: '2030-01-06', flow: 'heavy', feelings: [] });
   assert.equal(updated.status, 201);
   assert.equal(updated.body.data.id, id);
   assert.equal(updated.body.data.mood, null);
   assert.equal(db.prepare('SELECT mood FROM cycle_day_logs WHERE id = ?').get(id).mood, null);
 });
 
-test('Cycle-Log: intimacy ist hart privat – Eigentümer sieht es, family-Mitglied nicht', async () => {
+test('Cycle-Log: ein eingefrorener Legacy-mood-Wert bleibt erhalten, wenn ein Save weder feelings noch mood mitschickt', async () => {
+  asA();
+  const created = await call('POST', '/cycle/logs', { log_date: '2030-01-07', flow: 'light' });
+  assert.equal(created.status, 201);
+  const id = created.body.data.id;
+
+  // Gleicher Legacy-Zustand wie oben.
+  db.prepare('UPDATE cycle_day_logs SET mood = ? WHERE id = ?').run('melancholic', id);
+  assert.equal(db.prepare('SELECT mood FROM cycle_day_logs WHERE id = ?').get(id).mood, 'melancholic');
+
+  // Erneutes Speichern desselben Tages OHNE `feelings`/`mood` im Body - nur
+  // unbeteiligte Felder (flow, note, basal_temp) aendern sich. Der Altwert
+  // muss unangetastet bleiben.
+  const updated = await call('POST', '/cycle/logs', {
+    log_date: '2030-01-07', flow: 'heavy', note: 'nur eine Notiz', basal_temp: 36.6, basal_temp_unit: 'c',
+  });
+  assert.equal(updated.status, 201);
+  assert.equal(updated.body.data.id, id);
+  assert.equal(updated.body.data.flow, 'heavy');
+  assert.equal(updated.body.data.mood, 'melancholic');
+  assert.equal(db.prepare('SELECT mood FROM cycle_day_logs WHERE id = ?').get(id).mood, 'melancholic');
+  // Auch die bestehenden Gefuehls-Zeilen (falls vorhanden) duerfen ein Save
+  // ohne `feelings`/`mood` nicht leeren.
+  assert.deepEqual(updated.body.data.feelings, []);
+});
+
+test('Cycle-Log: intimacy ist hart privat - Eigentümer sieht es, family-Mitglied nicht', async () => {
   asA();
   const created = await call('POST', '/cycle/logs', {
     log_date: '2030-01-06', flow: 'medium', intimacy: 'unprotected', visibility: 'family',
@@ -1136,7 +1190,7 @@ test('Cycle: Bulk-Sichtbarkeit auf family lässt intimacy trotzdem verborgen', a
 // Owner-only wie intimacy: cervix_mucus, lh_test und pregnancy_test sind
 // ebenfalls hart privat, unabhängig von der Zeilen-Sichtbarkeit - dieselbe
 // Erwartung, drei Felder, je ein eigener Test.
-test('Cycle-Log: cervix_mucus ist hart privat – Eigentümer sieht es, family-Mitglied nicht', async () => {
+test('Cycle-Log: cervix_mucus ist hart privat - Eigentümer sieht es, family-Mitglied nicht', async () => {
   asA();
   const created = await call('POST', '/cycle/logs', {
     log_date: '2030-01-08', flow: 'medium', cervix_mucus: 'eggwhite', visibility: 'family',
@@ -1154,7 +1208,7 @@ test('Cycle-Log: cervix_mucus ist hart privat – Eigentümer sieht es, family-M
   assert.equal(asAlice.body.data.find((l) => l.log_date === '2030-01-08').cervix_mucus, 'eggwhite');
 });
 
-test('Cycle-Log: lh_test ist hart privat – Eigentümer sieht es, family-Mitglied nicht', async () => {
+test('Cycle-Log: lh_test ist hart privat - Eigentümer sieht es, family-Mitglied nicht', async () => {
   asA();
   const created = await call('POST', '/cycle/logs', {
     log_date: '2030-01-09', flow: 'medium', lh_test: 'positive', visibility: 'family',
@@ -1172,7 +1226,7 @@ test('Cycle-Log: lh_test ist hart privat – Eigentümer sieht es, family-Mitgli
   assert.equal(asAlice.body.data.find((l) => l.log_date === '2030-01-09').lh_test, 'positive');
 });
 
-test('Cycle-Log: pregnancy_test ist hart privat – Eigentümer sieht es, family-Mitglied nicht', async () => {
+test('Cycle-Log: pregnancy_test ist hart privat - Eigentümer sieht es, family-Mitglied nicht', async () => {
   asA();
   const created = await call('POST', '/cycle/logs', {
     log_date: '2030-01-10', flow: 'medium', pregnancy_test: 'negative', visibility: 'family',
