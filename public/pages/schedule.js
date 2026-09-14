@@ -2262,9 +2262,16 @@ async function saveCreatedSchedule(event) {
           // Grund ueberhaupt nachzufragen, vernichtete damit lautlos jedes
           // getippte Feld. confirmOverModal parkt das Formular stattdessen und
           // gibt es bei "Abbrechen" unveraendert zurueck (H-3).
+          //
+          // closeOnConfirm: false (Review zu #1099) - der Schreibversuch laeuft
+          // ERST NACH der Bestaetigung. Schloesse confirmOverModal hier schon
+          // selbst, waere das Formular bei einem fehlgeschlagenen POST bereits
+          // weg, und der Fehler-Toast erschiene ueber einer leeren Seite statt
+          // ueber dem noch getippten Formular. Der gemeinsame Erfolgspfad am
+          // Ende von saveCreatedSchedule() schliesst stattdessen.
           const confirmed = await confirmOverModal(
             t('schedule.fillRangeConfirmTitle'),
-            { confirmLabel: t('schedule.fillRange'), detail: t('schedule.fillRangeConfirmDetail', { from: formatDate(data.range_from), to: formatDate(data.range_to), type: typeLabel }) },
+            { confirmLabel: t('schedule.fillRange'), detail: t('schedule.fillRangeConfirmDetail', { from: formatDate(data.range_from), to: formatDate(data.range_to), type: typeLabel }), closeOnConfirm: false },
           );
           if (!confirmed) return;
           await api.post('/schedule/overrides/fill', { user_id: userId, from: data.range_from, to: data.range_to, shift_type_id: shiftTypeId, note: data.note, field_values: fieldValues });
@@ -2292,10 +2299,13 @@ async function saveCreatedSchedule(event) {
       const fieldValues = collectFieldValues(form);
       // Gleicher Grund wie im "replace"-Zweig oben: das Editier-Formular ist
       // beim Speichern noch offen, confirmOverModal parkt es statt es beim
-      // Nachfragen zu vernichten (H-3).
+      // Nachfragen zu vernichten (H-3). closeOnConfirm: false aus demselben
+      // Grund wie dort (Review zu #1099): der Schreibversuch folgt erst nach
+      // der Bestaetigung, und ein fehlgeschlagener POST soll das Formular
+      // noch vorfinden, nicht ein bereits geschlossenes Modal.
       const confirmed = await confirmOverModal(
         t('schedule.fillRangeConfirmTitle'),
-        { confirmLabel: t('schedule.save'), detail: t('schedule.fillRangeConfirmDetail', { from: formatDate(data.from), to: formatDate(data.to), type: typeLabel }) },
+        { confirmLabel: t('schedule.save'), detail: t('schedule.fillRangeConfirmDetail', { from: formatDate(data.from), to: formatDate(data.to), type: typeLabel }), closeOnConfirm: false },
       );
       if (!confirmed) return;
       await api.post('/schedule/overrides/fill', { user_id: userId, from: data.from, to: data.to, shift_type_id: shiftTypeId, note: data.note, field_values: fieldValues });

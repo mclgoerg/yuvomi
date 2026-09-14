@@ -1008,9 +1008,29 @@ test('the Overrides section groups consecutive same-type days and edits/deletes 
   // even if this regressed back to the destructive variant.
   assert.match(editBranch, /confirmOverModal\(/, 'saving an edited range confirms before writing and deleting, via the non-destructive confirmOverModal (confirmModal would force-close the open form)');
   assert.doesNotMatch(editBranch, /confirmModal\(/, 'must not regress to the destructive confirmModal, which force-closes the still-open form ("confirmOverModal(" itself does not match this literal, so this is a real, separate check)');
+  // Review of #1099: confirmOverModal's own default (closeOnConfirm: true)
+  // closes the parked form as soon as the user confirms - BEFORE the write
+  // below runs. A failed POST would then toast over an already-closed modal,
+  // discarding everything typed. closeOnConfirm: false leaves that to the
+  // shared success path at the end of saveCreatedSchedule().
+  assert.match(editBranch, /confirmOverModal\([\s\S]*closeOnConfirm:\s*false/, 'a failed save must find the form still parked, not already closed by the confirmation itself');
   assert.match(editBranch, /rangeDifference\(/, 'shrinking a range removes what fell outside it, not just fills the new span');
   const deleteBranch = schedulePage.slice(schedulePage.indexOf("'delete-override-range'"), schedulePage.indexOf("'save-days'"));
   assert.match(deleteBranch, /confirmModal\(/, 'deleting a range confirms first, unlike the old single-day delete');
+});
+
+// Review of #1099: the "replace" branch's own fill-range confirmation has the
+// identical hazard as the override-edit one above - the POST that can fail
+// runs after the user confirms, and confirmOverModal's default would already
+// have closed the parked form by then.
+test('saving a multi-day "replace" range parks the form through the confirmation, closing only on success', () => {
+  const schedulePage = readFileSync(new URL('../public/pages/schedule.js', import.meta.url), 'utf8');
+  const replaceBranch = schedulePage.slice(
+    schedulePage.indexOf("} else if (data.mode === 'replace') {"),
+    schedulePage.indexOf('\n      } else {', schedulePage.indexOf("} else if (data.mode === 'replace') {")),
+  );
+  assert.match(replaceBranch, /confirmOverModal\(/, 'a multi-day replace confirms before writing, via the non-destructive confirmOverModal');
+  assert.match(replaceBranch, /confirmOverModal\([\s\S]*closeOnConfirm:\s*false/, 'a failed /schedule/overrides/fill must find the form still parked, not already closed by the confirmation itself');
 });
 
 // Real behaviour instead of a name-in-source check (PR #930 review): a text

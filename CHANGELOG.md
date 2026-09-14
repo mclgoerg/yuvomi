@@ -102,8 +102,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   back does not repeat the failed request.
 
 - **A full audit of the Schedule module, fixed in one sweep.** The override editor no longer
-  destroys typed input when its "fill the whole range?" confirmation is cancelled — the confirm now
-  parks and resumes the open form instead of force-closing it. A member with read-only access to the
+  destroys typed input when its "fill the whole range?" confirmation is cancelled - the confirm now
+  parks and resumes the open form instead of force-closing it, and the same holds if the confirmed
+  save itself then fails: the form stays parked until the write actually succeeds, instead of
+  closing on confirmation and leaving a failure toast over an already-empty page. A member with
+  read-only access to the
   module sees an honest page: the banner was always there, but every create/edit/delete control
   rendered anyway and failed only on save; they are now gone, matching what the API has always
   enforced. Statistics and Overview refetch when the page is revisited (previously they re-labelled
@@ -115,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fire at the DST-correct minute around clock changes, enabling them defaults to a 15-minute lead
   instead of "at shift start", and a reminder can no longer keep firing for a shift type deleted in
   the sync's blind window. On the server, a pattern save is capped at 500 cycle-day rows (each
-  stored row is re-emitted on every resolved read — an uncapped save was stored read amplification
+  stored row is re-emitted on every resolved read - an uncapped save was stored read amplification
   any member could create), deleting a pattern or a user no longer leaks its custom-field values,
   duplicate field ids in one payload are rejected instead of half-committing and answering 500, and
   omitting `field_values` from an override save now preserves stored values, as the extras route
@@ -485,7 +488,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   view instead of doing nothing; week/day calendar chips show the full time range instead of just
   the start; and the "Free today" hero and the per-member status row on the dashboard no longer
   contradict a schedule entry sitting right next to them. The Statistics owner picker is self-only
-  for non-admin members now — statistics remain a read-only summary of data everyone can already see
+  for non-admin members now - statistics remain a read-only summary of data everyone can already see
   via the Today card and calendar, but the convenience of pulling up someone else's totals was never
   meant to be open to everyone. Shift-type presets are grouped by template (Work/School/University)
   instead of one flat list of fifteen, the reminder lead time accepts any custom value up to the
