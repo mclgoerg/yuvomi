@@ -2452,6 +2452,9 @@ async function submitForm(event) {
     }
     await load();
     renderPage();
+    // Die Ueberlappungs-Rueckfrage oben schliesst vor dem Speichern; ihr
+    // Fokus-Restore wird hier weggerendert (#1083).
+    refocusAfterRender();
     window.yuvomi?.showToast(t('schedule.saved'), 'success');
   } catch (error) {
     if (form.dataset.form === 'statistics' && statisticsRequest === statisticsRequestId) {
@@ -2686,6 +2689,7 @@ async function action(event) {
         // (jetzt falsche) Liste stehen und taeuschte vor, nichts sei passiert.
         await load();
         renderPage();
+        refocusAfterRender();
         window.yuvomi?.showToast(scheduleErrorMessage(error), 'danger');
         return;
       }
