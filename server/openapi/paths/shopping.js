@@ -25,7 +25,28 @@ export function shoppingPaths() {
     '/api/v1/shopping/categories/reorder': {
       patch: op({ summary: 'Reorder shopping categories', tag: 'Shopping', stateChanging: true, requestBody: jsonBody(null) }),
     },
-    '/api/v1/shopping/suggestions': { get: op({ summary: 'Get shopping suggestions', tag: 'Shopping' }) },
+    '/api/v1/shopping/suggestions': {
+      get: op({
+        summary: 'Get shopping suggestions',
+        description: 'Contract change (#1103): response items are now objects { name, category, quantity } instead of '
+          + 'plain name strings (string[] before), and the list is ordered by most recently used first instead of alphabetically. '
+          + 'Category and quantity come from the most recent item row with that name - the latest statement about '
+          + 'how the household files the article today.',
+        tag: 'Shopping',
+      }),
+    },
+    '/api/v1/shopping/versions': {
+      get: op({
+        summary: 'Change counter of every shopping list',
+        description: 'One `{ list_id, version }` per list. The counter says *that* a list changed, never *what*: '
+          + 'it moves whenever the list was renamed or its items were inserted, updated, moved or deleted by anyone '
+          + '- a household member, a meal-plan import, the CalDAV sync - and the row disappears with the list. '
+          + 'Database triggers keep it, so no writer has to announce itself. A client polls this while a list is '
+          + 'open and reloads a list through the same items request it used to open it; the write routes on items '
+          + 'return `list_change: { list_id, before, after }` so the writer can tell its own change apart.',
+        tag: 'Shopping',
+      }),
+    },
     '/api/v1/shopping/items/undo-transfer': {
       post: op({
         summary: 'Undo a kitchen transfer to a shopping list',
@@ -43,8 +64,28 @@ export function shoppingPaths() {
       put: op({ summary: 'Rename shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true }),
     },
+    '/api/v1/shopping/{listId}/duplicate': {
+      post: op({
+        summary: 'Duplicate a shopping list',
+        description: 'Body: { name, resetChecked?, keepQuantities?, keepNotes? } - the three flags default to true. '
+          + 'Category assignment and manual per-category order are always carried over, since preserving them is '
+          + 'the point of duplicating. CalDAV sync fields, the meal-plan origin, the recorded price and the shop '
+          + 'are never copied: each is a fact about the ORIGINAL item (a synced remote object, a specific meal, a '
+          + 'price actually paid in a specific shop) that is not true of a fresh copy.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: jsonBody(null),
+      }),
+    },
     '/api/v1/shopping/{listId}/items': {
-      get: op({ summary: 'List items in shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')] }),
+      get: op({
+        summary: 'List items in shopping list',
+        description: 'Returns the items with the list, the categories and `version`, the list\'s change counter read in the same '
+          + 'synchronous step as the items, so a client that polls `/shopping/versions` knows exactly which state it holds.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+      }),
       post: op({ summary: 'Add item to shopping list', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true, requestBody: jsonBody(null) }),
     },
     '/api/v1/shopping/{listId}/import-pantry': {
@@ -83,7 +124,17 @@ export function shoppingPaths() {
       }),
     },
     '/api/v1/shopping/{listId}/items/checked': {
-      delete: op({ summary: 'Delete checked shopping items', tag: 'Shopping', params: [idParam('listId', 'List ID')], stateChanging: true }),
+      delete: op({
+        summary: 'Delete checked shopping items',
+        description: 'Without a body, every item that is checked when the request arrives. With `{ ids }`, only those '
+          + 'ids, and of them only the ones that are checked and belong to this list - a client that removed rows '
+          + 'optimistically names exactly what it removed, so a row someone else ticked in the meantime stays. '
+          + '`deleted` reports what actually went.',
+        tag: 'Shopping',
+        params: [idParam('listId', 'List ID')],
+        stateChanging: true,
+        requestBody: { ...jsonBody(null, 'Optional: `{ ids: number[] }`'), required: false },
+      }),
     },
     '/api/v1/shopping/{listId}/items/reorder': {
       patch: op({ summary: 'Reorder the items of one category', tag: 'Shopping', stateChanging: true, params: [idParam('listId', 'Shopping list ID')], requestBody: jsonBody(null), description: 'Per category rather than across the whole list: the category order is already its own handle and models the route through the shop; a second, list-wide rank beside it would make two statements about the same order. The request must name EVERY item of the category - a subset would let the ranks of the omitted ones collide with the newly assigned ones, and creation time would decide again.' }),

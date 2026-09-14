@@ -16,7 +16,7 @@ import { tokenAllows } from '../scopes.js';
 const log    = createLogger('Reminders');
 const router = express.Router();
 
-const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry'];
+const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup'];
 
 /**
  * Nach jedem Schreibvorgang an den Erinnerungen eines Termins: die Zugewiesenen
@@ -83,7 +83,7 @@ function syncEventFanout(entityType, entityId, userId) {
  * Die LESEWEGE (GET) kennen alle Typen weiter: der Erinnerungs-Toast muss eine
  * abgeleitete Meldung anzeigen und wegwischen können.
  */
-const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry'];
+const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup'];
 
 /* DIESER ROUTER IST EINE MISCHSTELLE, UND SEIN PFAD SAGT DAS NICHT.
  *
@@ -119,6 +119,7 @@ const ORIGIN_MODULE = Object.freeze({
   cycle_log_nudge:        'health',
   schedule_entry:         'schedule',
   schedule_extra_entry:   'schedule',
+  waste_pickup:           'waste',
 });
 
 /**
@@ -206,13 +207,17 @@ router.get('/pending', (req, res) => {
             SELECT t.name FROM schedule_extra_shifts e JOIN schedule_shift_types t ON t.id = e.shift_type_id
             WHERE e.id = r.entity_id
           )
+          WHEN 'waste_pickup' THEN (
+            SELECT t.name FROM waste_reminder_entries e JOIN waste_types t ON t.id = e.type_id
+            WHERE e.id = r.entity_id
+          )
         END AS entity_title,
-        -- D-15: unterscheidet die eigene Perioden-Erinnerung von einer an eine
+        -- Unterscheidet die eigene Perioden-Erinnerung von einer an eine
         -- Partnerperson weitergereichten (gleicher entity_type 'cycle_period',
         -- siehe cycle-reminders.js#syncPartnerReminder) - ohne das läse der
         -- Partner-Toast "Nächste Periode - <Datum>" als wäre es die eigene.
         -- cycle_owner_name wird bewusst NICHT hier mitgeholt (kein JOIN auf
-        -- users in dieser Sammelabfrage für sechs Herkünfte), sondern weiter
+        -- users in dieser Sammelabfrage für sieben Herkünfte), sondern weiter
         -- unten verzögert und nur für tatsächliche 'partner_period'-Zeilen
         -- geholt - gleiche Form wie notifications.js.
         CASE WHEN r.entity_type = 'cycle_period'

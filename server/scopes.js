@@ -35,6 +35,7 @@ const SCOPE_MODULES = [
   { key: 'health',       prefixes: ['health'] },
   { key: 'rewards',      prefixes: ['rewards'] },
   { key: 'housekeeping', prefixes: ['housekeeping'] },
+  { key: 'waste',        prefixes: ['waste'] },
   { key: 'weather',      prefixes: ['weather'] },
   { key: 'family',       prefixes: ['family'] },
   // `quick-links` teilt sich den Schluessel mit `dashboard`: die Kachelreihe ist
@@ -133,11 +134,20 @@ function requiredAccess(method) {
 
 /**
  * Ermittelt den Modul-Schlüssel für einen /api/v1-Pfad (ohne führendes /api/v1).
+ *
+ * GROSS-/KLEINSCHREIBUNG WIRD HIER GEFALTET, WEIL EXPRESS SIE BEIM ROUTEN
+ * IGNORIERT. Express matcht Mount-Pfade und Routen standardmaessig ohne
+ * Beachtung der Schreibweise: `/Notes` landet im Notiz-Router wie `/notes`.
+ * Ohne das Falten fand diese Funktion fuer `/Notes` keinen Praefix und gab
+ * `null` zurueck - und die Modul-Deny-Liste in server/index.js laesst `null`
+ * durch. Ein Mitglied mit `notes: none` las so jede sichtbare Notiz, eines
+ * mit `tasks: read` schrieb Aufgaben. Alle Praefixe sind klein geschrieben
+ * (Kern-Module hier oben, Erweiterungen per `MODULE_ID_RE`).
  * @param {string} path z. B. "/health/cycle" oder "health/cycle"
  * @returns {string|null} Modul-Schlüssel oder null (unbekannt/nicht scopebar).
  */
 function moduleForPath(path) {
-  const cleaned = String(path || '').replace(/^\/+/, '');
+  const cleaned = String(path || '').replace(/^\/+/, '').toLowerCase();
   const parts = cleaned.split('/').filter(Boolean);
   if (parts[0] === 'extensions' && parts[1]) {
     const extKey = PREFIX_TO_MODULE.get(`extensions/${parts[1]}`);
@@ -149,6 +159,26 @@ function moduleForPath(path) {
     if (compoundKey) return compoundKey;
   }
   return PREFIX_TO_MODULE.get(parts[0]) || null;
+}
+
+/**
+ * Modul-Schlüssel + benötigtes Zugriffsniveau für eine Session-Anfrage
+ * (`moduleAccessVerdict()`'s zweites/drittes Argument). Anders als
+ * `moduleForPath()` + `requiredAccess()` allein senkt dies das Niveau auf
+ * `read` für genau `/schedule/preferences` (S-12, UX-Audit: die eigene
+ * Erinnerungsvorlaufzeit/Wochenstunden hängen an der EIGENEN users-Zeile,
+ * kein Admin-Gate) — ohne den Modul-Schlüssel selbst auf `null` zu setzen,
+ * was `moduleAccessVerdict()` unconditional auf "erlaubt" zwingen würde,
+ * auch für `none`-Zugriff. Exaktes `===`, kein `startsWith`, damit
+ * `/schedule/preferencesX` nicht mitgemeint ist.
+ * @param {string} path z. B. "/schedule/preferences"
+ * @param {string} method HTTP-Methode
+ * @returns {{ moduleKey: string|null, access: 'read'|'write' }}
+ */
+function sessionModuleAccessRequirement(path, method) {
+  const moduleKey = moduleForPath(path);
+  const access = path === '/schedule/preferences' ? 'read' : requiredAccess(method);
+  return { moduleKey, access };
 }
 
 /** All scope module keys including runtime extension modules. */
@@ -187,6 +217,7 @@ export {
   serializeScopes,
   requiredAccess,
   moduleForPath,
+  sessionModuleAccessRequirement,
   tokenAllows,
   getModuleKeys,
   getAllScopes,

@@ -106,6 +106,57 @@ function loadListItems(listId, categories) {
 }
 
 // --------------------------------------------------------
+// Laufnummern (Migration v196): eine je Liste, bewegt von Triggern bei jeder
+// Aenderung an der Liste oder ihren Artikeln. Ein offener Einkaufszettel
+// fragt sie im Takt ab und laedt nach, was sich bewegt hat - ueber denselben
+// GET /:listId/items wie beim Oeffnen. Die Nummer sagt DASS, nie WAS.
+// --------------------------------------------------------
+
+/** Die Laufnummer einer Liste; null, wenn es die Liste (oder ihre Zeile) nicht gibt. */
+function listVersion(listId) {
+  return db.get()
+    .prepare('SELECT version FROM shopping_list_changes WHERE list_id = ?')
+    .get(listId)?.version ?? null;
+}
+
+/**
+ * Einen Schreibvorgang mit der Laufnummer VOR und NACH ihm einrahmen.
+ *
+ * Beides, nicht nur die neue Nummer: der Zettel, der geschrieben hat, will
+ * sich das Nachladen sparen - aber nur, wenn zwischen seinem letzten Stand
+ * und dieser Antwort NIEMAND SONST geschrieben hat. Das kann er allein an
+ * `before` erkennen: stimmt sie mit seinem Stand ueberein, ist alles bis
+ * `after` sein eigenes Werk. Die neue Nummer allein saehe fuer ihn genauso
+ * aus, wenn ein anderes Geraet kurz vor ihm etwas abgehakt haette, und die
+ * Aenderung ginge bis zur uebernaechsten verloren.
+ *
+ * Kein Transaktionsrahmen noetig: die Aufrufe hier sind synchron, und ein
+ * anderer Request kommt zwischen den beiden Lesungen nicht zum Zug.
+ */
+function withListChange(listId, write) {
+  const before = listVersion(listId);
+  const result = write();
+  return { result, list_change: { list_id: Number(listId), before, after: listVersion(listId) } };
+}
+
+// --------------------------------------------------------
+// GET /api/v1/shopping/versions
+// Die Laufnummern aller Listen. Statisch vor /:listId, wie /categories.
+// Response: { data: [{ list_id, version }] }
+// --------------------------------------------------------
+router.get('/versions', (_req, res) => {
+  try {
+    const rows = db.get()
+      .prepare('SELECT list_id, version FROM shopping_list_changes ORDER BY list_id')
+      .all();
+    res.json({ data: rows });
+  } catch (err) {
+    log.error('GET /versions error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
 // GET /api/v1/shopping/categories
 // Alle Kategorien zurückgeben.
 // Response: { data: ShoppingCategory[] }
@@ -306,21 +357,46 @@ router.get('/send-recipients', (req, res) => {
 // --------------------------------------------------------
 // GET /api/v1/shopping/suggestions?q=…
 // Autocomplete-Vorschläge aus bisherigen Artikelnamen.
-// Response: { data: string[] }
+// Response: { data: { name, category, quantity }[] }
+//
+// KATEGORIE UND MENGE REISEN MIT (#1103). Ein Name allein macht aus der Liste
+// bisheriger Einkaeufe keinen Vorschlag, der etwas spart - ohne die Kategorie
+// landet jeder abgetippte Vorschlag wieder in "Sonstiges" und die
+// Gang-Reihenfolge, derentwegen jemand ueberhaupt Kategorien pflegt, ist beim
+// naechsten Einkauf neu zu sortieren. Die juengste Zeile mit diesem Namen
+// entscheidet, welche Kategorie/Menge vorgeschlagen wird - sie ist die
+// aktuellste Aussage darueber, wie der Haushalt den Artikel heute einordnet.
+//
+// REIHENFOLGE NACH ZULETZT VERWENDET, NICHT ALPHABETISCH (#1103). Ein
+// Haushalt kauft dieselbe Handvoll Artikel immer wieder - die zuletzt
+// eingekauften stehen oben, statt hinter allem, was zufaellig frueher im
+// Alphabet liegt.
 // --------------------------------------------------------
 router.get('/suggestions', (req, res) => {
   try {
     const q = (req.query.q ?? '').trim();
     if (q.length < 1) return res.json({ data: [] });
 
-    const rows = db.get().prepare(`
-      SELECT DISTINCT name FROM shopping_items
+    const names = db.get().prepare(`
+      SELECT name, MAX(created_at) AS latest, MAX(id) AS latest_id FROM shopping_items
       WHERE name LIKE ? COLLATE NOCASE
-      ORDER BY name ASC
+      GROUP BY name
+      ORDER BY latest DESC, latest_id DESC
       LIMIT 8
     `).all(`${q}%`);
 
-    res.json({ data: rows.map((r) => r.name) });
+    const mostRecent = db.get().prepare(`
+      SELECT category, quantity FROM shopping_items
+      WHERE name = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `);
+    const data = names.map((r) => {
+      const recent = mostRecent.get(r.name);
+      return { name: r.name, category: recent?.category ?? null, quantity: recent?.quantity ?? null };
+    });
+
+    res.json({ data });
   } catch (err) {
     log.error('suggestions error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -497,25 +573,27 @@ router.patch('/items/:itemId', (req, res) => {
     const fieldErrors = collectErrors([vNotes, vUrl]);
     if (fieldErrors.length) return res.status(400).json({ error: fieldErrors.join(' '), code: 400 });
 
-    db.get().prepare(`
-      UPDATE shopping_items
-      SET is_checked = ?, name = ?, quantity = ?, category = ?, notes = ?, url = ?,
-          price_cents = ?, store_id = ?
-      WHERE id = ?
-    `).run(is_checked ? 1 : 0, name.trim(), quantity ?? null, category, vNotes.value, vUrl.value,
-      priceCents ?? null, storeId ?? null, req.params.itemId);
-
-    // Kategoriewechsel heißt Positionswechsel: die Handsortierung zählt je
-    // Kategorie (#678), der alte Rang gilt in der neuen Nachbarschaft nicht.
-    // Ans Ende - dort landet in dieser Liste auch alles neu Hinzugefügte.
-    if (category !== item.category) {
+    const { list_change } = withListChange(item.list_id, () => {
       db.get().prepare(`
-        UPDATE shopping_items SET sort_order = COALESCE((
-          SELECT MAX(sort_order) FROM shopping_items
-           WHERE list_id = ? AND category = ? AND id != ?
-        ), 0) + 1 WHERE id = ?
-      `).run(item.list_id, category, item.id, item.id);
-    }
+        UPDATE shopping_items
+        SET is_checked = ?, name = ?, quantity = ?, category = ?, notes = ?, url = ?,
+            price_cents = ?, store_id = ?
+        WHERE id = ?
+      `).run(is_checked ? 1 : 0, name.trim(), quantity ?? null, category, vNotes.value, vUrl.value,
+        priceCents ?? null, storeId ?? null, req.params.itemId);
+
+      // Kategoriewechsel heißt Positionswechsel: die Handsortierung zählt je
+      // Kategorie (#678), der alte Rang gilt in der neuen Nachbarschaft nicht.
+      // Ans Ende - dort landet in dieser Liste auch alles neu Hinzugefügte.
+      if (category !== item.category) {
+        db.get().prepare(`
+          UPDATE shopping_items SET sort_order = COALESCE((
+            SELECT MAX(sort_order) FROM shopping_items
+             WHERE list_id = ? AND category = ? AND id != ?
+          ), 0) + 1 WHERE id = ?
+        `).run(item.list_id, category, item.id, item.id);
+      }
+    });
 
     const updated = db.get()
       .prepare('SELECT * FROM shopping_items WHERE id = ?')
@@ -525,7 +603,7 @@ router.patch('/items/:itemId', (req, res) => {
     // CalDAV-Server nach (#617).
     const pending = markTodoOutbound('shopping', item, updated);
 
-    res.json({ data: updated });
+    res.json({ data: updated, list_change });
 
     if (pending) pushToCalDAV('Änderung');
   } catch (err) {
@@ -601,14 +679,17 @@ router.post('/items/undo-transfer', (req, res) => {
 // --------------------------------------------------------
 router.delete('/items/:itemId', (req, res) => {
   try {
+    const item = db.get()
+      .prepare('SELECT id, list_id FROM shopping_items WHERE id = ?')
+      .get(req.params.itemId);
+    if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
+
     const queued = queueTodoDeletions('shopping', mirroredItems('id = ?', req.params.itemId));
 
-    const result = db.get()
-      .prepare('DELETE FROM shopping_items WHERE id = ?')
-      .run(req.params.itemId);
-    if (result.changes === 0)
-      return res.status(404).json({ error: 'Item not found.', code: 404 });
-    res.json({ ok: true });
+    const { list_change } = withListChange(item.list_id, () => {
+      db.get().prepare('DELETE FROM shopping_items WHERE id = ?').run(item.id);
+    });
+    res.json({ ok: true, list_change });
 
     if (queued) pushToCalDAV('Löschung');
   } catch (err) {
@@ -694,6 +775,102 @@ router.put('/:listId', (req, res) => {
 });
 
 // --------------------------------------------------------
+// POST /api/v1/shopping/:listId/duplicate
+// Liste als neue Liste kopieren (#1103) - "der Einkauf letzte Woche war gut,
+// das meiste davon wieder", ohne die alte Liste anzutasten.
+// Body: { name, resetChecked?, keepQuantities?, keepNotes? }  (die drei Flags
+//        sind alle standardmaessig an)
+// Response: { data: ShoppingList }
+//
+// KATEGORIE UND HANDSORTIERUNG WERDEN IMMER UEBERNOMMEN - das ist der Punkt
+// des Duplizierens, kein Schalter. Was NIE mitkopiert wird, unabhaengig von
+// den Flags:
+//
+//   - Die CalDAV-Sync-Spalten (external_uid/external_source/...). Sie sind
+//     eine Aussage ueber EIN Sync-Objekt auf einem fremden Server - eine
+//     unveraenderte Kopie wuerde jede Aenderung der Kopie auf dasselbe
+//     entfernte VTODO schreiben und jedes Loeschen der Kopie dessen Loeschung
+//     dort anstossen (siehe auch die Diskussion in #998). Eine Kopie ist ein
+//     neuer, lokaler Artikel, der beim naechsten Sync-Lauf ganz normal neu
+//     angelegt wird, falls die Zielliste selbst gespiegelt ist.
+//   - added_from_meal: eine Kopie stammt aus dieser Aktion, nicht aus der
+//     Mahlzeit, aus der der ORIGINAL-Artikel kam.
+//   - price_cents UND store_id: beide sind eine Tatsache ueber einen EINKAUF -
+//     "einmal bezahlt, in diesem Laden" (#1003) - eine Kopie wurde noch nicht
+//     bezahlt, ihr fehlen beide Tatsachen, die Preis und Laden festhalten
+//     (Ruecksprache mit dem Maintainer auf #1103: derselbe Grund fuer beide,
+//     nicht nur fuer den Preis).
+//   - Tags (shopping_item_tags): sie sind gespiegelte VTODO-CATEGORIES und
+//     haengen damit an denselben Sync-Spalten, die oben nicht mitkommen -
+//     dieselbe Regel, nicht ein Versehen.
+// --------------------------------------------------------
+router.post('/:listId/duplicate', (req, res) => {
+  try {
+    const list = db.get()
+      .prepare('SELECT * FROM shopping_lists WHERE id = ?')
+      .get(req.params.listId);
+    if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
+
+    // Express 5 laesst req.body bei einem POST ohne Body undefined -
+    // ohne das ?. antwortete die Route hier mit 500 statt 400.
+    const vName = str(req.body?.name, 'Name', { max: MAX_TITLE });
+    if (vName.error) return res.status(400).json({ error: vName.error, code: 400 });
+
+    // Die drei Flags sind optional, aber wenn gesetzt, echte Booleans. Ohne
+    // diese Pruefung wirkte jeder Nicht-false-Wert wie true - der String
+    // 'false' duplizierte also mit zurueckgesetzten Haken und behaltenen
+    // Mengen, und der API-Aufrufer erfuhr nie, dass sein Flag ignoriert wurde.
+    for (const flag of ['resetChecked', 'keepQuantities', 'keepNotes']) {
+      const value = req.body?.[flag];
+      if (value !== undefined && typeof value !== 'boolean')
+        return res.status(400).json({ error: `${flag} must be a boolean.`, code: 400 });
+    }
+
+    const resetChecked   = req.body?.resetChecked !== false;
+    const keepQuantities = req.body?.keepQuantities !== false;
+    const keepNotes      = req.body?.keepNotes !== false;
+
+    const items = db.get()
+      .prepare('SELECT * FROM shopping_items WHERE list_id = ?')
+      .all(req.params.listId);
+
+    const newList = db.get().transaction(() => {
+      const info = db.get()
+        .prepare('INSERT INTO shopping_lists (name, created_by) VALUES (?, ?)')
+        .run(vName.value, req.authUserId || req.session.userId);
+      const newListId = info.lastInsertRowid;
+
+      const insertItem = db.get().prepare(`
+        INSERT INTO shopping_items
+          (list_id, name, quantity, category, is_checked, notes, url, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const item of items) {
+        insertItem.run(
+          newListId,
+          item.name,
+          keepQuantities ? item.quantity : null,
+          item.category,
+          resetChecked ? 0 : item.is_checked,
+          keepNotes ? item.notes : null,
+          keepNotes ? item.url : null,
+          // Rang explizit uebernehmen statt dem Einfuege-Trigger zu ueberlassen
+          // (der neue Zeilen mit sort_order=0 ans Ende ihrer Kategorie stellt) -
+          // die Handsortierung IST das, was diese Route verspricht zu erhalten.
+          item.sort_order,
+        );
+      }
+      return db.get().prepare('SELECT * FROM shopping_lists WHERE id = ?').get(newListId);
+    })();
+
+    res.status(201).json({ data: newList });
+  } catch (err) {
+    log.error('POST /:listId/duplicate error:', err);
+    res.status(500).json({ error: 'Internal server error.', code: 500 });
+  }
+});
+
+// --------------------------------------------------------
 // DELETE /api/v1/shopping/:listId
 // Liste und alle Artikel löschen (CASCADE).
 // Response: { ok: true }
@@ -733,7 +910,12 @@ router.get('/:listId/items', (req, res) => {
     if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
 
     const categories = loadCategories();
-    res.json({ data: loadListItems(req.params.listId, categories), list, categories });
+    // Die Laufnummer, zu der diese Artikel gehoeren: der Zettel sagt sie dem
+    // Feed als seinen Stand. Sonst haengt es an der Reihenfolge zweier
+    // Antworten beim Oeffnen - Laufnummern zuerst oder Artikel zuerst -, ob
+    // eine Aenderung dazwischen bis zur uebernaechsten verloren geht.
+    // Synchron mit dem Lesen der Artikel, also derselbe Stand.
+    res.json({ data: loadListItems(req.params.listId, categories), list, categories, version: listVersion(list.id) });
   } catch (err) {
     log.error('GET /:listId/items error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -791,13 +973,15 @@ router.patch('/:listId/items/reorder', (req, res) => {
       return res.status(400).json({ error: 'order muss alle Artikel der Kategorie enthalten.', code: 400 });
 
     const update = db.get().prepare('UPDATE shopping_items SET sort_order = ? WHERE id = ?');
-    db.get().transaction(() => {
-      // Ab 1: die 0 bleibt dem Trigger als Marke "noch nicht eingeordnet".
-      ids.forEach((id, idx) => update.run(idx + 1, id));
-    })();
+    const { list_change } = withListChange(req.params.listId, () => {
+      db.get().transaction(() => {
+        // Ab 1: die 0 bleibt dem Trigger als Marke "noch nicht eingeordnet".
+        ids.forEach((id, idx) => update.run(idx + 1, id));
+      })();
+    });
 
     const categories = loadCategories();
-    res.json({ data: loadListItems(req.params.listId, categories), categories });
+    res.json({ data: loadListItems(req.params.listId, categories), categories, list_change });
   } catch (err) {
     log.error('PATCH /:listId/items/reorder error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
@@ -817,8 +1001,19 @@ router.post('/:listId/items', (req, res) => {
       .get(req.params.listId);
     if (!list) return res.status(404).json({ error: 'List not found.', code: 404 });
 
+    // Ohne Kategorie faellt der Artikel auf "Sonstiges", solange der Haushalt
+    // diese Kategorie noch hat - erst wenn sie umbenannt oder geloescht wurde,
+    // auf die LETZTE nach Gang-Reihenfolge. Nur "letzte" reicht nicht: POST
+    // /categories haengt Neues bei MAX(sort_order)+1 an, die letzte Kategorie
+    // ist also schlicht die zuletzt angelegte ("Baumarkt"), nicht die neutrale
+    // Sammelkategorie. Es kursierten drei Definitionen des Standards (hier:
+    // letzte; Quick-Add-Client: der NAME via DEFAULT_CATEGORY_NAME; Loesch-
+    // Rueckfall: erste) - diese Regel deckt sich mit dem Client und der
+    // Absicht von #548. Der Quick-Add-Client schickt die Kategorie ohnehin
+    // immer explizit mit; dieser Rueckfall greift nur, wenn sie fehlt (z.B.
+    // direkter API-Aufruf).
     const validNames = validCategoryNames();
-    const defaultCat = validNames[0] ?? 'Sonstiges';
+    const defaultCat = (validNames.includes('Sonstiges') ? 'Sonstiges' : validNames.at(-1)) ?? 'Sonstiges';
     const requestedCat = req.body.category || defaultCat;
 
     const vName  = str(req.body.name, 'Name', { max: MAX_TITLE });
@@ -829,15 +1024,15 @@ router.post('/:listId/items', (req, res) => {
     const errors = collectErrors([vName, vQty, vCat, vNotes, vUrl]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
-    const result = db.get().prepare(`
+    const { result, list_change } = withListChange(req.params.listId, () => db.get().prepare(`
       INSERT INTO shopping_items (list_id, name, quantity, category, notes, url)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(req.params.listId, vName.value, vQty.value, vCat.value || defaultCat, vNotes.value, vUrl.value);
+    `).run(req.params.listId, vName.value, vQty.value, vCat.value || defaultCat, vNotes.value, vUrl.value));
 
     const item = db.get()
       .prepare('SELECT * FROM shopping_items WHERE id = ?')
       .get(result.lastInsertRowid);
-    res.status(201).json({ data: item });
+    res.status(201).json({ data: item, list_change });
     // Gehört die Liste zu einer gespiegelten CalDAV-Liste, wandert der neue
     // Artikel gleich mit (#831) - sonst hinge er bis zum nächsten Sync-Intervall
     // fest, während Umbenennen und Abhaken sofort hinausgehen.
@@ -1055,7 +1250,10 @@ router.post('/:listId/import-pantry', (req, res) => {
     if (!entries.length) return res.json({ data: { added: 0, skipped: 0, added_ids: [] } });
 
     const validNames = validCategoryNames();
-    const defaultCat = validNames[validNames.length - 1] ?? 'Sonstiges';
+    // Gleiche Standard-Regel wie beim Artikel-POST oben: "Sonstiges" solange
+    // es die Kategorie gibt, sonst die letzte nach Gang-Reihenfolge - die
+    // beiden Routen sollen nicht auseinanderlaufen.
+    const defaultCat = (validNames.includes('Sonstiges') ? 'Sonstiges' : validNames.at(-1)) ?? 'Sonstiges';
 
     const result = db.get().transaction(() => {
       const findPantryItem = db.get().prepare('SELECT name, category FROM pantry_items WHERE id = ?');
@@ -1094,19 +1292,36 @@ router.post('/:listId/import-pantry', (req, res) => {
 
 // --------------------------------------------------------
 // DELETE /api/v1/shopping/:listId/items/checked
-// Alle abgehakten Artikel aus einer Liste löschen.
-// Response: { deleted: number }
+// Abgehakte Artikel aus einer Liste löschen.
+// Body (optional): { ids: number[] } - nur diese, sonst alle abgehakten.
+// Response: { deleted: number, list_change }
 // --------------------------------------------------------
 router.delete('/:listId/items/checked', (req, res) => {
   try {
-    const queued = queueTodoDeletions(
-      'shopping', mirroredItems('list_id = ? AND is_checked = 1', req.params.listId)
-    );
+    // Ohne Body: alles, was beim Eintreffen abgehakt ist. Mit `{ ids }`: nur
+    // diese - und auch davon nur, was abgehakt ist und zu dieser Liste
+    // gehoert. Der Zettel schickt die IDs, die er selbst entfernt hat: im
+    // Undo-Fenster kann jemand anderes einen weiteren Artikel abhaken (den
+    // die Auffrischung dann herbringt), und der ginge sonst mit - und das
+    // Zuruecknehmen brachte nur den eigenen Schnappschuss zurueck.
+    let ids = null;
+    if (req.body?.ids !== undefined) {
+      if (!Array.isArray(req.body.ids) || req.body.ids.length === 0)
+        return res.status(400).json({ error: 'ids muss ein nicht-leeres Array von Artikel-IDs sein.', code: 400 });
+      ids = req.body.ids.map(Number);
+      if (ids.some((id) => !Number.isInteger(id) || id <= 0))
+        return res.status(400).json({ error: 'ids darf nur Artikel-IDs enthalten.', code: 400 });
+    }
+    const scope = ids
+      ? { where: `list_id = ? AND is_checked = 1 AND id IN (${ids.map(() => '?').join(',')})`, params: [req.params.listId, ...ids] }
+      : { where: 'list_id = ? AND is_checked = 1', params: [req.params.listId] };
 
-    const result = db.get().prepare(`
-      DELETE FROM shopping_items WHERE list_id = ? AND is_checked = 1
-    `).run(req.params.listId);
-    res.json({ deleted: result.changes });
+    const queued = queueTodoDeletions('shopping', mirroredItems(scope.where, ...scope.params));
+
+    const { result, list_change } = withListChange(req.params.listId, () => db.get().prepare(`
+      DELETE FROM shopping_items WHERE ${scope.where}
+    `).run(...scope.params));
+    res.json({ deleted: result.changes, list_change });
 
     if (queued) pushToCalDAV('Löschung');
   } catch (err) {

@@ -636,6 +636,52 @@ test('GET /holidays/groups/:cc/:sc: gestubbt -> 200', async () => {
   assert.equal(res.body.data.length, 2);
   holidays.__setFetchImpl(null);
 });
+test('PUT holiday_subdivision=null laesst die Gruppe eines Landes ohne Subdivision stehen (PR #1186)', async () => {
+  await put({ holiday_country: 'BE', holiday_subdivision: null, holiday_group: 'BE-FR' });
+  const partial = await put({ holiday_subdivision: null });
+  assert.equal(partial.status, 200);
+  assert.equal(partial.body.data.holiday_country, 'BE');
+  assert.equal(partial.body.data.holiday_group, 'BE-FR', 'ein Teil-Update ohne Gruppe loescht die Gemeinschaft nicht');
+  // Eine Gruppe, die an einer gespeicherten Region hing, faellt weiter mit ihr.
+  await put({ holiday_country: 'CH', holiday_subdivision: 'CH-BE', holiday_group: 'CH-BE-VS' });
+  const removed = await put({ holiday_subdivision: null });
+  assert.equal(removed.body.data.holiday_subdivision, null);
+  assert.equal(removed.body.data.holiday_group, null);
+});
+test('PUT holiday_country auf ein anderes Land ohne Gruppe raeumt die alte Gruppe ab (PR #1186)', async () => {
+  await put({ holiday_country: 'BE', holiday_subdivision: null, holiday_group: 'BE-FR' });
+  const moved = await put({ holiday_country: 'DE', holiday_subdivision: null });
+  assert.equal(moved.body.data.holiday_country, 'DE');
+  assert.equal(moved.body.data.holiday_group, null, 'BE-FR gehoert nicht zu DE');
+  // Dasselbe Land erneut: die Gruppe bleibt.
+  await put({ holiday_country: 'BE', holiday_group: 'BE-FR' });
+  const same = await put({ holiday_country: 'BE' });
+  assert.equal(same.body.data.holiday_group, 'BE-FR');
+  // Landwechsel MIT neuer Gruppe: die neue gilt.
+  const withGroup = await put({ holiday_country: 'CH', holiday_subdivision: 'CH-BE', holiday_group: 'CH-BE-VS' });
+  assert.equal(withGroup.body.data.holiday_group, 'CH-BE-VS');
+});
+test('GET /holidays/groups/:cc: Land ohne Subdivisionen -> Gruppen am Land (D#1182)', async () => {
+  holidays.__setFetchImpl(async (url) => ({
+    ok: true,
+    json: async () => (new URL(String(url)).pathname === '/Subdivisions'
+      ? []
+      : [{ code: 'BE-FR', shortName: 'FR' }, { code: 'BE-NL', shortName: 'NL' }]),
+  }));
+  const res = await raw('GET', '/holidays/groups/BE');
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.data.map((g) => g.code), ['BE-FR', 'BE-NL']);
+  holidays.__setFetchImpl(null);
+});
+test('GET /holidays/groups/:cc: ungültiger Ländercode -> 400', async () => {
+  assert.equal((await raw('GET', '/holidays/groups/be')).status, 400);
+});
+test('PUT holiday: Gruppe am Land ohne Subdivision bleibt gespeichert (D#1182)', async () => {
+  const { status, body } = await put({ holiday_country: 'BE', holiday_subdivision: null, holiday_group: 'BE-FR' });
+  assert.equal(status, 200);
+  assert.equal(body.data.holiday_subdivision, null);
+  assert.equal(body.data.holiday_group, 'BE-FR');
+});
 test('POST /holidays/sync: Mitglied -> 403', async () => {
   assert.equal((await raw('POST', '/holidays/sync', { role: 'member' })).status, 403);
 });

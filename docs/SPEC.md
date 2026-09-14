@@ -440,6 +440,75 @@ rejects a grouped "1.000" instead of silently reading it as one.
 `store_id` is `ON DELETE SET NULL`, not `RESTRICT`: deleting a shop keeps every price and only
 clears the assignment. What was once paid stays true.
 
+### Shopping List Changes (migration v196)
+One row per list, a counter that says *that* the list or its items changed, never what. Every
+list has a row from the start (backfilled with 0 for existing lists, an insert trigger on
+`shopping_lists` for new ones), because a client takes the first version it sees as its baseline
+and a list without a row would lose its first change to that baseline. Triggers on
+`shopping_items` (after insert, update, delete, plus one for an item whose `list_id` changed,
+which bumps the list it left), on `shopping_item_tags` (after insert and delete, resolved to the
+list through the item) and on a `shopping_lists` update bump it, so every writer - the
+shopping routes, the meal-plan and recipe imports, housekeeping, MCP, the CalDAV to-do sync -
+counts without knowing about it; `GET /api/v1/shopping/versions` reads this table and nothing
+else. The update trigger carries a `WHEN` that compares the columns a client shows (`list_id`,
+`name`, `quantity`, `category`, `is_checked`, `notes`, `url`, `sort_order`, `price_cents`,
+`store_id`; `IS NOT`, so NULL equals NULL): bookkeeping does not count - not the `outbound_dirty`
+flag the CalDAV push sets after an own tap and clears after the upload (two steps no receipt could
+cover, so an own tap on a mirrored list would have cost a reload), not the second UPDATE
+`trg_shopping_items_updated_at` runs after every change (which doubled every step), and not the
+inbound sync rewriting an unchanged mirrored row on every pass. A new column a client should show
+needs a migration that extends the trigger. Deliberately no foreign key to Shopping Lists: the item triggers fire during the cascade of a
+list deletion and a foreign key would make exactly that insert fail; a trigger on `shopping_lists`
+removes the row after the list instead, and the missing row is how a client learns the list is
+gone. Deviates from the entity-table rule (no `id`, no timestamps) as a key/value table.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| list_id | INTEGER | PRIMARY KEY |
+| version | INTEGER | NOT NULL, DEFAULT 0 |
+
+### Duplicating a list (#1103)
+`POST /shopping/{listId}/duplicate` copies a list's items into a brand-new list in one transaction.
+Body: `{ name, resetChecked?, keepQuantities?, keepNotes? }`, all three flags default to `true`.
+
+Category assignment and the manual per-category `sort_order` are **always** carried over verbatim —
+that is the entire point of duplicating a list, not something to make optional. `sort_order` is
+copied explicitly rather than left to the `AFTER INSERT` trigger (which would append every copied row
+to the end of its category and destroy the order being preserved).
+
+What a copy never carries over, independent of the flags:
+- The CalDAV sync columns (`external_uid`, `external_source`, `external_account_id`,
+  `external_object_url`, `outbound_dirty`, `outbound_attempts`) reset to their local defaults. Each
+  names a fact about a *specific* mirrored remote object; copying them verbatim would make an edit to
+  the copy write onto the same remote VTODO the original mirrors, and deleting the copy would queue
+  deletion of that shared remote object (the same class of hazard raised on #998, "Move an item
+  between shopping lists"). If the destination list is itself a CalDAV sync target, a copied item
+  uploads as a brand-new VTODO on the next sync pass, same as any newly-added item.
+- `added_from_meal` resets to `NULL` — a copy was created by this action, not by the meal that added
+  the original item.
+- `price_cents` and `store_id` reset to `NULL` — both are facts about a purchase actually made
+  (#1003), "paid once, in this shop"; a copy has not been bought yet.
+- Tags (`shopping_item_tags`) — they are mirrored VTODO `CATEGORIES` and hang off the same sync
+  identity that is not copied either; the same rule, not an oversight.
+
+The three flags are optional but must be real booleans when present — a string `'false'` would
+otherwise silently act as `true`; the route answers `400` instead. A body-less POST answers `400`
+("Name is required."), not `500`.
+
+`GET /shopping/suggestions?q=` additionally returns each suggested name's most recently used
+`category` and `quantity`, not the name alone, so picking a suggestion in quick-add restores its usual
+aisle placement instead of defaulting to the fallback category (the gap #1103 opened with). Results
+are ordered by most recently used first (`MAX(created_at)`, tie-broken by row id) rather than
+alphabetically.
+
+The item POST route's own default category (when none is given) is `Sonstiges` by name as long as
+the household still has that category, and only then the *last* category by `sort_order` — "last"
+alone is not stable, since `POST /categories` appends new categories at `MAX(sort_order) + 1`, so
+the last category is simply whatever was added most recently. This matches quick-add's
+`DEFAULT_CATEGORY_NAME` and the original intent of issue #548 ("default manually added items to the
+misc category") — the route had drifted to defaulting to the *first* category instead.
+`import-pantry` applies the same rule, so the two stay in step.
+
 ### Meals
 | Column | Type | Constraint |
 |--------|------|-----------|
@@ -750,6 +819,8 @@ Display metadata (name, color) for synced Google/CalDAV calendars. Populated aut
 
 **Default assignee per sync target (migration v79):** each synced calendar (Google/Apple/CalDAV via `external_calendars`, and each ICS subscription) can carry an optional `default_assignee_user_id`. Newly imported events of that target are automatically assigned to that person — **new events only**, never retroactively, so a manually removed assignment does not reappear on the next sync. Configured per calendar row in Settings → Sync. The picker stands on **every** calendar of a connected account, including before it is ticked (v2.8.1, #730): `PATCH /api/v1/calendar/external-calendars` creates the `external_calendars` row itself when it does not exist yet, taking the display name from the provider's own selection list — which is also the limit, since only a calendar the connected account actually offers can get a row this way. Before that the picker appeared only after the first sync, by which time the first and usually largest batch of events had already arrived unassigned. `POST /api/v1/calendar/subscriptions` accepts `default_assignee_user_id` for the same reason: creating a subscription syncs immediately. Nulled automatically when the referenced user is deleted.
 
+**Applying a default assignee to events already imported (#1154):** the sync stays new-only, but an admin can run a one-off backfill from Settings → Sync (section "Fill in assignments"). `GET /api/v1/calendar/external-calendars/default-assignee-backfill` returns `{ count, token }` for the confirmation, `POST` on the same path applies it and returns `{ assigned }`. It covers every `external_calendars` row of every account that carries a default assignee and fills only events still mirrored from that calendar (`external_source` equals the calendar's source, so a locally detached occurrence that kept its `calendar_ref_id` is left alone), that arrived inbound rather than being created locally and pushed out (outbound leaves a trace no import carries: Google and CalDAV keep their `target_*` column, Apple and CalDAV upload under the UID `oikos-<id>@oikos.local`; an imported event someone moved to another calendar in Yuvomi carries a target too and is skipped as well; Google events created before migration 47 are skipped entirely, because the Google outbound of that time uploaded every local event without a target), with **no assignment at all** (`assigned_to IS NULL` and no `event_assignments` row), so a manual assignment always wins. It writes through `setEventAssignments()`, the same path as the event editor: the author's reminders fan out to the new assignee and a restricted attachment opens to them. That path runs only for events with a future author reminder or an attachment, and inherited reminders whose time has already passed are marked dismissed, so backfilling old events sends no stale notifications. `POST` requires `expected_count`, the number the confirmation showed, and takes the `token` from the count back as `expected_token` (#1171): a SHA-256 over the candidate list, each event with the person it would get. When the candidate set changed in between, it answers 409 with the current `{ count, token }` and changes nothing. The count alone only catches a change in size; the token also catches a swap of the same size (an event assigned by hand while a new import takes its place, or a calendar switched to another person). `expected_token` is optional so an API client written before it keeps working, but without it only the count is compared. The count and the candidate list are taken in the same synchronous step, and only that list is processed: each row is re-checked when written, so an event assigned by hand in the meantime stays as it is and a candidate that appeared later is not touched. It works in batches of 50 with a yield between them: 5000 events in one transaction measured over twelve seconds of blocked event loop. It cannot tell a never-assigned event from one whose assignment was removed by hand; the confirmation says so. An orphaned default assignee is skipped, and ICS subscriptions are not included: they belong to their creator and are configured in personal settings, not on the admin page the action lives on.
+
 ### Holiday Cache
 Cached public holidays and school holidays from the free [OpenHolidays API](https://openholidaysapi.org)
 (no API key). Populated by an admin-configured country/subdivision in Settings → Modules → Calendar and refreshed
@@ -825,7 +896,7 @@ external-calendar connections as two separate concerns).
 | end_date | TEXT | YYYY-MM-DD, NOT NULL |
 | name | TEXT | Localized holiday name, NOT NULL |
 | year | INTEGER | Source year (used for scoped re-sync), NOT NULL |
-| group_code | TEXT | School-holiday group (e.g. `CH-BE-VS`) for multilingual subdivisions; nullable (applies to the whole subdivision, e.g. public holidays) |
+| group_code | TEXT | School-holiday group (e.g. `CH-BE-VS`) for multilingual subdivisions, or of the country itself when it has no subdivisions (Belgium: `BE-FR`); nullable (applies to the whole subdivision or country, e.g. public holidays) |
 
 Indexes: `idx_holiday_cache_dates (start_date, end_date)`, `idx_holiday_cache_lookup (type, country, subdivision, year)`.
 Configuration lives in `sync_config`: `holiday_country`, `holiday_subdivision`, `holiday_group`, `holiday_show_public`,
@@ -1580,11 +1651,11 @@ Planned/estimated budget (Budget → Plan). A **steady monthly plan**: one amoun
 
 ### Reminders
 
-Per-user reminders attached to tasks, calendar events, subscriptions, inventory items, inventory tracked dates, pantry items, or upcoming schedule shifts.
+Per-user reminders attached to tasks, calendar events, subscriptions, inventory items, inventory tracked dates, pantry items, upcoming schedule shifts, or upcoming Waste pickups.
 
 | Column | Type | Constraint |
 |--------|------|-----------|
-| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item`, or `schedule_entry` (migration v178), NOT NULL |
+| entity_type | TEXT | `task`, `event`, `subscription`, `inventory_item`, `inventory_tracked_date`, `pantry_item`, `schedule_entry` (migration v178), or `waste_pickup` (migration v203, #1063 Phase 8), NOT NULL |
 | entity_id | INTEGER | Entity identifier, NOT NULL |
 | remind_at | TEXT | ISO 8601 datetime, NOT NULL |
 | dismissed | INTEGER | 0/1, default 0 |
@@ -2115,6 +2186,275 @@ Photo log for maintenance issues (migration v33).
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
 | created_at | TEXT | ISO 8601 |
 | updated_at | TEXT | ISO 8601 |
+
+### Waste Types (migration v197, #1063)
+A household's named waste categories (recycling, organic, general, or custom), each with an icon
+and color. Presets offered in the UI create ordinary rows here, never a closed enum.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| name | TEXT | NOT NULL |
+| icon | TEXT | NOT NULL DEFAULT 'trash-2' |
+| color | TEXT | HEX, NOT NULL |
+| archived | INTEGER | NOT NULL DEFAULT 0 - a type with schedules or pickups refuses DELETE (409); archive instead |
+| sort_order | INTEGER | NOT NULL DEFAULT 0 |
+| created_by | INTEGER | FK → Users (SET NULL on delete), nullable |
+| created_at | TEXT | ISO 8601 |
+| updated_at | TEXT | ISO 8601 |
+
+### Waste Schedules (migrations v197, v204, #1063)
+A weekly, fixed-day-of-month, or ordinal-weekday-of-month (migration 204, #1063 Phase 9, e.g. "2nd
+Monday" or "last Friday") manual pickup rhythm for one type. `recurrence_kind` picks which of
+`weekdays` / `month_day` is set (the other stays NULL for `weekly`/`monthly_fixed_day`; both are
+required for `monthly_ordinal_weekday`, enforced by a CHECK constraint); recurrence is delegated to
+`server/services/recurrence.js` via `waste-domain.js`'s `scheduleToRule()` - no Waste-specific
+recurrence math. `month_day = -1` (for `monthly_fixed_day`) means the last day of the month, and
+requires `anchor_date` to itself be the actual last day of its month; any other `month_day` requires
+`anchor_date`'s own day-of-month to equal it. For `monthly_ordinal_weekday`, `month_day` is
+repurposed to carry the ORDINAL POSITION instead (-1 for last, 1-4 for nth - always computable in
+every month, unlike a "5th" which not every month has) and `weekdays` carries exactly one weekday
+code (not the CSV list a weekly schedule stores); `anchor_date` must itself be that exact ordinal
+occurrence of its own month, the same consistency rule `monthly_fixed_day` already enforces.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| type_id | INTEGER | FK → Waste Types (no cascade - deletion refused while schedules exist) |
+| recurrence_kind | TEXT | 'weekly', 'monthly_fixed_day', or 'monthly_ordinal_weekday' |
+| anchor_date | TEXT | YYYY-MM-DD, NOT NULL - the series' first occurrence and the RRULE anchor |
+| interval | INTEGER | NOT NULL DEFAULT 1, CHECK 1-52 (domain layer narrows further: 1-52 weekly, 1-24 monthly) |
+| weekdays | TEXT | weekly: comma-separated RRULE BYDAY codes (e.g. "MO,TH"). monthly_ordinal_weekday: exactly one code (e.g. "MO"). NULL for monthly_fixed_day |
+| month_day | INTEGER | monthly_fixed_day: -1 or 1-31 (a day-of-month). monthly_ordinal_weekday: -1 or 1-4 (an ordinal position, reusing the same column and its existing CHECK bound for a different meaning). NULL for weekly |
+| valid_until | TEXT | YYYY-MM-DD, nullable - maps onto the RRULE's own UNTIL |
+| active | INTEGER | NOT NULL DEFAULT 1 - 0 pauses the schedule; it contributes no occurrences |
+| created_by | INTEGER | FK → Users (SET NULL on delete), nullable |
+| created_at | TEXT | ISO 8601 |
+| updated_at | TEXT | ISO 8601 |
+
+### Waste Schedule Overrides (migration v197, #1063)
+Moves or skips exactly one of a schedule's calculated occurrences. `replacement_date` NULL means an
+explicit skip; a date moves it. `original_date` must be a real calculated occurrence of the
+schedule (checked against the raw rule, ignoring any other existing override).
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| schedule_id | INTEGER | FK → Waste Schedules (CASCADE delete) |
+| original_date | TEXT | YYYY-MM-DD, NOT NULL. UNIQUE with schedule_id |
+| replacement_date | TEXT | YYYY-MM-DD, nullable (NULL = skip). CHECK: differs from original_date |
+| note | TEXT | nullable |
+| created_at | TEXT | ISO 8601 |
+| updated_at | TEXT | ISO 8601 |
+
+### Waste One-Off Pickups (migration v197, #1063)
+A manual pickup fact for an irregular or special collection - a domain fact, not a schedule with a
+fake recurrence. API path is `/api/v1/waste/pickups`.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| type_id | INTEGER | FK → Waste Types (no cascade - deletion refused while pickups exist) |
+| date | TEXT | YYYY-MM-DD, NOT NULL. UNIQUE with type_id |
+| note | TEXT | nullable |
+| created_by | INTEGER | FK → Users (SET NULL on delete), nullable |
+| created_at | TEXT | ISO 8601 |
+| updated_at | TEXT | ISO 8601 |
+
+Range reads (`GET /api/v1/waste/occurrences?from=&to=`) and next-per-type
+(`GET /api/v1/waste/occurrences/next`) resolve these four tables into one coalesced
+`WasteOccurrence` DTO (`server/services/waste-domain.js`'s `resolveOccurrences()`/`nextPerType()`);
+no occurrence is ever materialized into a table, and Waste never writes `calendar_events`. Ranges
+are capped to 731 days inclusive, matching Schedule's own ceiling. See `server/openapi/paths/waste.js`
+for the full request/response contracts.
+
+### Waste Sources (migrations v199, v202, #1063)
+One row per imported ICS file or subscribed ICS URL. `content_hash` is the sha256 of the raw ICS text
+behind the current committed snapshot; `version` is bumped on every committed (re)import and is the
+concurrency guard a re-import commit checks against (409 on mismatch, invariant #9). `last_success_at`
+is only touched on a successful commit and is never cleared by a later failed attempt - "needs
+refresh" (invariant #6) is derived at read time from the absence of a future *mapped* imported pickup
+for this source, not from this column or from `coverage_end` (which reflects every parsed candidate
+date, including labels the household chose to ignore). Migration v202 (Phase 7) widened `kind` to add
+`'url'` and added the columns below it in the table; they are NULL/default for `kind='file'`.
+
+`url` is a credential, not merely data: `server/routes/waste/sources.js` omits it entirely from every
+list/detail response for a caller without module write access (the same principle
+`server/services/caldav-sync.js` already applies to a stored password - never returned, not masked).
+`needs_mapping` is set when an automatic or manual refresh fetched new content but could not
+auto-commit it (an unmapped label, or an unresolved blocking diagnostic - neither may be decided by a
+machine); the scheduler skips the source entirely while it is set, and it is cleared only by a
+reviewed refresh through the same mapping wizard a file re-import uses. `next_attempt_at` is NULL
+whenever `needs_mapping` is set, for the same reason. `consecutive_failures` drives exponential
+backoff (capped at 24h) and resets to 0 on any successful fetch, whether or not it committed.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| kind | TEXT | NOT NULL DEFAULT 'file' - 'file' or 'url' |
+| name | TEXT | NOT NULL |
+| content_hash | TEXT | NOT NULL - sha256 of the committed ICS text |
+| version | INTEGER | NOT NULL DEFAULT 1 |
+| coverage_start | TEXT | YYYY-MM-DD, nullable - earliest parsed candidate date |
+| coverage_end | TEXT | YYYY-MM-DD, nullable - latest parsed candidate date |
+| last_import_at | TEXT | ISO 8601, nullable - set on every commit or fetch attempt |
+| last_success_at | TEXT | ISO 8601, nullable - set only on a successful commit |
+| last_error | TEXT | nullable |
+| url | TEXT | nullable - kind='url' only; the subscription URL |
+| etag | TEXT | nullable - kind='url' only; conditional-GET cache validator |
+| last_modified | TEXT | nullable - kind='url' only; conditional-GET cache validator |
+| refresh_interval_minutes | INTEGER | NOT NULL DEFAULT 1440 - kind='url' only; bounded 60-43200 |
+| next_attempt_at | TEXT | ISO 8601, nullable - kind='url' only; NULL while needs_mapping is set |
+| consecutive_failures | INTEGER | NOT NULL DEFAULT 0 - kind='url' only |
+| needs_mapping | INTEGER | NOT NULL DEFAULT 0 - kind='url' only |
+| created_by | INTEGER | FK → Users (SET NULL on delete), nullable |
+| created_at | TEXT | ISO 8601 |
+| updated_at | TEXT | ISO 8601 |
+
+### Waste Source Mappings (migration v200, #1063)
+One row per distinct label (an ICS `CATEGORIES` tag, or `SUMMARY` when a feed carries no categories)
+seen for a source. Exactly one of (`type_id` set) / (`ignored`=1) is valid - a label is always either
+mapped or explicitly excluded, never left ambiguous. Rows persist across re-imports (`UNIQUE` on
+`source_id`+`normalized_label`), so a reviewed decision is remembered and only resurfaced for review,
+not re-asked, unless the label itself is new.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| source_id | INTEGER | FK → Waste Sources (CASCADE delete) |
+| original_label | TEXT | NOT NULL - as it appeared in the source |
+| normalized_label | TEXT | NOT NULL - trimmed/collapsed/lowercased. UNIQUE with source_id |
+| type_id | INTEGER | FK → Waste Types, nullable - exactly one of type_id/ignored |
+| ignored | INTEGER | NOT NULL DEFAULT 0 |
+| created_at | TEXT | ISO 8601 |
+| updated_at | TEXT | ISO 8601 |
+
+### Waste Imported Pickups (migration v201, #1063)
+One row per concrete pickup fact accepted by a committed import. `identity_key` is the stable
+cross-reimport identity a re-import diffs against: the ICS UID (suffixed with the concrete date for a
+recurring or overridden VEVENT) when the source event had one, otherwise a deterministic fingerprint
+over the label and date (the opt-in `allowMissingUid` mode in `server/services/ics-parser.js`, used
+only by Waste). `type_id` carries no cascade - an imported pickup is a reference that blocks type
+deletion exactly like a schedule or one-off (invariant #5); only `source_id` cascades, so deleting a
+source never touches another source's or manual data.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| source_id | INTEGER | FK → Waste Sources (CASCADE delete) |
+| type_id | INTEGER | FK → Waste Types (no cascade - deletion refused while imported pickups exist) |
+| identity_key | TEXT | NOT NULL. UNIQUE with source_id |
+| external_uid | TEXT | nullable - the source event's own ICS UID, for display/diagnostics only |
+| original_summary | TEXT | nullable - the source event's own SUMMARY text |
+| date_key | TEXT | YYYY-MM-DD, NOT NULL |
+| tz_note | TEXT | nullable - explains the timezone conversion ("all-day", "TZID ...", "UTC", "floating") |
+| created_at | TEXT | ISO 8601 |
+| updated_at | TEXT | ISO 8601 |
+
+Import is a stateless preview → explicit label mapping → atomic commit flow
+(`server/services/waste-import.js` builds candidates from `ics-parser.js`'s VEVENTs;
+`server/services/waste-store.js#commitImport` reparses on commit and diffs into
+additions/changes/removals, never trusting a client-supplied candidate list). Imported pickups are a
+third occurrence origin (`kind: 'import'`) alongside `schedule`/`one_off`, coalesced by the same
+`resolveOccurrences()`/`coalesceOccurrences()` used for the manual domain - Waste still never writes
+`calendar_events`. See `server/openapi/paths/waste.js` for the full import/source request/response
+contracts.
+
+### Waste Reminder Settings (migration v203, #1063 Phase 8)
+One row per (user, waste type): the calling user's own opt-in, lead time, and household-local
+delivery time for that type's pickup reminders. Personal, not household-wide - the same "no admin
+gate, everyone edits only their own" shape as `users.schedule_reminder_offset_minutes`, but per-type
+rather than a single scalar, since a lead time is meaningful per waste type. A type with no row for a
+given user is treated as disabled (`GET /api/v1/waste/reminder-settings` synthesizes the default
+rather than requiring one row per type up front).
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| user_id | INTEGER | FK → Users (CASCADE delete) |
+| type_id | INTEGER | FK → Waste Types (CASCADE delete). UNIQUE with user_id |
+| enabled | INTEGER | 0/1, NOT NULL DEFAULT 1 |
+| offset_days | INTEGER | NOT NULL DEFAULT 1 - lead time before the pickup, bounded 0-14 |
+| delivery_time | TEXT | HH:MM, NOT NULL DEFAULT '08:00' - household-local delivery time |
+| created_at | TEXT | ISO 8601 |
+| updated_at | TEXT | ISO 8601 |
+
+### Waste Reminder Entries (migration v203, #1063 Phase 8)
+The anchor table `reminders.entity_type = 'waste_pickup'` points at - a Waste occurrence is computed
+on read (`server/services/waste-domain.js`), not a stored row, so `reminders.entity_id` has nothing
+stable to reference without one (same reasoning as `schedule_reminder_entries`/
+`cycle_reminder_anchors`). One anchor per (user, type, date_key) - exactly the coalesced occurrence
+identity the resolver already uses, so a moved/skipped/re-mapped-away occurrence lands on a cleanly
+different anchor rather than a duplicate.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| user_id | INTEGER | FK → Users (CASCADE delete) |
+| type_id | INTEGER | FK → Waste Types (CASCADE delete) |
+| date_key | TEXT | YYYY-MM-DD, NOT NULL. UNIQUE with (user_id, type_id) |
+| created_at | TEXT | ISO 8601 |
+
+`server/services/waste-reminders.js#syncWasteRemindersForUser()` establishes the desired reminder
+state for one user (anchors created/dropped, reminders created/left-untouched-if-unchanged/dropped);
+`syncAllWasteReminders()` runs it for every user with an enabled setting or a leftover anchor,
+periodically from `server/services/notifications.js#processDueNotifications` (same place every other
+module's reminder sync runs) and synchronously right after a `PUT /waste/reminder-settings/:typeId`
+call for immediate feedback. A module-disabled household or a per-user denied module drops every
+reminder for that user (checked on every sync run, not just at delivery time) - the same
+"origin-to-module permission filtering" `server/routes/reminders.js#ORIGIN_MODULE` already enforces
+for `GET /reminders/pending` and the generic reminder CRUD routes (`waste_pickup` is a `DERIVED_ENTITY_TYPES`
+entry there, settable only through `waste_reminder_settings`, never through the generic reminder
+routes directly).
+
+### Waste ICS feed and per-type feed selection (migration v205, #1063 Phase 10)
+A revocable, read-only iCalendar feed of upcoming (and recently past, 30 days) pickups, mirroring
+the existing per-module feeds (`calendar_feed_token`, `inventory_deadlines_feed_token`,
+`schedule_feed_token`) - one token column added to `users`, generated/rotated/cleared by
+`server/services/waste-ics.js`. Since Waste data has no owner or visibility column, the feed
+CONTENT stays household-wide; only the TOKEN is personal, so a revoke costs exactly one
+subscription, never every subscriber's. `GET/POST/DELETE /api/v1/waste/feed` manage the token
+(no admin gate, same reasoning as the sibling feeds: the token hangs off the caller's own `users`
+row); the ICS content itself is served unauthenticated at `GET /feed/waste/:token.ics` outside
+`/api/v1`, rate-limited like every other feed.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| users.waste_feed_token | TEXT | nullable, UNIQUE when set |
+| users.waste_feed_type_ids | TEXT | nullable JSON array of `waste_types.id` - NULL means every active type |
+
+The optional type selection (`PUT /api/v1/waste/feed/types`) is stored alongside the token rather
+than as a query parameter on the public feed URL: a subscription URL is meant to stay stable across
+edits, and putting mutable selection state in the URL would force a new URL - and therefore a
+broken existing subscription - every time the selection changes. All-day `VEVENT`s only (Waste
+pickups have no time component), with a UID derived from the stable `(type_id, date_key)`
+occurrence identity `waste-domain.js`'s `coalesceOccurrences()` already assigns, never regenerated
+per build.
+
+### Waste mapping-profile export/import (#1063 Phase 10)
+A portable, source-independent snapshot of one source's own label-to-type decisions -
+`{version, mappings: [{pattern, type_name}]}` - exported from `waste_source_mappings` decoupled
+from local ids so it can be re-applied to a different source or a different household where the
+ids differ but the type NAMES still match. No municipal/provider catalog ships with the app; a
+profile only ever round-trips a household's OWN prior decisions. `GET
+/api/v1/waste/sources/:id/mapping-profile/export` produces it; `POST .../import/preview` resolves
+each entry against the TARGET source's own mapping rows (by pattern) and the target household's own
+types (by name) - never inventing a mapping row or type that doesn't already exist, so an unrelated
+profile just reports everything unmatched - and returns a `profile_digest`; `POST .../import/commit`
+re-runs the preview server-side and requires that digest to match (409 on mismatch, the same guard
+shape as the ICS import's own `preview_digest`), then applies every `applicable` entry
+transactionally. No new table: this reuses `waste_source_mappings` as-is and, like
+`updateMapping()`, never retroactively rewrites already-committed imported pickups.
+
+### Waste in global search (migration v206, #1063 Phase 10)
+Only the `waste_types` catalog is indexed into the shared `search_index` FTS5 table (entity
+`waste_type`) - never anything `waste-domain.js`'s `expandSchedule()`/`resolveOccurrences()`
+computes at read time, which is unbounded (a weekly schedule has no last date until `valid_until`)
+and never materializes as rows. `server/services/search.js`'s `waste` bucket has no row-level
+owner filter (household-owned, like contacts), only the standard module-permission gate
+(`BUCKET_MODULE.waste = 'waste'`); archived types are excluded at query time like everywhere else
+in Waste.
+
+### Waste in Calendar: per-type visibility (#1063 Phase 10)
+Client-only, like every other Calendar layer/filter in this app (no server-side saved-filter
+state): `state.wasteVisibleTypeIds` (`public/pages/calendar.js`) is a Set persisted to
+`localStorage` under `yuvomi:calendar:waste:visibleTypes`, following the same "empty set means
+every type" convention as the existing person filter. Its options are derived from the loaded
+occurrence window itself (`type_id`/`type_name`/`type_color`, already present on every coalesced
+occurrence) rather than a second fetch of the type catalog. The per-type toggle list renders nested
+directly under the single Waste layer row in the filter sheet - the only genuine nesting in that
+sheet - and only while the Waste layer itself is switched on.
 
 ### Inventory Locations (migration v136)
 Storage places for owned belongings. Two-level hierarchy via `parent_id` (top-level place →
@@ -3020,7 +3360,9 @@ Shortening a pattern is refused while days sit beyond the new length, rather tha
 them. As of migration 188, a position is **not** unique — a cycle day may carry several rows (a
 timetable's multiple classes at different times on the same weekday), each its own `shift_type_id`.
 `PUT /patterns/:id/days` always replaces every row of a pattern in one transaction (delete-all,
-re-insert-all), so every save assigns fresh ids to every row, even unchanged ones.
+re-insert-all), so every save assigns fresh ids to every row, even unchanged ones. A save is capped
+at 500 rows total (`MAX_PATTERN_DAY_ROWS`): every stored row is re-emitted as its own entry on every
+resolved read, so an uncapped save would be stored read amplification, not scheduling.
 
 #### Schedule Overrides
 
@@ -3154,8 +3496,12 @@ and `POST /overrides/fill` (and their extra-shift equivalents) follow the same s
 `note` already established: a fill applies one set of values to every day in the range, not a value
 per day. Every read endpoint (`GET /patterns/{id}/days`, `GET /overrides`, `GET /extras`) embeds
 `field_values` per row; every delete path (`DELETE /overrides/{dateKey}`, `DELETE /overrides`,
-`DELETE /extras/{id}`) explicitly deletes the matching `schedule_custom_field_values` rows first,
-since `entry_id` carries no real foreign key for a cascade to ride on.
+`DELETE /extras/{id}`, `DELETE /patterns/{id}` — whose pattern days only cascade at the FK level —
+and the user-deletion transaction, which cascades away all three entry kinds at once) explicitly
+deletes the matching `schedule_custom_field_values` rows first, since `entry_id` carries no real
+foreign key for a cascade to ride on. Omitting `field_values` from a `PUT` leaves stored values
+untouched on both the override and the extra route; only an explicitly sent object (including `{}`)
+replaces them.
 
 **Frontend (capture):** the cycle-day editor, the override create/edit modals, and the extra-shift
 create/edit modals all render a field-input block right after their shift-type selector, sourced from
@@ -3208,7 +3554,13 @@ quiet week elsewhere in the same month cancel out a real overtime week (most peo
 7 days, so spreading the weekly target evenly across every calendar day in the range set a target a
 real week's hours could rarely cross). Only the worst window's excess is reported, never the sum
 across all crossings - overlapping windows share days, so summing would count the same hours
-repeatedly. A **Print** action in the same tab relies on the app's existing
+repeatedly. Tracking overtime at all is its own per-user switch (`schedule_overtime_enabled`,
+migration 208, UX audit S-24) rather than a repurposed value on `schedule_weekly_hours` — that field
+keeps rejecting 0 as invalid input server-side either way, since 0 is never a real full-/part-time
+target. Off (`overtimeEnabled: false`) suppresses the overtime card entirely, independent of whatever
+number happens to sit in the weekly-hours field, and disables that field in the UI (there's nothing
+for it to affect while tracking is off). NULL/unset reads as **on**, so an existing account sees no
+silent behavior change. A **Print** action in the same tab relies on the app's existing
 `@media print` baseline (`public/styles/layout.css`) layered with Schedule-specific print rules
 (`public/styles/schedule.css`) that hide the filters/tabs and lay out the two statistics tables for a
 clean page - no server-side PDF generation, the browser's native print-to-PDF does the rest.
@@ -3226,9 +3578,8 @@ recomputed on every request), managed via `GET/POST regenerate/DELETE /api/v1/sc
 (each member manages only their own token). See `server/services/schedule-ics.js`.
 
 **Personal preferences (Schedule v3):** `GET/PUT /api/v1/schedule/preferences`
-(`{ reminderOffsetMinutes, weeklyHours }`, `server/routes/schedule-preferences.js`) holds two
-per-user settings, both nullable (either field may be omitted from a `PUT` to leave it unchanged, or
-set to `null` to reset it to its default):
+(`{ reminderOffsetMinutes, weeklyHours, overtimeEnabled }`, `server/routes/schedule-preferences.js`)
+holds three per-user settings (any field may be omitted from a `PUT` to leave it unchanged):
 
 - **Shift-start reminders:** an opt-in push notification before an upcoming shift begins.
   `reminderOffsetMinutes: null` (the default) disables it; setting it also triggers an immediate
@@ -3250,7 +3601,14 @@ set to `null` to reset it to its default):
   the Statistics tab's overtime flag scales against (see "Overtime flag + print" above), `null`
   falling back to 40h/week. Per-user rather than a household field, since a part-time and a full-time
   member of the same household have different targets and the overtime card evaluates each member's
-  own range.
+  own range. Always an integer 1-168 (168 = hours in a week) — 0 is rejected, not reinterpreted as
+  "no target" (see the next field for that).
+- **Overtime tracking toggle (`schedule_overtime_enabled`, migration v208, boolean, no null
+  state):** whether the overtime flag runs at all for this person, independent of the weekly-hours
+  number above. Unset reads as `true` (no silent behavior change for existing accounts). Off both
+  hides the overtime card and disables the weekly-hours field in the UI, since there's nothing left
+  for it to affect. A deliberate, separate switch rather than letting `weeklyHours: 0` mean "off" —
+  0 keeps its ordinary meaning (an invalid target) either way.
 
 **Overview tab (Schedule v3):** a fifth tab compares several household members' resolved schedules
 side by side, one lane per person, for a whole week or a single day (`GET /schedule/entries`, no new
@@ -3620,6 +3978,38 @@ The surface carries four things, in this order: **the time**, large (this is whe
 - Integration with meal plan: "Add ingredients to shopping list" transfers with source reference
 - **Bulk import from meal plan (v1.3.0):** a "From meal plan" action (in the list header until v2.2.3, since then in the chip row's overflow menu) opens a date-range dialog (defaults to the next 7 days) and imports the ingredients of every planned meal in that range into the active list. Repeated ingredients are aggregated before insertion — numeric quantities with a matching unit are summed, purely textual quantities collapse to a `N × …` note. Already-transferred ingredients are skipped via the existing `on_shopping_list` flag (`POST /api/v1/shopping/:listId/import-meal-plan`).
 - Checked items shown with strikethrough + moved to bottom
+- **Live updates while the list is open (migration v196):** an open list hears within about
+  ten seconds that another member (or a meal-plan import, or the CalDAV sync) changed its items,
+  and redraws the affected rows in place - a check from another phone looks exactly like a check
+  on this one, no rebuild, no scroll jump. The list is rebuilt only when an item was added,
+  removed, renamed or moved (its `sort_order` changed - the answer's order alone changes with
+  every check, since checked rows sort last); a list someone else renamed or deleted updates the
+  tab row, and a deleted active list hands over to the first remaining one. The mechanism is two-layered: a per-list change
+  counter (`shopping_list_changes`) that database triggers bump on every insert/update/delete of
+  `shopping_items` (both lists when an item moves) and on a list rename, so no writer has to
+  announce itself; and `GET /api/v1/shopping/versions`, which the page polls every 10 s while
+  the tab is visible and immediately on `visibilitychange`/`focus`, reloading only a list whose
+  number moved - through the same items request it used to open the list, so there is still one
+  read path. Deliberately a poll, not a stream: `/api/v1` is the contract, a versions list works
+  through any proxy, holds none of the browser's per-origin connections, and can grow into a
+  stream on the same counter later without withdrawing anything. The poll is bound to the
+  router's abort signal (#976). Own edits cost no reload: the item write routes answer with
+  `list_change: { list_id, before, after }`, and the page advances its mark when `before` is the
+  version it last saw - if someone else wrote in between, `before` differs and the next poll
+  reloads. The items answer carries `version`, and the page hands it to the feed as the state it
+  holds (`hold`): on open, the versions poll and the items request run side by side and neither
+  order is the safe one, so the mark becomes whatever the page actually loaded - a lower value
+  makes the next poll reload the change that fell between the two answers, a higher one saves a
+  pointless reload. A receipt or a held state that arrives before the first versions answer is
+  kept and applied to it, in order. Own edits also survive a reload: the intent overlay (see the check-intent rules in
+  `public/pages/shopping.js`) keeps a pending tap on top of an older server answer, and a row
+  removed locally stays out of every answer that started before its DELETE was confirmed - during
+  the undo window and for a load still in flight when the window closes - because the receipt
+  has already moved the mark and no poll would reload it otherwise. "Clear checked" names the
+  ids the page removed (`DELETE /:listId/items/checked` with `{ ids }`), so a row someone else
+  ticked during the undo window stays; the page acknowledges the receipt only when the server
+  deleted exactly as many rows as it removed - fewer means someone unticked one of them in the
+  window and the server kept it, and the next poll brings it back.
 - **Manual item order within an aisle (v1.87.0, #678):** every row carries a drag handle next to its edit and delete actions. Dragging reorders within the category group only — a drag across groups would be a category change, which the item dialog already does, and ranks are per category anyway. The handle is a real button and takes ArrowUp/ArrowDown once focused, sharing one persistence path with the drag; that keyboard route is required of every `makeSortable` caller (see the header of `public/utils/sortable.js`) and is guarded in `test:frontend-audit`. Its `aria-label` carries the position, and a `role="status"` live region announces each move, reusing `category.reorderAnnounce`. Checked rows are filtered out of the drag and their handle is disabled — they sort last in their group regardless of rank. A category holding a single row hides its handle via `:only-child`. `PATCH /api/v1/shopping/:listId/items/reorder` takes `{ category, order }` and requires the **complete** group: a partial list would leave the omitted ranks colliding with the newly assigned ones. Requests are serialised per category with at most one follow-up queued, so rapid moves settle in the order they were made instead of letting the arrival order at the server decide; the follow-up reads the DOM when it starts, so any number of moves costs two requests. The list id is captured when a move is queued, so switching lists mid-flight neither misroutes the write nor overwrites the new list's state.
 - **Send the list to a member by email (#944):** an entry in the overflow menu mails the list's open
   items to one household member, grouped by category in the same shop order the screen shows.
@@ -3665,6 +4055,7 @@ The surface carries four things, in this order: **the time**, large (this is whe
 - **Quick-add is a disclosure on touch (v1.59.0):** the two-line quick-add form is collapsed on pointer-less devices and opened by the FAB, which until then was the only FAB in the kitchen that merely focused an already-visible field instead of opening a form. Esc closes it and returns focus to the FAB. On pointer devices the field stays open — it is faster than any button — and the redundant empty-state CTA is dropped there instead, because the input it points at is visible right above it.
 - **Item editor (v1.59.0):** the detail dialog is titled "Edit item" (shared key with the pantry) instead of carrying the data value as its title, offers name, quantity and category besides link and note, and has a Cancel button. Before this it had two fields, no Cancel, and neither name nor quantity could be changed — a typo meant deleting the row and re-creating it. Deleting stays in the row (× on pointer devices, swipe on touch), both with undo.
 - **"Apply" is disabled at zero hits (v1.59.0)** in the meal-plan import dialog, matching its sibling action "Randomize plan"; the preview enables it as soon as the range contains ingredients.
+- **Duplicate a list (#1103):** "Duplicate" sits in the list menu next to rename/delete and opens a dialog for the new list's name plus three on-by-default flags (reset checked state, keep quantities, keep notes & links) — see "Duplicating a list" under Data Model above for what always carries over and what never does. Picking an autocomplete suggestion while adding an item now restores that item's most recently used category and quantity too, not just its name, and suggestions are ordered by most recently used rather than alphabetically. Quick-add's category selector resets to the default after every item added, instead of staying on whatever a previous suggestion or manual pick set it to — otherwise an unrelated item typed right after could quietly land in the wrong aisle.
 
 ### Meal Plan (`/meals`)
 
@@ -3853,7 +4244,7 @@ Module for managing household staff workflows. Navigation uses violet accent the
 - **Staff profiles:** each worker is linked to a user account; configurable billing model (daily flat rate or hourly), payment schedule (daily / twice monthly / monthly), calendar color, and notes; staff accounts are hidden from task assignment, dashboard member avatars, and the family contact list — their birthdays remain visible in the calendar and birthday list; staff accounts cannot log in to the app (login blocked at authentication layer)
 - **Work sessions:** check-in/check-out with timestamps; open sessions shown prominently; automatic local calendar event created on check-in; optional payment task created on check-in (toggle in Settings → Modules → Module options). **Several sessions per day (#1133, #1138):** only an open session blocks a new check-in (409), so a split shift, a break with resumed work or a second visit on the same day is a second session with its own rate, calendar event and payment task. A worker carries two answers that used to collapse into one: `current_session` is the open session and carries the check-out button, `today_session` is the last session of the day and carries the time line under the name
 - **Hourly billing:** workers with `rate_type = 'hourly'` have their `hourly_rate` and `rate_type` snapshotted at check-in; on check-out the server computes `minutes_worked` from the session duration, rounds to the nearest 15 minutes, and stores the resulting amount in `daily_rate`; the visit editor lets staff adjust `minutes_worked` directly with a live recalculation preview
-- **Payment tracking:** mark sessions as paid; monthly visit log with payment summaries and paid/unpaid breakdown; visits can be edited from the housekeeping dashboard (recent visits section) or directly from a calendar event tap (deep-links via `?editVisit=<id>`). **A paid visit is settled:** only an admin can change, delete or pay it again (GHSA-4p5w-5346-8598), and moving the payment task of a paid visit out of done needs an admin as well, from any path in Tasks (GHSA-82jf-c39w-vh8c); ticking the task off stays open to members. **Marking paid asks first (#1136):** the "Mark paid" buttons in the report list, the visit report and the staff log share one confirmation that names what happens - the linked payment task is checked off, and only an admin can undo it. **An admin can take a payment back:** `POST /api/v1/housekeeping/visits/:id/unpay` clears `paid_at` and reopens a linked payment task that is done (otherwise the payment-task reconciliation on the next `GET /visits` would set `paid_at` again); a visit that is not paid is returned unchanged. Visit responses carry `can_mark_unpaid`, so the visit report offers "Undo payment" only where the server allows it, and the route checks the role again on write
+- **Payment tracking:** mark sessions as paid; monthly visit log with payment summaries and paid/unpaid breakdown; visits can be edited from the housekeeping dashboard (recent visits section) or directly from a calendar event tap (deep-links via `?editVisit=<id>`). **A paid visit is settled:** only an admin can change, delete or pay it again (GHSA-4p5w-5346-8598), and moving the payment task of a paid visit out of done needs an admin as well, from any path in Tasks (GHSA-82jf-c39w-vh8c); ticking the task off stays open to members. **Actions follow the permission (#1135):** every visit from `GET /visits` and `GET /visits/:id` carries `can_edit` and `can_delete`, computed by the same function as the write guard (`mayTouchSettled()`) and the write permission in front of the routes (`moduleAccessVerdict()` for a member with read-only Housekeeping access, `tokenAllows()` for an API token without `housekeeping:write`); `can_mark_paid` follows the same write permission for unpaid visits and gates every Mark paid control, so the Staff log, the Overview recent visits and the `?editVisit=` deep link offer edit and delete only where the route would allow them; a settled visit a member cannot touch shows the visit report instead and names the reason in its meta line. The routes still check on write. **Reports month (#1137):** the Reports tab has a previous/next month stepper with a current-month reset behind it (hidden on the current month, same order as Budget). The selected month is page state (`reportMonth`) that every reload through `loadData()` reads, so an action in a past month does not jump back; the Overview recent visits stay on the current month. **Marking paid asks first (#1136):** the "Mark paid" buttons in the report list, the visit report and the staff log share one confirmation that names what happens - the linked payment task is checked off, and only an admin can undo it. **An admin can take a payment back:** `POST /api/v1/housekeeping/visits/:id/unpay` clears `paid_at` and reopens a linked payment task that is done (otherwise the payment-task reconciliation on the next `GET /visits` would set `paid_at` again); a visit that is not paid is returned unchanged. Visit responses carry `can_mark_unpaid`, so the visit report offers "Undo payment" only where the server allows it, and the route checks the role again on write
 - **Recurring chores (`housekeeping_decay_tasks`):** define chores by name, area, and frequency in days; urgency level computed from elapsed time since `last_completed`; visual decay indicator; chores can be edited, deleted, or undone (clear `last_completed`) directly from the chore list
 - **Supply requests:** request supplies with optional quantity; supplies can be linked directly to shopping lists
 - **Dashboard integration:** housekeeping widgets show today's open sessions, upcoming chores, and a recent-visits strip with inline edit access
@@ -3901,12 +4292,29 @@ One page module with six deep-link routes (pattern like Settings, not like the K
 
 ### Schedule (`/schedule`)
 
-Off by default. Four tabs (shift types, patterns, overrides, statistics) plus a "today" card.
+Off by default. Four tabs — Shift types, Planning (patterns, overrides and extra shifts together),
+Statistics, and Compare (the side-by-side weekly view, formerly labelled "Overview") — plus a
+"today" card. Each tab is its own route (`/schedule/shifts`, `/schedule/patterns`,
+`/schedule/statistics`, `/schedule/overview`; the routes themselves keep the `overview` path segment
+even though the tab label reads "Compare") registered like Health's sub-tabs (one exact route per
+tab, `public/utils/schedule-tabs.js`, soft-navigated via the page module's `update()` export) — a
+reload or a shared/deep link lands on the right tab, and the browser Back button walks between tabs
+instead of leaving the page. A household with no shift types yet opens on the Shift types tab
+instead of Planning, which would otherwise dead-end every form behind it. Clicking a schedule entry
+anywhere it renders (the "today" card, the Compare grid, a week/day calendar block) opens a small
+read-only detail view (shift type, times, owner, note, custom field values, and its origin
+pattern/override/extra) — month-view calendar chips keep navigating to that day instead.
 
 - **Scoping:** every household member may *read* the whole overlay — the family mostly needs to know
   that one person is unavailable on Tuesday evening. A member writes only their own schedule; an
   admin writes for anyone. Shift types are the exception, because they are shared: anyone may add
-  one, only the creator or an admin may change or remove it.
+  one, only the creator or an admin may change or remove it. The Statistics tab's owner picker is
+  narrower than this read scope on purpose: a non-admin sees only themselves there, an admin sees
+  everyone. This is a client-side convenience restriction, not a data boundary — `GET
+  /schedule/entries` itself stays queryable by any `user_id` for any member with module read access,
+  because the "today" card, Compare, the calendar overlay and the dashboard widget all depend on
+  that being household-wide by design; Statistics just stops making it as convenient to pull up
+  someone else's hour totals as it is to look at their shifts directly.
 - **Calendar overlay:** a separate, explicitly toggleable, **read-only** layer — never ordinary
   editable events. It defaults to a compact strip rather than a full block, and the choice persists
   per browser. Its colour comes from `--module-schedule` in `tokens.css`, not from the markup: the

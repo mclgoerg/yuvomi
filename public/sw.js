@@ -17,7 +17,7 @@
  *   → bypassCacheUntil (in-memory + Cache API für SW-Restart-Robustheit)
  */
 
-const APP_RELEASE        = '2.66.0';
+const APP_RELEASE        = '2.66.1';
 const APP_BUILD_REVISION = '__YUVOMI_BUILD_REVISION__';
 const CACHE_RELEASE      = `${APP_RELEASE}-${APP_BUILD_REVISION}`;
 const SHELL_CACHE        = `yuvomi-shell-${CACHE_RELEASE}`;
@@ -33,6 +33,8 @@ const ALL_CACHES    = [SHELL_CACHE, PAGES_CACHE, LOCALES_CACHE, ASSETS_CACHE];
 // GET-API-Pfade (nach /api/v1), die für Read-only-Offline gecacht werden dürfen.
 // NUR Lese-Endpunkte — niemals /auth/* oder Mutationen. Prefix-Match.
 const API_CACHE_WHITELIST = ['/calendar', '/tasks', '/shopping', '/contacts', '/dashboard'];
+// Pfade UNTER einem Whitelist-Prefix, die trotzdem nie gecacht werden.
+const API_CACHE_EXCLUDE = ['/shopping/versions'];
 
 // App-Shell: sofort benötigt für ersten Render
 const APP_SHELL = [
@@ -147,6 +149,7 @@ const APP_SHELL = [
   '/utils/inventory-warranty.js',
   '/utils/kitchen-tabs.js',
   '/utils/kitchen-transfer.js',
+  '/utils/live-feed.js',
   '/utils/markdown-checklist.js',
   '/utils/markdown-toolbar.js',
   '/utils/meal-types.js',
@@ -176,6 +179,7 @@ const APP_SHELL = [
   '/utils/recipe-to-meal.js',
   '/utils/recurrence-scope.js',
   '/utils/reminder-offset.js',
+  '/utils/schedule-tabs.js',
   '/utils/scroll-restore.js',
   '/utils/seal-pair.js',
   '/utils/shopping-categories.js',
@@ -236,7 +240,13 @@ const APP_LOCALES = [
   '/locales/zh.json',
 ];
 
-// Seiten-Module: lazy geladen, aber vorab gecacht für Offline
+// Seiten-Module: lazy geladen, aber vorab gecacht für Offline.
+// waste.js fehlt hier BEWUSST (Round-3-Review, #1063): wie housekeeping.js
+// und schedule.js ist es ein Opt-in-Modul, das die meisten Installationen
+// nie laden - vorab gecacht würde es jede Installation Bytes kosten, und
+// die Seite selbst ist ohne Netz ohnehin nur eingeschränkt nützlich (die
+// Termine kommen aus /occurrences). Wer die drei offline will, hebt sie
+// zusammen hierher, nicht einzeln.
 const PAGE_MODULES = [
   '/pages/dashboard.js',
   '/pages/tasks.js',
@@ -595,6 +605,11 @@ function isMutableAppResource(pathname) {
 function isCacheableApiGet(pathname) {
   if (!pathname.startsWith('/api/v1')) return false;
   const rest = pathname.slice('/api/v1'.length);
+  // Die Laufnummern-Abfrage der Einkaufslisten faellt unter das Prefix
+  // /shopping, gehoert aber nicht in den Cache: sie kommt alle 10 s je offenem
+  // Tab, und offline hat ein alter Stand der Nummern keinen Wert - die Seite
+  // bekaeme ihn als normale 200 zurueck und hielte ihn fuer frisch.
+  if (API_CACHE_EXCLUDE.includes(rest)) return false;
   return API_CACHE_WHITELIST.some((p) => rest === p || rest.startsWith(`${p}/`));
 }
 

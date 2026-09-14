@@ -286,6 +286,35 @@ export function resolveHolidayLocation({
   return { country, subdivision };
 }
 
+/**
+ * Welche Schulferien-Gruppe gespeichert wird. Solange die Gruppensuche fuer den
+ * gewaehlten Ort nicht bestaetigt ist (sie laeuft noch oder ist gescheitert),
+ * bleibt die gespeicherte Gruppe stehen: ein versteckter, leerer Picker ist
+ * keine Auskunft, dass es keine Gruppe gibt. Sonst loeschte ein kurzer
+ * Netzfehler beim naechsten Speichern still die gewaehlte Gemeinschaft, und alle
+ * belgischen Ferien-Regime kaemen zurueck (Review zu PR #1186). Die gespeicherte
+ * Gruppe gilt nur fuer den Ort, an dem sie gespeichert wurde.
+ */
+export function resolveHolidayGroup({
+  groupReady,
+  pickerShown,
+  selectedGroup,
+  location,
+  persistedCountry,
+  persistedSubdivision,
+  persistedGroup,
+}) {
+  if (!groupReady) {
+    const samePlace = location.country === (persistedCountry || null)
+      && location.subdivision === (persistedSubdivision || null);
+    return samePlace ? persistedGroup || null : null;
+  }
+  // Eine Gruppe gibt es unter einer Subdivision (CH-BE-VS) oder, bei einem Land
+  // ohne Subdivisionen, am Land selbst (BE-FR, D#1182) - dann steht der Picker
+  // sichtbar da, obwohl keine Region gewaehlt ist.
+  return (location.subdivision || pickerShown) ? selectedGroup || null : null;
+}
+
 export async function runHolidayDiscovery(load, onError) {
   try {
     return { ok: true, value: await load() };
@@ -344,15 +373,19 @@ async function loadSubdivisions(
  * Schulferien-Gruppen einer Subdivision laden und den Picker nur einblenden,
  * wenn es mindestens zwei Regimes gibt (mehrsprachige Kantone, #434). Bei 0/1
  * Gruppe bleibt er verborgen, weil keine Mehrdeutigkeit besteht.
+ * `countryLevel`: das Land fuehrt keine Subdivisionen, seine Gruppen haengen am
+ * Land selbst (Belgien, D#1182) - dann wird ohne Subdivision gefragt.
+ * @returns {Promise<boolean|null>} true = fuer diesen Ort bestaetigt (auch "keine
+ *   Gruppe"), false = gescheitert, null = durch eine neuere Anfrage ueberholt.
  */
-async function loadGroups(
-  select,
-  groupContainer,
-  countryCode,
-  subdivisionCode,
-  selectedCode,
-  requestState,
-) {
+/**
+ * Leert und verbirgt den Gruppen-Picker und ueberholt jede noch laufende
+ * Gruppensuche. Beim Landwechsel SOFORT, nicht erst nach der Regionssuche:
+ * sonst stuende waehrend einer langsamen Anfrage die Gruppe des alten Landes
+ * sichtbar und gueltig neben dem neuen Land (Review zu PR #1186).
+ * @returns {number} die neue Anfrage-Nummer
+ */
+function clearGroupPicker(select, groupContainer, requestState) {
   const requestId = ++requestState.latestRequestId;
   const noneOption = document.createElement('option');
   noneOption.value = '';
@@ -360,18 +393,49 @@ async function loadGroups(
   select.replaceChildren(noneOption);
   select.disabled = true;
   groupContainer.hidden = true;
+  return requestId;
+}
 
-  if (!countryCode || !subdivisionCode) return;
+/**
+ * Soll nach der Regionssuche eines Landwechsels eine Gruppensuche starten?
+ * Nein, wenn inzwischen ein anderes Land gewaehlt ist oder die Antwort ueberholt
+ * wurde - der neuere Wechsel besitzt den Gruppenzustand. Und nein, wenn die
+ * Regionssuche gescheitert ist: dann haelt resolveHolidayLocation() den
+ * gespeicherten Ort, und eine Suche ohne Region wuerde "keine Gruppe"
+ * bestaetigen und die gespeicherte loeschen (Review zu PR #1186).
+ * Am Land gefragt wird nur fuer ein Land mit Schulferien-Quelle: die lokal
+ * berechneten Laender (US, CA, AU, NZ, BR, GB) fuehrt OpenHolidays nicht, eine
+ * Anfrage dort waere ein sicherer Fehlschlag (countrySchoolHolidaysAvailable()).
+ * @returns {{countryLevel: boolean}|null}
+ */
+export function groupLookupAfterSubdivisions({ discovery, requestedCountry, currentCountry, subdivisionCount, schoolHolidaysAvailable = true }) {
+  if (requestedCountry !== currentCountry) return null;
+  if (!discovery.ok || discovery.value === null) return null;
+  return { countryLevel: subdivisionCount === 0 && schoolHolidaysAvailable !== false };
+}
+
+async function loadGroups(
+  select,
+  groupContainer,
+  countryCode,
+  subdivisionCode,
+  selectedCode,
+  requestState,
+  { countryLevel = false } = {},
+) {
+  const requestId = clearGroupPicker(select, groupContainer, requestState);
+
+  if (!countryCode || (!subdivisionCode && !countryLevel)) return true;
 
   try {
-    const response = await api.get(
-      `/preferences/holidays/groups/${countryCode}/${subdivisionCode}`,
-    );
+    const response = subdivisionCode
+      ? await api.get(`/preferences/holidays/groups/${countryCode}/${subdivisionCode}`)
+      : await api.get(`/preferences/holidays/groups/${countryCode}`);
     // Zwischenzeitlich neu gewählt → verworfene Antwort ignorieren.
-    if (requestId !== requestState.latestRequestId) return;
+    if (requestId !== requestState.latestRequestId) return null;
 
     const groups = Array.isArray(response?.data) ? response.data : [];
-    if (groups.length < 2) return;
+    if (groups.length < 2) return true;
 
     for (const g of groups) {
       const option = document.createElement('option');
@@ -382,8 +446,11 @@ async function loadGroups(
     }
     select.disabled = false;
     groupContainer.hidden = false;
+    return true;
   } catch {
-    // Gruppen sind optional – Fehler still schlucken, Picker bleibt verborgen.
+    // Gruppen sind optional – Picker bleibt verborgen. Gescheitert ist aber
+    // nicht "keine Gruppe": resolveHolidayGroup() haelt die gespeicherte fest.
+    return requestId === requestState.latestRequestId ? false : null;
   }
 }
 
@@ -402,8 +469,15 @@ function holidayPreferenceData(container, discoveryState) {
   return {
     holiday_country: location.country,
     holiday_subdivision: location.subdivision,
-    // Ohne Subdivision kann es keine Gruppe geben.
-    holiday_group: location.subdivision ? (groupEl?.value || null) : null,
+    holiday_group: resolveHolidayGroup({
+      groupReady: discoveryState.groupReady,
+      pickerShown: container.querySelector('#holiday-group-group')?.hidden === false,
+      selectedGroup: groupEl?.value || '',
+      location,
+      persistedCountry: discoveryState.persistedCountry,
+      persistedSubdivision: discoveryState.persistedSubdivision,
+      persistedGroup: discoveryState.persistedGroup,
+    }),
     holiday_show_public: container.querySelector('#holiday-show-public')?.checked ?? false,
     holiday_show_school: container.querySelector('#holiday-show-school')?.checked ?? false,
     holiday_public_color: container.querySelector('#holiday-public-color').value,
@@ -523,6 +597,11 @@ async function bindEvents(container, preferences) {
     persistedCountry: preferences.holiday_country || null,
     persistedSubdivision: preferences.holiday_subdivision || null,
     persistedGroup: preferences.holiday_group || null,
+    // Gruppensuche fuer den aktuellen Ort bestaetigt? Siehe resolveHolidayGroup().
+    groupReady: false,
+  };
+  const applyGroupResult = (result) => {
+    if (result !== null) discoveryState.groupReady = result;
   };
 
   const showDiscoveryError = (error) => {
@@ -549,6 +628,8 @@ async function bindEvents(container, preferences) {
     const countryCode = countrySelect.value;
     discoveryState.countryReady = true;
     discoveryState.subdivisionReady = false;
+    discoveryState.groupReady = false;
+    clearGroupPicker(groupSelect, groupGroup, groupRequests);
     updateSyncState();
     applySchoolAvailability(countryCode);
     const result = await runHolidayDiscovery(
@@ -564,8 +645,18 @@ async function bindEvents(container, preferences) {
     if (result.ok && result.value) {
       discoveryState.subdivisionReady = result.value.selectedResolved;
     }
-    // Land gewechselt → Subdivision zurückgesetzt → Gruppen-Picker leeren.
-    await loadGroups(groupSelect, groupGroup, countryCode, subdivisionSelect.value, '', groupRequests);
+    // Land gewechselt → Subdivision zurückgesetzt. Ein Land ohne Subdivisionen
+    // bringt seine Gruppen selbst mit (D#1182).
+    const lookup = groupLookupAfterSubdivisions({
+      discovery: result,
+      requestedCountry: countryCode,
+      currentCountry: countrySelect.value,
+      subdivisionCount: subdivisionSelect.options.length - 1,
+      schoolHolidaysAvailable: countrySchoolHolidaysAvailable(countriesData, countryCode),
+    });
+    if (lookup) {
+      applyGroupResult(await loadGroups(groupSelect, groupGroup, countryCode, subdivisionSelect.value, '', groupRequests, lookup));
+    }
     updateSyncState();
   });
 
@@ -573,7 +664,8 @@ async function bindEvents(container, preferences) {
     applyHolidaySubdivisionSelection(discoveryState);
     updateSyncState();
     // Subdivision gewechselt → passende Ferien-Gruppen neu laden, Auswahl zurück.
-    await loadGroups(groupSelect, groupGroup, countrySelect.value, subdivisionSelect.value, '', groupRequests);
+    discoveryState.groupReady = false;
+    applyGroupResult(await loadGroups(groupSelect, groupGroup, countrySelect.value, subdivisionSelect.value, '', groupRequests));
   });
 
   groupSelect.addEventListener('change', () => {
@@ -679,6 +771,7 @@ async function bindEvents(container, preferences) {
 
   if (!preferences.holiday_country) {
     discoveryState.subdivisionReady = true;
+    discoveryState.groupReady = true;
   } else if (discoveryState.countryReady) {
     const subdivisionsResult = await runHolidayDiscovery(
       () => loadSubdivisions(
@@ -693,15 +786,34 @@ async function bindEvents(container, preferences) {
     if (subdivisionsResult.ok && subdivisionsResult.value) {
       discoveryState.subdivisionReady = subdivisionsResult.value.selectedResolved;
     }
-    if (preferences.holiday_subdivision) {
-      await loadGroups(
+    // Hat der Nutzer waehrend der Regionssuche schon ein anderes Land gewaehlt,
+    // gehoert der Gruppenzustand dessen Wechsel: keine Suche mehr fuer das
+    // gespeicherte Land starten, sie wuerde die neuere ueberholen (Review zu PR #1186).
+    const stillSavedCountry = countrySelect.value === preferences.holiday_country;
+    if (stillSavedCountry && preferences.holiday_subdivision) {
+      applyGroupResult(await loadGroups(
         groupSelect,
         groupGroup,
         preferences.holiday_country,
         preferences.holiday_subdivision,
         preferences.holiday_group || '',
         groupRequests,
-      );
+      ));
+    } else if (stillSavedCountry && subdivisionsResult.ok && subdivisionsResult.value && subdivisionSelect.options.length <= 1
+      && countrySchoolHolidaysAvailable(countriesData, preferences.holiday_country)) {
+      // Land ohne Subdivisionen (Belgien, D#1182): gespeicherte Gruppe am Land.
+      applyGroupResult(await loadGroups(
+        groupSelect,
+        groupGroup,
+        preferences.holiday_country,
+        '',
+        preferences.holiday_group || '',
+        groupRequests,
+        { countryLevel: true },
+      ));
+    } else if (stillSavedCountry && subdivisionsResult.ok && subdivisionsResult.value) {
+      // Land mit Subdivisionen, keine gewaehlt: bestaetigt ohne Gruppe.
+      discoveryState.groupReady = true;
     }
   }
   updateSyncState();

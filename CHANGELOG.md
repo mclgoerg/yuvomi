@@ -9,6 +9,238 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **New optional module: Waste collection** (#1063). Define your household's waste types
+  (recycling, organic, general, or your own, each with an icon and color) and a weekly or
+  fixed-day-of-month pickup schedule for each. A single calculated pickup can be moved to a
+  different date or skipped without touching the rest of the schedule, and moving one origin never
+  hides another - a manual one-off pickup recorded on the same day a schedule occurrence moved away
+  from still shows. One-off pickups cover irregular or special collections that are not part of any
+  recurring schedule. A type with schedules or pickups cannot be deleted (archive it instead), so a
+  season's history is never lost by accident. Off by default; a household turns it on in
+  Settings → Modules. A municipality's ICS calendar file can also be imported: preview its pickups,
+  map each label to a waste type (or create one on the spot, or ignore it), and commit - the file is
+  re-parsed on commit so nothing is trusted from the preview alone, and re-importing next year's file
+  diffs cleanly into additions/changes/removals without duplicating or losing manual data. A source
+  with no future mapped pickup is flagged for a refresh. An optional Dashboard widget shows the next
+  pickup per active type, soonest first, and carries the same "needs a refresh" flag as the module
+  page; hidden by default, like the module itself. A device-local Calendar layer, off by default,
+  shows every type's pickups in month, week, day, and agenda view; a pickup carries its type's icon
+  and color and opens the module directly, never the ordinary event editor. Beyond a one-time file
+  import, a source can also subscribe to an ICS URL: it refreshes itself automatically on a
+  configurable schedule (hourly to monthly), applying an update only once every label already has a
+  confirmed mapping - unrecognized content is flagged for review instead of guessed at, and a manual
+  "check now" is always available alongside the automatic schedule. Each household member can also opt
+  into their own pickup reminders per waste type, choosing how many days ahead and what time of day
+  (household-local) to be notified - personal, so a reminder never goes to someone who didn't ask for
+  it. A monthly schedule can now also follow an ordinal weekday - "the second Monday" or "the last
+  Friday" of every month - alongside the existing weekly and fixed-day-of-month rhythms; the
+  underlying shared recurrence engine gained this once and every existing recurring feature (Tasks,
+  Calendar, CalDAV/ICS import) benefits from it, not just Waste. A revocable, personal read-only ICS
+  feed of upcoming pickups is now available too (Settings → Feeds), with an optional per-type
+  selection; a source's label-to-type mapping decisions can be exported as a portable profile and
+  re-applied to another source or household, without the app ever shipping a municipal/provider
+  catalog. Waste types are now searchable from the global search bar, and the Calendar layer's filter
+  sheet gained a per-type visibility list nested under the one Waste toggle, so a rare collection is
+  never silently hidden while a noisy one can be tucked away.
+
+- **Waste page UX: labelled add-type entry point, unified row actions, curated type colors** (#1146).
+  The page now leads with a labelled "Add waste type" button rather than hiding all four actions
+  behind one unlabelled menu, both empty states offer the step their own text describes, and the
+  pickup button no longer dead-ends on a fresh install - without a type it now opens the type dialog
+  instead of only saying that one is missing. Waste type, schedule, and source rows carry the same
+  single overflow menu with named entries that the pickup rows already used, so a destructive action
+  is no longer one stray tap away and an action whose meaning changes with the source finally says
+  which one it is; every one of those menus now sits at the trailing edge of its row, and every row
+  puts its icon beside the name instead of above it, so all four row types read the same way. A
+  paused schedule is now visually distinct from an archived type instead of wearing the same badge.
+  A type's color comes from a curated palette instead of a free color picker, which had happily
+  accepted a white or black icon that then disappeared against the light or dark background - an
+  existing color outside the palette is kept, not silently overwritten.
+
+- **A calendar's default assignee can now be applied to the events it already imported** (#1154).
+  Until now the mapping only reached events that arrived after it was set, so the first thing
+  anyone saw after mapping a calendar was a list of unassigned events. Settings → Sync gains a
+  one-off "Apply to existing appointments" action for admins: it runs over the calendars of all
+  accounts that have a default assignee, names how many events it will touch, and fills only
+  events that are not assigned to anyone yet. An assignment made by hand is left alone. ICS
+  subscriptions are not included.
+
+- **The Housekeeping Reports tab can step through past months** (#1137). Until now it only ever
+  showed the current month, and older reports were reachable only through a single worker in the
+  Staff tab. A previous/next stepper with a jump back to the current month now sits next to the
+  title, in the same order as Budget. The chosen month stays put while you work in it: marking a
+  visit paid or editing one reloads that month instead of jumping back, and an empty month says
+  which month it is.
+
+- **A shopping list can be duplicated** (#1103). "Duplicate" sits in the list menu next to
+  rename/delete and copies every item into a new list, with category assignment and the manual
+  per-category order always carried over - that is the point of duplicating, not a switch. Three
+  flags control the rest: reset checked state, keep quantities, and keep notes & links, all on by
+  default.
+
+  A duplicated item is a new, local item: CalDAV sync fields, the originating meal, any recorded
+  price or shop, and tags are never copied. The first three each name something true of the
+  *original* item only (a synced remote object, a specific meal, a price actually paid in a specific
+  shop), never of a fresh copy - and tags are mirrored VTODO categories, so they follow the same
+  rule as the sync fields they belong to.
+
+- **A shopping suggestion carries its category and quantity** (#1113, from discussion #1103).
+  Picking a suggestion while adding an item now also fills in that item's most recently used
+  category and quantity, instead of only its name - without the category, every picked suggestion
+  landed back in the fallback category and the aisle order had to be re-sorted on the next trip.
+  Suggestions are also now ordered by most recently used first, instead of alphabetically - a
+  household buys the same handful of things again and again, and the ones bought last stood out
+  less behind everything the alphabet puts first. For API users this is a contract change on
+  `GET /api/v1/shopping/suggestions`: the response items are now objects `{ name, category,
+  quantity }` ordered by recency, where they used to be plain name strings.
+
+- **A shopping list follows what the rest of the household does, while it is open** (#1108). Two people
+  in the same shop used to see two different lists: what one ticked off stayed unticked on the
+  other's phone until that page was reloaded. The open list now hears about changes within about ten
+  seconds and redraws the affected rows in place - the same gesture as your own tap, no jump, no
+  animation - and rebuilds only when an item was added, removed, renamed or moved.
+
+  The server keeps a change counter per list, maintained by database triggers rather than by the
+  routes: shopping items are written from six modules (the list itself, meal-plan and recipe
+  imports, the housekeeping module, MCP, the CalDAV to-do sync), and a counter that every writer
+  has to remember is a counter one of them forgets. The counter also moves when a list is renamed,
+  and its row goes with the list, so a list someone else deletes disappears from your screen too.
+  The open page asks `GET /api/v1/shopping/versions` every ten seconds while the tab is visible,
+  and at once when it becomes visible or gets focus - the moment somebody looks at the phone. It
+  reloads only a list whose number moved, through the same request it used to open it, so there
+  is still one read path. Deliberately a poll and not an open stream: it works through any
+  reverse proxy, holds no connection, and can grow into a stream on the same counter later. Your
+  own taps do not cost a reload: the write routes answer with the counter before and after, and
+  the page skips the reload when nothing else moved in between.
+
+### Fixed
+
+- **Belgian school holidays can be narrowed to one language community.** OpenHolidays lists Belgium
+  without any regions but splits its school holidays between the Flemish, French and German-speaking
+  Communities, so the calendar settings had nothing to choose from and the calendar showed all three
+  side by side. A country without regions now offers its school-holiday groups directly under
+  Settings > Modules > Calendar, and the hint there no longer speaks only of Swiss cantons.
+
+- **Housekeeping only offers visit actions you are allowed to take** (#1135). A paid visit is
+  settled, and only an admin can change or delete it - but the Staff log and the recent visits on
+  the Overview showed edit and delete on every visit, so a member found out at save. The server now
+  sends per visit whether the current user may edit or delete it. Where that is not allowed, the row
+  offers the visit report instead and says that only an admin can change it. A calendar link to
+  such a visit opens the report rather than a form that cannot be saved.
+
+- **An item added without a category lands in the misc category again** (#548). The item route had
+  drifted to defaulting to the *first* category ("Fruit & vegetables" in aisle order). It now
+  prefers the misc category by name as long as the household still has it, and only falls back to
+  the *last* category in aisle order once it has been renamed or removed - "last" alone would have
+  meant whatever category was added most recently, since new categories append at the end. The
+  pantry import follows the same rule, so the two stay in step. In the same corner, quick-add's
+  category selector resets to the default after every item added, instead of staying on whatever a
+  previous suggestion or manual pick set it to - an unrelated item typed right after could quietly
+  land in the wrong aisle.
+
+- **Household members and guests created as contacts now show the translated "Other" category
+  instead of the German "Sonstiges"** (#1140). The contact that is mirrored when a household member
+  or a split-expenses guest is created carried the raw German word instead of the category key, so
+  every non-German household saw it untranslated on the contacts page. New contacts get the proper
+  key, and existing ones are corrected when the app updates.
+
+- **Opening Housekeeping with a broken visit deep link now says so** (#1139). Tapping a
+  housekeeping visit in the calendar opens Housekeeping through an `?editVisit=<id>` link; when
+  that visit has been deleted or the link is malformed, it used to fail silently and land on the
+  ordinary dashboard, with nothing to tell a stale link apart from a working one. It now shows a
+  localized message - a missing or invalid visit says so without a retry, while a server error, a
+  network problem or rate limiting offers to try again. The broken link is cleared from the
+  address bar right away - only that parameter, the rest of the URL stays - so a reload or going
+  back does not repeat the failed request.
+
+- **A full audit of the Schedule module, fixed in one sweep.** The override editor no longer
+  destroys typed input when its "fill the whole range?" confirmation is cancelled - the confirm now
+  parks and resumes the open form instead of force-closing it, and the same holds if the confirmed
+  save itself then fails: the form stays parked until the write actually succeeds, instead of
+  closing on confirmation and leaving a failure toast over an already-empty page. A member with
+  read-only access to the
+  module sees an honest page: the banner was always there, but every create/edit/delete control
+  rendered anyway and failed only on save; they are now gone, matching what the API has always
+  enforced. Statistics and Overview refetch when the page is revisited (previously they re-labelled
+  another user's cached numbers as your own after a tab switch), show real loading and error states
+  instead of zeros that looked like data, and rapid week-flipping can no longer let a slow older
+  response overwrite a newer one. The dashboard "who's working today" widget refreshes with the
+  15-minute cycle instead of showing the morning state all day, and a failed load renders the error
+  tile with a retry button instead of the "create a shift type" onboarding. Shift-start reminders
+  fire at the DST-correct minute around clock changes, enabling them defaults to a 15-minute lead
+  instead of "at shift start", and a reminder can no longer keep firing for a shift type deleted in
+  the sync's blind window. On the server, a pattern save is capped at 500 cycle-day rows (each
+  stored row is re-emitted on every resolved read - an uncapped save was stored read amplification
+  any member could create), deleting a pattern or a user no longer leaks its custom-field values,
+  duplicate field ids in one payload are rejected instead of half-committing and answering 500, and
+  omitting `field_values` from an override save now preserves stored values, as the extras route
+  always did. The statistics hint text in all 24 languages finally describes the rolling
+  7-day-window rule the overtime flag actually applies, the printed statistics sheet no longer leads
+  with the personal reminder settings card, and a member with no schedule access no longer gets a
+  dead "Schedule" calendar layer plus a guaranteed-403 request on every calendar load.
+
+- **A second pass on the Schedule module, this time on comprehension and everyday polish.** Deleting a
+  shift type now asks first, naming what it removes, like every other destructive action in the
+  module already did. Two raw server strings that used to reach the toast ("shift_type_id must be a
+  positive number.", "cycle_length cannot exclude existing pattern days.") are now plain sentences
+  that say what to do next, and an Extra with no shift types yet shows a hint instead of an empty,
+  submittable dropdown. Editing a pattern's cycle days and leaving the tab (or the card) without
+  saving now prompts to discard, matching the confirm every other unsaved-changes flow in the app
+  already has; merely switching the Add-entry modal's Pattern/Override/Extra segment no longer
+  counts as a change worth asking about. Each cycle-day position shows the actual next date it falls
+  on, with a one-line explanation of the repeating cycle; creating or reactivating a pattern that
+  overlaps another one now asks first and names the consequence, and the pattern currently in effect
+  carries a small marker. A household with no shift types yet opens on that tab instead of the
+  planning tab it would immediately dead-end on. Every schedule tab now has its own address
+  (`/schedule/patterns`, `/schedule/statistics`, ...), so reloading keeps the tab, the back button
+  walks between tabs instead of leaving the page, and the dashboard widget and a shift reminder both
+  link straight to the relevant tab instead of the bare module. Clicking a shift anywhere it appears
+  (the Today card, the Compare view, a week/day calendar block) now opens a small read-only detail
+  view instead of doing nothing; week/day calendar chips show the full time range instead of just
+  the start; and the "Free today" hero and the per-member status row on the dashboard no longer
+  contradict a schedule entry sitting right next to them. The Statistics owner picker is self-only
+  for non-admin members now - statistics remain a read-only summary of data everyone can already see
+  via the Today card and calendar, but the convenience of pulling up someone else's totals was never
+  meant to be open to everyone. Shift-type presets are grouped by template (Work/School/University)
+  instead of one flat list of fifteen, the reminder lead time accepts any custom value up to the
+  server's own 24-hour cap instead of the seven fixed presets, and an expanded shift-type card spans
+  the full row instead of leaving a gap beside it. Tracking overtime at all is now its own switch
+  next to the weekly-hours target, instead of that number being the only way to affect whether the
+  Statistics tab flags anything - turning it off removes the overtime card entirely rather than
+  requiring a number nobody's schedule will ever cross. All of the above is translated into all 24
+  languages.
+
+- **Schedule: a stable "Today" card and one clear way to add an entry.** The Today card used to be
+  the first block of the Planning/Shift-types tabs only, so switching to Statistics or Compare made
+  it vanish and everything below it jump up to fill the gap; it now renders once, above the
+  per-tab content, and simply stays in place across every tab (still hidden entirely for a household
+  that hasn't used the module yet). The Planning tab offered up to four "add" affordances at once -
+  the page's own FAB, an always-visible "Create override" button, an always-visible "Add extra
+  shift" button, and each section's empty-state CTA underneath its own always-visible twin; a
+  household with nothing entered yet saw two identical buttons stacked in both the Overrides and
+  Extras sections. The FAB (which already opens the same form, pre-selecting the right mode) is now
+  the one durable way in; the section headers no longer carry their own button, and each empty-state
+  CTA remains as the contextual nudge for first-time setup, matching how the Patterns section already
+  worked. The three quick-start template buttons on the Shift-types tab looked like a segmented
+  toggle even though picking one is a one-shot action with no "selected" state to show - they're
+  plain buttons now, and the household's own hidden-template setting still filters which ones
+  appear. The Compare tab's day headers scrolled away with the hours beneath them; they now stay
+  pinned to the top of the scroll area while the day's shifts scroll past, so a block halfway down a
+  long day is never orphaned from the day it belongs to.
+
+## [2.66.1] - 2026-09-14
+
+### Security
+
+- **A member's module permissions now hold for every letter case of an API path
+  (GHSA-cvwj-hx37-3r7m).** The API routes `/api/v1/Notes` to the same place as `/api/v1/notes`,
+  but the check that enforces per-member module access compared the path letter for letter, found
+  no module for the capitalised spelling and let the request through. A member set to "no access"
+  for a module could read it that way, and a member with read-only access could write to it. This
+  affected every module since per-member module access arrived in v1.4.0; admins and members
+  without restrictions were never limited by it. Scoped API tokens were never let through, but were
+  refused for a capitalised path to a module they may use - that now works as well.
+
 - **The cycle tab grows into a full tracker: visible flow strength, feelings, more fertility
   signals, hard-private intimacy logging, PMS patterns, and a "today" insight bubble.** The day log
   gains cervical mucus, LH and pregnancy tests, multi-select feelings (replacing the single mood),
@@ -30,7 +262,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   imported from CSV (German date and separator formats included), the Health overview shows the
   next period at a glance, and the trends section was restructured around one expander per symptom
   with an added feelings-by-phase view and a pain summary.
-
 ## [2.66.0] - 2026-09-13
 
 ### Added
