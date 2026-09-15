@@ -1888,9 +1888,10 @@ function syncViewPanel() {
  * ihn wie `hidden` aus dem Layout zu nehmen.
  *
  * War der Knopf fokussiert, als er aktuell wurde (Enter/Space auf "Heute"
- * fuehrt genau dorthin), faengt `moveFocusOffCurrentButton` den Fokus vorher
- * auf einen Stepper daneben ab - sonst faellt er auf `<body>`, weil `inert`
- * ein fokussiertes Element ebenso blurred wie `display: none` es taete.
+ * fuehrt genau dorthin), holt sich `syncTodayButton()` selbst den Fokus vorher
+ * auf einen Stepper daneben (kein eigener Helfer - die paar Zeilen weiter
+ * unten, direkt vor dem `inert`-Zuweisen) - sonst faellt er auf `<body>`, weil
+ * `inert` ein fokussiertes Element ebenso blurred wie `display: none` es taete.
  *
  * Die Frage „ist heute zu sehen" beantwortet der ANGEZEIGTE BEREICH, nicht
  * eine Fallunterscheidung je Ansicht: `getRangeForView` kennt ihn fuer alle

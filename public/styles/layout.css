@@ -2264,9 +2264,12 @@ html.fab-anim-done .page-fab {
  * Platz, und der naechste/vorherige Pfeil ruckte um die Knopfbreite. Seit
  * `.is-current` (layout.css, `.btn.is-current`) den Slot per `visibility`
  * PERMANENT reserviert, gibt es diese 66px nie mehr frei - der Slot ist auf
- * jedem Zeitraum gleich breit. Das Label steht deshalb unabhaengig vom
- * Reset-Zustand auf seiner 7ch-Untergrenze; das ist der Preis fuer den
- * ruhigen Pfeil und wird hier bewusst in Kauf genommen. */
+ * jedem Zeitraum gleich breit. Das Label hat dadurch dauerhaft 66px weniger
+ * Raum als vor #1200, unabhaengig vom Reset-Zustand; das ist der Preis fuer
+ * den ruhigen Pfeil und wird hier bewusst in Kauf genommen. Die 7ch-Untergrenze
+ * (calendar.css) bleibt ein Sicherheitsnetz fuer eine noch schmalere Kombination
+ * aus Locale und Viewport - in den gemessenen Layouts (PR #1200 Review Runde 3)
+ * greift sie nirgends, das Label bleibt ueberall breiter als 7ch. */
 /* NUR IM AUSGEKLAPPTEN ZUSTAND, und das ist gemessen worden, nicht vermutet.
  *
  * Der eingeklappte Kopf (`is-collapsed`) hat eine ANDERE Zeilenordnung: der

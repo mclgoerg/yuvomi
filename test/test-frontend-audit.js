@@ -17238,3 +17238,23 @@ test('inVerschachtelterFunktion trennt Rueckruf von Dialogvorbereitung', () => {
   assert.equal(inVerschachtelterFunktion(imTry, 0, 2), false,
     'ein try-Block oeffnet keinen Rueckruf');
 });
+
+// PR #1200 Review Runde 3, Nice-to-have 2: keine Suite pinnte den
+// eigentlichen CSS-MECHANISMUS des reservierten Reset-Slots fest. Der
+// Reviewer hat gegengeprueft: `.btn.is-current { visibility: hidden; }` durch
+// `{ display: none; }` ersetzt, und test:calendar, test:meals, test:budget-ui,
+// test:frontend-audit und test:mobile-scroll-layout blieben ALLE gruen - das
+// waere die Rueckkehr der Runde-1-Regression ("›" ruckt um die Knopfbreite),
+// von keiner Suite bemerkt. `display: none` naehme die Box aus dem Fluss,
+// `visibility: hidden` blendet nur die Malerei aus und haelt den Slot
+// reserviert - genau das ist der Unterschied, den layout.css direkt darueber
+// selbst dokumentiert (siehe Kommentar ueber der Regel).
+test('.btn.is-current blendet per visibility aus, nicht per display (PR #1200 Review Runde 3)', () => {
+  const layout = read('../public/styles/layout.css');
+  const rule = [...eachRule(layout)].find(({ selector }) => selector.trim() === '.btn.is-current');
+  assert.ok(rule, '.btn.is-current-Regel nicht gefunden');
+  assert.match(rule.body, /visibility:\s*hidden/,
+    '.btn.is-current muss visibility:hidden setzen - der reservierte Slot haengt daran, dass die Box im Fluss bleibt');
+  assert.doesNotMatch(rule.body, /display:\s*none/,
+    '.btn.is-current darf nicht display:none setzen - das nimmt die Box aus dem Fluss und laesst "›" wieder wandern (Runde-1-Regression)');
+});

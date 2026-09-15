@@ -76,7 +76,7 @@ function addDays(dateStr, n) {
 
 /**
  * Schmale Telefone (PR #1200 Review, Blocking 2): das volle Datum an beiden
- * Enden - "14.09.2026 – 20.09.2026" - lief in de/fr/uk bei 320/375px 21-112px
+ * Enden - "14.09.2026 - 20.09.2026" - lief in de/fr/uk bei 320/375px 21-112px
  * ueber die Zeile. Seit #1164 lebt `#week-today` in derselben Zeile wie das
  * Label und macht sie um seine Breite enger; auf main war der schlechteste
  * Fall 9px bei 320px, hier gemessen bis 112px.
@@ -90,18 +90,43 @@ function addDays(dateStr, n) {
  * sondern zwei) war noetig, um die von Reviewern gemessenen 112px in fr
  * sicher aufzufangen.
  */
+const NARROW_WEEK_LABEL_QUERY = '(max-width: 639px)';
+
 function formatWeekLabel(monday) {
   const sunday = addDays(monday, 6);
-  const narrow = window.matchMedia?.('(max-width: 639px)').matches;
+  const narrow = window.matchMedia?.(NARROW_WEEK_LABEL_QUERY).matches;
   // Unter 640px faellt das Jahr an BEIDEN Enden weg (`formatDayMonth`): die
   // Kalenderwoche liegt so gut wie nie ueber einen Jahreswechsel, und die
   // gesparte Breite ist hier der knappere Preis - eine Woche wie
-  // "28.12. – 03.01." bleibt trotzdem eindeutig genug fuer den Kopf einer
+  // "28.12. - 03.01." bleibt trotzdem eindeutig genug fuer den Kopf einer
   // Seite, die ohnehin "diese Woche" zeigt.
   const from = narrow ? formatDayMonth(monday) : formatDate(monday);
   const to = narrow ? formatDayMonth(sunday) : formatDate(sunday);
   return `${from} – ${to}`;
 }
+
+/**
+ * PR #1200 Review Runde 3, Nice-to-have 4: `formatWeekLabel()` liest
+ * `matchMedia` nur beim Rendern - ein Fenster, das ueber die 640px-Schwelle
+ * gezogen wird, behielt bis zum naechsten Wochenwechsel das alte Format.
+ *
+ * EINE gehaltene `MediaQueryList` statt eines
+ * `window.matchMedia(...).addEventListener(...)` in einem Rutsch: ohne
+ * gehaltene Referenz darf die Engine die Liste einsammeln, und der Listener
+ * verstummt irgendwann still - dasselbe Muster wie router.js' `darkSchemeQuery`.
+ * Modul-Top-Level statt in `render()`: `render()` laeuft bei jeder Navigation
+ * zur Seite neu, ein dort gebundener Listener wuerde sich mit jedem Besuch
+ * verdoppeln.
+ *
+ * `_container?.isConnected` (wie beim Fokus-Rueckstoss weiter unten) haelt den
+ * Listener nach einer Navigation weg von /meals stumm - ohne die Prüfung
+ * rendert er in einen Container, den niemand mehr sieht.
+ */
+function onNarrowWeekLabelQueryChange() {
+  if (_container?.isConnected) renderWeekGrid();
+}
+const _narrowWeekLabelQuery = typeof window !== 'undefined' ? window.matchMedia?.(NARROW_WEEK_LABEL_QUERY) ?? null : null;
+_narrowWeekLabelQuery?.addEventListener('change', onNarrowWeekLabelQueryChange);
 
 function isToday(dateStr) {
   return dateStr === todayKey();
@@ -1894,6 +1919,20 @@ export const __test = {
   getMondayOf,
   formatWeekLabel,
   state,
+  // PR #1200 Review Runde 3, Nice-to-have 1: der bisherige Verdrahtungstest
+  // las `renderWeekGrid()` als QUELLTEXT (Regex auf den Funktionskoerper) -
+  // ein auskommentiertes `// syncTodayButton();` im echten Render-Pfad blieb
+  // gruen, solange der String noch irgendwo im Funktionskoerper stand. Dieser
+  // Wrapper laesst den TATSAECHLICHEN Render-Pfad laufen (mit einem
+  // uebergebenen Test-Container statt des Modul-internen `_container`), damit
+  // der Test die echte Verdrahtung prueft, nicht ihre Textform.
+  renderWeekGridForTest(container) {
+    _container = container;
+    renderWeekGrid();
+  },
+  // PR #1200 Review Runde 3, Nice-to-have 4: pinnt, dass ein Wechsel ueber die
+  // 640px-Schwelle das Wochen-Label wirklich neu zeichnet (test-meals.js).
+  onNarrowWeekLabelQueryChange,
 };
 
 // --------------------------------------------------------

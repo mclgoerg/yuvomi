@@ -126,12 +126,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does nothing on the current week or month tells a screen-reader user about a control that has no
   effect - and it keeps its slot: hiding it now toggles `visibility` and `inert` on a class, not the
   `hidden` attribute, so its box stays in the layout and the arrow next to it never moves, whether
-  the reset is showing or not (a first cut used `hidden`, which drops the box and let the flexible
-  label grow into the freed space - the arrow would land under a second click that meant to keep
-  going). Toggling the reset's own visibility no longer changes header height at any width by
-  itself; a header can still change height between two periods for reasons that have nothing to do
-  with this reset (a label whose text wraps differently at very narrow widths, for one, on both this
-  branch and main), and that is unchanged by this fix.
+  the reset is showing or not. Toggling the reset's own visibility no longer changes header height
+  at any width by itself; a header can still change height between two periods for reasons that
+  have nothing to do with this reset (a label whose text wraps differently at very narrow widths,
+  for one, on both this branch and main), and that is unchanged by this fix.
 
 ### Fixed
 

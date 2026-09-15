@@ -251,17 +251,48 @@ test('syncCurrentButton() rettet den Fokus vor dem eigenen inert-Werden', () => 
   }
 });
 
-// PR #1200 Review, Nice-to-have 7: der Reviewer hat `syncCurrentButton();` aus
-// `updateTabs()` geloescht (der echte Render-Pfad) und `test:budget-ui` blieb
-// gruen, weil alle Tests oben die Sync-Funktion isoliert aufrufen. Diese
-// Quelltext-Probe bindet die Verdrahtung selbst.
+// Minimales Fake-Element fuer Knoten, die `updateTabs()` neben dem Reset
+// noch anfasst (#budget-body, #budget-prev/-next/-label, #budget-period-note,
+// #budget-add): `hidden`, `textContent`, `setAttribute`, eine leere
+// `querySelector()` (fuer `addBtn.querySelector('.toolbar-new-btn__label')`).
+function fakeToolbarElement() {
+  return {
+    hidden: false,
+    textContent: '',
+    setAttribute() {},
+    querySelector() { return null; },
+  };
+}
+
+// PR #1200 Review Runde 3, Nice-to-have 1: der bisherige Test las
+// `updateTabs()` als QUELLTEXT (Regex auf den Funktionskoerper) - ein
+// `if (false) syncCurrentButton();` im echten Render-Pfad blieb gruen,
+// solange der String noch irgendwo im Funktionskoerper stand. Dieser Test
+// laesst den ECHTEN Render-Pfad laufen: `updateTabsForTest()` setzt den
+// Modul-internen Container auf einen Test-Container und ruft `updateTabs()`
+// unveraendert auf; geprueft wird das SICHTBARE ERGEBNIS am echten
+// `#budget-today`-Knoten, nicht der Quelltext.
 test('updateTabs() verdrahtet syncCurrentButton() wirklich in den Render-Pfad', () => {
-  const fnStart = budget.indexOf('function updateTabs() {');
-  assert.ok(fnStart > -1, 'updateTabs() nicht gefunden');
-  const fnEnd = budget.indexOf('\nfunction ', fnStart + 1);
-  assert.ok(fnEnd > fnStart, 'Ende von updateTabs() nicht gefunden');
-  assert.match(budget.slice(fnStart, fnEnd), /\bsyncCurrentButton\(\);/,
-    'updateTabs() muss syncCurrentButton() aufrufen - sonst bleibt der Reset auf jedem Tab-Wechsel stumm falsch sichtbar');
+  const todayBtn = fakeResetButton();
+  const testContainer = {
+    classList: { toggle() {} },
+    querySelector(sel) {
+      if (sel === '#budget-today') return todayBtn;
+      return fakeToolbarElement();
+    },
+  };
+  const zuvorTab = budgetUi.state.activeTab;
+  const zuvorMonth = budgetUi.state.month;
+  try {
+    budgetUi.state.activeTab = 'budget'; // TAB_CAPS['budget']: month: true
+    budgetUi.state.month = budgetUi.currentMonth(); // aktueller Monat -> is-current
+    budgetUi.updateTabsForTest(testContainer);
+    assert.equal(todayBtn.classList.contains('is-current'), true,
+      'updateTabs() muss syncCurrentButton() wirklich aufrufen - der Reset traegt im aktuellen Monat sonst kein .is-current');
+  } finally {
+    budgetUi.state.activeTab = zuvorTab;
+    budgetUi.state.month = zuvorMonth;
+  }
 });
 
 // PR #1200 Review, Befund 5: monthNavHtml() rendert den Reset ohne

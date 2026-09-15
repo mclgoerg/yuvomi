@@ -3549,4 +3549,15 @@ export const __test = {
   tabCaps,
   currentMonth,
   state,
+  // PR #1200 Review Runde 3, Nice-to-have 1: der bisherige Verdrahtungstest
+  // las `updateTabs()` als QUELLTEXT (Regex auf den Funktionskoerper) - ein
+  // `if (false) syncCurrentButton();` im echten Render-Pfad blieb gruen,
+  // solange der String noch irgendwo im Funktionskoerper stand. Dieser
+  // Wrapper laesst den TATSAECHLICHEN Render-Pfad laufen (mit einem
+  // uebergebenen Test-Container statt des Modul-internen `_container`),
+  // damit der Test die echte Verdrahtung prueft, nicht ihre Textform.
+  updateTabsForTest(container) {
+    _container = container;
+    updateTabs();
+  },
 };
