@@ -36,6 +36,9 @@ function makeDb() {
       label TEXT NOT NULL, date TEXT NOT NULL);
     CREATE TABLE pantry_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
       quantity REAL NOT NULL DEFAULT 1, expires_on TEXT, created_by INTEGER REFERENCES users(id) ON DELETE SET NULL);
+    -- Minimal, nur genug fuer den 'document_expiry'-Zweig in processDueNotifications().
+    CREATE TABLE family_documents (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+      expires_at TEXT);
     -- Minimal, wie inventory_items/pantry_items daneben - nur genug fuer die
     -- CASE-Zweige in processDueNotifications() und den Schichtplan-Sync.
     CREATE TABLE schedule_shift_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,

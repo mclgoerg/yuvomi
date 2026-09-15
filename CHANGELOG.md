@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Family documents can now carry an optional expiry date and reminder lead time.** Set an expiry
+  (e.g. a passport or a residence permit) and how many days ahead to be reminded - an expiring or
+  overdue document shows a status chip, and a matching "expiring soon" filter chip sits next to the
+  category chips. Archiving a document (or deleting it) clears its reminder, so an archived scan
+  never keeps nagging.
 - **New optional module: Waste collection** (#1063). Define your household's waste types
   (recycling, organic, general, or your own, each with an icon and color) and a weekly or
   fixed-day-of-month pickup schedule for each. A single calculated pickup can be moved to a

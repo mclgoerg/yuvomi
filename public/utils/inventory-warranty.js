@@ -9,10 +9,12 @@
 // `todayKey` heisst hier schon ein Parameter (bzw. eine lokale Bindung), der den
 // Bezugstag traegt - der Import kommt deshalb unter eigenem Namen herein.
 import { parseLocalDateKey, todayKey as householdToday } from '/utils/date.js';
+// dateStatus() und ihr Schwellenwert leben jetzt in einer neutralen Datei, weil
+// Dokumente (und spaeter Health) denselben Chip brauchen. Re-exportiert, damit
+// jeder bestehende Inventar-Import unveraendert bleibt.
+import { WARRANTY_ALERT_DAYS, dateStatus } from './date-status.js';
 
-/** Vorlauf in Tagen, ab dem eine Garantie als "läuft bald ab" gilt - identisch
- *  zum server-seitigen Erinnerungs-Vorlauf (server/routes/inventory/items.js). */
-export const WARRANTY_ALERT_DAYS = 30;
+export { WARRANTY_ALERT_DAYS, dateStatus };
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
@@ -51,18 +53,6 @@ export function warrantyStatus(item, todayKey = householdToday()) {
 export function hasWarrantyAlert(item, todayKey = householdToday()) {
   const status = warrantyStatus(item, todayKey);
   return !!status && status.state !== 'valid';
-}
-
-/**
- * @param {string|null} dateKey - YYYY-MM-DD, oder null/leer
- * @param {string} [todayKey]
- * @returns {{ state: 'valid'|'expiring'|'expired', endDateKey: string, days: number } | null}
- */
-export function dateStatus(dateKey, todayKey = householdToday()) {
-  if (!dateKey) return null;
-  const days = Math.round((parseLocalDateKey(dateKey) - parseLocalDateKey(todayKey)) / 86_400_000);
-  const state = days < 0 ? 'expired' : days <= WARRANTY_ALERT_DAYS ? 'expiring' : 'valid';
-  return { state, endDateKey: dateKey, days };
 }
 
 /** Trifft der Listen-Hinweis zu - Garantie ODER irgendeine getrackte Frist
