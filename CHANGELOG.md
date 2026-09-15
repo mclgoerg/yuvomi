@@ -13,9 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   signals, hard-private intimacy logging, PMS patterns, and a "today" insight bubble.** The day log
   gains cervical mucus, LH and pregnancy tests, multi-select feelings (replacing the single mood),
   and intimacy - cervical mucus, the two test results and intimacy are never shown to anyone but
-  yourself, even on days shared with the family, enforced by the server. On `POST
-  /api/v1/health/cycle/logs`, `mood` (kept for older clients) and `feelings` now both accept only
-  the fixed feelings list - an out-of-list value is a 400 instead of being stored as free text.
+  yourself, even on days shared with the family, enforced by the server. On
+  `POST /api/v1/health/cycle/logs`, `mood` (kept for older clients) and `feelings` now both accept
+  only the fixed feelings list - an out-of-list value is a 400 instead of being stored as free text.
   Saving a day log through the app always sends the current feelings selection, so an older
   free-text mood value is cleared the next time that day is edited in the app; only a save that
   omits both fields entirely (outside the app's own form) leaves it as-is. Flow strength finally

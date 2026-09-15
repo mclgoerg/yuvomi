@@ -1134,13 +1134,86 @@ test('buildCycleCalendar: hasLog erkennt einen reinen cervix_mucus-Eintrag', () 
   const cal = buildCycleCalendar('2026-06-15', {
     periods: periods(['2026-06-01'], 5),
     logs: [
-      { log_date: '2026-06-08', cervix_mucus: 'egg_white' },
+      { log_date: '2026-06-08', cervix_mucus: 'eggwhite' },
     ],
     todayKey: '2026-06-15',
     weekStartsOn: 1,
   });
   const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
   assert.equal(at('2026-06-08').hasLog, true);
+});
+
+// R5-1a: GET /cycle/logs liefert `feelings` auf JEDER Zeile als Array, auch
+// wenn keine Gefühle gespeichert sind - ein leeres Array ist in JS wahr, ein
+// reines `!!log.feelings` (statt `log.feelings?.length`) würde deshalb JEDEN
+// Tag fälschlich als geloggt zählen.
+test('buildCycleCalendar: hasLog zählt ein leeres feelings-Array (ohne sonstige Felder) nicht als Log', () => {
+  const cal = buildCycleCalendar('2026-06-15', {
+    periods: periods(['2026-06-01'], 5),
+    logs: [
+      { log_date: '2026-06-09', feelings: [] },
+    ],
+    todayKey: '2026-06-15',
+    weekStartsOn: 1,
+  });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(at('2026-06-09').hasLog, false);
+});
+
+// R5-1b: mood, lh_test, pregnancy_test und basal_temp isoliert - je ein Tag
+// mit GENAU einem dieser Felder und sonst nichts, damit ein versehentliches
+// Entfernen eines einzelnen Feldes aus der hasLog-Bedingung genau einen
+// dieser Tests (und nur diesen) rot werden lässt.
+test('buildCycleCalendar: hasLog erkennt einen reinen mood-Eintrag', () => {
+  const cal = buildCycleCalendar('2026-06-15', {
+    periods: periods(['2026-06-01'], 5),
+    logs: [
+      { log_date: '2026-06-10', mood: 'sad' },
+    ],
+    todayKey: '2026-06-15',
+    weekStartsOn: 1,
+  });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(at('2026-06-10').hasLog, true);
+});
+
+test('buildCycleCalendar: hasLog erkennt einen reinen lh_test-Eintrag', () => {
+  const cal = buildCycleCalendar('2026-06-15', {
+    periods: periods(['2026-06-01'], 5),
+    logs: [
+      { log_date: '2026-06-12', lh_test: 'positive' },
+    ],
+    todayKey: '2026-06-15',
+    weekStartsOn: 1,
+  });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(at('2026-06-12').hasLog, true);
+});
+
+test('buildCycleCalendar: hasLog erkennt einen reinen pregnancy_test-Eintrag', () => {
+  const cal = buildCycleCalendar('2026-06-15', {
+    periods: periods(['2026-06-01'], 5),
+    logs: [
+      { log_date: '2026-06-13', pregnancy_test: 'negative' },
+    ],
+    todayKey: '2026-06-15',
+    weekStartsOn: 1,
+  });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(at('2026-06-13').hasLog, true);
+});
+
+test('buildCycleCalendar: hasLog erkennt einen reinen basal_temp-Eintrag', () => {
+  const cal = buildCycleCalendar('2026-06-15', {
+    periods: periods(['2026-06-01'], 5),
+    logs: [
+      { log_date: '2026-06-14', basal_temp: 36.5 },
+    ],
+    todayKey: '2026-06-15',
+    weekStartsOn: 1,
+  });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(at('2026-06-14').hasLog, true);
 });
 
 // A-1: buildCycleCalendar() muss dieselbe BBT-Bestätigung wie predictCycle()
