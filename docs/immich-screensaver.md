@@ -55,3 +55,5 @@ and their matching controls become read-only in Settings. Restart Yuvomi after c
   reachability, album UUID, and that the library or album contains images.
 - A successful test with an empty album is valid, but Preview needs at least one accessible image.
 - The screensaver applies throughout the authenticated app, not only on the dashboard route.
+- A running kitchen timer on the dashboard keeps the screensaver away: the idle period starts over
+  while the countdown runs, and the screensaver can appear again once the timer has rung.

@@ -83,7 +83,7 @@ services:
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
       - OPENWEATHER_CITY=${OPENWEATHER_CITY:-Berlin}
       - OPENWEATHER_UNITS=${OPENWEATHER_UNITS:-metric}
-      - OPENWEATHER_LANG=${OPENWEATHER_LANG:-de}
+      - OPENWEATHER_LANG=${OPENWEATHER_LANG:-en}
       # Email / SMTP (optional). Without a host, "forgot password" stays off.
       # Can also be configured later under Settings > Administration; a value
       # set here always wins and the field is then LOCKED in the UI.
@@ -117,7 +117,8 @@ services:
       # links accounts that already exist.
       - OIDC_ALLOW_SIGNUP=${OIDC_ALLOW_SIGNUP:-true}
       # Set to false to make SSO the only way in: no login form, no password
-      # reset. Ignored unless all four OIDC values above are set.
+      # reset. Ignored unless all four OIDC values above are set and an
+      # administrator account is already linked to the provider.
       - AUTH_ALLOW_PASSWORD_LOGIN=${AUTH_ALLOW_PASSWORD_LOGIN:-true}
       # Scheduled local backups into the /backups volume above.
       - BACKUP_ENABLED=${BACKUP_ENABLED:-true}

@@ -31,9 +31,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withoutCommentsKeepingLines } from './source-text.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -255,4 +256,143 @@ test('kein adminOnly-Blatt schreibt eine per-Nutzer-Preference', () => {
   assert.deepEqual(violations, [],
     'Diese Einstellungen wirken pro Nutzer, ihr Blatt ist aber adminOnly - jeder darf sie setzen, '
     + 'nur erreicht sie niemand ausser dem Admin:\n  ' + violations.join('\n  '));
+});
+
+// ── Dritte Sonde: eine Schreibweise fuer das Admin-Praedikat ─────────────────
+//
+// Ob eine Anfrage als Admin gilt, fragt der Server ueber `isAdminRequest()` aus
+// server/middleware/require-admin.js. Dieser Test haelt nur die SCHREIBWEISE:
+// ein neues `req.authRole === 'admin'` oder ein Session-Fallback neben dem
+// Helfer wird rot. Die Regel selbst (Mitglied bekommt 403, Admin kommt durch)
+// halten die Verhaltenstests der Routen, etwa test-email.js,
+// test-rewards-routes.js, test-screensaver.js und test-notifications.js.
+//
+// Gelesen wird der ganze Quelltext ohne Kommentare, nicht Zeile fuer Zeile:
+// zeilenweise sah der Guard `req.authRole` und `=== 'admin'` auf zwei Zeilen
+// nicht. Zwischen den Tokens darf deshalb Leerraum samt Umbruch stehen, und
+// `req?.authRole`, `req['authRole']` und `'admin' === req.authRole` meinen
+// dasselbe. Die Zeile fuer die Meldung wird aus dem Offset zurueckgerechnet.
+//
+// Die Karte fuehrt je Datei die erlaubten VORKOMMEN, nicht ihre Anzahl: eine
+// Zahl bleibt gleich, wenn eine gelistete Stelle geht und eine neue kommt, und
+// der Tausch waere gruen. Ein Vorkommen ist `<Ausdruck> @ <Anweisung>` - der
+// Treffer und die Anweisung um ihn herum, begrenzt durch `;`, `{` oder `}`,
+// beide ohne Leerraum ausser zwischen zwei Wortzeichen. Die Anweisung statt der
+// Zeile, weil sie Einruecken, Umbrechen und Kommentare aushaelt; der Ausdruck
+// dazu, weil eine Anweisung mehrere Treffer tragen kann. Zwei Stellen, die das
+// Praedikat in verschiedene Bedingungen setzen, sind so verschiedene Schluessel.
+// Zeilennummern stehen bewusst nicht darin, sie wandern bei jedem Edit.
+// Verglichen wird auf Gleichheit der Multimengen: faellt eine Stelle weg, muss
+// ihr Eintrag mitfallen, sonst waechst hier still ein Freibrief.
+//
+// GRENZE: wer eine gelistete Anweisung woertlich an eine andere Stelle
+// derselben Datei verschiebt, bleibt gruen. Umgekehrt meldet jede Aenderung an
+// einer gelisteten Anweisung sie als neu und den alten Eintrag als verschwunden.
+// Der Guard liest Text, keinen Syntaxbaum (Entscheidung vom 15.09.2026, kein
+// Parser als Abhaengigkeit): ein geklammerter Operand wie
+// `(req.authRole) === 'admin'` bleibt gruen, ebenso Code hinter einem
+// Regex-Literal an einer Divisionsstelle (Grenze des Scanners, siehe
+// `withoutCommentsKeepingLines`). Umgekehrt wird die Schreibweise in einem
+// String oder im Text eines Template-Literals rot, obwohl dort nichts prueft.
+// Durchrutschen kann also nur absichtlich verschleierter Code; dagegen stehen
+// die Verhaltenstests oben, nicht dieser Guard.
+
+/** `.name`, `?.name`, `['name']` und `?.['name']`, mit Leerraum dazwischen. */
+const zugriff = (name) => String.raw`\s*(?:\??\.\s*${name}\b|(?:\?\.)?\s*\[\s*['"\x60]${name}['"\x60]\s*\])`;
+const EQ = String.raw`\s*[!=]==?\s*`;
+const ADMIN = String.raw`['"\x60]admin['"\x60]`;
+const AUTH_ROLE = String.raw`(?:\[\s*['"\x60]authRole['"\x60]\s*\]|\bauthRole\b)`;
+const OBJEKT = String.raw`(?:[\w$]+\s*(?:\?\.)?\s*\.?\s*)?`;
+const SESSION_ROLE = String.raw`\bsession${zugriff('role')}`;
+
+const ADMIN_PREDICATE = new RegExp([
+  AUTH_ROLE + EQ + ADMIN,
+  ADMIN + EQ + OBJEKT + AUTH_ROLE,
+  SESSION_ROLE + EQ + ADMIN,
+  ADMIN + EQ + OBJEKT + SESSION_ROLE,
+  String.raw`\bsession${zugriff('isAdmin')}`,
+].join('|'), 'g');
+
+/** Leerraum weg, ausser zwischen zwei Wortzeichen (`return req` bleibt lesbar). */
+const kompakt = (s) => s.replace(/\s+/g, ' ').trim().replace(/ (?![\w$])|(?<![\w$]) /g, '');
+
+/** Jedes Admin-Praedikat einer Quelle mit Zeile, Ausdruck und Kartenschluessel. */
+function adminPredicates(source) {
+  const src = withoutCommentsKeepingLines(source);
+  return [...src.matchAll(ADMIN_PREDICATE)].map((m) => {
+    let von = m.index;
+    while (von > 0 && !';{}'.includes(src[von - 1])) von--;
+    let bis = m.index + m[0].length;
+    while (bis < src.length && !';{}'.includes(src[bis])) bis++;
+    const expr = kompakt(m[0]);
+    return {
+      line: src.slice(0, m.index).split('\n').length,
+      expr,
+      key: `${expr} @ ${kompakt(src.slice(von, bis))}`,
+    };
+  });
+}
+
+/** Datei -> erlaubte Vorkommen als `<Ausdruck> @ <Anweisung>`, mit Grund. */
+const ADMIN_PREDICATE_EXCEPTIONS = new Map([
+  // Die Definition des Helfers selbst.
+  ['server/middleware/require-admin.js', [
+    "authRole==='admin' @ return req.authRole==='admin'",
+  ]],
+  // test-sso-only.js haelt die woertliche Schreibweise per Regex.
+  ['server/auth.js', [
+    "authRole==='admin' @ if(req.authRole==='admin')return",
+    "authRole==='admin' @ const isAdmin=req.authRole==='admin'",
+  ]],
+  // Ausserhalb dieses Schnitts geblieben; zieht beim naechsten Anfassen nach.
+  ['server/routes/dashboard.js', [
+    "authRole==='admin' @ result.quicklinks=listQuickLinksFor(userId,req.authRole==='admin')",
+  ]],
+]);
+
+function serverJsFiles(dir = join(ROOT, 'server')) {
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...serverJsFiles(full));
+    else if (entry.name.endsWith('.js')) files.push(full);
+  }
+  return files;
+}
+
+test('das Admin-Praedikat steht nur in isAdminRequest() und den gezaehlten Ausnahmen', () => {
+  const files = serverJsFiles();
+  assert.ok(files.length >= 200, `nur ${files.length} Dateien unter server/ gefunden - der Walk greift nicht mehr`);
+
+  // Die Schreibweisen, fuer die der zeilenweise Guard blind war.
+  const gefunden = (src) => adminPredicates(src).map((p) => p.line);
+  assert.deepEqual(gefunden("a();\nconst x = req.authRole\n  === 'admin';"), [2], 'umbrochener Vergleich');
+  assert.deepEqual(gefunden("const x = 'admin' ===\n  req\n  ?.authRole;"), [1], 'umgekehrt und umbrochen');
+  assert.deepEqual(gefunden("const x = req['authRole'] !== 'admin';"), [1], 'Klammerzugriff');
+  assert.deepEqual(gefunden("const x = req.session\n  ?.role == 'admin';"), [1], 'Session-Rolle umbrochen');
+  assert.deepEqual(gefunden("req.authRole = 'admin'; // req.authRole === 'admin'"), [], 'Zuweisung und Kommentar');
+
+  const found = new Map();
+  for (const file of files) {
+    const rel = relative(ROOT, file).split('\\').join('/');
+    const predicates = adminPredicates(readFileSync(file, 'utf8'));
+    if (predicates.length) found.set(rel, predicates);
+  }
+
+  const problems = [];
+  for (const rel of new Set([...found.keys(), ...ADMIN_PREDICATE_EXCEPTIONS.keys()])) {
+    const offen = [...(ADMIN_PREDICATE_EXCEPTIONS.get(rel) ?? [])];
+    for (const p of found.get(rel) ?? []) {
+      const k = offen.indexOf(p.key);
+      if (k !== -1) { offen.splice(k, 1); continue; }
+      problems.push(`neues Vorkommen ${rel}:${p.line} ${p.expr} - isAdminRequest() benutzen\n    Kartenschluessel: ${JSON.stringify(p.key)}`);
+    }
+    for (const key of offen) {
+      problems.push(`gelistetes Vorkommen nicht mehr gefunden - Karte streichen\n    ${rel}: ${JSON.stringify(key)}`);
+    }
+  }
+
+  assert.deepEqual(problems, [],
+    'Das Admin-Praedikat gehoert in isAdminRequest(req) aus server/middleware/require-admin.js; '
+    + 'die Ausnahmekarte listet jedes Vorkommen und muss beim Einsammeln mitfallen:\n  ' + problems.join('\n  '));
 });

@@ -23,6 +23,17 @@ are retried by the notification scheduler with the same backoff and attempt
 limit used for Gotify and ntfy. Secrets are never returned by the channel API
 or written into delivery error messages.
 
+The endpoint must resolve to a public address, the same SSRF protection every
+other outbound integration has. A URL on a private or local network - a Home
+Assistant or n8n instance in the LAN, a container in the same Docker network,
+`localhost` - is refused when you save the channel, and the message names the
+switch that allows it: set `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true` in the
+deployment environment (see the
+[installation guide](installation.md#calendar-subscriptions--ics-feeds-optional)).
+Delivery checks the address again for every connection, redirects included, so
+a host name that resolves into a private network is refused at send time as
+well.
+
 ## Request format
 
 Yuvomi sends an HTTP `POST` with `Content-Type: application/json`:

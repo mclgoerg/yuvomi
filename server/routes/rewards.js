@@ -10,6 +10,8 @@ import express from 'express';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { getBalance, isEnrolled, postLedger } from '../services/rewards.js';
+import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 
 const log = createLogger('Rewards');
 const router = express.Router();
@@ -18,7 +20,7 @@ const MAX_COST = 1_000_000;
 const MAX_BONUS = 1_000_000;
 
 function requireAdmin(req, res, next) {
-  if (req.authRole !== 'admin') {
+  if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'Admin access required.', code: 403 });
   }
   next();
@@ -28,8 +30,10 @@ function actingUser(req) {
   return req.authUserId || req.session?.userId || null;
 }
 
-// Nur echte Familienmitglieder (keine Haushaltshilfe-Konten).
-const MEMBER_FILTER = 'NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = u.id)';
+// Nur Haushaltsmitglieder - kein Hauspersonal, keine Gaeste (#1207). Eine
+// alte Einschreibung von Personal oder Gast bleibt in reward_participants
+// stehen, erscheint aber in keiner dieser Listen und zaehlt nicht mit.
+const MEMBER_FILTER = householdMemberSql('u');
 
 function toInt(val) {
   const n = Math.trunc(Number(val));
@@ -88,12 +92,12 @@ router.get('/overview', (req, res) => {
     const pending = d.prepare("SELECT COUNT(*) AS n FROM reward_redemptions WHERE status = 'pending'").get().n;
     // Zähler für den Eltern-Ersteinrichtungs-Hinweis (aktivierte Mitglieder,
     // angelegte Prämien, Aufgaben mit Punktewert).
-    const participantCount = d.prepare('SELECT COUNT(*) AS n FROM reward_participants WHERE enabled = 1').get().n;
+    const participantCount = d.prepare(`SELECT COUNT(*) AS n FROM reward_participants p JOIN users u ON u.id = p.user_id WHERE p.enabled = 1 AND ${MEMBER_FILTER}`).get().n;
     const catalogCount = d.prepare('SELECT COUNT(*) AS n FROM reward_catalog WHERE is_active = 1').get().n;
     const pointedTaskCount = d.prepare('SELECT COUNT(*) AS n FROM tasks WHERE points > 0').get().n;
     res.json({ data: {
       balances, catalog, pendingCount: pending,
-      isAdmin: req.authRole === 'admin', me: actingUser(req),
+      isAdmin: isAdminRequest(req), me: actingUser(req),
       setup: { participantCount, catalogCount, pointedTaskCount },
     } });
   } catch (err) {
@@ -132,6 +136,14 @@ router.put('/participants/:userId', requireAdmin, (req, res) => {
     const enabled = req.body?.enabled === true || req.body?.enabled === 1 ? 1 : 0;
     const user = db.get().prepare('SELECT id FROM users WHERE id = ?').get(userId);
     if (!user) return res.status(404).json({ error: 'User not found.', code: 404 });
+    // Einschreiben nur Haushaltsmitglieder (#1207). Eine eingeschaltete
+    // Einschreibung von frueher bleibt gueltig und laesst sich abschalten;
+    // abgeschaltet ist sie keine mehr, und neu anlegen geht nicht.
+    if (enabled === 1) {
+      const current = db.get().prepare('SELECT enabled FROM reward_participants WHERE user_id = ?').get(userId);
+      const strangers = newNonMembers([userId], { stored: current?.enabled === 1 ? [userId] : [] });
+      if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
+    }
 
     db.get().prepare(`
       INSERT INTO reward_participants (user_id, enabled) VALUES (?, ?)
@@ -151,7 +163,7 @@ router.put('/participants/:userId', requireAdmin, (req, res) => {
 // --------------------------------------------------------
 router.get('/catalog', (req, res) => {
   try {
-    const all = req.authRole === 'admin' && req.query.all === '1';
+    const all = isAdminRequest(req) && req.query.all === '1';
     const rows = db.get().prepare(`
       SELECT id, name, cost, icon, description, is_active, sort_order
       FROM reward_catalog
@@ -316,7 +328,7 @@ router.post('/redemptions', (req, res) => {
   try {
     const d = db.get();
     const me = actingUser(req);
-    const targetId = req.body?.user_id != null && req.authRole === 'admin' ? toInt(req.body.user_id) : me;
+    const targetId = req.body?.user_id != null && isAdminRequest(req) ? toInt(req.body.user_id) : me;
     if (!targetId) return res.status(400).json({ error: 'user_id is required.', code: 400 });
 
     const item = d.prepare('SELECT * FROM reward_catalog WHERE id = ? AND is_active = 1').get(toInt(req.body?.catalog_id));
@@ -374,7 +386,7 @@ router.patch('/redemptions/:id', (req, res) => {
     if (row.status !== 'pending')
       return res.status(409).json({ error: 'Redemption already decided.', code: 409 });
 
-    const isAdmin = req.authRole === 'admin';
+    const isAdmin = isAdminRequest(req);
     if ((action === 'fulfill' || action === 'reject') && !isAdmin)
       return res.status(403).json({ error: 'Admin access required.', code: 403 });
     if (action === 'cancel' && !isAdmin && row.user_id !== me)

@@ -40,11 +40,13 @@ app.use(express.json());
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
+  // cookieSession: eine Sitzung, die neben einem API-Token mitkommt - requireAuth
+  // setzt authUserId/authRole dann aus dem Token, req.session bleibt die Sitzung.
+  req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
   next();
 });
 app.use('/', splitRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((r) => server.on('listening', () => r(`http://127.0.0.1:${server.address().port}`)));
 
 async function call(method, path, { actor: a, body } = {}) {
@@ -103,6 +105,15 @@ test('requireGroupAccess: Mitglied hat Lesezugriff', async () => {
 test('requireGroupAccess: System-Admin ohne Mitgliedschaft hat Zugriff (bewusster Bypass)', async () => {
   const r = await call('GET', `/groups/${GROUP}/members`, { actor: { id: ADMIN, role: 'admin' } });
   assert.equal(r.status, 200);
+});
+
+test('requireGroupAccess: Token eines Aussenstehenden neben einer Admin-Sitzung bekommt 404, die Admin-Sitzung allein 200', async () => {
+  const withToken = await call('GET', `/groups/${GROUP}/members`, {
+    actor: { id: OUTSIDER, role: 'member', cookieSession: { userId: ADMIN, role: 'admin' } },
+  });
+  assert.equal(withToken.status, 404, 'der Bypass urteilt nach der Rolle des Token-Subjekts');
+  const adminOnly = await call('GET', `/groups/${GROUP}/members`, { actor: { id: ADMIN, role: 'admin' } });
+  assert.equal(adminOnly.status, 200);
 });
 
 // --------------------------------------------------------------------------

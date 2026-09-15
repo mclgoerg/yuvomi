@@ -38,6 +38,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const tz = await import('../public/utils/timezone.js');
+test('explicit recorded zone retains fold offset and rejects a missing local hour', () => {
+  assert.equal(typeof tz.wallTimeInstant, 'function');
+  assert.equal(tz.wallTimeInstant('2025-10-26T02:35:00', 'Europe/Prague', '2025-10-26T01:30:00Z'), '2025-10-26T01:35:00.000Z');
+  assert.equal(tz.wallTimeInstant('2025-10-26T02:35:00', 'Europe/Prague', '2025-10-26T00:30:00Z'), '2025-10-26T00:35:00.000Z');
+  assert.throws(() => tz.wallTimeInstant('2025-03-30T02:30:00', 'Europe/Prague'), /wall time/);
+  assert.equal(tz.wallTimeValue('2025-10-26T01:30:00.123Z', 'Europe/Prague'), '2025-10-26T02:30:00');
+  assert.equal(tz.wallTimeInstant('2025-10-26T02:30:00', 'Europe/Prague', '2025-10-26T01:30:00.123Z'), '2025-10-26T01:30:00.123Z');
+});
 const dateUtils = await import('../public/utils/date.js');
 
 const {

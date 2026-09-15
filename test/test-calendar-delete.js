@@ -770,3 +770,58 @@ test('Undo releases a reserved series write so the next deletion can commit', as
   await scheduled[1].commit({ keepalive: false });
   assert.deepEqual(requests, ['second']);
 });
+
+// #1083: the commit render comes seconds after the delete gesture, outside any
+// handler. Measured in the agenda: focus had moved to the next row and fell to
+// BODY when renderView() replaced #cal-body.
+test('only the late re-renders go through keepFocus, the gesture render does not (#1083)', async () => {
+  const calls = [];
+  const scheduled = [];
+  const common = {
+    message: 'Deleted',
+    schedule: (options) => { scheduled.push(options); },
+    requestDelete: async () => {},
+    isViewActive: () => true,
+    reloadEvents: async () => { calls.push('reload'); },
+    handleError: () => {},
+    render: () => { calls.push('render'); },
+    keepFocus: (renderNow) => { calls.push('keepFocus'); renderNow(); },
+    refocusAfterUndo: () => { calls.push('refocusAfterUndo'); },
+  };
+
+  scheduleCalendarDeleteWithUndo({
+    ...common,
+    state: makeState(),
+    deleteScope: { eventId: 7, scope: 'this', occurrenceDate: '2027-01-29' },
+  });
+  assert.deepEqual(calls, ['render'], 'the first render belongs to the delete gesture');
+  await scheduled[0].commit({ keepalive: false });
+  assert.deepEqual(calls, ['render', 'reload', 'keepFocus', 'render'],
+    'a commit brings nothing back, so there is no restored row to refocus');
+
+  calls.length = 0;
+  scheduleCalendarDeleteWithUndo({
+    ...common,
+    state: makeState(),
+    deleteScope: { eventId: 8, scope: 'all' },
+  });
+  scheduled[1].restore();
+  // Keyboard Undo: the toast removed its focused button before calling restore,
+  // so keepFocus has nothing to carry; the refocus runs after the row is back.
+  assert.deepEqual(calls, ['render', 'keepFocus', 'render', 'refocusAfterUndo'],
+    'Undo re-renders just as late and then puts focus back on the restored row');
+});
+
+test('every calendar delete passes the focus keeper to the scheduler (#1083)', () => {
+  const src = readFileSync(new URL('../public/pages/calendar.js', import.meta.url), 'utf8');
+  const calls = src.split('scheduleCalendarDeleteWithUndo({').slice(1)
+    .map((part) => part.slice(0, part.indexOf('\n  });')));
+  assert.ok(calls.length >= 3, `expected the three delete paths, found ${calls.length}`);
+  for (const call of calls) {
+    assert.match(call, /\n\s*keepFocus: renderKeepingFocus,/,
+      'without it the default keeps no focus, and the commit render drops it to body');
+    assert.match(call, /\n\s*refocusAfterUndo: refocusAfterRender,/,
+      'without it a keyboard Undo leaves focus on body - the toast removed its button first');
+  }
+  assert.match(src, /import \{[^}]*\brenderKeepingFocus\b[^}]*\} from '\/components\/modal\.js'/);
+});

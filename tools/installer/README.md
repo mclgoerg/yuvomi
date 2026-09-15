@@ -19,7 +19,7 @@ of inactivity otherwise). Download the generated `.env` before you close the tab
 
 ## Requirements
 
-- Node.js 18+ (the installer itself has zero npm dependencies — Node built-ins only)
+- Node.js 22+, the version the repository targets and CI tests (the installer itself has zero npm dependencies - Node built-ins only)
 - A container engine — either **Docker** with Compose v2, or **Podman** with the
   `podman compose` subcommand (4.1+) or the `podman-compose` package
 - The repository cloned locally
@@ -49,21 +49,22 @@ dedicated `podman-compose.yml` (SELinux `:Z` labels).
        how Yuvomi is exposed (`SESSION_SECURE`, `TRUST_PROXY`) and the public
        address (`BASE_URL`). The exposure choice follows the host you enter, and the
        combination of an `http://` address with enforced secure cookies is rejected -
-       nobody could sign in to that
+       nobody could sign in to that. A timezone the browser does not recognise
+       (`Europe/Berln`) is refused on the spot instead of falling back to UTC
      - **Security keys** — `SESSION_SECRET` and `DB_ENCRYPTION_KEY` (pre-filled
        on a fresh install; existing keys are kept, see below)
      - **Weather** — Open-Meteo coordinates (no API key)
      - **Calendar** — Google Calendar and Apple CalDAV
      - **Email** — SMTP (`EMAIL_SMTP_*`, `EMAIL_FROM_*`); enables password-reset
        emails, email as a household notification channel, and sending a shopping
-       list to a member
+       list to a member; a port outside 1-65535 is refused on the spot
      - **Storage & backups** — the host data folder (`DATA_DIR`), automatic backups,
        off-site WebDAV backups (`WEBDAV_BACKUP_*`), and local-folder, WebDAV or
        Google Drive document storage. Everything that decides *where data lives*
      - **Advanced** — Single Sign-On (OIDC, including whether SSO becomes the only
-       way in), the three home-network permissions
-       (calendar subscriptions, recipe mirrors, WebDAV target - they lift the SSRF
-       protection and are asked as one group), the calendar sync interval, live
+       way in), the four home-network permissions
+       (calendar subscriptions, recipe mirrors, waste collection feeds, WebDAV
+       target - they lift the SSRF protection and are asked as one group), the calendar sync interval, live
        currency rates (`FIXER_API_KEY`) and the Web-Push contact (`VAPID_SUBJECT`).
        Everything that decides *what Yuvomi connects to*
    - The advanced path asks for `BASE_URL` (pre-filled from host, port and the

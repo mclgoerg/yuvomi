@@ -26,12 +26,10 @@ evening (#777), and a person's own calendar rather than the household's (#739, #
 - **Decided.** A person is a row in `users`, and whether they can sign in is a state of that
   row - [DECISIONS.md entry 4](DECISIONS.md#4-a-household-is-people-not-accounts), reached in
   #1007, #913 and #787. Being visible as a person is a property, not a relationship.
-- **Open.** The explicit "can sign in" state with its migration; the Family page adding a
-  person with a login as an option; the one predicate replacing the three module-local answers
-  (the first step, and the one without behaviour change). For the display account, #913 has
-  two questions still with the maintainer: may it act at all, and does it authenticate like an
-  account or like a provisioned device. For personal calendar connections, the missing piece
-  is an owner on the connection (#739).
+- **Open.** The explicit "can sign in" state with its migration, and the Family page adding a
+  person with a login as an option. Every list of members already goes through one strict
+  predicate, and choosing a person follows it (#1207). For personal calendar
+  connections, the missing piece is an owner on the connection (#739).
 
 ## Private by default, in one vocabulary
 
@@ -79,13 +77,16 @@ their Google calendar (#573).
 A tablet on the kitchen wall is not a person, it is a device the whole family looks at, and it
 keeps asking for its own treatment: a customisable wall mode (#915), the screensaver inside the
 dashboard (#885), calendar names instead of "event" (#988), themes from design-token overrides
-(#972), and the display account above (#913).
+(#972), and a display account that is not a member (#913).
 
 - **Decided.** No switch whose only job is to hide one button: the entry into wall mode is
   always visible, shipped in v2.60.0 that way on purpose (#915). Colours first for themes,
-  fonts as a separate feature (#972).
-- **Open.** Configurable widgets on the wall, the expensive half of #915; the display
-  account's two questions.
+  fonts as a separate feature (#972). The display account (#913) may act, but only for a
+  person chosen on the device and only to tick off tasks and request redemptions; it signs in
+  as a device an admin pairs, never with a password.
+- **Open.** Configurable widgets on the wall, the expensive half of #915; the display account
+  in three steps: one member predicate (#1207), the paired display on top of it (#1208), and its
+  two actions (#1209), which also need "who did it" on tasks (#1205).
 
 ## A different week
 
@@ -94,9 +95,9 @@ A week is not seven equal days for everyone: week views in blocks (#435), a week
 
 - **Decided.** Timetables live in the Schedule module as several blocks per cycle day, not as
   a twentieth module - [entry 6](DECISIONS.md#6-one-model-not-two), from #786 and #1018.
-- **Open.** The blocks-per-cycle-day change itself, in #1022; the side-by-side view of
-  several members' timetables, decided in #1018 as a tab in Schedule rather than a mode in
-  the calendar, and still to build.
+  Both halves have shipped with #1022: a cycle day carries more than one block, and the
+  side-by-side view of several members' timetables is an Overview tab in Schedule rather
+  than a mode in the calendar.
 
 ---
 
@@ -122,4 +123,4 @@ this list.
 
 Already tickets, since 2 September 2026: bank export import with a saved mapping (#1000),
 per-month budget plans (#1001), the health change feed (#1002), a price on a shopping item
-(#1003), account metadata without the secret (#1004).
+(#1003).

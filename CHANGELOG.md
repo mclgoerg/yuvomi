@@ -83,6 +83,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A type's color comes from a curated palette instead of a free color picker, which had happily
   accepted a white or black icon that then disappeared against the light or dark background - an
   existing color outside the palette is kept, not silently overwritten.
+- **A fasting journal records timers and past fasts in Health** (Refs #1173).
+  Start now or earlier, record completed intervals, and edit or undo changes with
+  conflict protection. Elapsed/remaining clocks, personal goals and an optional
+  educational dial preserve the recorded time zone. History loads ten records at
+  a time; date filters and CSV cover the complete visible history. Family members
+  can read shared records; personal settings stay private. Fasting is available to
+  every member by default and an admin can switch it off per family role or person.
+  Yuvomi records fasting and does not provide medical advice.
 
 - **A calendar's default assignee can now be applied to the events it already imported** (#1154).
   Until now the mapping only reached events that arrived after it was set, so the first thing
@@ -139,8 +147,146 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reverse proxy, holds no connection, and can grow into a stream on the same counter later. Your
   own taps do not cost a reload: the write routes answer with the counter before and after, and
   the page skips the reload when nothing else moved in between.
+- **`BIND_ADDRESS` sets the address the server listens on.** Unset, nothing changes: the app
+  listens on all interfaces, which is exactly what a container needs for its published port to
+  reach it, so Docker, Podman, Unraid, TrueNAS and Umbrel installations leave it alone. When Node
+  runs directly on a machine behind a reverse proxy on that same machine, `127.0.0.1` keeps the
+  app itself off the network. The built-in MCP bridge follows the setting when it calls the API
+  back. It is not the same as `OIKOS_HTTP_BIND`, which decides where the container engine
+  publishes the port.
+
+### Changed
+
+- **Housekeeping staff and shared-expense guests no longer appear where you pick or list household
+  members** (#1207). The pickers for task assignees, calendar attendees, budget responsibles,
+  schedule owners, medication owners, synced-calendar assignees and the Outlook account owner, the
+  family list, the calendar's person filter, mentions, the reward standings and enrolment and the
+  Overview's member cards now show household members only, and the household size counts them the
+  same way - a household of one person and a cleaner is a household of one for what the app shows.
+  Visibility, locking and document sharing stay available as long as anyone else can read the
+  module, a cleaner with access included, so a new entry can still be kept private. Splitting an expense
+  still offers the guests of that group, and guests can still be added to a group; housekeeping
+  staff cannot. Nothing is taken away: a task, event, budget entry, schedule, synced calendar or
+  document share that already names a staff member or guest keeps them, still shows them in its
+  editor and can still be saved, and an event's visibility stays as it was. Existing group
+  memberships stay as well and still show in the group editor, so they can be ended. An old reward
+  enrolment of a staff member or guest stays on record, but it no longer earns points, redeems or
+  receives a bonus. Schedule
+  rows on the dashboard keep their names; only choosing a staff member or guest anew is refused.
+  User administration and permissions still list every account, API tokens every account except
+  shared-expense guests as before, and the two-factor overview for admins now shows every account,
+  housekeeping staff and guests included.
+- **The README is shorter between the introduction and the install steps** (#1212). Each module
+  gets one line in the module table, with the detail left to the spec, and "Before you commit" -
+  what happens if the project stops, how to take your data elsewhere, what it costs - now comes
+  before the first command instead of after it. The install section opens with the three ways in,
+  lists the encryption key and the blocking of addresses on your own network as facts that apply
+  to every path, and names the logs command for both Docker and Podman.
 
 ### Fixed
+
+- **A request with an API token is judged by the token's own role, even when an admin session comes
+  along.** If the same client also sent the session cookie of a signed-in administrator, a request
+  made with a member's API token could still pass as an administrator in several places: calendar
+  subscriptions and events, locked tasks, household note categories, documents and DMS connections,
+  recipe providers, the shift schedule and split expenses. Each of them had its own admin check that
+  also looked at the session. They now use the same check as every other route, which looks only at
+  the role of the person the token belongs to. Signing in as an administrator without a token keeps
+  full access, and a request with only a session or only a token behaves as before.
+- **Form fields have a clearly visible edge in both themes.** Text inputs, selects and text areas
+  drew their resting edge in the same faint shade as card and group outlines, which rendered at 1.2
+  to 1.5:1 against the surface around them - well below the 3:1 a control boundary needs for people
+  to find the field at all. Fields now have an edge color of their own, at 3.2 to 3.5:1 in the light
+  theme and 3.9 to 5.5:1 in the dark theme on every surface they sit on: the sign-in page, dialogs,
+  settings pages, the search overlay, and the search and quick-add fields above the lists. Card
+  edges and separators keep their quieter shade, and a focused field still takes the accent color.
+- **Set-aside cards and rows stay readable.** Done and archived tasks (in the list and on the
+  board), archived accounts, paused and completed subscriptions, inactive medications and rewards,
+  archived waste types, paused pickups, and rows that an import has already added all faded out by
+  turning partly transparent. That pulled every text on them below the 4.5:1 normal text needs,
+  status badges and the initials in avatars included: 1.7 to 3.9:1 in the light theme, 2.4 to
+  4.2:1 in the dark theme. They now recede in one consistent way instead: the card sinks to a
+  slightly deeper surface with a quieter edge, secondary details use the quieter text color, and
+  titles, status badges, priority chips and avatars stay at full strength. They keep that look
+  when the pointer rests on them, instead of lighting up like an active card. The amount of an
+  expected budget entry is no longer faded either (3.5:1 and 3.0:1 before); it keeps its income or
+  expense color, and the "expected" badge marks the row. In the birthday import dialog, the
+  "already added" badge had no background at all and its text was practically invisible; it now
+  shows in the module color again.
+- **Checked-off shopping items look the same with reduced motion, and stay readable.** A checked
+  item was meant to fade as a whole, but that only happened for people who had reduced motion turned
+  on, and for them its name and quantity dropped to 2.0:1 (light) and 2.5:1 (dark). Everyone else
+  saw the item unfaded, because the fade-in animation of the list left a setting behind that
+  overrode it. The animation now cleans up after itself, and a checked item recedes through quieter
+  text colors instead of transparency: the name struck through in the secondary text color, details
+  and tags in the tertiary one, at 5.4:1 or more in both themes. Its tags no longer fade on their
+  own either (2.6:1 and 3.7:1 before). A checked item can still be tapped to reopen it, so it is not
+  exempt the way a disabled control would be. The same leftover setting had also kept a dragged row
+  or board card fully opaque, and stopped note and document cards from lifting slightly when the
+  pointer rests on them; a dragged card now fades while it is being moved, and notes and documents
+  lift on hover again, as intended.
+- **An early click on the simple setup no longer overwrites an existing installation.** The web
+  installer locks its simple path when it finds an `.env`, because that path sets host, port and
+  cookie security itself. The lock only took effect once the installer had finished checking for
+  the file, so a click in the moment before could still start the simple path and write over, for
+  example, a setup running behind a reverse proxy. The simple path now waits for that check and
+  continues in the advanced setup, where each of these values is visible, and its save step refuses
+  to write over an existing file. The check itself no longer waits indefinitely for a container
+  engine that does not answer: after a few seconds the installer carries on and treats the container
+  as not running.
+
+- **The web installer shows an existing configuration as a warning, not as a hint.** When the
+  installer finds an `.env`, the setup says that the current file will be backed up before saving -
+  a setup that works is about to be replaced. That line was tinted like a plain hint; it now carries
+  the same amber warning style and icon as the installer's backup reminders.
+
+- **On the project page, the module list on phones folds away again, and the jump menu marks the
+  right section after a language switch.** On a phone, "Show all modules" opened the full list and
+  then disappeared, so the list could not be shortened again; the button now stays and switches
+  between all and fewer modules. The jump menu remembered where each section starts and measured
+  again only when the window changed size, so after switching to the longer German page it
+  highlighted the next section too early. It now measures again whenever the language changes or
+  the module list opens or closes. The calendar screenshot also tells screen readers what it shows,
+  instead of just "Calendar".
+
+- **A Google Calendar change made while the connection is down now reaches Google once it is
+  back.** Before pushing an edit or moving an event to another calendar, Yuvomi asks Google for that
+  calendar's details. When that request failed for a passing reason, such as no network, a token
+  refresh or a rate limit, the change was handled like one for a read-only calendar and dropped: it
+  never reached Google, and nothing said so. It now waits for the next sync and is only given up
+  after the usual five attempts, or when Google reports the calendar as gone. A different calendar
+  picked while a move is still under way is also no longer discarded when Google rejects that move.
+
+- **The website and both READMEs now say what reaches out once you use a feature** (#1212). Out of
+  the box the only outbound request is still the update check against the GitHub releases API. The
+  pages said that weather, calendar sync and cloud backup stay off until you enter credentials, but
+  weather needs only a location, and once a country is set, holidays are fetched from
+  openholidaysapi.org - except the public holidays of Australia, Brazil, Canada, New Zealand, the
+  United Kingdom and the United States, which Yuvomi works out itself without a request. Opening the
+  calendar settings loads the list of holiday countries from openholidaysapi.org as well, whether or
+  not a country is set. Looking up a logo for a subscription contacts the service's website, and
+  push goes through your browser's push service. The outbound line now names all of them.
+
+- **A WebDAV backup URL made of whitespace no longer locks the backup settings.** A space or line
+  break in `WEBDAV_BACKUP_URL`, for example from `${WEBDAV_BACKUP_URL:- }` in a compose file, was
+  ignored as a URL but still marked the backup fields as set by the environment, so they could not be
+  edited in Settings. Both now use the same check: only a value that is not blank comes from the
+  environment.
+
+- **A modules folder set through `MODULES_DIR` in `.env` is found again.** `docker-compose.yml`,
+  `podman-compose.yml` and the Podman Quadlet hand the `.env` to the container, and the app reads
+  `MODULES_DIR` there as its own folder: an absolute host path in it pointed the app at a folder
+  nobody had mounted, so dropped-in modules never appeared. The three descriptors now pin it to
+  `/app/modules` inside the container; with Compose the `.env` value only moves the mount source, and
+  the Quadlet keeps its host folder in the unit file. It reaches an existing install once its compose
+  file or Quadlet unit is updated.
+
+- **The Unraid template no longer takes email, backup and document-storage settings out of the
+  app's hands.** Seven of its variables shipped a value, and a value there wins over the matching
+  setting in Settings, locking the email and document-storage fields. New containers leave them
+  empty. A container created from the older template keeps what it was created with; clearing the
+  variable on its Edit page hands the setting back to the app (see the Unraid section of the
+  installation guide).
 
 - **Belgian school holidays can be narrowed to one language community.** OpenHolidays lists Belgium
   without any regions but splits its school holidays between the Flemish, French and German-speaking
@@ -254,6 +400,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   appear. The Compare tab's day headers scrolled away with the hours beneath them; they now stay
   pinned to the top of the scroll area while the day's shifts scroll past, so a block halfway down a
   long day is never orphaned from the day it belongs to.
+
+- **The calendar keeps keyboard focus when a deletion is committed** (#1083). A deleted event
+  disappears at once and is removed for good once the Undo notice runs out, and the view then draws
+  itself once more. Whatever you had moved on to in the meantime, for example the next row in the
+  agenda, lost focus at that moment, so the next Tab started again at the top of the page. That
+  element now keeps focus across the redraw. Pressing Undo from the keyboard lost focus the same
+  way, because the notice removes its button before the event comes back; focus now lands on the
+  restored event.
+
+- **A dialog no longer moves keyboard focus into its first field after you have already moved on**
+  (#1156). Opening a form puts focus into its first field a moment later. On a slow or busy device
+  that moment could arrive after you had already acted, for example after answering a save
+  confirmation, which hands focus back to the Save button: focus then jumped to the first field
+  instead, and nothing brought it back. The same could pull focus out of an open date picker. The
+  first field now stays out of the way once focus has moved inside the dialog or into something on
+  top of it, such as a date picker; focus that lands on the page behind the dialog still moves in.
 
 ## [2.66.1] - 2026-09-14
 

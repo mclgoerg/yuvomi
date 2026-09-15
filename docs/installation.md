@@ -10,7 +10,7 @@ node tools/installer/install-server.js
 # Open http://localhost:8090
 ```
 
-Requires Node.js 18+ on the host. The browser-based wizard is fully localized (24 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` — including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups — starts the container, and creates your admin account. The engine still runs the app itself.
+Requires Node.js 22+ on the host. The browser-based wizard is fully localized (24 languages, auto-detected from your browser), detects your container engine (Docker or Podman) first, then configures your `.env` - including optional reverse-proxy/HTTPS, Single Sign-On (OIDC), and automatic backups - starts the container, and creates your admin account. The engine still runs the app itself.
 
 ### Option B — CLI Installer (Linux / macOS)
 
@@ -160,7 +160,7 @@ There are seven ways to get Yuvomi running. **Option A** (web installer) is reco
 
 ### Option A — Web Installer (Recommended)
 
-Requires Node.js 18+ and Docker on the host.
+Requires Node.js 22+ and Docker on the host.
 
 #### 1. Clone the Repository
 
@@ -179,12 +179,12 @@ node tools/installer/install-server.js
 
 Open your browser and navigate to **http://localhost:8090**. The wizard detects your browser language (24 languages supported), verifies that a container engine is available (Docker with Compose v2, or Podman with `podman compose` / `podman-compose`), and reports an existing `.env` file as well as a running container before you start. When it finds one, the **simple setup is disabled** and you continue with the advanced setup: the simple path writes fixed values for host, port, `SESSION_SECURE` and `TRUST_PROXY`, which would silently downgrade an installation that already runs behind a reverse proxy. The wizard then guides you through:
 
-- Basics — domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`, which pre-sets the household zone; that one is changeable later under Settings → Personal → Appearance → Region), how Yuvomi is exposed (`SESSION_SECURE`, `TRUST_PROXY`) and the public address (`BASE_URL`). The exposure choice follows the host you enter, and the wizard rejects an `http://` address combined with enforced secure cookies — nobody could sign in to that combination. A typed public address only counts once it names a full `http://` or `https://` origin; until then the wizard keeps the address it derives from host and port
+- Basics - domain/IP, HTTP host port (`OIKOS_HTTP_PORT`), timezone (`TZ`, which pre-sets the household zone; that one is changeable later under Settings → Personal → Appearance → Region), how Yuvomi is exposed (`SESSION_SECURE`, `TRUST_PROXY`) and the public address (`BASE_URL`). The exposure choice follows the host you enter, and the wizard rejects an `http://` address combined with enforced secure cookies - nobody could sign in to that combination. A typed public address only counts once it names a full `http://` or `https://` origin; until then the wizard keeps the address it derives from host and port. A timezone the browser does not recognise (`Europe/Berln`) is refused on the spot instead of silently falling back to UTC
 - Security key generation (`SESSION_SECRET`, `DB_ENCRYPTION_KEY`) — on a re-run, keys already present in your `.env` are kept rather than regenerated, so running the wizard again on a live installation cannot lock you out of your encrypted database
 - Optional integrations (weather, Google Calendar, Apple CalDAV)
 - Email/SMTP for the "forgot password" flow (`EMAIL_SMTP_*`, `EMAIL_FROM_*`)
 - Storage & backups — the host data folder (`DATA_DIR`), automatic backups, off-site WebDAV backups and the three document storage options. Everything that decides where data lives
-- Advanced settings — Single Sign-On (OIDC), the three home-network permissions (they lift the SSRF protection and are asked as one group), the calendar sync interval, live currency rates and the Web-Push contact. Everything that decides what Yuvomi connects to
+- Advanced settings - Single Sign-On (OIDC), the four home-network permissions for calendar subscriptions, recipe mirrors, waste collection feeds and a WebDAV target (they lift the SSRF protection and are asked as one group), the calendar sync interval, live currency rates and the Web-Push contact. Everything that decides what Yuvomi connects to
 - Writing your `.env` file (an existing `.env` is backed up to `.env.bak-<timestamp>` first)
 - Starting the container (via Docker or Podman, whichever was detected)
 - Creating your admin account
@@ -383,6 +383,8 @@ Launch Yuvomi from your Umbrel home screen. The first visit guides you through c
 
 > **Finish setup right away.** When Umbrel's reverse-proxy authentication is disabled, the unauthenticated first-run setup endpoint is reachable on your LAN until you create the admin account. Complete the first-run setup immediately after installing.
 
+> **No third-party modules on Umbrel.** The store package mounts no modules folder, so the drop-in [modules](../MODULES.md) are not available on this path. Every other install option supports them.
+
 ---
 
 ### Option F — Unraid (Community Apps)
@@ -404,6 +406,10 @@ Click **Install**. In the template, set:
 #### 3. Apply and Open
 
 Click **Apply**. Once the container is running, click the Yuvomi icon → **WebUI**. The first visit guides you through creating your admin account in the browser.
+
+#### Fields locked in Settings
+
+A variable filled in on the template wins over the matching setting in the app: the email and WebDAV document-storage fields show it locked under **Settings**, and the WebDAV backup path and retention use it without saying so. Until 14 September 2026 the template shipped values for seven of these variables (`EMAIL_SMTP_PORT`, `EMAIL_SMTP_SECURE`, `EMAIL_FROM_NAME`, `WEBDAV_BACKUP_PATH`, `WEBDAV_BACKUP_KEEP`, `DOCUMENT_STORAGE_WEBDAV_ENABLED`, `DOCUMENT_STORAGE_WEBDAV_PATH`), so a container created from an older template can carry them although nobody chose them. To manage such a setting in the app again, open the container's **Edit** page, clear the variable and click **Apply**.
 
 ---
 
@@ -445,6 +451,7 @@ All configuration happens in the `.env` file. The container reads these values o
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `PORT` | Port the Express server listens on **inside the container** (rarely changed) | `3000` | No |
+| `BIND_ADDRESS` | Address the Express server listens on. Unset means all interfaces, and a container needs exactly that: the published port only reaches the app this way, so leave it unset for Docker, Podman, Unraid, TrueNAS and Umbrel. Set it to `127.0.0.1` when Node runs directly on the host behind a reverse proxy on that host. It has to be an IP address: a host name, `localhost` included, is refused at startup, because the MCP bridge would resolve it again on every call and could reach another machine with the caller's credentials. An IPv6 address with a zone ID (`fe80::1%eth0`) is refused at startup: no URL can reach it, so the built-in MCP bridge could never call the API back. Not to be confused with `OIKOS_HTTP_BIND`, which decides where the container engine publishes the port. | all interfaces | No |
 | `OIKOS_HTTP_PORT` | Host port that the compose file maps to the container's port 3000. Change this to expose Yuvomi on a different host port; the app inside the container always listens on 3000. | `3000` | No |
 | `OIKOS_HTTP_BIND` | Host bind address for the published port (`podman-compose.yml` only). Set to `127.0.0.1` for rootless Podman behind a reverse proxy on the same host. | `0.0.0.0` | No |
 | `TZ` | Container timezone (e.g. `Europe/Berlin`). Affects log timestamps and the automated-backup schedule, and is the **default** for the household zone. Since v2.34.0 the household zone is a setting of its own (Settings → Personal → Appearance → Region), and where both exist the setting wins: `TZ` lives in the compose file, which is out of reach on Umbrel, TrueNAS and Unraid, and it also drives things that have nothing to do with the family calendar. Whichever applies is the zone used wherever a time carries none of its own: the calendar day server-side jobs call "today" (upcoming events, countdowns, recurring split expenses, birthdays), events pushed to Google Calendar when the target calendar reports no zone, events pushed to Outlook, events pushed to a CalDAV server (#938 - before that they carried no zone at all, leaving every server free to read them on its own clock), the due times of CalDAV reminders synced into Tasks, and the times in the exported calendar feed (`/feed/calendar/<token>.ics`), which subscribers read in this zone - a wrong zone shifts every appointment for everyone subscribed. **Since v2.36.0 the app's own display follows it too**, so a device travelling in another zone shows the household's clock rather than its own; that half applies only when the setting is set, since `TZ` alone leaves the display on the browser as before. | `UTC` | No |
@@ -461,7 +468,7 @@ All configuration happens in the `.env` file. The container reads these values o
 | `RATE_LIMIT_WINDOW_MS` | Time window for rate limiting (ms) | `60000` | No |
 | `RATE_LIMIT_MAX_ATTEMPTS` | Max attempts per window on the credential routes: sign-in, the second factor, and password reset | `5` | No |
 | `ENABLE_API_DOCS` | API documentation (`/docs`, `/openapi.json`) is admin-only and hidden entirely in production. Set to `true` to expose it to signed-in admins in production too. | `false` (hidden) | No |
-| `MCP_INTERNAL_BASE_URL` | Base URL the built-in MCP endpoint (`/mcp`) uses when its `call_api_operation` bridge calls the REST API back over loopback. Only needed for non-standard bind addresses. | `BASE_URL` or `http://127.0.0.1:<PORT>` | No |
+| `MCP_INTERNAL_BASE_URL` | Base URL the built-in MCP endpoint (`/mcp`) uses when its `call_api_operation` bridge calls the REST API back over loopback. Only needed when neither default reaches the app. | `BASE_URL`, otherwise `http://<BIND_ADDRESS>:<PORT>` (`127.0.0.1` while `BIND_ADDRESS` is unset) | No |
 
 Generate a secure `SESSION_SECRET`:
 
@@ -479,7 +486,15 @@ Settings → Personal → Notifications.
 Admins can also add household Gotify, ntfy, generic HTTP webhook or email channels on the same
 settings page. These channels are configured in the UI and do not require environment variables. The
 Yuvomi backend container or host must be able to reach the configured base URL. HTTPS is recommended;
-HTTP is accepted for trusted internal networks such as a private LAN or container network.
+HTTP is accepted as well.
+
+Since v2.64.1 a channel URL must also resolve to a public address, like every other outbound
+integration. A private or local target - a Gotify or ntfy container in the same Docker network, a
+Home Assistant webhook in the LAN - is refused when the channel is saved, with a message naming the
+switch that allows it: `NOTIFICATION_ALLOW_PRIVATE_NETWORK=true` (see
+[the private-network switches](#calendar-subscriptions--ics-feeds-optional)). Delivery repeats the
+check for every connection it opens, redirects included. A LAN channel created before that release
+stops delivering until the switch is set, and records the reason on the channel.
 
 An **email** channel is the exception: it has no base URL and no credentials of its own. It reuses
 the app-wide SMTP access that already sends password resets and invitations, so configure
@@ -551,7 +566,7 @@ makes exactly that field read-only in the settings UI; empty values fall back to
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `EMAIL_SMTP_HOST` | SMTP server hostname. | - | No |
-| `EMAIL_SMTP_PORT` | SMTP server port. | `587` | No |
+| `EMAIL_SMTP_PORT` | SMTP server port. | `587` (`465` with `ssl`) | No |
 | `EMAIL_SMTP_SECURE` | Connection security: `ssl`, `starttls`, or `none`. | `starttls` | No |
 | `EMAIL_SMTP_USER` | SMTP auth username. | - | No |
 | `EMAIL_SMTP_PASS` | SMTP auth password. | - | No |
@@ -597,7 +612,8 @@ security, and troubleshooting.
 | `DB_ENCRYPTION_KEY` | SQLCipher AES-256 key for encryption at rest. Leave it empty and the database stays unencrypted. Once set there is no way back: it cannot be recovered and cannot be changed on an existing database. The placeholder that `.env.example` ships (`REPLACE_WITH_...`) is refused on a fresh install, because it is printed in this repository and would protect nothing. | - | No, but strongly recommended |
 | `DB_ALLOW_NEWER_SCHEMA` | Emergency switch, normally unset. An older Yuvomi refuses to start on a database a newer version has opened (see [Going back](#going-back)); `1` starts it anyway, at your own risk, with a warning on every start. | - | No |
 | `DATA_DIR` | Host directory mounted at `/data` inside the container (set in `.env` or `docker-compose.yml`). | `./data` | No |
-| `MODULES_DIR` | Host directory mounted at `/app/modules` inside the container - the drop-in folder for [third-party modules](../MODULES.md). | `./modules` | No |
+| `MODULES_DIR` | Host directory mounted at `/app/modules` inside the container - the drop-in folder for [third-party modules](../MODULES.md). Like `BACKUP_DIR`, the app also reads this name itself as the directory *inside* the container, which is why `docker-compose.yml`, `podman-compose.yml` and the Quadlet pin it to `/app/modules` there. With Compose the value in `.env` therefore only moves the mount source; the Quadlet keeps its host folder in the unit file, and Portainer uses a named volume. | `./modules` | No |
+| `BACKUP_DIR` | In `.env`/`docker-compose.yml`: the **host** directory mounted at `/backups`. Inside the container the app reads the same name as the **container** path it writes to - the compose files pin it to `/backups`, and the image defaults to `/backups` as well. Only override it inside the container if you mount your backup volume somewhere else. | `./backups` (host) / `/backups` (container) | No |
 
 > **Where the backups go.** There is no `BACKUP_DIR` in the setup wizard, and that is deliberate.
 > Unlike `DATA_DIR`, which exists only as a Compose substitution for the mount source, `BACKUP_DIR`
@@ -614,7 +630,6 @@ security, and troubleshooting.
 > ```
 >
 > The same applies to the module drop-in folder at `/app/modules`.
-| `BACKUP_DIR` | In `.env`/`docker-compose.yml`: the **host** directory mounted at `/backups`. Inside the container the app reads the same name as the **container** path it writes to — the compose files pin it to `/backups`, and the image defaults to `/backups` as well. Only override it inside the container if you mount your backup volume somewhere else. | `./backups` (host) / `/backups` (container) | No |
 
 Generate a secure `DB_ENCRYPTION_KEY`:
 
@@ -775,12 +790,14 @@ ICS calendar subscriptions are added in the UI. For SSRF protection, feed URLs m
 and resolve only to public network addresses; `http://`, private, loopback, link-local, and internal
 DNS targets are rejected. To subscribe to a feed on your local network (e.g. Sonarr/Radarr/Home
 Assistant, or a self-hosted calendar behind an internal DNS name), set the opt-in below. Only enable
-it in controlled environments.
+it in controlled environments. The other integrations that reach a URL you enter carry a switch of
+the same kind, listed in the same table.
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
 | `ICS_SUBSCRIPTION_ALLOW_PRIVATE_NETWORK` | Allow `http://` and private/local network ICS feeds; lifts SSRF protection (`true`/`false`) | `false` | No |
-| `RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK` | Allow `http://` and private/local network recipe provider (Mealie/Tandoor) targets; lifts SSRF protection (`true`/`false`) | `false` | No |
+| `RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK` | Allow private/local network recipe provider (Mealie/Tandoor) targets, including a base URL that is itself a private IP such as `http://192.168.x.x` (needed for those since v2.64.1); lifts SSRF protection (`true`/`false`). A plain `http://` base URL is accepted without it | `false` | No |
+| `WASTE_SOURCE_ALLOW_PRIVATE_NETWORK` | Allow `http://` and private/local network waste collection URL sources; lifts SSRF protection (`true`/`false`). Without it a source URL must use `https://` and resolve to a public address | `false` | No |
 | `NOTIFICATION_ALLOW_PRIVATE_NETWORK` | Allow private/local network notification channel targets (Webhook, Gotify, ntfy); lifts SSRF protection (`true`/`false`) | `false` | No |
 | `DMS_ALLOW_PRIVATE_NETWORK` | Allow private/local network document management targets (Paperless-ngx, Papra); `false` enforces SSRF protection (`true`/`false`) | `true` | No |
 
@@ -902,7 +919,7 @@ Pocket ID documents Yuvomi as one of its [client examples](https://pocket-id.org
 | `OIDC_REDIRECT_URI` | OAuth callback URL — must be registered with the provider (e.g. `https://yuvomi.example.com/api/v1/auth/oidc/callback`) | - | No |
 | `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM` | Set to `true` to allow account linking when the IdP omits the `email_verified` claim entirely. Only enable for IdPs fully under your control that never issue unverified addresses (e.g. older Authentik without an explicit `email_verified` property mapping). | - | No |
 | `OIDC_ALLOW_SIGNUP` | Set to `false` so an SSO sign-in never provisions a new account. Sign-in and account linking are unaffected, so the admin creates the account and the user signs in with SSO. Use this when your identity provider serves more people than this household. | `true` | No |
-| `AUTH_ALLOW_PASSWORD_LOGIN` | Set to `false` to make SSO the only way in: the login form, password login and password reset are all switched off. Ignored until all four OIDC variables are set **and** at least one account is linked to the provider, so a typo - or a fresh install - can never lock everyone out. | `true` | No |
+| `AUTH_ALLOW_PASSWORD_LOGIN` | Set to `false` to make SSO the only way in: the login form, password login and password reset are all switched off. Ignored until all four OIDC variables are set **and** at least one administrator account is linked to the provider, so a typo - or a fresh install - can never lock everyone out. | `true` | No |
 
 When all four OIDC variables are set, a **"Sign in with SSO"** button appears on the login page. The flow uses Authorization Code + PKCE (S256) with a nonce. On first login, the user is matched by their OIDC `sub`. If no match exists, an existing local account is linked automatically **only when the provider reports a verified email (`email_verified: true`) and exactly one local account holds that email address**; otherwise a new account is provisioned. Unverified or ambiguous emails never take over an existing account. If your provider omits the `email_verified` claim, set `OIDC_TRUST_EMAIL_WITHOUT_VERIFIED_CLAIM=true` to enable linking.
 
@@ -912,7 +929,7 @@ When all four OIDC variables are set, a **"Sign in with SSO"** button appears on
 
 Three things are deliberate:
 
-- **The switch only takes effect once somebody can actually get in through SSO.** Two conditions: all four OIDC variables set, and at least one account already linked to the provider. Until then password login stays on and the server says so on startup. The second condition is what makes a fresh install work - it creates its first administrator through `/setup` with a password, and that account would otherwise be dead the moment it was created, with `/setup` closed behind it. Sign in once through SSO to link the admin account, and the switch takes hold from then on.
+- **The switch only takes effect once somebody can actually get in through SSO.** Two conditions: all four OIDC variables set, and at least one administrator account already linked to the provider. Until then password login stays on and the server says so on startup. The second condition is what makes a fresh install work - it creates its first administrator through `/setup` with a password, and that account would otherwise be dead the moment it was created, with `/setup` closed behind it. Sign in once through SSO to link the admin account, and the switch takes hold from then on.
 - **Invitations adapt.** While the switch is in effect, accepting an invitation creates an account with no password, linked on first SSO sign-in through the invitation's email address. An invitation without an email address is refused rather than consumed into an account nobody can reach.
 - **Existing passwords are not touched.** Setting the variable back to `true` restores the form exactly as it was. Removing a password is a per-account decision instead: **Settings → Administration → Family** offers "SSO sign-in only" both when creating a member and when editing one. An account switched this way carries a placeholder no password can ever match; switching it back requires setting a new password in the same step, so the account is never left with no way in at all.
 - **Recovery is a documented `.env` change.** If the identity provider becomes unreachable, remove the line and restart. A break-glass admin account with a password would defeat the point of the switch, so there is none.

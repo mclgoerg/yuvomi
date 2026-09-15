@@ -9,7 +9,9 @@ import { createHmac, randomBytes } from 'node:crypto';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
 import { str, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
-import { documentVisibleSql } from '../services/document-access.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
+import { canManageDocument, documentVisibleSql } from '../services/document-access.js';
+import { newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import {
   DocumentDeletionInProgressError,
   documentDeleteIsActive,
@@ -141,8 +143,10 @@ function userId(req) {
   return req.authUserId || req.session.userId;
 }
 
-function isAdmin(req) {
-  return req.authRole === 'admin' || req.session?.role === 'admin';
+// Schreiben darf, wer das Dokument angelegt hat, oder ein Admin. Die Regel steht
+// neben der Sichtbarkeit in services/document-access.js (#989).
+function mayManage(req, document) {
+  return canManageDocument(document, { userId: userId(req), isAdmin: isAdminRequest(req) });
 }
 
 function canSeeSql(alias = 'd') {
@@ -323,7 +327,7 @@ function configProtected(message, options = {}) {
 
 router.get('/storage/config', (req, res) => {
   try {
-    if (!isAdmin(req)) {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
     }
     res.json({ data: storageConfigStatus() });
@@ -336,7 +340,7 @@ router.get('/storage/config', (req, res) => {
 
 router.put('/storage/config', async (req, res) => {
   try {
-    if (!isAdmin(req)) {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
     }
     if (
@@ -474,7 +478,7 @@ router.put('/storage/config', async (req, res) => {
 
 router.post('/storage/test', async (req, res) => {
   try {
-    if (!isAdmin(req)) {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Not authorized.', code: 403 });
     }
     await assertWebdavTargetAllowed(resolveConfig(req.body));
@@ -501,8 +505,8 @@ router.get('/meta/options', (req, res) => {
         active_upload_backend: getActiveUploadBackend(),
         // Der Client blendet Deep-Links in die (admin-only) Dokument-Einstellungen
         // nur ein, wenn sie auch erreichbar sind — kein toter Link für Mitglieder.
-        is_admin: isAdmin(req),
-        dms_accounts: isAdmin(req) ? dmsAccounts : [],
+        is_admin: isAdminRequest(req),
+        dms_accounts: isAdminRequest(req) ? dmsAccounts : [],
       },
     });
   } catch (err) {
@@ -653,7 +657,7 @@ router.get('/folders/:id/delete-impact', (req, res) => {
       `)
       .all({ ...folderParams, userId: userId(req) });
     const canDeleteDocuments = visibleDocuments.length === documents.length
-      && (isAdmin(req) || visibleDocuments.every((document) => document.created_by === userId(req)));
+      && visibleDocuments.every((document) => mayManage(req, document));
 
     const linkedState = folderDeleteLinkedState(documents.map((document) => document.id));
     const visibleLinkedState = folderDeleteLinkedState(visibleDocuments.map((document) => document.id));
@@ -846,7 +850,7 @@ router.delete('/folders/:id', async (req, res) => {
     // Speicher angefasst wird. Sonst könnte ein Mitglied erst eigene Dateien
     // löschen und beim ersten fremden Dokument in einem halben Baum stranden.
     if (deleteDocuments && (visibleDocumentIds.size !== documents.length
-        || (!isAdmin(req) && documents.some((document) => document.created_by !== userId(req))))) {
+        || !documents.every((document) => mayManage(req, document)))) {
       return res.status(403).json({ error: 'Not authorized to delete every document in this folder.', code: 403 });
     }
 
@@ -1050,6 +1054,9 @@ router.post('/', async (req, res) => {
     if (parsed.error) return res.status(400).json({ error: parsed.error, code: 400 });
 
     const allowedIds = visibility === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
+    // Freigeben laesst sich ein neues Dokument nur Haushaltsmitgliedern (#1207).
+    const strangers = newNonMembers(allowedIds);
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     stagedUpload = await stageDocumentUpload({
       buffer: parsed.buffer,
       mime: parsed.mime,
@@ -1115,7 +1122,7 @@ router.put('/:id', (req, res) => {
     const id = Number(req.params.id);
     const existing = getVisibleDocument(id, req);
     if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404 });
-    if (existing.created_by !== userId(req) && !isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
 
     const vName = req.body.name !== undefined ? str(req.body.name, 'Name', { max: MAX_TITLE }) : { value: null };
@@ -1134,6 +1141,14 @@ router.put('/:id', (req, res) => {
         && activeFolderTreeDeletes.has(vFolderId.value)) {
       return deletionInProgress(res);
     }
+    const allowedIds = (visibility || existing.visibility) === 'restricted' ? parseMemberIds(req.body.allowed_member_ids) : [];
+    // Neu freigeben laesst sich nur Haushaltsmitgliedern (#1207). Wer schon
+    // freigegeben ist - auch Hauspersonal oder ein Gast -, bleibt speicherbar.
+    // Geprueft vor dem UPDATE: eine abgelehnte Anfrage aendert nichts.
+    const storedAccess = db.get().prepare('SELECT user_id FROM family_document_access WHERE document_id = ?')
+      .all(id).map((row) => row.user_id);
+    const strangers = newNonMembers(allowedIds, { stored: storedAccess });
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
     db.get().prepare(`
       UPDATE family_documents
       SET name = COALESCE(?, name),
@@ -1152,8 +1167,7 @@ router.put('/:id', (req, res) => {
       req.body.folder_id !== undefined ? vFolderId.value : existing.folder_id,
       id
     );
-    if ((visibility || existing.visibility) === 'restricted') replaceAccess(id, parseMemberIds(req.body.allowed_member_ids));
-    else replaceAccess(id, []);
+    replaceAccess(id, allowedIds);
 
     const row = db.get().prepare(`${documentSelect()} WHERE d.id = ? GROUP BY d.id`).get(id);
     res.json({ data: normalizeDocument(row) });
@@ -1168,7 +1182,7 @@ router.patch('/:id/archive', (req, res) => {
     const id = Number(req.params.id);
     const existing = getVisibleDocument(id, req);
     if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404 });
-    if (existing.created_by !== userId(req) && !isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
     const status = req.body.archived === false ? 'active' : 'archived';
     db.get().prepare('UPDATE family_documents SET status = ? WHERE id = ?').run(status, id);
@@ -1271,7 +1285,7 @@ router.delete('/:id', async (req, res) => {
     const id = Number(req.params.id);
     const existing = getVisibleDocument(id, req, true);
     if (!existing) return res.status(404).json({ error: 'Document not found.', code: 404 });
-    if (existing.created_by !== userId(req) && !isAdmin(req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    if (!mayManage(req, existing)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
     if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
     lockDocumentDeletes([id]);
     lockedId = id;

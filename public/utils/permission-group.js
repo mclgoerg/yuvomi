@@ -41,3 +41,26 @@ export function parsePermissionGroup(group) {
   if (sep < 0) return { type: raw, key: '' };
   return { type: raw.slice(0, sep), key: raw.slice(sep + 1) };
 }
+
+/**
+ * A capability is a summary deviation only when its effective value differs
+ * from that capability's shipped default. Capabilities are not uniformly
+ * opt-in: fasting ships allowed while household note-category management does
+ * not, so comparing every capability with one global default inverts one of
+ * the two states.
+ */
+export function isPermissionDeviation(item, effectiveAccess) {
+  return effectiveAccess !== (item?.default ?? 'none');
+}
+
+/**
+ * Resolves the access shown by a capability segment. Each capability owns its
+ * shipped default: fasting defaults to allow while household note-category
+ * management defaults to none. A user row may inherit a role value; a role row
+ * falls straight through to the capability's own default.
+ */
+export function effectiveCapabilityAccess(item, { mode, draft, inherited } = {}) {
+  if (draft && draft !== 'inherit') return draft;
+  if (mode === 'user') return inherited ?? item?.default ?? 'none';
+  return item?.default ?? 'none';
+}

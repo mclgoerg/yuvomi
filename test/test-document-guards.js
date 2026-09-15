@@ -7,8 +7,9 @@
  *        zweier Regeln entstehen, deren Token-Paare je fuer sich AA halten.
  * Ausfuehren: npm run test:document-guards   (braucht Browser + Serverprozess)
  *
- * NICHT in `npm test`: die uebrige Kette ist netzfrei und serverlos und soll
- * das bleiben. test-suite-chain.js kennt die Zweiteilung als Regel (eine Suite,
+ * NICHT in `npm test`: die uebrige Kette kommt ohne eigenen Serverprozess und
+ * ohne Browser aus (HTTP nur im Testprozess ueber Loopback) und soll das
+ * bleiben. test-suite-chain.js kennt die Zweiteilung als Regel (eine Suite,
  * die `puppeteer` importiert, gehoert in die Browser-Kette), nicht als
  * Namensausnahme.
  *
@@ -373,6 +374,108 @@ test('save confirmations preserve the same editor across repeated gates and keep
       const confirmed = await window.saveGateTest.pending;
       return { confirmed, closeCount: window.saveGateTest.closeCount(), editorConnected: window.saveGateTest.editor.isConnected };
     }), { confirmed: true, closeCount: 1, editorConnected: false });
+  } finally {
+    await page.close();
+  }
+});
+
+// #1156: die Save-Gate-Probe oben war unter Last zeitweise rot (`focus:
+// 'gate-title'`). Ursache gemessen: nicht das `inert` beim Fortsetzen, sondern der
+// 50-ms-Erstfokus des Editors - lag er hinter dem Fortsetzen, zog er den Fokus vom
+// Speichern-Knopf ins erste Feld. Unter Last war das Zufall; hier wird der Timer
+// fuer das eine Oeffnen auf 1500 ms gestreckt, damit er SICHER hinter dem
+// Fortsetzen liegt und die Sonde bei jedem Lauf misst, was vorher nur manchmal kam.
+test('der verspaetete Erstfokus nimmt dem fortgesetzten Speichern-Tor den Fokus nicht weg (#1156)', async () => {
+  const page = await openPage(harness, { device: 'desktop', locale: 'de' });
+  try {
+    const openSlow = (title) => page.evaluate(async (modalTitle) => {
+      const modal = await import('/components/modal.js');
+      const origSetTimeout = window.setTimeout;
+      window.setTimeout = (fn, ms, ...rest) => origSetTimeout(fn, ms === 50 ? 1500 : ms, ...rest);
+      try {
+        modal.openModal({
+          title: modalTitle,
+          content: '<form><input id="slow-title" value="Original"><button type="button" id="slow-save">Save</button></form>',
+        });
+      } finally {
+        window.setTimeout = origSetTimeout;
+      }
+      window.slowGate = { modal };
+    }, title);
+
+    await openSlow('Slow editor');
+    await page.evaluate(() => {
+      document.getElementById('slow-save').focus();
+      window.slowGate.pending = window.slowGate.modal.confirmOverModal('Continue saving?', { closeOnConfirm: false });
+    });
+    await page.click('#confirm-modal-cancel');
+    assert.deepEqual(await page.evaluate(async () => {
+      const confirmed = await window.slowGate.pending;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return { confirmed, focus: document.activeElement?.id };
+    }), { confirmed: false, focus: 'slow-save' },
+    'der Erstfokus-Timer feuert nach dem Fortsetzen und darf den Speichern-Knopf nicht verdraengen');
+
+    // Gegenseite: ohne Tor bekommt dasselbe Modal seinen Erstfokus weiterhin.
+    await page.evaluate(() => window.slowGate.modal.closeModal({ force: true }));
+    await openSlow('Slow editor again');
+    assert.equal(await page.evaluate(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return document.activeElement?.id;
+    }), 'slow-title', 'ohne spaeter gewaehlten Fokus landet der Erstfokus wie bisher im ersten Feld');
+
+    // Wie das Datepicker-Popover: ein Fokusziel direkt unter body, AUSSERHALB des
+    // Modals, ohne dass das Modal inert wird (Befund aus der claude-review zu #1193).
+    await page.evaluate(() => window.slowGate.modal.closeModal({ force: true }));
+    await openSlow('Slow editor with a popover');
+    assert.equal(await page.evaluate(async () => {
+      const popover = document.createElement('div');
+      popover.id = 'slow-popover';
+      popover.setAttribute('popover', 'manual');
+      popover.tabIndex = -1;
+      document.body.appendChild(popover);
+      popover.showPopover?.();
+      popover.focus();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const focus = document.activeElement?.id;
+      popover.remove();
+      return focus;
+    }), 'slow-popover', 'der Erstfokus-Timer darf den Fokus nicht aus einem Popover unter body ziehen');
+
+    // Faellt der Fokus nur auf body, weil der Ausloeser weggerendert wurde, ist
+    // das keine Wahl: das Modal bekommt seinen Erstfokus trotzdem.
+    await page.evaluate(() => window.slowGate.modal.closeModal({ force: true }));
+    await page.evaluate(() => {
+      const trigger = document.createElement('button');
+      trigger.id = 'slow-trigger';
+      document.body.appendChild(trigger);
+      trigger.focus();
+    });
+    await openSlow('Slow editor over a re-rendered list');
+    assert.equal(await page.evaluate(async () => {
+      document.getElementById('slow-trigger')?.remove();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return document.activeElement?.id;
+    }), 'slow-title', 'ein auf body gefallener Fokus ist keine Wahl - das erste Feld bekommt ihn trotzdem');
+
+    // Tab waehrend der Verzoegerung landet auf der Seite DAHINTER (nicht inert, der
+    // Trap haengt nur am Panel). Das ist keine Wahl: der Fokus muss in den Dialog
+    // (zweite Runde der Review zu #1193).
+    await page.evaluate(() => {
+      window.slowGate.modal.closeModal({ force: true });
+      document.getElementById('slow-background')?.remove();
+      const background = document.createElement('button');
+      background.id = 'slow-background';
+      document.body.appendChild(background);
+    });
+    await openSlow('Slow editor, tab into the page behind');
+    assert.equal(await page.evaluate(async () => {
+      document.getElementById('slow-background').focus();
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const focus = document.activeElement?.id;
+      document.getElementById('slow-background').remove();
+      return focus;
+    }), 'slow-title', 'ein Seitenelement hinter dem Modal ist keine Wahl - der Fokus muss in den Dialog');
   } finally {
     await page.close();
   }

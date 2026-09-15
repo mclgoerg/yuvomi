@@ -182,6 +182,8 @@ module CSS sizing the page.
 
 | Export | Role |
 |--------|------|
+| `COMPOSITION_MODES` | the frozen list of the six modes |
+| `compositionModeClass` | the `.app-page--<mode>` class for a mode |
 | `renderAppPage` | page root with mode + `data-composition` |
 | `renderPageHeader` | canonical `.page-toolbar`; title, center and actions are its direct children in every option combination |
 | `renderPageTitle` | `.page-toolbar__title` |
@@ -208,16 +210,25 @@ Enforced in [`test/test-frontend-audit.js`](../test/test-frontend-audit.js):
 
 | ID | Invariant |
 |----|-----------|
+| PAGE-000 | The scope is not empty and covers nearly all pages |
 | PAGE-001 | Page has exactly one composition mode |
 | PAGE-002 | PageHeader and PageBody share composition context |
 | PAGE-003 | Primary content does not define arbitrary width |
 | PAGE-004 | Page-level spacing uses layout tokens |
 | PAGE-005 | Page does not define local breakpoints (allowlisted exceptions) |
 | PAGE-006 | Page-level negative margins are prohibited |
+| PAGE-006b | A page without a measure does not narrow its header |
 | PAGE-007 | Helpers export the approved layout surface |
+| PAGE-007b | A header keeps its slots as direct children, whatever the options |
 | PAGE-008 | Primary content edges align with declared grid |
 | PAGE-009 | Responsive transformation follows composition mode |
 | PAGE-010 | Full-bleed regions are explicitly declared (`--bleed`) |
+| PAGE-011 | The exception list does not grow and names only real pages |
+| PAGE-012 | The router applies what an extension manifest declares |
+| PAGE-013 | A narrow header follows the measure of its page; `full`/`split` roots take the shell height |
+| PAGE-014 | The page-layout helpers escape every attribute they emit |
+| PAGE-015 | A tab panel inside a page declares the mode of that page |
+| PAGE-016 | A page whose header runs full width puts nothing on the measure |
 
 **Scope: every page behind the app shell.** The audit derives that set from
 `public/router.js` rather than from a list somebody has to remember: a route with
@@ -305,5 +316,6 @@ overflow checks. Not wired into CI yet.
 | C | budget family | budget + stats/plans | Mode declared (`reading`); stats and plans are tab panels inside the Budget page and inherit its measure. A per-tab mode (reports as `dashboard`) also means switching the shared header per tab - an open design decision, not done here |
 | C' | `full` / `split` | subscriptions (`full`), split-expenses (`split`) | Mode declared; content not on a measure yet (analytics grid / two-column layout own their width) |
 | D | `dashboard` / `full` | calendar, tasks, notes, health, dashboard | Mode declared |
+| Later | `reading` | waste | Built with the mode declared from the start |
 
 After v1, every layout question becomes: *which composition mode, and which contract clause is violated?*

@@ -30,12 +30,15 @@ the last tag is an interface release.
 
 ## The ordinary release, from `main`
 
-1. **Changelog.** Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty
+1. **Version.** `npm version <patch|minor|major> --no-git-tag-version`, then read the new number
+   from `package.json`. The bump comes before the changelog: `test:changelog` accepts a version
+   heading that has no tag yet only when it equals the version in `package.json`, so that an
+   ordinary pull request cannot file its entry under a release heading of its own.
+2. **Changelog.** Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty
    `## [Unreleased]` above it, keep every bullet. Only Keep-a-Changelog sections (`Added`,
    `Changed`, `Fixed`, `Removed`, `Security`), one bullet per user-facing change, in English. Do
-   not touch the file header; `npm run test:changelog` checks the structure.
-2. **Version.** `npm version <patch|minor|major> --no-git-tag-version`, then read the new number
-   from `package.json`.
+   not touch the file header; `npm run test:changelog` checks the structure, and that no section
+   released earlier differs from its tag.
 3. **Service worker.** Set `APP_RELEASE` in `public/sw.js` to exactly that number. `npm version`
    does not touch this file, and `test:frontend-audit` fails the build if it disagrees with
    `package.json`. If a file was added under `public/`, `test:sw-precache` also has to be green:
@@ -43,8 +46,10 @@ the last tag is an interface release.
 4. **Version literals in the docs.** The landing pages and the installation guide carry the
    version and the release date as text: `docs/index.html` (hero bar and footer, with
    `data-released`), `docs/install.html` (footer, with `data-released`), and `docs/installation.md`
-   (pinning example, compose line, sample startup log). Treat that list as a hint and the grep as
-   the authority - it has been wrong twice:
+   (pinning example, compose line, `cosign verify` and `imagetools inspect` examples, sample
+   startup log). Both footers carry the date twice, in `data-released` and as visible text, and the
+   version grep finds neither. Treat that list as a hint and the grep as the authority - it has
+   been wrong twice:
 
    ```bash
    grep -rn "<old version>" README.md README.de.md docs/*.html docs/*.md tools/installer/
@@ -111,18 +116,21 @@ last tag, carrying the fix, its tests and its documentation and nothing else:
 2. Cherry-pick the fix commits. On the branch `## [Unreleased]` holds only the `### Security`
    block; expect a conflict there if `main`'s Unreleased section is not empty, and resolve it to
    the security entries alone.
-3. Steps 1 to 5 above, by hand where the version bump tooling assumes `main`. A guard that landed
-   after the tag (the cadence check itself was such a case in September 2026) is absent on the
-   branch; run it from a copy taken off `main`.
-4. `npm test` on the branch, then commit, fetch, tag, push, release, downstream - steps 9 to 11.
+3. Steps 1 to 6 above, by hand where the version bump tooling assumes `main`. The Umbrel notes are
+   part of it: the publish workflow aborts on a stale version marker whichever branch the release
+   came from. A guard that landed after the tag (the cadence check itself was such a case in
+   September 2026) is absent on the branch; run it from a copy taken off `main`.
+4. `npm test` on the branch, then commit, fetch, tag, push, release, downstream - steps 9 to 12.
    The cadence check passes on the second track by construction: the diff since the last tag is
    the fix.
 5. Merge the branch back: `git switch main && git merge --no-ff release/X.Y.Z`. Two conflicts
    are normal - `CHANGELOG.md`, where the new block goes below `## [Unreleased]` and the
    Unreleased bullets stay, and `public/sw.js`, where `main`'s shape of the file wins with the new
    version number. After resolving, check that `CHANGELOG.md` contains no conflict markers and that
-   its heading structure is what you meant (`git add` checks neither, and `test:changelog` does not
-   see a bullet that slid under the wrong heading), run `npm test` on the merge, push.
+   its heading structure is what you meant (`git add` checks neither; `test:changelog` compares
+   every released section with the new tag and so catches a bullet that slid into or out of the
+   new block, but not one that landed under the wrong heading inside `[Unreleased]`), run
+   `npm test` on the merge, push.
 
 Publish the advisory after the image is out, with the fixed version, the reporter's credit and a
 CVE requested through GitHub. The response times this has to fit are in

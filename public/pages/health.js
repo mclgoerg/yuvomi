@@ -39,6 +39,7 @@ import {
   ACTIVITY_TYPES, activityType, weekSummary, activityTotals,
 } from '/utils/health-activity.js';
 import { upcomingDoses, computeAdherenceStreak } from '/utils/health-overview.js';
+import { withChosenPeople } from '/utils/people-picker.js';
 import {
   FLOW_LEVELS, flowLevel, SYMPTOM_TYPES, symptomType, MOOD_TYPES, moodType, PHASE,
   predictCycle, cycleStats, buildCycleCalendar, cycleRing, MIN_HISTORY_GAPS,
@@ -51,6 +52,7 @@ import {
   CERVIX_MUCUS_TYPES, TEST_RESULT_VALUES, INTIMACY_TYPES, CONTRACEPTION_TYPES,
 } from '/utils/health-cycle.js';
 import { HEALTH_ROUTES, renderHealthTabsBar } from '/utils/health-tabs.js';
+import { canUseFasting } from '/permissions.js';
 import { emptyStateHTML, emptyHintHTML, mountLoadError } from '/utils/empty-state.js';
 
 let _container = null;
@@ -89,13 +91,16 @@ function mountAreaLoadError(area, name, onRetry) {
 // damit die Regel an genau einer Stelle steht. Default an, damit Bestandskonten
 // ihr Verhalten behalten; wird in render() aus /preferences aufgefrischt.
 let cycleEnabled = true;
+let fastingEnabled = false;
 
 async function loadHealthPrefs() {
   try {
     const res = await api.get('/preferences');
     cycleEnabled = res?.data?.health_cycle_effective !== false;
+    fastingEnabled = canUseFasting();
   } catch {
     cycleEnabled = true;
+    fastingEnabled = canUseFasting();
   }
 }
 
@@ -237,6 +242,13 @@ const PANELS = () => [
     emptyDescKey: 'health.cycle.emptyDesc',
   },
   {
+    route: '/health/fasting',
+    icon: 'timer',
+    titleKey: 'health.fasting.title',
+    emptyTitleKey: 'health.fasting.emptyTitle',
+    emptyDescKey: 'health.fasting.emptyDesc',
+  },
+  {
     route: '/health/meds',
     icon: 'pill',
     titleKey: 'health.meds.title',
@@ -262,6 +274,7 @@ const PANELS = () => [
 function normalizeHealthPath(path) {
   // Zyklus deaktiviert → Deep-Link auf die Übersicht umleiten (kein leeres Panel).
   if (path === '/health/cycle' && !cycleEnabled) return '/health';
+  if (path === '/health/fasting' && !fastingEnabled) return '/health';
   return HEALTH_ROUTES.includes(path) ? path : '/health';
 }
 
@@ -275,6 +288,8 @@ function panelMarkup(panel, activeRoute) {
     ? '<div class="health-vitals" data-vitals-root></div>'
     : panel.route === '/health/cycle'
     ? '<div class="health-cycle" data-cycle-root></div>'
+    : panel.route === '/health/fasting'
+    ? '<div class="health-fasting" data-fasting-root></div>'
     : panel.route === '/health/meds'
     ? '<div class="health-meds" data-meds-root></div>'
     : panel.route === '/health/labs'
@@ -351,6 +366,7 @@ function refreshHealthFab() {
 
 export async function render(container, ctx = {}) {
   _container = container;
+  healthUser = ctx.user ?? healthUser;
   vitals.meId = ctx.user?.id ?? vitals.meId;
   vitals.root = null;
   vitals.loaded = false;
@@ -371,7 +387,7 @@ export async function render(container, ctx = {}) {
   overview.loaded = false;
   await Promise.all([loadHealthPrefs(), loadCareGrants(), loadVisibilityDefaults()]);
   const activeRoute = normalizeHealthPath(window.location.pathname);
-  const panels = PANELS().filter((panel) => cycleEnabled || panel.route !== '/health/cycle');
+  const panels = PANELS().filter((panel) => (cycleEnabled || panel.route !== '/health/cycle') && (fastingEnabled || panel.route !== '/health/fasting'));
 
   container.replaceChildren();
   container.insertAdjacentHTML('beforeend', `
@@ -392,11 +408,12 @@ export async function render(container, ctx = {}) {
   container.querySelector('.health-page').appendChild(_fab);
 
   if (window.lucide) window.lucide.createIcons({ el: container });
-  renderHealthTabsBar(container, activeRoute, { cycleEnabled });
+  renderHealthTabsBar(container, activeRoute, { cycleEnabled, fastingEnabled });
   updateHealthFab(activeRoute);
   maybeMountOverview(activeRoute);
   maybeMountVitals(activeRoute);
   maybeMountCycle(activeRoute);
+  maybeMountFasting(activeRoute);
   maybeMountMeds(activeRoute);
   maybeMountLabs(activeRoute);
   maybeMountActivity(activeRoute);
@@ -407,15 +424,17 @@ export async function render(container, ctx = {}) {
 // + Panel-Sync) aus — kein Full-Reload. Rückgabe false erzwingt volles Rendern.
 export async function update({ path, user } = {}) {
   if (!_container?.isConnected) return false;
+  if (user?.id) healthUser = user;
   if (user?.id) { vitals.meId = user.id; meds.meId = user.id; labs.meId = user.id; activity.meId = user.id; cycle.meId = user.id; overview.meId = user.id; }
   const activeRoute = normalizeHealthPath(path || window.location.pathname);
 
   _container.querySelector('.sub-tabs-bar')?.remove();
-  renderHealthTabsBar(_container, activeRoute, { cycleEnabled });
+  renderHealthTabsBar(_container, activeRoute, { cycleEnabled, fastingEnabled });
   updateHealthFab(activeRoute);
   maybeMountOverview(activeRoute);
   maybeMountVitals(activeRoute);
   maybeMountCycle(activeRoute);
+  maybeMountFasting(activeRoute);
   maybeMountMeds(activeRoute);
   maybeMountLabs(activeRoute);
   maybeMountActivity(activeRoute);
@@ -436,17 +455,31 @@ function maybeMountVitals(activeRoute) {
   mountVitals();
 }
 
+// Das angemeldete Konto der Seite (render/update), fuer die Personenliste.
+let healthUser = null;
+
+/**
+ * Personenliste und Startperson einer Health-Ansicht - einmal fuer alle sechs
+ * Ansichten statt sechs Kopien. Die Liste sind die Haushaltsmitglieder (#1207)
+ * und dazu das angemeldete Konto: ist es kein Mitglied, liest und schreibt die
+ * Ansicht trotzdem unter ihm (personId = meId), und der Personen-Umschalter
+ * muss dann genau diese Person nennen - nicht das erste Mitglied der Liste.
+ */
+async function loadHealthMembers(view, user) {
+  if (!view.members.length) {
+    const res = await api.get('/family/members');
+    view.members = withChosenPeople(res.data || [], user?.id ? [user] : []);
+  }
+  if (!view.personId) view.personId = view.meId ?? view.members[0]?.id ?? null;
+}
+
 async function mountVitals() {
   vitals.root.replaceChildren();
   vitals.root.insertAdjacentHTML('beforeend',
     `<div class="health-vitals__loading">${esc(t('common.loading'))}</div>`);
 
   try {
-    if (!vitals.members.length) {
-      const res = await api.get('/family/members');
-      vitals.members = res.data || [];
-    }
-    if (!vitals.personId) vitals.personId = vitals.meId ?? vitals.members[0]?.id ?? null;
+    await loadHealthMembers(vitals, healthUser);
     await loadVitals();
     vitals.error = false;
   } catch (err) {
@@ -1361,11 +1394,7 @@ async function mountMeds() {
     `<div class="health-meds__loading">${esc(t('common.loading'))}</div>`);
 
   try {
-    if (!meds.members.length) {
-      const res = await api.get('/family/members');
-      meds.members = res.data || [];
-    }
-    if (!meds.personId) meds.personId = meds.meId ?? meds.members[0]?.id ?? null;
+    await loadHealthMembers(meds, healthUser);
     await loadMeds();
     meds.error = false;
   } catch (err) {
@@ -2524,11 +2553,7 @@ async function mountLabs() {
     `<div class="health-labs__loading">${esc(t('common.loading'))}</div>`);
 
   try {
-    if (!labs.members.length) {
-      const res = await api.get('/family/members');
-      labs.members = res.data || [];
-    }
-    if (!labs.personId) labs.personId = labs.meId ?? labs.members[0]?.id ?? null;
+    await loadHealthMembers(labs, healthUser);
     await loadLabs();
     labs.error = false;
   } catch (err) {
@@ -3184,11 +3209,7 @@ async function mountActivity() {
     `<div class="health-activity__loading">${esc(t('common.loading'))}</div>`);
 
   try {
-    if (!activity.members.length) {
-      const res = await api.get('/family/members');
-      activity.members = res.data || [];
-    }
-    if (!activity.personId) activity.personId = activity.meId ?? activity.members[0]?.id ?? null;
+    await loadHealthMembers(activity, healthUser);
     await loadActivity();
     activity.error = false;
   } catch (err) {
@@ -3653,11 +3674,7 @@ async function mountOverview() {
     `<div class="health-overview__loading">${esc(t('common.loading'))}</div>`);
 
   try {
-    if (!overview.members.length) {
-      const res = await api.get('/family/members');
-      overview.members = res.data || [];
-    }
-    if (!overview.personId) overview.personId = overview.meId ?? overview.members[0]?.id ?? null;
+    await loadHealthMembers(overview, healthUser);
     const today = todayKey();
     overview.exportRange = { from: addLocalDays(today, -(OVERVIEW_EXPORT_DAYS - 1)), to: today };
     await loadOverview();
@@ -4229,6 +4246,17 @@ function maybeMountCycle(activeRoute) {
   mountCycle();
 }
 
+function maybeMountFasting(activeRoute) {
+  if (activeRoute !== '/health/fasting' || !fastingEnabled) return;
+  const root = _container?.querySelector('[data-fasting-root]');
+  if (!root) return;
+  root.dataset.fastingMounted = 'true';
+  import('/pages/health-fasting.js').then(({ mountFasting }) => mountFasting(root, { userId: vitals.meId })).catch((error) => {
+    root.replaceChildren();
+    root.insertAdjacentHTML('beforeend', `<div class="fasting-panel__error" role="alert"><h3>${esc(t('health.fasting.loadError'))}</h3><p>${esc(error?.message || '')}</p></div>`);
+  });
+}
+
 function cycleSkeletonMarkup() {
   // Skeleton statt Spinner/Text: spiegelt die Hero-Silhouette (Ring + Statistik),
   // damit der Layout-Sprung beim Laden ausbleibt (Product-Register).
@@ -4251,11 +4279,7 @@ async function mountCycle() {
   </div>`);
 
   try {
-    if (!cycle.members.length) {
-      const res = await api.get('/family/members');
-      cycle.members = res.data || [];
-    }
-    if (!cycle.personId) cycle.personId = cycle.meId ?? cycle.members[0]?.id ?? null;
+    await loadHealthMembers(cycle, healthUser);
     await loadCycle();
     cycle.error = false;
   } catch (err) {
@@ -6592,6 +6616,8 @@ function openCycleSettingsModal() {
 
 export const __test = {
   canEditFor,
+  loadHealthMembers,
+  personSwitcherMarkup,
   // Testseam fuer #1031: setzt `careFor` fuer die drei Berechtigungsfaelle
   // (eigene Daten, betreute Person, unbeteiligtes Mitglied), ohne das Array
   // selbst nach aussen zu geben - Tests koennen die Betreuungsliste nur ganz

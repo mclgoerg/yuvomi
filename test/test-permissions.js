@@ -29,6 +29,7 @@ import {
   PERMISSION_WIDGETS,
   PERMISSION_CAPABILITIES,
 } from '../server/permissions.js';
+import { effectiveCapabilityAccess, isPermissionDeviation } from '../public/utils/permission-group.js';
 import { WIDGET_IDS } from '../public/utils/dashboard-widgets.js';
 
 function freshDb() {
@@ -106,7 +107,35 @@ test('Standard ohne Konfiguration: Vollzugriff (rückwärtskompatibel)', () => {
   assert.equal(r.modules.budget, 'write');
   assert.equal(r.widgets.cycle, 'allow');
   assert.equal(r.capabilities.notes_manage_household_categories, 'none');
+  assert.equal(r.capabilities.health_use_fasting, 'allow');
   assert.equal(buildSessionModuleAccess(r), null); // nichts eingeschränkt
+});
+
+test('Fasting is default-on but explicit role and member denials still win', () => {
+  const db = freshDb();
+  const member = addUser(db, { id: 21, role: 'member', family_role: 'child' });
+  assert.equal(resolvePermissions(db, member).capabilities.health_use_fasting, 'allow');
+
+  replaceSubjectPermissions(db, 'role', 'child', {
+    capabilities: { health_use_fasting: 'none' },
+  });
+  assert.equal(resolvePermissions(db, member).capabilities.health_use_fasting, 'none');
+
+  replaceSubjectPermissions(db, 'role', 'child', { capabilities: {} });
+  replaceSubjectPermissions(db, 'user', member.id, {
+    capabilities: { health_use_fasting: 'none' },
+  });
+  assert.equal(resolvePermissions(db, member).capabilities.health_use_fasting, 'none');
+  db.close();
+});
+
+test('permission sheet resolves each capability from its own default', () => {
+  const fasting = { default: 'allow' };
+  assert.equal(effectiveCapabilityAccess(fasting, { mode: 'role' }), 'allow');
+  assert.equal(effectiveCapabilityAccess(fasting, { mode: 'user' }), 'allow');
+  assert.equal(effectiveCapabilityAccess(fasting, { mode: 'user', inherited: 'none' }), 'none');
+  assert.equal(effectiveCapabilityAccess(fasting, { mode: 'user', draft: 'none', inherited: 'allow' }), 'none');
+  assert.equal(effectiveCapabilityAccess({ default: 'none' }, { mode: 'role' }), 'none');
 });
 
 test('Haushaltskategorien: Admin darf immer verwalten', () => {
@@ -336,8 +365,20 @@ test('permissionCatalog liefert Module, Widgets, Rollen, Levels', () => {
   assert.deepEqual(cat.moduleAccessLevels, ['none', 'read', 'write']);
   assert.deepEqual(cat.widgetAccessLevels, ['none', 'allow']);
   assert.ok(cat.capabilities.some((item) => item.key === 'notes_manage_household_categories'));
+  assert.equal(cat.capabilities.find((item) => item.key === 'notes_manage_household_categories').default, 'none');
+  assert.equal(cat.capabilities.find((item) => item.key === 'health_use_fasting').default, 'allow');
   assert.deepEqual(cat.capabilityAccessLevels, ['none', 'allow']);
-  assert.deepEqual(PERMISSION_CAPABILITIES.map((item) => item.key), ['notes_manage_household_categories']);
+  assert.deepEqual(PERMISSION_CAPABILITIES.map((item) => item.key), ['notes_manage_household_categories', 'health_use_fasting']);
+});
+
+test('capability summary compares against each capability default', () => {
+  const optIn = { key: 'notes_manage_household_categories', default: 'none' };
+  const optOut = { key: 'health_use_fasting', default: 'allow' };
+
+  assert.equal(isPermissionDeviation(optIn, 'none'), false);
+  assert.equal(isPermissionDeviation(optIn, 'allow'), true);
+  assert.equal(isPermissionDeviation(optOut, 'allow'), false);
+  assert.equal(isPermissionDeviation(optOut, 'none'), true);
 });
 
 test('clientPermissions: kompakte Payload mit admin-Flag', () => {

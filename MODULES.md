@@ -44,7 +44,7 @@ The folder name must match the manifest `id`.
 
 Required fields:
 
-- `id`: lowercase letters, numbers and hyphens only. Must match the module folder.
+- `id`: lowercase letters, numbers and hyphens only, 3 to 64 characters, starting and ending with a letter or number. Must match the module folder.
 - `entry`: a relative `.js` file exporting a `render(container, context)` function.
 
 Optional fields:
@@ -133,7 +133,7 @@ Yuvomi's CSRF token protects Yuvomi's endpoints, not a module's. State-changing 
 - the service's own double-submit CSRF cookie and header pair;
 - an endpoint-specific role or ownership check.
 
-Scheduled jobs have no session. Issue an API token under Settings -> Admin -> API Access (admin-only, so a module that needs one has to ask the household's admin for it) with only the scopes the module needs - for core modules `budget:read` and `budget:write`, for extension modules `ext:<module-id>:read` / `:write` - and keep it in the service's secrets, never in the module folder, a Compose file, or browser storage. Keep the service's own state in the service's own database, and treat stored secrets as write-only: expose `has_api_token: true`, never a fragment of the token itself.
+Scheduled jobs have no session. Issue an API token under Settings -> Administration -> API access (admin-only, so a module that needs one has to ask the household's admin for it) with only the scopes the module needs - for core modules `budget:read` and `budget:write`, for extension modules `ext:<module-id>:read` / `:write` - and keep it in the service's secrets, never in the module folder, a Compose file, or browser storage. Keep the service's own state in the service's own database, and treat stored secrets as write-only: expose `has_api_token: true`, never a fragment of the token itself.
 
 When your module declares `capabilities.api.prefix`, enforce household permissions on the sidecar: after resolving the session through `GET /api/v1/auth/me`, deny requests when `permissions.modules['ext:<module-id>'] === 'none'`, and treat `'read'` as read-only for mutating routes.
 
@@ -220,13 +220,14 @@ Rules:
 
 - `manifestVersion` declares the **format** your manifest is written in, not the version of your module (that is `version`). It is an integer; this Yuvomi reads up to **1**. Omit it and 1 is assumed, so manifests written before this field keep working. A manifest declaring a *higher* version is rejected outright rather than read in part: loading it halfway would mean silently ignoring fields it considers essential, and the operator would see a module that runs and does something other than what it says. The error names both numbers.
 - **What a version bump means for you:** new optional fields never require one - an older manifest simply omits them and behaves as before. The number only moves when a field is removed or renamed, and when it does, this Yuvomi keeps reading the older format as well. A guard in `test/test-modules.js` enforces that: it drives a manifest carrying every promised field through the real normaliser, so dropping one turns the suite red rather than turning somebody's widget blank.
-- Permission module key: `ext:<module-id>` (appears in Settings -> Admin -> Roles & permissions).
+- Permission module key: `ext:<module-id>` (appears in Settings -> Administration -> Roles & permissions).
 - Widget id in the dashboard: `<module-id>:<widget-id>` (namespace avoids collisions with core widgets).
 - `capabilities.permissions.module` is required when you declare widgets and/or `api.prefix`.
 - `capabilities.api.prefix`, when declared, must be exactly `/api/extensions/<module-id>` (trailing slash optional). Any other prefix - including a core path such as `/api/tasks` - is rejected and the module loads as errored.
+- Widget `id`: starts with a lowercase letter, then lowercase letters, numbers and hyphens, 32 characters at most. `defaultSize` is one of `1x1` to `4x4` (default `1x2`).
 - Widget `entry` must export `renderWidget(container, { size, options, user })`.
 - Widgets fetch their own data (typically from your sidecar API). They are not injected into `GET /api/v1/dashboard`.
-- `optionsSchema` supports up to 8 keys (`boolean`, `number`, `string`, or `enum` via `enum` array).
+- `optionsSchema` supports up to 8 keys (lowercase letters, numbers and underscores). A field's `type` is `boolean`, `number`, `string` or `array` (default `string`); an `enum` array on the field (up to 20 values) turns it into a fixed choice.
 - Widget chrome (header, module seal, empty states) should follow the dashboard widget patterns in `DESIGN.md` ("Der Widget-Kopf") - core renders error/retry chrome for failed loads; your `renderWidget` owns the happy path inside the mount.
 
 Serve a sidecar from the same origin under `/api/extensions/<module-id>/` (Traefik or an equivalent reverse proxy). `capabilities.api.prefix` must match that path exactly. The Capabilities JSON example above is the canonical minimal manifest; copy it into your own folder under `modules/`.
@@ -254,8 +255,10 @@ How long that line holds: before an operation under `/api/v1` changes or goes aw
 
 ## Docker / Podman
 
-The default `docker-compose.yml` mounts `${MODULES_DIR:-./modules}` to `/app/modules`. To keep modules outside the Yuvomi checkout, set `MODULES_DIR=/absolute/path/to/yuvomi-modules` in `.env` and restart the compose service. New or changed module folders are scanned at runtime; rebuilding the image is not required.
+The default `docker-compose.yml` mounts `${MODULES_DIR:-./modules}` to `/app/modules`. To keep modules outside the Yuvomi checkout, set `MODULES_DIR=/absolute/path/to/yuvomi-modules` in `.env` and restart the compose service. The compose file pins `MODULES_DIR` to `/app/modules` inside the container, so the value in `.env` only moves the host folder. New or changed module folders are scanned at runtime; rebuilding the image is not required.
 
 On Podman (RHEL/Fedora/CentOS Stream) use `podman-compose.yml` instead — it mounts the same `/app/modules` path with the SELinux `:Z` relabel so the rootless container can read your modules.
 
 On Portainer the stack mounts a named volume (`oikos_modules`) at `/app/modules`, since a Portainer deployment has no repository checkout to bind-mount from. Copy module folders into that volume (for example via `docker cp` into the running container, or a temporary container mounting the volume); a bind mount to a host path works too if you edit the stack.
+
+Unraid (the template's *Modules* path, `/mnt/user/appdata/yuvomi/modules` by default), TrueNAS (the *Modules Storage* entry) and the Podman Quadlet (`~/.local/share/oikos/modules`) mount `/app/modules` as well. **Umbrel is the exception:** its store package mounts no modules folder, so third-party modules are not available there. A module copied into the running container would sit in the container layer and be gone on the next update.

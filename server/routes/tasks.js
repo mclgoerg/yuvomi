@@ -23,6 +23,8 @@ import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
 import { mentionedUserIds } from '../../public/utils/mentions.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
 import { resolvePermissions } from '../permissions.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
+import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { pushService } from '../services/push.js';
 import { todayKey } from '../utils/timezone.js';
 import {
@@ -315,9 +317,6 @@ function lockingTask(task) {
   return parent && parent.locked ? parent : null;
 }
 
-/** Admin - hier lokal, weil die Regel in der Route wohnt und nicht in einer Middleware. */
-function isAdmin(req) { return req.authRole === 'admin' || req.session?.role === 'admin'; }
-
 /**
  * Darf diese Person die DEFINITION der Aufgabe aendern oder sie loeschen? (#830)
  *
@@ -332,7 +331,7 @@ function isAdmin(req) { return req.authRole === 'admin' || req.session?.role ===
 function mayEditTaskDefinition(task, req) {
   const lock = lockingTask(task);
   if (!lock) return true;
-  if (isAdmin(req)) return true;
+  if (isAdminRequest(req)) return true;
   return lock.created_by === (req.authUserId || req.session?.userId);
 }
 
@@ -1000,6 +999,10 @@ router.post('/', (req, res) => {
     // geaendert hat. Welcher Tag der erste ist, beantwortet die Expansion.
     const userIds  = parseAssignedTo(req.body.assigned_to);
     const firstUid = userIds[0] ?? null;
+    // Zuweisen nur an Haushaltsmitglieder (#1207) - dieselbe Liste, die
+    // `meta/options` anbietet. Eine neue Aufgabe hat noch keinen Stand.
+    const strangers = newNonMembers(userIds);
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
     // Sync-Ziel (#695). Unteraufgaben bekommen keines: sie gehören zu ihrer
     // Elternaufgabe, und als eigenständiges VTODO stünden sie gleichrangig
@@ -1134,7 +1137,7 @@ router.put('/:id', (req, res) => {
     const status = (req.body.status === undefined || archiveRequested)
       ? task.status
       : req.body.status;
-    if (reopensSettledVisit(db.get(), task.id, task.status, status) && req.authRole !== 'admin') {
+    if (reopensSettledVisit(db.get(), task.id, task.status, status) && !isAdminRequest(req)) {
       return res.status(403).json({ error: 'Permission denied.', code: 403 });
     }
 
@@ -1144,6 +1147,10 @@ router.put('/:id', (req, res) => {
       ? parseAssignedTo(req.body.assigned_to)
       : assignedBefore;
     const firstUid = userIds[0] ?? null;
+    // Neu nur Haushaltsmitglieder (#1207). Wer schon zugewiesen ist, bleibt
+    // es - auch eine Haushaltskraft an einer aelteren Aufgabe.
+    const strangers = newNonMembers(userIds, { stored: assignedBefore });
+    if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
 
     // Sperre der Aufgabe (#830). Nicht mitgeschickt heisst "nicht angefasst".
     const lockedRequested = req.body.locked !== undefined ? (req.body.locked ? 1 : 0) : null;
@@ -1527,7 +1534,7 @@ router.patch('/:id/status', (req, res) => {
       return res.json({ data: { id: Number(req.params.id), status: prev.status, archived_at: archivedAt } });
     }
 
-    if (reopensSettledVisit(db.get(), prev.id, prev.status, status) && req.authRole !== 'admin') {
+    if (reopensSettledVisit(db.get(), prev.id, prev.status, status) && !isAdminRequest(req)) {
       return res.status(403).json({ error: 'Permission denied.', code: 403 });
     }
 
@@ -1873,7 +1880,7 @@ function notifyMentions(task, comment, authorId, previousComment = '') {
   // dem Kommentartext in der Meldung.
   const users = db.get().prepare(`
     SELECT id, display_name FROM users u
-    WHERE NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = u.id)
+    WHERE ${householdMemberSql('u')}
   `).all();
   // Beim Nachbessern zaehlen nur die NEU dazugekommenen Namen: wer schon in der
   // ersten Fassung stand, ist benachrichtigt und bekaeme sonst bei jedem Tippfehler
@@ -1916,7 +1923,7 @@ function commentForWrite(req, { allowAdmin = false } = {}) {
     .get(req.params.commentId, task.id);
   if (!row) return { error: 404 };
 
-  const mayWrite = row.user_id === me || (allowAdmin && req.authRole === 'admin');
+  const mayWrite = row.user_id === me || (allowAdmin && isAdminRequest(req));
   if (!mayWrite) return { error: 403 };
   return { task, row, me };
 }
@@ -2027,7 +2034,7 @@ router.get('/meta/options', (req, res) => {
   try {
     const users = db.get().prepare(
       `SELECT id, display_name, avatar_color FROM users u
-       WHERE NOT EXISTS (SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = u.id)
+       WHERE ${householdMemberSql('u')}
        ORDER BY display_name`
     ).all();
     res.json({
@@ -2057,7 +2064,7 @@ router.get('/meta/options', (req, res) => {
 // dasselbe Admin-Gate wie beim Setzen des Standards und beim Nachziehen.
 router.get('/points/affected', (req, res) => {
   try {
-    if (req.authRole !== 'admin') {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Admin access required.', code: 403 });
     }
     const points = Number(req.query.points);
@@ -2079,7 +2086,7 @@ router.get('/points/affected', (req, res) => {
 // steht vorab im Bestätigungsdialog, der Wechsel ist also nie verdeckt.
 router.post('/points/rebase', (req, res) => {
   try {
-    if (req.authRole !== 'admin') {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Admin access required.', code: 403 });
     }
     const from = Number(req.body.from);

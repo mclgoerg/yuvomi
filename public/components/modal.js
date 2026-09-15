@@ -287,19 +287,50 @@ function trapFocus(container, initialFocus = 'first-field') {
  *                             nichts zu tippen, und ein Feldfokus fährt auf dem
  *                             Smartphone grundlos die Tastatur hoch.
  *   HTMLElement             - genau dieses Element.
+ *
+ * DER ERSTFOKUS KOMMT 50 MS SPAETER - UND DARF DANN NICHTS MEHR UEBERSCHREIBEN
+ * (#1156). Auf einem langsamen Geraet liegt der Timer laenger, und bis dahin hat
+ * schon jemand gewaehlt: gemessen am Speichern-Tor, wo `confirmOverModal` das
+ * Formular parkt, fragt und den Fokus beim Fortsetzen auf den Speichern-Knopf
+ * zurueckgibt. Der liegengebliebene Timer zog ihn danach ins erste Feld, und
+ * nichts holte ihn zurueck. Er fokussiert deshalb nur noch, wenn das Ziel noch
+ * haengt, das Modal nicht geparkt (`inert`) ist und seit dem Planen niemand den
+ * Fokus im Modal oder in einer Oberflaeche darueber gewaehlt hat.
+ *
+ * "ODER DARUEBER" (Review zu #1193): der Datepicker oeffnet sein Popover direkt
+ * unter `document.body` und fokussiert synchron hinein - ausserhalb des Modals,
+ * ohne es inert zu machen. Eine Wache, die nur im Modal nachsieht, haette den
+ * Fokus aus dem offenen Kalender zurueck ins erste Feld gerissen.
+ *
+ * "DARUEBER", NICHT "IRGENDWO" (zweite Runde derselben Review): wer waehrend der
+ * Verzoegerung Tab drueckt, landet auf einem Element der Seite DAHINTER - die ist
+ * nicht inert, der Fokus-Trap haengt nur am Panel. Zaehlte das als Wahl, kaeme der
+ * Fokus nie in den Dialog, und der Trap griffe nie. Ein Seitenelement dahinter ist
+ * also so wenig eine Wahl wie ein auf body gefallener Fokus.
  */
 function applyInitialFocus(container, initialFocus) {
   if (initialFocus === 'none') return;
 
-  if (initialFocus && typeof initialFocus.focus === 'function') {
-    setTimeout(() => initialFocus.focus(), 50);
-    return;
+  const target = initialFocus && typeof initialFocus.focus === 'function'
+    ? initialFocus
+    : container.querySelector(FIRST_FIELD) ?? container.querySelector(FOCUSABLE);
+  if (target) {
+    const beimPlanen = document.activeElement;
+    setTimeout(() => _focusInitialUnlessClaimed(container, target, beimPlanen), 50);
   }
+}
 
-  const first = container.querySelector(FIRST_FIELD) ?? container.querySelector(FOCUSABLE);
-  if (first) {
-    setTimeout(() => first.focus(), 50);
-  }
+function _focusInitialUnlessClaimed(container, target, beimPlanen) {
+  if (!target.isConnected) return;
+  if (container.closest?.('[inert]')) return;
+  const jetzt = document.activeElement;
+  // Gewaehlt ist nur ein Fokus im Modal selbst oder in einem Popover darueber.
+  // body (der Ausloeser wurde weggerendert) und die Seite dahinter (Tab waehrend
+  // der Verzoegerung) sind keine Wahl - das Modal bekommt seinen Einstieg trotzdem.
+  const gewaehlt = jetzt && jetzt !== beimPlanen
+    && (container.contains(jetzt) || Boolean(jetzt.closest?.('[popover]')));
+  if (gewaehlt) return;
+  target.focus();
 }
 
 /**
@@ -961,6 +992,36 @@ export function refocusAfterRender() {
 }
 
 /**
+ * DEN FOKUS UEBER EINEN NEUAUFBAU TRAGEN, DEN KEIN SCHLIESSEN AUSLOEST (#1083).
+ *
+ * `refocusAfterRender()` gehoert zu einem Schliessvorgang: sein Merker ist der
+ * Ausloeser des letzten Dialogs. Das Loeschen im Kalender rendert aber ein
+ * zweites Mal, wenn das Undo-Fenster ablaeuft - Sekunden spaeter und ausserhalb
+ * jedes Handlers (`scheduleCalendarDeleteWithUndo` in utils/calendar-delete.js).
+ * Bis dahin hat der Nutzer weitergearbeitet: gemessen in der Agenda stand der
+ * Fokus auf der naechsten Zeile, `renderView()` tauschte `#cal-body` aus, und er
+ * fiel auf BODY. Der Merker des Dialogs zeigte auf die geloeschte Zeile und
+ * haette die Seitenwurzel geliefert, nicht die Zeile, auf der der Nutzer stand.
+ *
+ * Gemerkt wird deshalb DIREKT VOR dem Neuaufbau, was den Fokus haelt, und
+ * dasselbe Element danach im neuen Baum wiedergefunden. Die Wachen sind die des
+ * Nachfassens: war vorher nichts fokussiert, haelt das Element den Fokus noch,
+ * hat der Neuaufbau selbst etwas fokussiert oder steht ein Dialog offen, tut der
+ * Aufruf nichts. Der Merker des letzten Schliessens bleibt unberuehrt.
+ *
+ * @param {() => void} render  der synchrone Neuaufbau
+ * @returns {HTMLElement|null} das Element, das den Fokus bekam, sonst null
+ */
+export function renderKeepingFocus(render) {
+  const memo = rememberFocus(document.activeElement);
+  render();
+  if (!memo || activeOverlay) return null;
+  if (memo.el.isConnected && document.activeElement === memo.el) return null;
+  if (document.activeElement !== document.body) return null;
+  return _fokussiereMitRueckfall(focusRestoreTarget(memo));
+}
+
+/**
  * Den Merker verwerfen, weil etwas an dieser Schicht vorbei geschlossen wurde.
  *
  * `closeDetailView()` kehrt im Popover-Zweig frueh zurueck, ohne `closeModal()`
@@ -1584,6 +1645,7 @@ export const __test = {
   wireSheetSwipe: _wireSheetSwipe,
   createConfirmOverModal,
   finishSuspendedConfirmation,
+  applyInitialFocus,
 };
 
 // --------------------------------------------------------

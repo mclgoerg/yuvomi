@@ -39,7 +39,8 @@ import { resolvePermissions } from '../permissions.js';
 import { createLogger } from '../logger.js';
 import { predictCycle } from '../../public/utils/health-cycle.js';
 import { healthCycleViews } from '../routes/preferences.js';
-import { isHouseholdMember, listHouseholdMembers } from './member-email.js';
+import { isHouseholdMember } from './household-members.js';
+import { listHouseholdMembers } from './member-email.js';
 
 // Einzige Familienrolle, die als Kind gilt (server/auth.js FAMILY_ROLES:
 // dad/mom/parent/child/grandparent/relative/other) - eine Konstante statt

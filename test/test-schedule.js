@@ -109,12 +109,14 @@ const app = express();
 app.use((req, _res, next) => {
   req.authUserId = actor.id;
   req.authRole = actor.role;
-  req.session = { userId: actor.id, role: actor.role };
+  // cookieSession: a session sent along with an API token - requireAuth then
+  // takes authUserId/authRole from the token, req.session stays the session.
+  req.session = actor.cookieSession ?? { userId: actor.id, role: actor.role };
   next();
 });
 app.use(express.json());
 app.use('/', scheduleRouter);
-const server = app.listen(0);
+const server = app.listen(0, '127.0.0.1');
 const baseUrl = await new Promise((resolveServer) => server.on('listening', () => resolveServer(`http://127.0.0.1:${server.address().port}`)));
 test.after(() => server.close());
 
@@ -241,6 +243,18 @@ test('members may write only themselves while admins may write any household sch
   assert.equal(self.status, 200);
   const foreign = await call('PUT', '/overrides/2026-11-03', { as: ALICE, body: { user_id: BOB.id, shift_type_id: null } });
   assert.equal(foreign.status, 403);
+});
+
+test('a member API token sent next to an admin session may not write someone else\'s schedule; the admin session alone may', async () => {
+  const body = { user_id: BOB.id, shift_type_id: null, note: 'Token probe' };
+  try {
+    const withToken = await call('PUT', '/overrides/2031-02-03', { as: { ...ALICE, cookieSession: { userId: ADMIN.id, role: 'admin' } }, body });
+    assert.equal(withToken.status, 403, 'the gate judges by the token subject\'s role');
+    const adminOnly = await call('PUT', '/overrides/2031-02-03', { as: ADMIN, body });
+    assert.equal(adminOnly.status, 200);
+  } finally {
+    database.prepare('DELETE FROM schedule_overrides WHERE user_id = ? AND date_key = ?').run(BOB.id, '2031-02-03');
+  }
 });
 
 // A shift type belongs to the household, not to a person: it shows up in every
@@ -958,7 +972,7 @@ test('PUT /api/v1/preferences: a non-admin payload mixing schedule_hidden_templa
   prefsApp.use((req, _res, next) => { req.authUserId = ALICE.id; req.authRole = prefsRole; next(); });
   const { default: preferencesRouter } = await import('../server/routes/preferences.js');
   prefsApp.use('/', preferencesRouter);
-  const prefsServer = prefsApp.listen(0);
+  const prefsServer = prefsApp.listen(0, '127.0.0.1');
   const prefsBaseUrl = await new Promise((r) => prefsServer.on('listening', () => r(`http://127.0.0.1:${prefsServer.address().port}`)));
   try {
     // Baseline, set as admin, so the "must not have changed" assertion below

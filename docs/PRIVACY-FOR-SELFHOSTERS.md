@@ -33,10 +33,13 @@
    - 2.10 [Web Push & Benachrichtigungs-Kanäle](#210-web-push--benachrichtigungs-kanäle)
    - 2.11 [E-Mail-Versand (SMTP)](#211-e-mail-versand-smtp)
    - 2.12 [Versions-/Changelog-Abruf (GitHub)](#212-versions-changelog-abruf-github)
-   - 2.13 [Mealie-Rezept-Sync](#213-mealie-rezept-sync)
+   - 2.13 [Rezept-Provider (Mealie / Tandoor)](#213-rezept-provider-mealie--tandoor)
    - 2.14 [DMS-Anbindung (Paperless-ngx / Papra)](#214-dms-anbindung-paperless-ngx--papra)
    - 2.15 [ICS-Kalender-Abos](#215-ics-kalender-abos)
    - 2.16 [Outlook-Push (Microsoft Graph)](#216-outlook-push-microsoft-graph)
+   - 2.17 [Feiertage und Schulferien (OpenHolidays)](#217-feiertage-und-schulferien-openholidays)
+   - 2.18 [Immich-Bildschirmschoner](#218-immich-bildschirmschoner)
+   - 2.19 [Abfall-Modul: ICS-URL-Quellen](#219-abfall-modul-ics-url-quellen)
 3. [Logging und Speicherbegrenzung](#3-logging-und-speicherbegrenzung-art-5-abs-1-lit-e-dsgvo)
 4. [Haushaltsausnahme](#4-haushaltsausnahme-art-2-abs-2-lit-c-dsgvo)
 5. [Verarbeitungsverzeichnis-Vorlage (Art. 30 DSGVO)](#5-verarbeitungsverzeichnis-vorlage-art-30-dsgvo)
@@ -95,10 +98,13 @@ Betreiber daraus resultieren.
 | Benachrichtigungs-Kanäle (Gotify/ntfy/E-Mail …) | `server/services/notification-channels.js`, `server/services/notification-providers/` | nur wenn ein Admin einen Kanal konfiguriert | abhängig vom Ziel (meist selbst gehostet) | i. d. R. nein (siehe 2.10) |
 | E-Mail-Versand (SMTP) | `server/services/email.js` | nur wenn SMTP konfiguriert | abhängig vom Provider | ja, bei kommerziellen Anbietern (siehe 2.11) |
 | Versions-/Changelog-Abruf | `server/routes/changelog.js` | ja — beim Öffnen des Änderungsverlaufs bzw. der Versionsprüfung (30-Min-Server-Cache) | USA — GitHub/Microsoft, DPF | nein (siehe 2.12) |
-| Mealie-Rezept-Sync | `server/services/mealie/` | nur wenn eine Mealie-Instanz verbunden ist | i. d. R. selbst gehostet | i. d. R. nein (siehe 2.13) |
+| Rezept-Provider (Mealie/Tandoor) | `server/services/recipe-providers/` | nur wenn ein Recipe-Provider verbunden ist | i. d. R. selbst gehostet | i. d. R. nein (siehe 2.13) |
 | DMS-Anbindung (Paperless-ngx/Papra) | `server/services/dms/` | nur wenn ein DMS verbunden ist | i. d. R. selbst gehostet | i. d. R. nein (siehe 2.14) |
 | ICS-Kalender-Abos | `server/services/ics-subscription.js` | nur wenn ein Nutzer einen Feed abonniert | abhängig vom Feed-Anbieter | nein (siehe 2.15) |
 | Outlook-Push (Microsoft Graph) | `server/services/outlook-calendar.js` | nur wenn alle `MS_*` gesetzt sind **und** ein Konto per OAuth verbunden wurde | USA/Microsoft; DPF-Status prüfen | für private Microsoft-Konten **nicht abschließbar** (siehe 2.16) |
+| Feiertage/Schulferien (OpenHolidays) | `server/services/holidays.js` | nur wenn ein Admin ein Feiertagsland wählt und eine Feiertags-Ebene aktiv ist | Anbieter-Standort selbst prüfen | nein (siehe 2.17) |
+| Immich-Bildschirmschoner | `server/routes/screensaver.js` | nur wenn `IMMICH_URL` und `IMMICH_API_KEY` gesetzt oder unter Einstellungen → Administration → Immich eingetragen sind | i. d. R. selbst gehostet | i. d. R. nein (siehe 2.18) |
+| Abfall-Modul: ICS-URL-Quellen | `server/services/waste-url-source.js` | nur wenn im Abfall-Modul eine ICS-URL als Quelle abonniert wird | abhängig vom Feed-Anbieter | nein (siehe 2.19) |
 
 ### 2.1 Open-Meteo (Wetter-Standard)
 
@@ -291,10 +297,12 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   die Server-IP an den jeweiligen Website-Betreiber. Private, Loopback- und
   Link-Local-Ziele werden blockiert; Skripte der Website werden nicht
   ausgeführt.
-- **Benachrichtigungsdienste:** Je nach Agent werden Name, Betrag, Währung und
-  Fälligkeitsdatum eines Abonnements an SMTP, Discord, Telegram, Pushover,
-  Gotify, Serverchan, Ntfy oder einen Webhook übertragen. Seit #944 kann auch
-  ein Haushalts-Kanal selbst per E-Mail zustellen; er nutzt denselben
+- **Benachrichtigungsdienste:** Je nach Kanal werden Name, Betrag, Währung und
+  Fälligkeitsdatum eines Abonnements an Gotify, ntfy oder einen Webhook
+  übertragen (`server/services/notification-providers/`); Dienste wie Discord
+  oder Slack erreicht Yuvomi nur über den generischen Webhook, einen eigenen
+  Adapter je Dienst gibt es nicht. Seit #944 kann ein Haushalts-Kanal auch
+  selbst per E-Mail zustellen; er nutzt denselben
   SMTP-Zugang wie Passwort-Reset und Einladungen (Abschnitt 2.11). Für private/LAN-Ziele
   ist eine ausdrückliche Deployment-Freigabe erforderlich. Dieselben Kanäle
   transportieren auch andere Erinnerungen der App — einschließlich
@@ -415,17 +423,21 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   `CHANGELOG.md` und sagt das auch. Nur der Hinweis auf eine neuere Version
   bleibt aus — den kann eine Instanz ohne Netz nach draußen nicht kennen.
 
-### 2.13 Mealie-Rezept-Sync
+### 2.13 Rezept-Provider (Mealie / Tandoor)
 
-- **Code-Stellen:** `server/services/mealie/`, `server/services/mealie-sync.js`.
-- **Aktiv nur, wenn:** ein Admin eine Mealie-Instanz verbindet
-  (Einstellungen → Synchronisation).
-- **Was wird übertragen:** API-Token, Rezeptdaten (Titel, Zutaten, Bilder-URLs)
-  in beide Richtungen sowie die Server-IP — an die konfigurierte
-  Mealie-Instanz.
-- **Drittland/AVV:** Mealie ist typischerweise selbst gehostet im eigenen
-  Netz — dann kein Drittland, kein AVV. Bei einer fremd betriebenen
-  Mealie-Instanz gelten die üblichen Prüfungen (Standort, AVV).
+- **Code-Stellen:** `server/services/recipe-providers/` (`mealie.js`,
+  `tandoor.js`), `server/services/recipe-provider-sync.js`,
+  `server/routes/recipe-providers.js`.
+- **Aktiv nur, wenn:** eine Mealie- oder Tandoor-Instanz als Recipe-Provider
+  verbunden ist (Einstellungen → Module → Küche).
+- **Was wird übertragen:** API-Token (Bearer) und die Server-IP an die
+  konfigurierte Instanz. Die Adapter sind **reine Lese-Clients**: Rezepte
+  (Titel, Zutaten, Vorschaubilder) werden abgerufen und gespiegelt, nichts wird
+  zurückgeschrieben. Ziele im privaten Netz sind nur mit
+  `RECIPE_PROVIDER_ALLOW_PRIVATE_NETWORK` erreichbar.
+- **Drittland/AVV:** Mealie und Tandoor sind typischerweise selbst gehostet im
+  eigenen Netz - dann kein Drittland, kein AVV. Bei einer fremd betriebenen
+  Instanz gelten die üblichen Prüfungen (Standort, AVV).
 
 ### 2.14 DMS-Anbindung (Paperless-ngx / Papra)
 
@@ -547,6 +559,64 @@ Konfiguration so, dass du auf einen EU-Provider umstellen könntest.
   im Klartext auf der Platte liegen, und bei Gesundheitsbezug den Freitext knapp
   halten. Das Client-Secret der Entra-App gehört wie ein Passwort behandelt und
   läuft nach spätestens 24 Monaten ab.
+
+### 2.17 Feiertage und Schulferien (OpenHolidays)
+
+- **Code-Stellen:** `server/services/holidays.js`, Einstellungs-Routen in
+  `server/routes/preferences.js` (`/holidays/...`).
+- **Aktiv nur, wenn:** ein Admin ein Feiertagsland wählt **und** mindestens eine
+  der beiden Ebenen (Feiertage, Schulferien) eingeschaltet ist. Ohne Land wird
+  nichts abgerufen. Kein API-Key.
+- **Endpunkt:** `openholidaysapi.org`, abgefragt vom Backend im gemeinsamen
+  Sync-Lauf und auf manuellen Anstoß eines Admins; die Antworten liegen in der
+  Tabelle `holiday_cache`. Beim Einrichten ruft der Server außerdem die Länder-,
+  Regionen- und Gruppenlisten ab. Für einige Länder, die OpenHolidays nicht
+  führt, berechnet Yuvomi die gesetzlichen Feiertage lokal ohne Abruf.
+- **Was wird übertragen:** Ländercode, ggf. Regionscode, der abgefragte
+  Zeitraum sowie die IP deines Yuvomi-Servers. Keine Nutzer- oder
+  Haushaltsdaten.
+- **Drittland/AVV:** kein AVV (keine Verarbeitung personenbezogener Nutzerdaten
+  im Auftrag); Betreiber und Standort des Dienstes vor der Aktivierung selbst
+  prüfen und in der Datenschutzerklärung transparent nennen.
+
+### 2.18 Immich-Bildschirmschoner
+
+- **Code-Stellen:** `server/routes/screensaver.js`, Einstellungsseite
+  Einstellungen → Administration → Immich.
+- **Aktiv nur, wenn:** eine Immich-URL und ein API-Schlüssel gesetzt sind -
+  per `IMMICH_URL`/`IMMICH_API_KEY` (optional `IMMICH_SCREENSAVER_ALBUM_ID`;
+  Env-Werte haben Vorrang) oder in der Einstellungsseite.
+- **Was wird übertragen:** Der **Server** fragt bei der konfigurierten
+  Immich-Instanz zufällige Fotos ab (`/api/search/random`, optional auf ein
+  Album beschränkt) und holt deren Vorschaubilder
+  (`/api/assets/<id>/thumbnail`). Dabei gehen API-Schlüssel, ggf. Album-ID und
+  die Server-IP an Immich. Der Schlüssel verlässt den Server nie; der Browser
+  erhält die Bilder über Yuvomi, dazu Aufnahmezeitpunkt sowie Stadt und Land aus
+  den EXIF-Daten.
+- **Besonderheit:** Fotos sind oft personenbezogen, und der Bildschirmschoner
+  zeigt sie auf einem gemeinsam genutzten Gerät (Wand-Tablet). Ein eigenes Album
+  statt der gesamten Bibliothek begrenzt, was dort erscheinen kann.
+- **Drittland/AVV:** Immich ist typischerweise selbst gehostet - dann kein
+  Drittland, kein AVV. Bei einer fremd betriebenen Instanz: Standort und AVV
+  prüfen.
+
+### 2.19 Abfall-Modul: ICS-URL-Quellen
+
+- **Code-Stellen:** `server/services/waste-url-source.js`,
+  `server/routes/waste/sources.js`.
+- **Aktiv nur, wenn:** im Abfall-Modul eine ICS-URL (etwa der Abfuhrkalender
+  der Gemeinde) als Quelle abonniert wird. Ein einmaliger Datei-Import
+  kontaktiert niemanden.
+- **Was wird übertragen:** Der Server ruft die URL im eingestellten Intervall
+  ab (zwischen einer Stunde und 30 Tagen, Voreinstellung täglich; zusätzlich
+  „jetzt prüfen" von Hand). Zum Feed-Betreiber fließen die IP deines
+  Yuvomi-Servers und die URL selbst; Abfuhrtermine fließen ausschließlich
+  herein. Ohne Freigabe nur `https://`-Ziele im öffentlichen Netz; `http://`
+  und private Netze nur mit `WASTE_SOURCE_ALLOW_PRIVATE_NETWORK`.
+- **Drittland/AVV:** wie bei den ICS-Kalender-Abos (Abschnitt 2.15): abhängig
+  vom Feed-Anbieter, für reine Abrufe ohne Personenbezug genügt der
+  Transparenzhinweis. Eine URL mit eingebettetem Token wie Zugangsdaten
+  behandeln.
 
 ---
 

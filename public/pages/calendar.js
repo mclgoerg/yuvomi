@@ -6,7 +6,7 @@
 
 import { api } from '/api.js';
 import { renderRRuleFields, bindRRuleEvents, getRRuleValues, recurrenceRow } from '/rrule-ui.js';
-import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender } from '/components/modal.js';
+import { openModal as openSharedModal, closeModal, confirmModal, confirmOverModal, advancedSection, wireBlurValidation, reportFieldError, refocusAfterRender, renderKeepingFocus } from '/components/modal.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { openDetailView, visibilityRow, assignedRow } from '/components/detail-view.js';
 import { stagger, wireScrollFade, scheduleUndoableDelete } from '/utils/ux.js';
@@ -34,6 +34,8 @@ import { resolveEventColor } from '/utils/event-color.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { parseRemindAtAsUtc } from '/utils/reminder-offset.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
+import { withChosenPeople } from '/utils/people-picker.js';
+import { othersCanRead } from '/utils/household.js';
 import { wireTablist } from '/utils/tablist.js';
 // EINE Schalterform, auch hier. Das Primitiv liegt unter `/settings/`, weil
 // dort sein Anlass lag (vier Schalterformen nebeneinander, Critique
@@ -1562,13 +1564,18 @@ async function getCachedAt(path) {
   }
 }
 
+/**
+ * Auswahl und Personenfilter zeigen Haushaltsmitglieder (#1207). Die Namen
+ * bestehender Dienstplan-Eintraege kommen aus dem Kontenverzeichnis: auch
+ * Hauspersonal kann einen Plan haben, und sein Eintrag soll einen Namen tragen.
+ */
 async function loadUsers() {
-  try {
-    const res   = await api.get('/auth/users');
-    state.users = res.data;
-  } catch {
-    state.users = [];
-  }
+  const [members, directory] = await Promise.all([
+    api.get('/family/members').then((res) => res.data ?? []).catch(() => []),
+    api.get('/auth/users').then((res) => res.data ?? []).catch(() => []),
+  ]);
+  state.users = members;
+  state.userDirectory = directory;
 }
 
 // --------------------------------------------------------
@@ -2452,7 +2459,7 @@ function persistWasteTypeFilter() {
 function scheduleHasTimes(entry) { return Boolean(entry.shift_type?.start_time && entry.shift_type?.end_time); }
 
 function scheduleOwnerName(entry) {
-  const owner = state.users.find((user) => Number(user.id) === Number(entry.user_id));
+  const owner = (state.userDirectory ?? state.users).find((user) => Number(user.id) === Number(entry.user_id));
   return owner?.display_name || owner?.username || "";
 }
 
@@ -3460,7 +3467,7 @@ function openCalendarFilters() {
     // uebrigen aus; das ist die Lesart, die Apple in derselben Liste hat.
     checked: state.people.size === 0 || state.people.has(u.id),
     // ZWEI NAMEN FUER DIESELBE FARBE, und das ist kein Tippfehler in einer
-    // der beiden Quellen: `/auth/users` liefert die Spalte roh als
+    // der beiden Quellen: `/family/members` liefert die Spalte roh als
     // `avatar_color`, waehrend `assigned_users` sie im JSON auf `color`
     // umbenennt (services/calendar-events.js:17). Wer nur einen der beiden
     // Namen liest, bekommt an einer der beiden Stellen `undefined` - hier
@@ -3934,6 +3941,7 @@ async function openFoundEvent(ev) {
 }
 
 export const __test = {
+  buildEventModalContent,
   fetchWindow,
   getWeekRange,
   getRangeForView,
@@ -4026,8 +4034,12 @@ function renderAgendaEvent(ev, dayStr) {
 
   const displayBg     = resolveEventBackground(ev);
   const assignedUsers = ev.assigned_users ?? [];
+  // `data-date` macht die Zeile eindeutig: ein Serientermin und ein mehrtaegiger
+  // Termin stehen mit derselben id an mehreren Tagen. Ohne das Datum findet
+  // `renderKeepingFocus()` nach dem Neuaufbau mehrere Kandidaten und weicht auf
+  // die Seitenwurzel aus, statt auf der Zeile zu bleiben (#1083).
   return `
-    <div class="list-row agenda-event" data-id="${ev.id}" role="button" tabindex="0"
+    <div class="list-row agenda-event" data-id="${ev.id}" data-date="${esc(dayStr ?? localDate(ev.start_datetime))}" role="button" tabindex="0"
          aria-label="${esc(agendaEventAriaLabel(ev, timeStr))}">
       <div class="agenda-event__color" style="background:${esc(displayBg)};"></div>
       <div class="agenda-event__body">
@@ -5250,11 +5262,18 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
     </div>
 
     <div class="form-group">
-      ${renderUserMultiSelect(state.users, selectedUserIds, 'cal_assigned', 'calendar.assignedLabel')}
+      ${renderUserMultiSelect(withChosenPeople(state.users, isEdit ? event.assigned_users : []), selectedUserIds, 'cal_assigned', 'calendar.assignedLabel')}
     </div>
 
-    ${state.users.length > 1 ? `
-    <div class="form-group">
+    <!-- Verborgen, nicht entfernt: der Speicherpfad liest
+         "#modal-visibility?.value || 'all'". Ohne den Knoten machte jedes
+         Speichern einen privaten Termin fuer alle sichtbar, sobald die Liste
+         hoechstens ein Mitglied hat - ein Haushalt aus einer Person und einer
+         Haushaltshilfe genauso. Das Aufgabenformular macht es ebenso.
+         Sichtbar bleibt es, solange ein anderes Konto den Kalender lesen kann -
+         auch Hauspersonal mit Zugriff: sonst bliebe jeder neue Termin bei
+         "alle" und waere fuer genau dieses Konto lesbar. -->
+    <div class="form-group"${state.users.length > 1 || othersCanRead('calendar') ? '' : ' hidden'}>
       <label class="form-label" for="modal-visibility">${t('common.visibility.label')}</label>
       <select class="input" id="modal-visibility" name="visibility">
         <option value="all"       ${visibility === 'all'       ? 'selected' : ''}>${t('common.visibility.all')}</option>
@@ -5263,7 +5282,7 @@ function buildEventModalContent({ mode, event, date, reminder = null, time = nul
       </select>
       <p class="form-hint">${t('common.visibility.hint')}</p>
       <p class="form-hint field-hint--warn" id="modal-visibility-warning" role="status" hidden><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('common.visibility.assigneesNobodyHint')}</span></p>
-    </div>` : ''}
+    </div>
 
     <!-- #647: der Schalter, den @Kyrodan beschrieben hat - „einen Termin als
          Countdown markieren" statt eines zweiten Systems daneben. Er steht im
@@ -5616,6 +5635,8 @@ async function deleteEvent(event) {
     },
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
+    keepFocus: renderKeepingFocus,
+    refocusAfterUndo: refocusAfterRender,
     handleError: (err) => window.yuvomi?.showToast(
       err.data?.error ?? t('calendar.deleteError'),
       'danger',
@@ -5817,6 +5838,8 @@ async function deleteThisAndFollowing(event) {
     }),
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
+    keepFocus: renderKeepingFocus,
+    refocusAfterUndo: refocusAfterRender,
     handleError: (err) => window.yuvomi?.showToast(
       err.data?.error ?? t('calendar.deleteError'),
       'danger',
@@ -5845,6 +5868,8 @@ async function deleteSingleOccurrence(event) {
     }),
     isViewActive: () => Boolean(_container?.isConnected),
     reloadEvents: reloadCalendarRangeAfterDelete,
+    keepFocus: renderKeepingFocus,
+    refocusAfterUndo: refocusAfterRender,
     handleError: (err) => window.yuvomi?.showToast(
       err.data?.error ?? t('calendar.deleteError'),
       'danger',
