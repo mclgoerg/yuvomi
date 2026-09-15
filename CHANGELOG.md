@@ -130,8 +130,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at any width by itself; a header can still change height between two periods for reasons that
   have nothing to do with this reset (a label whose text wraps differently at very narrow widths,
   for one, on both this branch and main), and that is unchanged by this fix.
+- **The README is shorter between the introduction and the install steps** (#1212). Each module
+  gets one line in the module table, with the detail left to the spec, and "Before you commit" -
+  what happens if the project stops, how to take your data elsewhere, what it costs - now comes
+  before the first command instead of after it. The install section opens with the three ways in,
+  lists the encryption key and the blocking of addresses on your own network as facts that apply
+  to every path, and names the logs command for both Docker and Podman.
 
 ### Fixed
+
+- **An early click on the simple setup no longer overwrites an existing installation.** The web
+  installer locks its simple path when it finds an `.env`, because that path sets host, port and
+  cookie security itself. The lock only took effect once the installer had finished checking for
+  the file, so a click in the moment before could still start the simple path and write over, for
+  example, a setup running behind a reverse proxy. The simple path now waits for that check and
+  continues in the advanced setup, where each of these values is visible, and its save step refuses
+  to write over an existing file. The check itself no longer waits indefinitely for a container
+  engine that does not answer: after a few seconds the installer carries on and treats the container
+  as not running.
+
+- **The web installer shows an existing configuration as a warning, not as a hint.** When the
+  installer finds an `.env`, the setup says that the current file will be backed up before saving -
+  a setup that works is about to be replaced. That line was tinted like a plain hint; it now carries
+  the same amber warning style and icon as the installer's backup reminders.
+
+- **On the project page, the module list on phones folds away again, and the jump menu marks the
+  right section after a language switch.** On a phone, "Show all modules" opened the full list and
+  then disappeared, so the list could not be shortened again; the button now stays and switches
+  between all and fewer modules. The jump menu remembered where each section starts and measured
+  again only when the window changed size, so after switching to the longer German page it
+  highlighted the next section too early. It now measures again whenever the language changes or
+  the module list opens or closes. The calendar screenshot also tells screen readers what it shows,
+  instead of just "Calendar".
+
+- **A Google Calendar change made while the connection is down now reaches Google once it is
+  back.** Before pushing an edit or moving an event to another calendar, Yuvomi asks Google for that
+  calendar's details. When that request failed for a passing reason, such as no network, a token
+  refresh or a rate limit, the change was handled like one for a read-only calendar and dropped: it
+  never reached Google, and nothing said so. It now waits for the next sync and is only given up
+  after the usual five attempts, or when Google reports the calendar as gone. A different calendar
+  picked while a move is still under way is also no longer discarded when Google rejects that move.
+
+- **The website and both READMEs now say what reaches out once you use a feature** (#1212). Out of
+  the box the only outbound request is still the update check against the GitHub releases API. The
+  pages said that weather, calendar sync and cloud backup stay off until you enter credentials, but
+  weather needs only a location, and once a country is set, holidays are fetched from
+  openholidaysapi.org - except the public holidays of Australia, Brazil, Canada, New Zealand, the
+  United Kingdom and the United States, which Yuvomi works out itself without a request. Opening the
+  calendar settings loads the list of holiday countries from openholidaysapi.org as well, whether or
+  not a country is set. Looking up a logo for a subscription contacts the service's website, and
+  push goes through your browser's push service. The outbound line now names all of them.
+
+- **A WebDAV backup URL made of whitespace no longer locks the backup settings.** A space or line
+  break in `WEBDAV_BACKUP_URL`, for example from `${WEBDAV_BACKUP_URL:- }` in a compose file, was
+  ignored as a URL but still marked the backup fields as set by the environment, so they could not be
+  edited in Settings. Both now use the same check: only a value that is not blank comes from the
+  environment.
 
 - **A modules folder set through `MODULES_DIR` in `.env` is found again.** `docker-compose.yml`,
   `podman-compose.yml` and the Podman Quadlet hand the `.env` to the container, and the app reads
