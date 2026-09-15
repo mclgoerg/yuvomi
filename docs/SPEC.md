@@ -3074,9 +3074,13 @@ string or plain string array (both yield `intensity: null`).
 of the legacy scalar `mood` column exactly like migration 178 did for symptoms: backfill copies
 every non-empty `mood` into one row, the column freezes. The API's `feelings` field is this table's
 keys (validated against the 7 `MOOD_TYPES` values - unlike symptom keys, an unknown feeling is a
-400); saving fully replaces a log's rows (delete + re-insert, no diffing) and actively sets the
-legacy `mood` column to NULL, so a cleared selection stays cleared on pre-migration rows; readers
-fall back to `mood` only when `feelings` is absent entirely, never when it is an empty array.
+400); a save that provides either `feelings` or the legacy `mood` in the request body fully
+replaces the log's feelings rows (delete + re-insert, no diffing) and sets the legacy `mood` column
+to NULL, so a cleared selection stays cleared on pre-migration rows - the same full-replace-when-
+provided semantics `symptoms` already has. A save that provides neither key leaves both the
+existing feelings rows and the `mood` column untouched, so an unrelated change (flow, note, basal
+temperature) cannot silently wipe a frozen legacy value. Readers fall back to `mood` only when
+`feelings` is absent entirely, never when it is an empty array.
 
 | Column | Type | Constraint |
 |--------|------|-----------|

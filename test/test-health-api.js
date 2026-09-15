@@ -823,6 +823,16 @@ test('Cycle-Settings: notify_partner_user_id lehnt eine unbekannte Person ab (40
   assert.equal(res.status, 400);
 });
 
+test('Cycle-Settings: notify_partner_user_id lehnt einen nicht-numerischen Wert ab (400), statt ihn wie parseInt() vorne abzuschneiden', async () => {
+  asA();
+  // Der Praefix ist absichtlich Bobs echte (gueltige) user_id: parseInt()
+  // wuerde still `${userB}` lesen und die eigentlich unsinnige Eingabe als
+  // gueltigen, sogar berechtigten Partner akzeptieren - Number.isInteger()
+  // auf Number(...) muss den Wert als Ganzes ablehnen.
+  const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: `${userB}abc` });
+  assert.equal(res.status, 400);
+});
+
 test('Cycle-Settings: notify_partner_user_id lehnt die aufrufende Person selbst ab (400)', async () => {
   asA();
   const res = await call('PUT', '/cycle/settings', { notify_partner_user_id: userA });
@@ -1132,9 +1142,14 @@ test('Cycle-Log: ein eingefrorener Legacy-mood-Wert wird genullt, wenn feelings/
 
 test('Cycle-Log: ein eingefrorener Legacy-mood-Wert bleibt erhalten, wenn ein Save weder feelings noch mood mitschickt', async () => {
   asA();
-  const created = await call('POST', '/cycle/logs', { log_date: '2030-01-07', flow: 'light' });
+  // Zuerst eine echte Gefuehls-Zeile anlegen (statt eines Tages ohne jede
+  // Gefuehls-Angabe) - sonst waere "feelings bleibt leer" weiter unten trivial
+  // wahr und ein Bug, der bestehende Gefuehle bei jedem Save loescht, wuerde
+  // gar nicht auffallen.
+  const created = await call('POST', '/cycle/logs', { log_date: '2030-01-07', flow: 'light', feelings: ['good'] });
   assert.equal(created.status, 201);
   const id = created.body.data.id;
+  assert.deepEqual(created.body.data.feelings, ['good']);
 
   // Gleicher Legacy-Zustand wie oben.
   db.prepare('UPDATE cycle_day_logs SET mood = ? WHERE id = ?').run('melancholic', id);
@@ -1151,9 +1166,9 @@ test('Cycle-Log: ein eingefrorener Legacy-mood-Wert bleibt erhalten, wenn ein Sa
   assert.equal(updated.body.data.flow, 'heavy');
   assert.equal(updated.body.data.mood, 'melancholic');
   assert.equal(db.prepare('SELECT mood FROM cycle_day_logs WHERE id = ?').get(id).mood, 'melancholic');
-  // Auch die bestehenden Gefuehls-Zeilen (falls vorhanden) duerfen ein Save
-  // ohne `feelings`/`mood` nicht leeren.
-  assert.deepEqual(updated.body.data.feelings, []);
+  // Auch die zuvor gesetzte Gefuehls-Zeile muss ein Save ohne `feelings`/`mood`
+  // unangetastet lassen - nicht nur "leer bleibt leer".
+  assert.deepEqual(updated.body.data.feelings, ['good']);
 });
 
 test('Cycle-Log: intimacy ist hart privat - Eigentümer sieht es, family-Mitglied nicht', async () => {

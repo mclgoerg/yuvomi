@@ -12,10 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The cycle tab grows into a full tracker: visible flow strength, feelings, more fertility
   signals, hard-private intimacy logging, PMS patterns, and a "today" insight bubble.** The day log
   gains cervical mucus, LH and pregnancy tests, multi-select feelings (replacing the single mood),
-  and intimacy - the latter is never shown to anyone but yourself, even on days shared with the
-  family, enforced by the server. On `POST /api/v1/health/cycle/logs`, `mood` (kept for older
-  clients) and `feelings` now both accept only the fixed feelings list - an out-of-list value is a
-  400 instead of being stored as free text. Flow strength finally shows up everywhere it matters: a
+  and intimacy - cervical mucus, the two test results and intimacy are never shown to anyone but
+  yourself, even on days shared with the family, enforced by the server. On
+  `POST /api/v1/health/cycle/logs`, `mood` (kept for older clients) and `feelings` now both accept
+  only the fixed feelings list - an out-of-list value is a
+  400 instead of being stored as free text. Saving a day log through the app always sends the
+  current feelings selection, so an older free-text mood value is cleared the next time that day is
+  edited in the app; only a save that omits both fields entirely (outside the app's own form) leaves
+  it as-is. Flow strength finally shows up everywhere it matters: a
   four-step dot scale on the calendar, a heaviest-flow chip per period in the history, a per-cycle
   flow intensity chart, and a calm hint when recent periods run repeatedly heavy or over a week. A
   bubble at the top answers the daily question at a glance - cycle day and phase, plus whichever of
@@ -264,6 +268,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   affected every module since per-member module access arrived in v1.4.0; admins and members
   without restrictions were never limited by it. Scoped API tokens were never let through, but were
   refused for a capitalised path to a module they may use - that now works as well.
+
 ## [2.66.0] - 2026-09-13
 
 ### Added
