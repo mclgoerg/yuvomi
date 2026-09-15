@@ -164,7 +164,9 @@ const STUBS = {
     export const refresh = async () => {};
   `,
   '/components/user-multi-select.js': `
-    export const renderUserMultiSelect = () => '';
+    // Tests, die das Markup einer Personen-Auswahl pruefen, setzen
+    // globalThis.__renderUserMultiSelect (etwa auf die echte Komponente).
+    export const renderUserMultiSelect = (...args) => globalThis.__renderUserMultiSelect?.(...args) ?? '';
     export const getSelectedUserIds = () => [];
     export const bindUserMultiSelect = () => {};
     export const renderAvatarStack = () => '';
