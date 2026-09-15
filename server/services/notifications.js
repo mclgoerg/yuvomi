@@ -123,6 +123,7 @@ const REMINDER_ORIGINS = {
   // overrides it in reminderPayload() with the stable ?type=&date= deep link
   // contract every other Waste projection already uses.
   waste_pickup:           { titleKey: 'nav.waste',              url: '/waste' },
+  document_expiry:        { titleKey: 'nav.documents',          url: '/documents' },
 };
 
 /**
@@ -216,6 +217,15 @@ function wastePickupBody(reminder) {
   return `${reminder.entity_title} - ${reminder.waste_date_key}`;
 }
 
+/**
+ * Body of a document expiry reminder: the document name and its expiry date -
+ * same reasoning as warrantyBody/trackedDateBody/pantryExpiryBody above.
+ */
+function documentExpiryBody(reminder) {
+  if (!reminder.doc_expires_at) return reminder.entity_title;
+  return `${reminder.entity_title} - ${reminder.doc_expires_at}`;
+}
+
 function reminderPayload(reminder, locale, dateFormat) {
   const title = reminder.entity_title || FALLBACK_BODY;
   const origin = REMINDER_ORIGINS[reminder.entity_type];
@@ -234,6 +244,8 @@ function reminderPayload(reminder, locale, dateFormat) {
     body = scheduleEntryBody(reminder);
   } else if (reminder.entity_type === 'waste_pickup' && reminder.entity_title) {
     body = wastePickupBody(reminder);
+  } else if (reminder.entity_type === 'document_expiry' && reminder.entity_title) {
+    body = documentExpiryBody(reminder);
   }
   // Waste is the one entity_type with a real per-occurrence deep link
   // (?type=<id>&date=<date_key>, the same contract every other Waste
@@ -444,6 +456,7 @@ export async function processDueNotifications({
           SELECT t.name FROM waste_reminder_entries e JOIN waste_types t ON t.id = e.type_id
           WHERE e.id = r.entity_id
         )
+        WHEN 'document_expiry' THEN (SELECT name FROM family_documents WHERE id = r.entity_id)
       END AS entity_title,
       -- Unterscheidet die eigene Perioden-Erinnerung von der an eine
       -- Partnerperson weitergereichten (gleicher entity_type, siehe
@@ -484,7 +497,9 @@ export async function processDueNotifications({
         THEN (SELECT currency FROM budget_subscriptions WHERE id = r.entity_id) END AS sub_currency,
       CASE WHEN r.entity_type = 'subscription'
         THEN (SELECT next_payment_date FROM budget_subscriptions WHERE id = r.entity_id)
-        END AS sub_next_payment_date
+        END AS sub_next_payment_date,
+      CASE WHEN r.entity_type = 'document_expiry'
+        THEN (SELECT expires_at FROM family_documents WHERE id = r.entity_id) END AS doc_expires_at
     FROM reminders r
     WHERE r.dismissed = 0 AND r.pushed_at IS NULL AND r.remind_at <= ?
       -- Kein Push an eine Aufgabe/einen Termin, den es nicht mehr gibt. Seit

@@ -24,6 +24,7 @@ import { withChosenPeople } from '/utils/people-picker.js';
 import { maxUploadBytes } from '/utils/upload-limit.js';
 import { mountEmptyState } from '/utils/empty-state.js';
 import { subtreeIds, folderPath, flattenFolderTree } from '/utils/folder-tree.js';
+import { dateStatus } from '/utils/date-status.js';
 import {
   buildFolderUploadPlan,
   executeFolderUploadPlan,
@@ -78,7 +79,7 @@ function friendlyError(err) {
 
 // Sortierschlüssel der Liste. `updated` spiegelt die Server-Reihenfolge
 // (ORDER BY updated_at DESC) und bleibt daher der Default.
-const SORTS = ['updated', 'name', 'size'];
+const SORTS = ['updated', 'name', 'size', 'expiring'];
 
 let state = {
   allDocuments: [],
@@ -99,6 +100,10 @@ let state = {
     : 'updated',
   status: 'active',
   category: '',
+  // Erledigt ODER laeuft bald ab (dateStatus() != 'valid') - dieselbe Facette
+  // wie Kategorie/Ordner, rein clientseitig ueber state.allDocuments, kein
+  // eigener Roundtrip.
+  expiringSoon: false,
   folderId: '',
   query: '',
   selectMode: false,
@@ -184,12 +189,14 @@ export async function render(container) {
           <button type="button" class="filter-chip filter-chip--sm${state.status === 'archived' ? ' filter-chip--active' : ''}" data-status="archived" aria-pressed="${state.status === 'archived'}">${t('documents.statusArchived')}</button>
         </div>
         <div class="documents-filter-chips" id="documents-category" role="group" aria-label="${t('documents.categoryLabel')}"></div>
+        <div class="documents-filter-chips" id="documents-expiring-filter" role="group" aria-label="${t('documents.expiringFilterLabel')}"></div>
         <div class="documents-filters__end">
           <label class="sr-only" for="documents-sort">${t('documents.sortLabel')}</label>
           <select class="input documents-sort" id="documents-sort">
             <option value="updated" ${state.sort === 'updated' ? 'selected' : ''}>${t('documents.sortUpdated')}</option>
             <option value="name" ${state.sort === 'name' ? 'selected' : ''}>${t('documents.sortName')}</option>
             <option value="size" ${state.sort === 'size' ? 'selected' : ''}>${t('documents.sortSize')}</option>
+            <option value="expiring" ${state.sort === 'expiring' ? 'selected' : ''}>${t('documents.sortExpiring')}</option>
           </select>
           <button class="btn btn--secondary btn--icon btn--icon-sm" type="button" id="documents-select-btn"
                   aria-pressed="false" title="${t('documents.selectLabel')}" aria-label="${t('documents.selectLabel')}">
@@ -248,6 +255,7 @@ export async function render(container) {
   renderDmsHeaderBtn();
   bindPageEvents();
   renderCategoryChips();
+  renderExpiringChip();
   renderFolderBrowser();
   renderDocuments();
 }
@@ -256,6 +264,7 @@ export async function render(container) {
 // Zähler (Kategorie + Ordner) hängen voneinander ab, deshalb nie einzeln aufrufen.
 function renderAll() {
   renderCategoryChips();
+  renderExpiringChip();
   renderFolderBrowser();
   renderBreadcrumb();
   renderDocuments();
@@ -373,12 +382,33 @@ function matchesFolder(doc) {
   return doc.folder_id != null && folderSubtree(Number(state.folderId)).has(doc.folder_id);
 }
 
+/** Laeuft der Ablauf bald ab oder ist er schon vorbei? Kein Ablaufdatum heisst nein. */
+function matchesExpiringSoon(doc) {
+  if (!state.expiringSoon) return true;
+  const status = dateStatus(doc.expires_at);
+  return !!status && status.state !== 'valid';
+}
+
+function expiringCount() {
+  return state.allDocuments.filter((doc) => matchesCategory(doc) && matchesFolder(doc)
+    && !!dateStatus(doc.expires_at) && dateStatus(doc.expires_at).state !== 'valid').length;
+}
+
 function sortDocuments(docs) {
   const sorted = [...docs];
   if (state.sort === 'name') {
     sorted.sort((a, b) => a.name.localeCompare(b.name, getLocale()));
   } else if (state.sort === 'size') {
     sorted.sort((a, b) => (b.file_size || 0) - (a.file_size || 0));
+  } else if (state.sort === 'expiring') {
+    // Kein Ablaufdatum steht ans Ende - Sortierung nach etwas, das nicht
+    // existiert, waere sonst Zufall (Einfuegereihenfolge des Servers).
+    sorted.sort((a, b) => {
+      if (!a.expires_at && !b.expires_at) return 0;
+      if (!a.expires_at) return 1;
+      if (!b.expires_at) return -1;
+      return a.expires_at.localeCompare(b.expires_at);
+    });
   } else {
     sorted.sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
   }
@@ -387,7 +417,7 @@ function sortDocuments(docs) {
 
 function applyFilters() {
   state.documents = sortDocuments(
-    state.allDocuments.filter((doc) => matchesCategory(doc) && matchesFolder(doc)),
+    state.allDocuments.filter((doc) => matchesCategory(doc) && matchesFolder(doc) && matchesExpiringSoon(doc)),
   );
 }
 
@@ -414,6 +444,13 @@ function bindPageEvents() {
     const chip = e.target.closest('[data-category]');
     if (!chip || chip.dataset.category === state.category) return;
     state.category = chip.dataset.category;
+    applyFilters();
+    renderAll();
+  });
+  // Ein-/Ausschalten wie der Kategorie-Filter: reine Client-Facette.
+  _container.querySelector('#documents-expiring-filter')?.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-expiring-toggle]')) return;
+    state.expiringSoon = !state.expiringSoon;
     applyFilters();
     renderAll();
   });
@@ -586,6 +623,7 @@ function clearSearch() {
 function resetFilters() {
   state.category = '';
   state.folderId = '';
+  state.expiringSoon = false;
   applyFilters();
   renderAll();
 }
@@ -632,7 +670,7 @@ function showDocumentsLoading() {
 }
 
 function hasActiveFilter() {
-  return Boolean(state.category) || Boolean(state.folderId);
+  return Boolean(state.category) || Boolean(state.folderId) || state.expiringSoon;
 }
 
 // Vier unterscheidbare Leerzustände statt einem. Der alte Einheitszustand
@@ -809,6 +847,21 @@ function renderCategoryChips() {
     <button type="button" class="filter-chip filter-chip--sm${state.category === category ? ' filter-chip--active' : ''}" data-category="${esc(category)}" aria-pressed="${state.category === category}">
       <i data-lucide="${CATEGORY_ICONS[category] || 'folder'}" class="icon-md" aria-hidden="true"></i>${esc(labels[category])}<span class="filter-chip__count">${counts.get(category) || 0}</span>
     </button>`).join('')}
+  `);
+  if (window.lucide) lucide.createIcons({ el: host });
+}
+
+// Ein einzelner Umschalt-Chip, gleiches Muster wie renderCategoryChips - nur ein
+// Zustand statt einer Auswahlliste, weil es nur "an" oder "aus" gibt.
+function renderExpiringChip() {
+  const host = _container?.querySelector('#documents-expiring-filter');
+  if (!host) return;
+  const count = expiringCount();
+  host.replaceChildren();
+  host.insertAdjacentHTML('beforeend', `
+    <button type="button" class="filter-chip filter-chip--sm${state.expiringSoon ? ' filter-chip--active' : ''}" data-expiring-toggle aria-pressed="${state.expiringSoon}">
+      <i data-lucide="calendar-clock" class="icon-md" aria-hidden="true"></i>${t('documents.expiringFilterLabel')}<span class="filter-chip__count">${count}</span>
+    </button>
   `);
   if (window.lucide) lucide.createIcons({ el: host });
 }
@@ -1286,6 +1339,7 @@ function renderMeta(doc, { showSize = true } = {}) {
     ${hidesPrivacyControls('documents') ? '' : `<span><i data-lucide="${doc.visibility === 'family' ? 'users' : doc.visibility === 'private' ? 'lock' : 'user-check'}" aria-hidden="true"></i>${t(`documents.visibility.${doc.visibility}`)}</span>`}
     ${showSize ? `<span>${formatFileSize(doc.file_size)}</span>` : ''}
     ${storageBadgeHtml(doc)}
+    ${expiryChipHtml(doc)}
   `;
 }
 
@@ -1350,6 +1404,25 @@ function uploadTargetIcon(backend) {
   if (backend === 'webdav') return 'cloud';
   if (backend === 'local_folder') return 'folder';
   return 'database';
+}
+
+/**
+ * Ablauf-Chip auf der Zeile/Karte, gleiches Muster wie pantry.js#expiryBadge -
+ * bewusst nur bei "bald ab" oder "abgelaufen": ein Chip auf jeder Zeile mit
+ * Ablaufdatum waere Ornament und wuerde genau die Zeilen entwerten, die
+ * wirklich Aufmerksamkeit brauchen.
+ */
+function expiryChipHtml(doc) {
+  const status = dateStatus(doc.expires_at);
+  if (!status || status.state === 'valid') return '';
+  // "expired" teilt sich bewusst die Gefahr-Farbe mit dem bestehenden
+  // .doc-badge--unavailable statt einer eigenen, identisch aussehenden Regel
+  // (DESIGN.md, Colors: die Skalen-Regel).
+  const tone = status.state === 'expired' ? 'unavailable' : 'expiring';
+  const text = status.state === 'expired'
+    ? t('documents.expiredDays', { count: Math.abs(status.days) })
+    : t('documents.expiringInDays', { count: status.days });
+  return `<span class="doc-badge doc-badge--${tone}"><i data-lucide="calendar-clock" aria-hidden="true"></i>${esc(text)}</span>`;
 }
 
 function storageBadgeHtml(doc) {
@@ -1715,7 +1788,7 @@ function openDocumentModal(doc = null, { initialUpload = 'files' } = {}) {
   // Nur noch echte Sekundärfelder liegen im Akkordeon. Die Sichtbarkeit ist das
   // beworbene Kernversprechen des Moduls („steuere, wer jede Datei sehen darf")
   // und steht deshalb offen im Formular, nicht zugeklappt darunter.
-  const advancedOpen = isEdit && (!!doc.description || doc.status === 'archived');
+  const advancedOpen = isEdit && (!!doc.description || doc.status === 'archived' || !!doc.expires_at);
 
   const advancedFieldsHtml = `
         <div class="form-group">
@@ -1728,6 +1801,18 @@ function openDocumentModal(doc = null, { initialUpload = 'files' } = {}) {
             <option value="active" ${doc?.status !== 'archived' ? 'selected' : ''}>${t('documents.statusActive')}</option>
             <option value="archived" ${doc?.status === 'archived' ? 'selected' : ''}>${t('documents.statusArchived')}</option>
           </select>
+        </div>
+        <div class="modal-grid modal-grid--2">
+          <div class="form-group">
+            <label class="label" for="document-expires-at">${t('documents.expiresAtLabel')}</label>
+            <input class="input" id="document-expires-at" type="date" value="${esc(doc?.expires_at || '')}">
+          </div>
+          <div class="form-group">
+            <label class="label" for="document-expiry-reminder-days">${t('documents.expiryReminderLabel')}</label>
+            <input class="input" id="document-expiry-reminder-days" type="number" min="0" max="365" step="1"
+                   value="${doc?.expiry_reminder_days ?? ''}" placeholder="${esc(t('documents.expiryReminderPlaceholder'))}">
+            <p class="document-form__hint">${t('documents.expiryReminderHint')}</p>
+          </div>
         </div>`;
 
   // Beim Anlegen kommt die Datei zuerst: sie ist das Objekt der Handlung und
@@ -2316,6 +2401,10 @@ async function saveDocument(event, doc, panel) {
       folder_id: form.querySelector('#document-folder').value || null,
       visibility,
       status: form.querySelector('#document-status').value,
+      expires_at: form.querySelector('#document-expires-at').value || null,
+      expiry_reminder_days: form.querySelector('#document-expiry-reminder-days').value !== ''
+        ? Number(form.querySelector('#document-expiry-reminder-days').value)
+        : null,
       allowed_member_ids: visibility === 'restricted'
         ? Array.from(form.querySelectorAll('.document-member-picker input:checked')).map((input) => Number(input.value))
         : [],

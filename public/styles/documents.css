@@ -1944,6 +1944,16 @@
   color: var(--color-text-primary);
 }
 
+/* Ablauf-Chip (dateStatus()): "expiring" bald faellig (Warnung) - "valid" zeigt
+   gar keinen Chip. "expired" (bereits ueberfaellig) teilt sich bewusst die
+   Gefahr-Farbe mit .doc-badge--unavailable statt einer eigenen, identischen
+   Regel (DESIGN.md, Colors: die Skalen-Regel - zwei Modifier duerfen nicht
+   unabsichtlich gleich aussehen, ohne sich eine Regel zu teilen). */
+.doc-badge--expiring {
+  background: var(--color-warning-light);
+  color: var(--color-warning-ink);
+}
+
 .document-storage-target {
   display: flex;
   align-items: center;

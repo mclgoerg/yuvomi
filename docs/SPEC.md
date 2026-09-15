@@ -2093,6 +2093,8 @@ Upload and manage family files with per-document access control.
 | external_url | TEXT | nullable (deep link to the document in the DMS) |
 | external_meta | TEXT | nullable (JSON `{ correspondent, tags }` mirrored from the DMS for display) |
 | created_by | INTEGER | FK → Users (CASCADE delete), NOT NULL |
+| expires_at | TEXT | nullable, `YYYY-MM-DD` (migration v209) |
+| expiry_reminder_days | INTEGER | nullable = no reminder; 0–365 when set, range-validated in the route (migration v209) |
 
 `storage_backend` is the authoritative discriminator. Valid compatibility pairs are
 `local/local`, `external/webdav`, `external/google_drive`, and `external/dms`; database triggers
@@ -2141,6 +2143,22 @@ endpoint in the background, shows the Share button busy until it is there, and t
 straight into `navigator.share()`; closing the viewer aborts the fetch and drops the file. When the
 answer is no, no dead control is shown: a line under the metadata says why (type, or browser and
 context) and Download stays the path that works everywhere.
+
+**Expiry date and reminder (v217):** a document may carry an optional
+`expires_at` and an optional `expiry_reminder_days` lead time (0–365, mirroring
+`inventory_item_dates.reminder_offset_days`; an explicit `0` is preserved, not coerced to a default).
+Together they drive one `reminders` row (`entity_type = 'document_expiry'`) at
+`expires_at` minus the lead time, recomputed on every write (`POST /documents`, `PATCH /documents/:id`)
+the same way `inventory/items.js#syncReminder` recomputes the warranty reminder — a document does not
+change on its own, so there is no periodic sync for it. The reminder is owned by
+`family_documents.created_by`, not by whoever is editing (an admin fixing someone else's document
+does not inherit their reminder). It is torn down on every path that takes a document out of the
+active set: `DELETE /documents/:id`, the folder-tree delete path, and archiving
+(`status → 'archived'`) — an archived passport scan must not keep nagging; reactivating restores it
+if the expiry is still in the future. `GET /documents?expiring=<days>` lists documents whose expiry
+falls within (or has already passed) the given number of days. The status chip and the "expiring
+soon" filter share `dateStatus()` (`public/utils/date-status.js`, extracted from
+`public/utils/inventory-warranty.js` so Inventory's existing import keeps working).
 
 ### Family Document Access
 Allowlist for `visibility = 'restricted'` documents — only listed users can see the document.

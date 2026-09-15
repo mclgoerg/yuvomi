@@ -8,8 +8,9 @@ import express from 'express';
 import { createHmac, randomBytes } from 'node:crypto';
 import * as db from '../db.js';
 import { createLogger } from '../logger.js';
-import { str, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
+import { str, date as validateDate, num, collectErrors, id as validateId, MAX_TEXT, MAX_TITLE } from '../middleware/validate.js';
 import { isAdminRequest } from '../middleware/require-admin.js';
+import { reminderDateBefore, reminderIsInThePast } from '../utils/reminder-schedule.js';
 import { canManageDocument, documentVisibleSql } from '../services/document-access.js';
 import { newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import {
@@ -153,6 +154,73 @@ function canSeeSql(alias = 'd') {
   return documentVisibleSql(alias);
 }
 
+const EXPIRY_REMINDER_MIN_DAYS = 0;
+const EXPIRY_REMINDER_MAX_DAYS = 365;
+
+/**
+ * `expires_at` ist optional und einfach `undefined` (nicht mitgeschickt) vs.
+ * `null`/`''` (bewusst geloescht) unterscheidbar - PATCH lässt ein Feld sonst
+ * nicht einzeln weglassbar.
+ */
+function vExpiresAt(value) {
+  if (value === undefined) return { value: undefined, error: null };
+  if (value === null || value === '') return { value: null, error: null };
+  return validateDate(value, 'Expiry date');
+}
+
+/**
+ * 0-365, mirroring `inventory_item_dates.reminder_offset_days`. Anders als dort
+ * gibt es hier keinen Default - `null`/nicht mitgeschickt heisst "keine
+ * Erinnerung", nicht "30 Tage". Ein explizites `0` bleibt `0` (Range-Check
+ * unterscheidet nicht per Wahrheitswert, sondern per `undefined`/`null`/`''`).
+ */
+function vExpiryReminderDays(value) {
+  if (value === undefined) return { value: undefined, error: null };
+  if (value === null || value === '') return { value: null, error: null };
+  const parsed = num(value, 'Reminder lead time');
+  if (parsed.error) return parsed;
+  if (!Number.isInteger(parsed.value) || parsed.value < EXPIRY_REMINDER_MIN_DAYS || parsed.value > EXPIRY_REMINDER_MAX_DAYS) {
+    return { value: null, error: `Reminder lead time must be an integer between ${EXPIRY_REMINDER_MIN_DAYS} and ${EXPIRY_REMINDER_MAX_DAYS}.` };
+  }
+  return { value: parsed.value, error: null };
+}
+
+/**
+ * Erinnerungs-Sync fuer den Ablauf eines Dokuments, identisches Muster wie
+ * server/routes/inventory/items.js#syncReminder: bei jedem Schreiben erst
+ * loeschen, dann - falls die Bedingungen greifen - neu anlegen. Eigentuemer ist
+ * `created_by` (der Anlegende), nicht die gerade schreibende Person - gleiche
+ * Regel wie bei den Inventar-Fristen.
+ */
+function syncDocumentExpiryReminder(document) {
+  const database = db.get();
+  database.prepare(`
+    DELETE FROM reminders WHERE entity_type = 'document_expiry' AND entity_id = ?
+  `).run(document.id);
+
+  if (!document.expires_at || document.expiry_reminder_days == null || !document.created_by) return;
+
+  const remindAt = reminderDateBefore(document.expires_at, document.expiry_reminder_days);
+  if (reminderIsInThePast(remindAt)) return;
+
+  database.prepare(`
+    INSERT INTO reminders (entity_type, entity_id, remind_at, created_by)
+    VALUES ('document_expiry', ?, ?, ?)
+  `).run(document.id, remindAt, document.created_by);
+}
+
+/**
+ * Abraeumen, wo ein Dokument den aktiven Bestand verlaesst: geloescht, im
+ * Ordnerbaum mitgeloescht, oder archiviert. `reminders.entity_id` hat keinen
+ * FK, also ist das explizit noetig - gleiches Muster wie
+ * item-dates.js#removeTrackedDateReminders.
+ */
+function removeDocumentExpiryReminder(documentId) {
+  db.get().prepare(`
+    DELETE FROM reminders WHERE entity_type = 'document_expiry' AND entity_id = ?
+  `).run(documentId);
+}
+
 function parseMemberIds(value) {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
@@ -184,6 +252,7 @@ function documentSelect() {
            d.original_name, d.mime_type, d.file_size, d.storage_provider,
            d.storage_backend, d.storage_key, d.dms_account_id, d.external_url,
            d.external_meta, d.folder_id, d.created_by, d.created_at, d.updated_at,
+           d.expires_at, d.expiry_reminder_days,
            f.name AS folder_name,
            u.display_name AS creator_name, u.avatar_color AS creator_color,
            da.provider AS dms_provider,
@@ -207,7 +276,7 @@ function normalizeDocument(row) {
 }
 
 function getVisibleDocument(id, req, includeContent = false) {
-  const columns = includeContent ? 'd.*' : 'd.id, d.created_by, d.visibility, d.description, d.folder_id';
+  const columns = includeContent ? 'd.*' : 'd.id, d.created_by, d.visibility, d.description, d.folder_id, d.status, d.expires_at, d.expiry_reminder_days';
   return db.get().prepare(`
     SELECT ${columns}
     FROM family_documents d
@@ -894,6 +963,7 @@ router.delete('/folders/:id', async (req, res) => {
       for (const document of storageDeletedDocuments) {
         try {
           db.get().prepare('DELETE FROM family_documents WHERE id = ?').run(document.id);
+          removeDocumentExpiryReminder(document.id);
           deletedDocuments += 1;
         } catch (err) {
           log.error(`DELETE /folders/:id document ${document.id} database error:`, err);
@@ -980,6 +1050,14 @@ router.get('/', (req, res) => {
     const folderId = req.query.folder_id !== undefined && req.query.folder_id !== ''
       ? Number(req.query.folder_id)
       : null;
+    // `?expiring=<days>` - Dokumente, deren Ablauf innerhalb der naechsten N Tage
+    // liegt oder bereits vergangen ist (dieselbe "faellig ODER ueberfaellig"-
+    // Lesart wie der Chip von public/utils/date-status.js). Ein ungueltiger Wert
+    // wird verworfen statt den Filter stillschweigend ueberzuspringen.
+    const expiringDays = req.query.expiring !== undefined && req.query.expiring !== ''
+      ? Number(req.query.expiring)
+      : null;
+    const expiringWithinDays = Number.isInteger(expiringDays) && expiringDays >= 0 ? expiringDays : null;
 
     /* EIN ORDNER ZEIGT AUCH, WAS UNTER IHM LIEGT (#785).
      *
@@ -1007,13 +1085,19 @@ router.get('/', (req, res) => {
     const folderClause = subtree
       ? `AND d.folder_id IN (${subtree.map((_v, i) => `@f${i}`).join(',')})`
       : '';
-    const params = { userId: userId(req), status, category, ...folderParams };
+    const params = {
+      userId: userId(req), status, category, expiringWithinDays, ...folderParams,
+    };
+    const expiringClause = expiringWithinDays !== null
+      ? "AND d.expires_at IS NOT NULL AND date(d.expires_at) <= date('now', '+' || @expiringWithinDays || ' days')"
+      : '';
     const rows = db.get().prepare(`
       ${documentSelect()}
       WHERE ${canSeeSql('d')}
         AND d.status = @status
         AND (@category IS NULL OR d.category = @category)
         ${folderClause}
+        ${expiringClause}
       GROUP BY d.id
       ORDER BY d.updated_at DESC
     `).all(params);
@@ -1031,7 +1115,9 @@ router.post('/', async (req, res) => {
     const vDescription = str(req.body.description, 'Description', { max: MAX_TEXT, required: false });
     const vOriginalName = str(req.body.original_name, 'Original filename', { max: MAX_TITLE });
     const vFolderName = str(req.body.folder_name, 'Folder name', { max: MAX_TITLE, required: false });
-    const errors = collectErrors([vName, vDescription, vOriginalName, vFolderName]);
+    const vExpiresAtField = vExpiresAt(req.body.expires_at);
+    const vExpiryReminderDaysField = vExpiryReminderDays(req.body.expiry_reminder_days);
+    const errors = collectErrors([vName, vDescription, vOriginalName, vFolderName, vExpiresAtField, vExpiryReminderDaysField]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     // `folder_key` benennt den Systemordner eines Moduls, `folder_name` nur
@@ -1066,12 +1152,14 @@ router.post('/', async (req, res) => {
     const database = db.get();
     const row = database.transaction(() => {
       const folderId = vFolderId.value ?? ensureFolder(folderKey, vFolderName.value, userId(req));
+      const expiresAt = vExpiresAtField.value ?? null;
+      const expiryReminderDays = vExpiryReminderDaysField.value ?? null;
       const result = database.prepare(`
         INSERT INTO family_documents (
           name, description, category, visibility, folder_id, original_name,
           mime_type, file_size, content_data, storage_provider, storage_backend,
-          storage_key, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          storage_key, created_by, expires_at, expiry_reminder_days
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         vName.value,
         vDescription.value,
@@ -1085,9 +1173,17 @@ router.post('/', async (req, res) => {
         stagedUpload.storage_provider,
         stagedUpload.storage_backend,
         stagedUpload.storage_key,
-        userId(req)
+        userId(req),
+        expiresAt,
+        expiryReminderDays
       );
       if (visibility === 'restricted') replaceAccess(result.lastInsertRowid, allowedIds);
+      syncDocumentExpiryReminder({
+        id: result.lastInsertRowid,
+        expires_at: expiresAt,
+        expiry_reminder_days: expiryReminderDays,
+        created_by: userId(req),
+      });
       return database.prepare(`
         ${documentSelect()}
         WHERE d.id = ?
@@ -1127,7 +1223,9 @@ router.put('/:id', (req, res) => {
 
     const vName = req.body.name !== undefined ? str(req.body.name, 'Name', { max: MAX_TITLE }) : { value: null };
     const vDescription = req.body.description !== undefined ? str(req.body.description, 'Description', { max: MAX_TEXT, required: false }) : { value: null };
-    const errors = collectErrors([vName, vDescription]);
+    const vExpiresAtField = vExpiresAt(req.body.expires_at);
+    const vExpiryReminderDaysField = vExpiryReminderDays(req.body.expiry_reminder_days);
+    const errors = collectErrors([vName, vDescription, vExpiresAtField, vExpiryReminderDaysField]);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const category = req.body.category !== undefined && CATEGORIES.includes(req.body.category) ? req.body.category : null;
@@ -1149,6 +1247,8 @@ router.put('/:id', (req, res) => {
       .all(id).map((row) => row.user_id);
     const strangers = newNonMembers(allowedIds, { stored: storedAccess });
     if (strangers.length) return res.status(400).json({ error: nonMemberMessage(strangers), code: 400 });
+    const expiresAt = req.body.expires_at !== undefined ? vExpiresAtField.value : existing.expires_at;
+    const expiryReminderDays = req.body.expiry_reminder_days !== undefined ? vExpiryReminderDaysField.value : existing.expiry_reminder_days;
     db.get().prepare(`
       UPDATE family_documents
       SET name = COALESCE(?, name),
@@ -1156,7 +1256,9 @@ router.put('/:id', (req, res) => {
           category = COALESCE(?, category),
           visibility = COALESCE(?, visibility),
           status = COALESCE(?, status),
-          folder_id = ?
+          folder_id = ?,
+          expires_at = ?,
+          expiry_reminder_days = ?
       WHERE id = ?
     `).run(
       req.body.name !== undefined ? vName.value : null,
@@ -1165,9 +1267,20 @@ router.put('/:id', (req, res) => {
       visibility,
       status,
       req.body.folder_id !== undefined ? vFolderId.value : existing.folder_id,
+      expiresAt,
+      expiryReminderDays,
       id
     );
     replaceAccess(id, allowedIds);
+
+    // Ein archiviertes Dokument darf nicht mehr nagen (ein archiviertes
+    // Passfoto etwa) - dieselbe Teardown-Regel wie DELETE/Ordner-Loeschen.
+    const finalStatus = status ?? existing.status;
+    if (finalStatus === 'archived') {
+      removeDocumentExpiryReminder(id);
+    } else {
+      syncDocumentExpiryReminder({ id, expires_at: expiresAt, expiry_reminder_days: expiryReminderDays, created_by: existing.created_by });
+    }
 
     const row = db.get().prepare(`${documentSelect()} WHERE d.id = ? GROUP BY d.id`).get(id);
     res.json({ data: normalizeDocument(row) });
@@ -1186,6 +1299,16 @@ router.patch('/:id/archive', (req, res) => {
     if (documentDeleteIsActive(id)) return documentDeletionInProgress(res);
     const status = req.body.archived === false ? 'active' : 'archived';
     db.get().prepare('UPDATE family_documents SET status = ? WHERE id = ?').run(status, id);
+    // Ein archiviertes Dokument darf nicht mehr nagen (ein archiviertes
+    // Passfoto etwa). Reaktivieren stellt die Erinnerung wieder her, falls die
+    // Ablauf-Angaben noch stehen.
+    if (status === 'archived') {
+      removeDocumentExpiryReminder(id);
+    } else {
+      syncDocumentExpiryReminder({
+        id, expires_at: existing.expires_at, expiry_reminder_days: existing.expiry_reminder_days, created_by: existing.created_by,
+      });
+    }
     res.json({ data: { id, status } });
   } catch (err) {
     log.error('PATCH /:id/archive error:', err);
@@ -1291,6 +1414,7 @@ router.delete('/:id', async (req, res) => {
     lockedId = id;
     await deleteDocumentContent(existing);
     db.get().prepare('DELETE FROM family_documents WHERE id = ?').run(id);
+    removeDocumentExpiryReminder(id);
     res.status(204).end();
   } catch (err) {
     log.error('DELETE /:id error:', err);

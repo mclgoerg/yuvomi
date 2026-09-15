@@ -14395,8 +14395,12 @@ test('der Vorlauf einer Fristmeldung ist die Schwelle, die die Zeile faerbt', ()
       server: ['../server/services/pantry-reminders.js', /EXPIRY_REMINDER_OFFSET_DAYS\s*=\s*(\d+)/],
     },
     {
+      // WARRANTY_ALERT_DAYS zog nach public/utils/date-status.js um - Dokumente
+      // brauchen denselben Chip fuer ihr Ablaufdatum; inventory-warranty.js
+      // re-exportiert nur noch, damit bestehende Inventar-Importe unveraendert
+      // bleiben.
       what: 'Inventar: Garantieende',
-      client: ['../public/utils/inventory-warranty.js', /WARRANTY_ALERT_DAYS\s*=\s*(\d+)/],
+      client: ['../public/utils/date-status.js', /WARRANTY_ALERT_DAYS\s*=\s*(\d+)/],
       server: ['../server/routes/inventory/items.js', /WARRANTY_REMINDER_OFFSET_DAYS\s*=\s*(\d+)/],
     },
   ];

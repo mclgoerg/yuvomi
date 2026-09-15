@@ -56,6 +56,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   household display time zone consistently. Calculations remain bounded for very long intervals.
   (#1178)
 
+- **Family documents can now carry an optional expiry date and reminder lead time.** Set an expiry
+  (e.g. a passport or a residence permit) and how many days ahead to be reminded - an expiring or
+  overdue document shows a status chip, and a matching "expiring soon" filter chip sits next to the
+  category chips. Archiving a document (or deleting it) clears its reminder, so an archived scan
+  never keeps nagging.
+
 ### Changed
 
 - **The jump-to-now reset sits behind the period stepper in all three period-navigation headers,

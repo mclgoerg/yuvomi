@@ -16,7 +16,7 @@ import { tokenAllows } from '../scopes.js';
 const log    = createLogger('Reminders');
 const router = express.Router();
 
-const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup'];
+const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry'];
 
 /**
  * Nach jedem Schreibvorgang an den Erinnerungen eines Termins: die Zugewiesenen
@@ -120,6 +120,7 @@ const ORIGIN_MODULE = Object.freeze({
   schedule_entry:         'schedule',
   schedule_extra_entry:   'schedule',
   waste_pickup:           'waste',
+  document_expiry:        'documents',
 });
 
 /**
@@ -211,6 +212,7 @@ router.get('/pending', (req, res) => {
             SELECT t.name FROM waste_reminder_entries e JOIN waste_types t ON t.id = e.type_id
             WHERE e.id = r.entity_id
           )
+          WHEN 'document_expiry' THEN (SELECT name FROM family_documents WHERE id = r.entity_id)
         END AS entity_title,
         -- Unterscheidet die eigene Perioden-Erinnerung von einer an eine
         -- Partnerperson weitergereichten (gleicher entity_type 'cycle_period',

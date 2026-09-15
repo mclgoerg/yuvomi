@@ -197,7 +197,7 @@ test('die Listenansicht trägt Datum und Größe als eigene Spalten', () => {
 });
 
 test('die Liste ist sortierbar und merkt sich die Wahl', () => {
-  assert.match(page, /const SORTS = \['updated', 'name', 'size'\]/);
+  assert.match(page, /const SORTS = \['updated', 'name', 'size', 'expiring'\]/);
   assert.match(page, /localStorage\.setItem\('yuvomi-documents-sort'/);
   assert.match(page, /function sortDocuments\(/);
 });
