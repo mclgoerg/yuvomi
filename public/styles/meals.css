@@ -240,7 +240,10 @@
    * (order: 3 in layout.css), weil „center" in den meisten Modulen ein Suchfeld
    * ist und damit nachrangig gegenüber Titel und Aktionen. Hier ist der
    * __center-Slot die Datums-Navigation und damit das Wichtigste im Kopf: sie
-   * gehört auf die erste Zeile, „Heute"/Zufallsplan darunter. Deshalb genau
+   * gehört auf die erste Zeile. Seit #1164 sitzt „Heute" IM __center-Slot,
+   * hinter den Pfeilen (weekNavHtml(), meals.js) - es steht also mit auf
+   * dieser ersten Zeile, nicht mehr darunter. Nur „Zufallsplan" (und der
+   * Rail-Toggle) bleiben im Actions-Slot der zweiten Zeile. Deshalb genau
    * diese Umkehrung - kein eigenes Kopf-Layout, nur eine andere Reihenfolge
    * innerhalb der geteilten Grammatik. */
   .meals-page .page-toolbar__center {

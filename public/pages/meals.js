@@ -74,9 +74,33 @@ function addDays(dateStr, n) {
   return addLocalDays(dateStr, n);
 }
 
+/**
+ * Schmale Telefone (PR #1200 Review, Blocking 2): das volle Datum an beiden
+ * Enden - "14.09.2026 – 20.09.2026" - lief in de/fr/uk bei 320/375px 21-112px
+ * ueber die Zeile. Seit #1164 lebt `#week-today` in derselben Zeile wie das
+ * Label und macht sie um seine Breite enger; auf main war der schlechteste
+ * Fall 9px bei 320px, hier gemessen bis 112px.
+ *
+ * Unter 640px faellt das Jahr an BEIDEN Enden weg (`formatDayMonth` statt
+ * `formatDate`) - verwandt mit dem Muster, das der Kalender fuer sein eigenes
+ * schmales Wochen-Label nutzt (`updateLabel()`, calendar.js:
+ * `calendar.dayRangeLabel`), dort behaelt nur der Endtag sein Jahr. Hier
+ * fällt es an BEIDEN Tagen weg: eine Kalenderwoche liegt so gut wie nie über
+ * einen Jahreswechsel, und die zusätzliche Breite (nicht nur ein Datum,
+ * sondern zwei) war noetig, um die von Reviewern gemessenen 112px in fr
+ * sicher aufzufangen.
+ */
 function formatWeekLabel(monday) {
   const sunday = addDays(monday, 6);
-  return `${formatDate(monday)} – ${formatDate(sunday)}`;
+  const narrow = window.matchMedia?.('(max-width: 639px)').matches;
+  // Unter 640px faellt das Jahr an BEIDEN Enden weg (`formatDayMonth`): die
+  // Kalenderwoche liegt so gut wie nie ueber einen Jahreswechsel, und die
+  // gesparte Breite ist hier der knappere Preis - eine Woche wie
+  // "28.12. – 03.01." bleibt trotzdem eindeutig genug fuer den Kopf einer
+  // Seite, die ohnehin "diese Woche" zeigt.
+  const from = narrow ? formatDayMonth(monday) : formatDate(monday);
+  const to = narrow ? formatDayMonth(sunday) : formatDate(sunday);
+  return `${from} – ${to}`;
 }
 
 function isToday(dateStr) {
@@ -233,15 +257,33 @@ function weekNavHtml() {
 /**
  * „Heute" erscheint nur, wenn die aktuelle Woche nicht zu sehen ist -
  * dieselbe Sichtbarkeitsregel wie syncTodayButton() im Kalender (#1164).
- * `hidden` statt entfernen: der Slot bleibt bestehen und die Kopfhoehe
- * springt beim Blaettern nicht; wer die Leiste mit einem Screenreader liest,
- * hoert kein Bedienelement, das nichts bewirkt. Durchgesetzt wird `hidden`
- * von der geteilten Regel `.btn[hidden]` (layout.css).
+ *
+ * `.is-current` statt `hidden` (PR #1200 Review): `hidden` entfernte die Box
+ * aus dem Fluss, und `.week-nav__label` daneben (`flex: 1`) wuchs in den frei
+ * gewordenen Platz - "›" ruckte dadurch um die Knopfbreite, sobald der Reset
+ * erschien oder verschwand. `.is-current` (layout.css, `.btn.is-current`)
+ * blendet nur per `visibility` aus; die Box bleibt im Fluss, der Slot bleibt
+ * gleich breit. `inert` nimmt dem Knopf zusaetzlich Zeiger, Fokus und
+ * A11y-Baum.
+ *
+ * War der Knopf fokussiert (Enter auf „Heute" fuehrt genau in den Zustand, der
+ * ihn gleich verbirgt), holt sich der Fokus vorher einen Stepper daneben -
+ * sonst faellt er auf `<body>`, denn ein `inert`es Element blurred wie
+ * `display: none` es taete.
  */
 function syncTodayButton(root = _container) {
   const btn = root?.querySelector('#week-today');
   if (!btn) return;
-  btn.hidden = state.currentWeek === getMondayOf(todayKey());
+  const isCurrent = state.currentWeek === getMondayOf(todayKey());
+  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne DOM
+  // stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
+  // schon beim Werteauswerten.
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  if (isCurrent && active === btn) {
+    (root.querySelector('#week-prev') || root.querySelector('#week-next'))?.focus();
+  }
+  btn.classList.toggle('is-current', isCurrent);
+  btn.inert = isCurrent;
 }
 
 export async function render(container, { user }) {
@@ -293,6 +335,15 @@ export async function render(container, { user }) {
 
   const today  = todayKey();
   const monday = getMondayOf(today);
+
+  // Vor dem ersten Laden synchronisieren, nicht erst danach: `state.currentWeek`
+  // steht schon (die Seite oeffnet immer auf der aktuellen Woche), also kann
+  // „Heute" seinen Zielzustand VOR dem ersten Bildaufbau bekommen. Sonst
+  // rendert weekNavHtml() ihn sichtbar, der Ladevorgang laeuft, und erst danach
+  // versteckt syncTodayButton() ihn wieder - ein sichtbares Aufblitzen bei
+  // jedem frischen Laden von /meals (PR #1200 Review, Befund 5).
+  state.currentWeek = monday;
+  syncTodayButton();
 
   await Promise.all([loadWeek(monday), loadLists(), loadPreferences(), loadCategories(), loadRecipes()]);
   renderWeekGrid();
@@ -1841,6 +1892,7 @@ export const __test = {
   weekNavHtml,
   syncTodayButton,
   getMondayOf,
+  formatWeekLabel,
   state,
 };
 

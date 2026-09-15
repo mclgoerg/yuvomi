@@ -221,6 +221,11 @@ let state = {
   range:        'month',      // 'week' | 'month' | 'year'
   reportAnchor: todayKey(),
   reportPeriod: '',           // vom Server gemeldeter Zeitraum (nur für 'week' im Label)
+  // Rohe Grenzen desselben Zeitraums (YYYY-MM-DD), fuer Containment-Pruefungen
+  // (reportShowsToday()) - reportPeriod ist bereits lokalisiert formatiert und
+  // nicht mehr vergleichbar.
+  reportRangeFrom: null,
+  reportRangeTo:   null,
 };
 let _container = null;
 let _user = null;
@@ -447,21 +452,59 @@ function monthNavHtml() {
 /**
  * „Aktuell" erscheint nur, wenn der aktuelle Zeitraum nicht zu sehen ist -
  * dieselbe Sichtbarkeitsregel wie syncTodayButton() im Kalender (#1164).
- * `hidden` statt entfernen: der Slot bleibt bestehen und die Kopfhoehe
- * springt beim Blaettern nicht; wer die Leiste mit einem Screenreader liest,
- * hoert kein Bedienelement, das nichts bewirkt. Vorher war der Knopf auf dem
- * aktuellen Monat ein stummer No-Op (der Handler kehrt frueh zurueck).
+ *
+ * `.is-current` statt `hidden` (PR #1200 Review, Blocking 1): `hidden` nahm
+ * die Box aus dem Fluss, `.budget-nav__label` daneben (`flex: 1`) wuchs in den
+ * frei gewordenen Platz, und "›" ruckte um die Knopfbreite, sobald der Reset
+ * erschien/verschwand - gemessen 11/11 ueber 33 Layouts, am schlimmsten von
+ * allen drei Koepfen. `.is-current` (layout.css) blendet nur per `visibility`
+ * aus, die Box bleibt im Fluss. `inert` nimmt Zeiger, Fokus und A11y-Baum.
+ * War der Knopf fokussiert, holt sich der Fokus vorher einen Stepper daneben -
+ * sonst faellt er auf `<body>` (`inert` blurred wie `display: none`).
+ *
  * Laeuft NACH dem Tab-Block in updateTabs(): der entscheidet, ob der Tab
- * ueberhaupt Monatsnavigation traegt, hier wird nur verfeinert. Auf den
- * Berichten ist der angezeigte Zeitraum der Anker, sonst der Monat.
+ * ueberhaupt Monatsnavigation traegt, hier wird nur verfeinert.
+ *
+ * „Zu sehen" heisst CONTAINMENT, nicht Ankergleichheit (Befund 4): auf den
+ * Berichten ankert `anchorForMonth()` den laufenden Monat auf dem heutigen
+ * Tag, jeden anderen auf dessen Ersten - `state.reportAnchor === todayKey()`
+ * traf deshalb nur an einem einzigen Tag im Monat zu, obwohl der ganze Monat
+ * "heute" enthaelt. `reportShowsToday()` prueft je Aufloesung den ANGEZEIGTEN
+ * BEREICH (Jahr/Monat/Woche), genau wie `getRangeForView` es im Kalender tut.
  */
+function reportShowsToday() {
+  const today = todayKey();
+  if (state.range === 'year') {
+    return parseLocalDateKey(state.reportAnchor).getFullYear() === parseLocalDateKey(today).getFullYear();
+  }
+  if (state.range === 'month') {
+    return state.reportAnchor.slice(0, 7) === currentMonth();
+  }
+  // Woche: die Grenzen meldet der Server (onPeriod), erst dann ist Containment
+  // pruefbar. Bis dahin (erster Bildaufbau) faellt es auf Ankergleichheit
+  // zurueck - der Anker ist zu dem Zeitpunkt ohnehin `todayKey()` (state-Default).
+  if (state.reportRangeFrom && state.reportRangeTo) {
+    return today >= state.reportRangeFrom && today <= state.reportRangeTo;
+  }
+  return state.reportAnchor === today;
+}
+
 function syncCurrentButton(root = _container) {
   const btn = root?.querySelector('#budget-today');
   if (!btn) return;
   const caps = tabCaps();
-  btn.hidden = !caps.month || (state.activeTab === 'reports'
-    ? state.reportAnchor === todayKey()
+  const isCurrent = !caps.month || (state.activeTab === 'reports'
+    ? reportShowsToday()
     : state.month === currentMonth());
+  // `typeof document` statt eines nackten Bezeichners: Testumgebungen ohne DOM
+  // stubben `document` nicht immer, und ein nackter Bezeichner wirft dort
+  // schon beim Werteauswerten.
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  if (isCurrent && active === btn) {
+    (root.querySelector('#budget-prev') || root.querySelector('#budget-next'))?.focus();
+  }
+  btn.classList.toggle('is-current', isCurrent);
+  btn.inert = isCurrent;
 }
 
 export async function render(container, { user }) {
@@ -548,6 +591,14 @@ export async function render(container, { user }) {
 
   if (window.lucide) lucide.createIcons({ el: container });
 
+  // Vor dem ersten Laden synchronisieren, nicht erst danach: `state.month` und
+  // `state.activeTab` stehen schon, also kann „Aktuell" seinen Zielzustand VOR
+  // dem ersten Bildaufbau bekommen. Sonst rendert monthNavHtml() ihn sichtbar,
+  // der Ladevorgang laeuft, und erst renderBody() (nach dem Await) versteckt
+  // ihn wieder - ein sichtbares Aufblitzen bei jedem frischen Laden von
+  // /budget (PR #1200 Review, Befund 5).
+  syncCurrentButton();
+
   if (user?.access_scope !== 'split_guest') {
     // Konten einmalig beim Mount laden (Salden sind monatsunabhängig; kein
     // Nachladen pro Monatswechsel). Namensliste versorgt die Transaktions-Meta.
@@ -583,9 +634,11 @@ function wireNav() {
   _container.querySelector('#budget-next').addEventListener('click', () => stepPeriod(1));
   _container.querySelector('#budget-today').addEventListener('click', async () => {
     if (state.activeTab === 'reports') {
-      const today = todayKey();
-      if (today === state.reportAnchor) return;
-      state.reportAnchor = today;
+      // Containment statt Ankergleichheit (Befund 4, wie in reportShowsToday()):
+      // ein Klick, waehrend der Anker schon im heutigen Bereich liegt, waere
+      // sonst ein sichtbares No-Op, obwohl der Knopf `inert` sein sollte.
+      if (reportShowsToday()) return;
+      state.reportAnchor = todayKey();
       renderBody();
       return;
     }
@@ -708,10 +761,17 @@ function renderBody() {
         refocusSegmented('.budget-stats__ranges');
       },
       // Die Wochengrenzen kennt der Server; das Kopf-Label holt sie sich von dort
-      // nach, statt die Wochenlogik ein zweites Mal im Client zu führen.
+      // nach, statt die Wochenlogik ein zweites Mal im Client zu führen. Die
+      // rohen Grenzen (reportRangeFrom/To) braucht reportShowsToday() für die
+      // Containment-Prüfung von „Aktuell" bei Auflösung „Woche".
       onPeriod: ({ from, to }) => {
         state.reportPeriod = `${formatDate(from)} – ${formatDate(to)}`;
-        if (state.activeTab === 'reports' && state.range === 'week') updateLabel();
+        state.reportRangeFrom = from;
+        state.reportRangeTo   = to;
+        if (state.activeTab === 'reports' && state.range === 'week') {
+          updateLabel();
+          syncCurrentButton();
+        }
       },
     }).catch((err) => console.error('[Budget] stats render error:', err));
     return;
