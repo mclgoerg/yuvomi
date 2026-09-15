@@ -1637,10 +1637,26 @@ export function buildCycleCalendar(anchorKey, { periods = [], logs = [], setting
       // schließen sich für eine Zelle gegenseitig aus (siehe Dokblock oben).
       confirmed,
       flow: log?.flow || null,
-      // symptoms ist seit Phase 2 ein Array ({key, intensity}[], vom Server
-      // aus cycle_day_log_symptoms zusammengesetzt) - ein LEERES Array ist in
-      // JS wahr, `.length` ist die eigentliche Frage "gibt es welche".
-      hasLog: !!log && !!(log.flow || log.symptoms?.length || log.mood || log.note),
+      // symptoms und feelings sind seit Phase 2 Arrays ({key,...}[] bzw.
+      // string[], vom Server zusammengesetzt) - ein LEERES Array ist in JS
+      // wahr, `.length` ist die eigentliche Frage "gibt es welche". `mood`
+      // bleibt als Legacy-Fallback für alte, noch nicht neu gespeicherte
+      // Einträge relevant (R2: eine Speicherung ohne `feelings`/`mood`-Key
+      // lässt `mood` unangetastet, ein Speichern mit diesen Keys löscht es
+      // aber ohne Ersatz in `feelings` zu schreiben - ein reiner
+      // Feelings/Zervixschleim/Test-Tag hätte sonst keinen Punkt im
+      // Kalender, obwohl echte Daten geloggt wurden).
+      hasLog: !!log && !!(
+        log.flow
+        || log.symptoms?.length
+        || log.feelings?.length
+        || log.mood
+        || log.note
+        || log.cervix_mucus
+        || log.lh_test
+        || log.pregnancy_test
+        || log.basal_temp
+      ),
     };
   };
 

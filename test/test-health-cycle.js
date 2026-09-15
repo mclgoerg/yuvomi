@@ -1112,6 +1112,37 @@ test('buildCycleCalendar: hasLog zählt ein leeres symptoms-Array nicht als Log'
   assert.equal(at('2026-06-06').hasLog, true);
 });
 
+// R4-1: ein Tag, der nur Feelings, Zervixschleim, LH-Test oder BBT enthält
+// (kein flow/symptoms/mood/note), muss trotzdem als geloggt gelten - sonst
+// verschwindet der Kalenderpunkt für genau die Felder, die seit Phase 2 neu
+// dazugekommen sind bzw. für einen bereits umgestellten Tag (mood wird beim
+// erneuten Speichern gelöscht, ohne dass hasLog das noch bemerkt).
+test('buildCycleCalendar: hasLog erkennt reine Feelings-Einträge ohne flow/symptoms/mood/note', () => {
+  const cal = buildCycleCalendar('2026-06-15', {
+    periods: periods(['2026-06-01'], 5),
+    logs: [
+      { log_date: '2026-06-07', feelings: ['good'] },
+    ],
+    todayKey: '2026-06-15',
+    weekStartsOn: 1,
+  });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(at('2026-06-07').hasLog, true);
+});
+
+test('buildCycleCalendar: hasLog erkennt einen reinen cervix_mucus-Eintrag', () => {
+  const cal = buildCycleCalendar('2026-06-15', {
+    periods: periods(['2026-06-01'], 5),
+    logs: [
+      { log_date: '2026-06-08', cervix_mucus: 'egg_white' },
+    ],
+    todayKey: '2026-06-15',
+    weekStartsOn: 1,
+  });
+  const at = (k) => cal.weeks.flat().find((c) => c.dateKey === k);
+  assert.equal(at('2026-06-08').hasLog, true);
+});
+
 // A-1: buildCycleCalendar() muss dieselbe BBT-Bestätigung wie predictCycle()
 // zeigen - sonst widersprechen sich Hero/Ring und Kalender (live beobachtet:
 // Hero "bestätigt 06-07", Kalender zeigte weiter das rein kalendarische
