@@ -1132,6 +1132,116 @@ test('„Heute" im Essensplan folgt der HAUSHALTSZONE, nicht der Prozesszone des
   }
 });
 
+// PR #1200 Review Runde 4, Should-fix 2: `onNarrowWeekLabelQueryChange()` rief
+// bisher `renderWeekGrid()` auf - eine Bildschirmdrehung ueber die 640px-
+// Schwelle riss damit das GANZE Wochengitter neu auf (jede Karte, den
+// Stagger, den Scroll zur heutigen Spalte), obwohl nur das Label ein anderes
+// Format braucht. Stand der Fokus auf einer Mahlzeit-Karte, fiel er dabei auf
+// `<body>` - main haelt ihn auf der Karte. Dieser Test pinnt beide Haelften
+// des Fixes fest: der Handler darf das Grid nicht anfassen (Spione auf den
+// Methoden, die ein echter renderWeekGrid()-Durchlauf nachweislich benutzt -
+// siehe Testaufbau oben), und ein zuvor gesetzter Fokus muss unveraendert
+// bleiben.
+test('onNarrowWeekLabelQueryChange() aktualisiert nur Label und Reset, nicht das Wochengitter (Runde 4, Should-fix 2)', () => {
+  withMinimalDom(() => {
+    const grid = fakeDomElement('div');
+    let gridTouched = false;
+    const zuvorRemoveAttribute = grid.removeAttribute.bind(grid);
+    grid.removeAttribute = (name) => { gridTouched = true; zuvorRemoveAttribute(name); };
+    grid.setAttribute = (name, value) => { gridTouched = true; grid.attributes[name] = value; };
+    const zuvorReplaceChildren = grid.replaceChildren.bind(grid);
+    grid.replaceChildren = (...items) => { gridTouched = true; zuvorReplaceChildren(...items); };
+
+    const label = fakeDomElement('span');
+    const todayBtn = fakeResetButton();
+    const prevBtn = fakeResetButton();
+    const strayCard = fakeResetButton(); // Stellvertreter fuer eine fokussierte Mahlzeit-Karte
+    const testContainer = {
+      isConnected: true,
+      querySelector(sel) {
+        if (sel === '#week-grid') return grid;
+        if (sel === '#week-label') return label;
+        if (sel === '#week-today') return todayBtn;
+        if (sel === '#week-prev') return prevBtn;
+        return null;
+      },
+    };
+    const zuvorWeek = mealsUi.state.currentWeek;
+    const zuvorMeals = mealsUi.state.meals;
+    const zuvorError = mealsUi.state.loadError;
+    const zuvorDocument = globalThis.document;
+    try {
+      mealsUi.state.currentWeek = mealsUi.getMondayOf(todayKey());
+      mealsUi.state.meals = [];
+      mealsUi.state.loadError = null;
+
+      // Testaufbau-Beweis: ein ECHTER renderWeekGrid()-Durchlauf beruehrt das
+      // Grid nachweislich (Leerzustand-Zweig ruft grid.removeAttribute auf) -
+      // ohne diesen Beweis waere ein "gridTouched bleibt false" unten wertlos.
+      mealsUi.renderWeekGridForTest(testContainer);
+      assert(gridTouched === true,
+        'Testaufbau fehlerhaft: ein echter renderWeekGrid()-Durchlauf muss das Grid beruehren, sonst beweist der Test unten nichts');
+
+      gridTouched = false;
+      globalThis.document = { activeElement: strayCard };
+      mealsUi.onNarrowWeekLabelQueryChange();
+
+      assert(gridTouched === false,
+        'onNarrowWeekLabelQueryChange() darf das Wochengitter NICHT anfassen - das rebuildet Karten, Stagger und Scroll unnoetig (Runde 4, Should-fix 2)');
+      assert(globalThis.document.activeElement === strayCard,
+        'onNarrowWeekLabelQueryChange() darf den Fokus nicht verschieben - ein Grid-Rebuild waere genau der Weg, ueber den main den Fokus verliert');
+      assert(todayBtn.classList.contains('is-current') === true,
+        'onNarrowWeekLabelQueryChange() muss trotzdem syncTodayButton() ausfuehren - nur das Grid bleibt unberuehrt, nicht Label/Reset');
+    } finally {
+      mealsUi.state.currentWeek = zuvorWeek;
+      mealsUi.state.meals = zuvorMeals;
+      mealsUi.state.loadError = zuvorError;
+      globalThis.document = zuvorDocument;
+    }
+  });
+});
+
+// PR #1200 Review Runde 4, Nice-to-have 3b: der bestehende Test oben ruft
+// `onNarrowWeekLabelQueryChange()` direkt auf - das prueft, dass der Handler
+// TUT, was er soll, aber nicht, dass er ueberhaupt an ein echtes
+// `matchMedia(...)`-Change-Ereignis gebunden ist. Ein geloeschtes
+// `addEventListener('change', ...)` in meals.js liesse `test:meals` komplett
+// gruen, weil kein Test je einen echten Aufruf des Verdrahtungs-Einzeilers
+// beobachtet. Dieser Test importiert das Modul FRISCH (Cache-Buster in der
+// Spezifizierer-Query, dasselbe Muster wie test-nav-badges.js/
+// test-overlay-history.js) gegen ein `window.matchMedia`, dessen
+// `addEventListener` selbst ein Spion ist - nur ein echter Modul-Top-Level-
+// Aufruf von `addEventListener('change', ...)` erzeugt hier einen Treffer.
+const _narrowWeekLabelListenerCalls = await (async () => {
+  const calls = [];
+  const zuvorWindow = globalThis.window;
+  globalThis.window = {
+    matchMedia: (query) => ({
+      matches: false,
+      addEventListener(type, handler) { calls.push({ query, type, handler }); },
+    }),
+  };
+  try {
+    await import(`../public/pages/meals.js?narrow-week-label-listener-probe=${process.pid}-${Date.now()}`);
+  } finally {
+    globalThis.window = zuvorWindow;
+  }
+  return calls;
+})();
+
+test('meals.js registriert onNarrowWeekLabelQueryChange() wirklich per matchMedia(...).addEventListener() (Runde 4, Nice-to-have 3b)', () => {
+  assert(_narrowWeekLabelListenerCalls.length === 1,
+    `erwartet genau eine addEventListener()-Registrierung beim Modul-Import, erhalten: ${_narrowWeekLabelListenerCalls.length}. ` +
+    'Eine geloeschte addEventListener-Zeile in meals.js waere hier 0, nicht 1.');
+  const [call] = _narrowWeekLabelListenerCalls;
+  assert(call.query === '(max-width: 639px)',
+    `erwartet die Anmeldung auf "(max-width: 639px)", erhalten: "${call.query}"`);
+  assert(call.type === 'change',
+    `erwartet ein "change"-Ereignis, erhalten: "${call.type}"`);
+  assert(typeof call.handler === 'function',
+    'der registrierte Handler muss eine Funktion sein (onNarrowWeekLabelQueryChange)');
+});
+
 // --------------------------------------------------------
 // Ergebnis
 // --------------------------------------------------------

@@ -264,6 +264,44 @@
     order: -1;
   }
 
+  /* PR #1200 Review Runde 4, Should-fix 1: „Heute" bekommt unter 640px eine
+   * EIGENE Zeile, statt sich die erste mit „<", dem Label und „>" zu teilen.
+   *
+   * Bis hierher (Runde 3) reservierte das Label immer nur den Platz, der nach
+   * Pfeilen UND Reset-Knopf übrig blieb - fest genug, damit „>" beim
+   * Auftauchen/Verschwinden von „Heute" nicht wandert (Runde-3-Fix), aber zu
+   * knapp: der reservierte Reset-Slot skaliert mit dem übersetzten Wort
+   * ("Aujourd'hui" 101.5px, "Сьогодні" 87.2px gegen "Heute" 65.7px, gemessen),
+   * und bei 320px blieb dem Label in fr/uk zu wenig Raum fuer BEIDE
+   * Wochenenden - der Ellipsis-Notnagel aus Runde 3 schnitt dann das
+   * Enddatum lautlos ab, statt nur ueberzulaufenden Text zu verstecken.
+   *
+   * Der Reset-Knopf wandert deshalb hier auf eine zweite Zeile. `order`
+   * reicht nicht, weil `.week-nav` sonst genauso schmal umbrechen wuerde wie
+   * vorher; erst `flex-basis: 100%` erzwingt, dass er NIE neben Pfeilen und
+   * Label passt und darum IMMER umbricht - unabhaengig von Sprache, Wortlaenge
+   * oder Sichtbarkeitszustand. Das Label bekommt dadurch immer die volle
+   * Zeile abzueglich der beiden Pfeile, nie abzueglich des Reset-Knopfs - der
+   * Engpass, der die zwei Enddaten kostete, existiert damit strukturell nicht
+   * mehr, in keiner Sprache und keiner Woche (auch nicht bei einem
+   * Monatswechsel innerhalb der Woche).
+   *
+   * Preis: „Heute" steht bei 320-639px nicht mehr auf derselben Zeile wie die
+   * Pfeile (die #1164-Anordnung oben gilt nur noch fuer breitere Bildschirme).
+   * Der reservierte Slot bleibt trotzdem `.is-current`-gesteuert (visibility,
+   * nicht `hidden`) - die zweite Zeile bleibt also immer gleich hoch, ob der
+   * Knopf sichtbar ist oder nicht, und die Pfeile ruckeln beim Wechsel weiterhin
+   * nicht. */
+  .week-nav {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .week-nav__today {
+    flex-basis: 100%;
+    order: 1;
+  }
+
   .week-grid {
     /* FAB-Clearance: genug Raum, damit der schwebende FAB nicht den letzten
      * „+ Mahlzeit"-Button des Wochenscrolls verdeckt (Audit F3). Das Token

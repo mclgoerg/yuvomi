@@ -121,9 +121,19 @@ function formatWeekLabel(monday) {
  * `_container?.isConnected` (wie beim Fokus-Rueckstoss weiter unten) haelt den
  * Listener nach einer Navigation weg von /meals stumm - ohne die Prüfung
  * rendert er in einen Container, den niemand mehr sieht.
+ *
+ * PR #1200 Review Runde 4, Should-fix 2: hier stand `renderWeekGrid()` statt
+ * `updateWeekLabel()` - eine Bildschirmdrehung ueber die 640px-Schwelle riss
+ * damit das GANZE Wochengitter neu auf (jede Karte, den Stagger, den Scroll
+ * zur heutigen Spalte), obwohl nur das Label ein anderes Format braucht.
+ * Stand der Fokus auf einer Mahlzeit-Karte, landete er nach dem Neuaufbau auf
+ * `<body>` - eine Kartenreferenz, die `renderWeekGrid()` wegwirft, ueberlebt
+ * den Wechsel nicht. `updateWeekLabel()` ruehrt nur `#week-label` und den
+ * Reset-Knopf an, beide unabhaengig vom Karten-DOM - der Fokus bleibt daher
+ * unberuehrt, wo immer er gerade steht.
  */
 function onNarrowWeekLabelQueryChange() {
-  if (_container?.isConnected) renderWeekGrid();
+  if (_container?.isConnected) updateWeekLabel();
 }
 const _narrowWeekLabelQuery = typeof window !== 'undefined' ? window.matchMedia?.(NARROW_WEEK_LABEL_QUERY) ?? null : null;
 _narrowWeekLabelQuery?.addEventListener('change', onNarrowWeekLabelQueryChange);
@@ -450,13 +460,24 @@ function wireRailToggle() {
 // Wochengitter
 // --------------------------------------------------------
 
+/**
+ * Aktualisiert NUR Label und Reset-Knopf der Wochen-Navigation - ohne das
+ * Wochengitter anzufassen. Eigene Funktion statt zweier Zeilen inline in
+ * `renderWeekGrid()` (PR #1200 Review Runde 4, Should-fix 2): der
+ * Breakpoint-Handler unten braucht GENAU diese zwei Zeilen, keine der
+ * Karten-Neuaufbauten, die im Rest von `renderWeekGrid()` folgen.
+ */
+function updateWeekLabel() {
+  const label = _container?.querySelector('#week-label');
+  if (label) label.textContent = formatWeekLabel(state.currentWeek);
+  syncTodayButton();
+}
+
 function renderWeekGrid() {
   const grid = _container.querySelector('#week-grid');
   if (!grid) return;
 
-  _container.querySelector('#week-label').textContent =
-    formatWeekLabel(state.currentWeek);
-  syncTodayButton();
+  updateWeekLabel();
 
   // Fehlgeschlagene Woche: Fehlerzustand statt Leerzustand. Muss VOR der
   // Leer-Prüfung stehen - `state.meals` ist nach einem Fehler ebenfalls leer,

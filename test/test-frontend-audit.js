@@ -17258,3 +17258,24 @@ test('.btn.is-current blendet per visibility aus, nicht per display (PR #1200 Re
   assert.doesNotMatch(rule.body, /display:\s*none/,
     '.btn.is-current darf nicht display:none setzen - das nimmt die Box aus dem Fluss und laesst "›" wieder wandern (Runde-1-Regression)');
 });
+
+// PR #1200 Review Runde 4, Nice-to-have 3a: keine Suite pinnte den
+// CSS-MECHANISMUS fest, der verhindert, dass ueberlaufender Wochen-Text unter
+// "›" hinweg gemalt wird. Der Reviewer hat gegengeprueft: `overflow: hidden;`
+// und `text-overflow: ellipsis;` aus `.week-nav__label` entfernt, und
+// test:meals, test:frontend-audit und test:mobile-scroll-layout blieben ALLE
+// gruen - das waere die Rueckkehr der Runde-3-Regression (34px Text unter dem
+// Pfeil in fr, 20px in uk, beides gemessen), von keiner Suite bemerkt. Dieser
+// Test pinnt jetzt GENAU DIESEN Mechanismus fest, nach demselben Muster wie
+// `.btn.is-current` direkt darueber: die Regel per `eachRule()` lesen, nicht
+// den Dateitext durchsuchen (eine zufaellige Erwaehnung anderswo waere sonst
+// ein falscher gruener Treffer).
+test('.week-nav__label schneidet ueberlaufenden Text per overflow/text-overflow, statt ihn unter den Pfeil zu malen (PR #1200 Review Runde 4)', () => {
+  const meals = read('../public/styles/meals.css');
+  const rule = [...eachRule(meals)].find(({ selector }) => selector.trim() === '.week-nav__label');
+  assert.ok(rule, '.week-nav__label-Regel nicht gefunden');
+  assert.match(rule.body, /overflow:\s*hidden/,
+    '.week-nav__label muss overflow:hidden setzen - sonst malt ueberlaufender Text unter "›" (Runde-3-Regression)');
+  assert.match(rule.body, /text-overflow:\s*ellipsis/,
+    '.week-nav__label muss text-overflow:ellipsis setzen - sonst wird ueberlaufender Text kommentarlos abgeschnitten statt sichtbar gekuerzt');
+});
