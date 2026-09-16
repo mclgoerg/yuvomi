@@ -27,7 +27,7 @@ import { todayKey } from '/utils/date.js';
 import { formatDate, getLocale } from '/i18n.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
 import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines } from '/utils/inventory-warranty.js';
-import { openDetailView } from '/components/detail-view.js';
+import { openDetailView, closeDetailView } from '/components/detail-view.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { setNavBadge } from '/utils/nav-badges.js';
@@ -718,8 +718,118 @@ function trackedDateDetailEntries(item) {
       ? t('inventory.trackedDateOverdueDays', { count: Math.abs(status.days) })
       : status.days === 0 ? t('inventory.trackedDateDueToday')
       : t('inventory.trackedDateInDays', { count: status.days });
-    return { text: d.label, sub: countdown ? `${formatDate(d.date)} · ${countdown}` : formatDate(d.date) };
+    const distanceHint = d.interval_distance
+      ? t('inventory.trackedDateDistanceHint', { count: d.interval_distance, unit: item.odometer_unit || 'km' })
+      : '';
+    const sub = [countdown ? `${formatDate(d.date)} · ${countdown}` : formatDate(d.date), distanceHint]
+      .filter(Boolean).join(' · ');
+    return { text: d.label, sub };
   });
+}
+
+/**
+ * Fristen-Zeilen der Detailansicht MIT "Erledigt"-Aktion auf einer faelligen
+ * Zeile - eigener Knoten statt inventoryDetailListNode, weil dort keine
+ * Aktion je Zeile vorgesehen ist. `onDone` bekommt die einzelne getrackte
+ * Frist und loest die Abschluss-Karte aus (siehe openCompletionSheet).
+ */
+function trackedDatesDetailNode(item, onDone) {
+  const rows = item.tracked_dates || [];
+  if (!rows.length) return null;
+  const entries = trackedDateDetailEntries(item);
+  const wrap = document.createElement('div');
+  wrap.className = 'inventory-detail-list';
+  rows.forEach((d, i) => {
+    const { text, sub } = entries[i];
+    const status = dateStatus(d.date);
+    const due = !!status && status.state !== 'valid';
+
+    const line = document.createElement('div');
+    line.className = 'inventory-tracked-date-detail-row';
+    const main = document.createElement('div');
+    main.className = 'inventory-detail-list__item';
+    const span = document.createElement('span');
+    span.className = 'inventory-detail-list__text';
+    span.textContent = text;
+    main.appendChild(span);
+    if (sub) {
+      const subEl = document.createElement('span');
+      subEl.className = 'inventory-detail-list__sub';
+      subEl.textContent = sub;
+      main.appendChild(subEl);
+    }
+    line.appendChild(main);
+
+    if (due) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn--secondary btn--sm inventory-tracked-date-detail-row__done';
+      btn.textContent = t('inventory.markDoneAction');
+      btn.addEventListener('click', () => onDone(d));
+      line.appendChild(btn);
+    }
+    wrap.appendChild(line);
+  });
+  return wrap;
+}
+
+/** Eine Zeile der Verlaufs-Ansicht (Service-Log-Eintrag, verknuepfte Buchung
+ *  oder verknuepftes Dokument) - eine Zeitleiste aus drei Quellen, die es
+ *  schon gibt (server/routes/inventory/service-log.js#loadHistory). */
+function historyEntryLine(entry, odometerUnit) {
+  const line = document.createElement('div');
+  line.className = 'inventory-history-entry';
+  const main = document.createElement('div');
+  main.className = 'inventory-history-entry__main';
+
+  const label = document.createElement('span');
+  label.className = 'inventory-history-entry__label';
+  label.textContent = entry.label;
+  main.appendChild(label);
+
+  const subParts = [formatDate(entry.date)];
+  if (entry.type === 'service_log') {
+    if (entry.vendor) subParts.push(entry.vendor);
+    if (entry.odometer != null) {
+      subParts.push(t('inventory.historyOdometerValue', { count: entry.odometer, unit: odometerUnit }));
+    }
+    if (entry.note) subParts.push(entry.note);
+  } else if (entry.type === 'budget_entry') {
+    subParts.push(roleLabel(entry.role));
+  }
+  const sub = document.createElement('span');
+  sub.className = 'inventory-history-entry__sub';
+  sub.textContent = subParts.join(' · ');
+  main.appendChild(sub);
+  line.appendChild(main);
+
+  if (entry.type === 'budget_entry') {
+    const amount = document.createElement('span');
+    amount.className = 'inventory-history-entry__amount';
+    amount.textContent = formatMoney(entry.amount, _householdCurrency);
+    line.appendChild(amount);
+  }
+  return line;
+}
+
+/** Verlaufs-Knoten: Zeitleiste + Gesamtkosten - reine Anzeige, keine eigene
+ *  Datenhaltung (server-seitig eine Zusammenfuehrung, kein neuer Speicher). */
+function historyDetailNode(history, odometerUnit) {
+  if (!history || !history.timeline.length) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'inventory-history-list';
+  history.timeline.forEach((entry) => wrap.appendChild(historyEntryLine(entry, odometerUnit)));
+  if (history.total) {
+    const total = document.createElement('div');
+    total.className = 'inventory-history-total';
+    const label = document.createElement('span');
+    label.textContent = t('inventory.historyTotalLabel');
+    const value = document.createElement('span');
+    value.textContent = formatMoney(history.total, _householdCurrency);
+    total.append(label, value);
+    wrap.appendChild(total);
+  }
+  return wrap;
 }
 
 /** Detail-Vorschau: eigenes DOM-Element statt Text/Link, gleiche Rolle wie
@@ -742,7 +852,7 @@ function photoDetailNode(photoData) {
  * (detailRowEl), also keine Fallunterscheidung hier noetig.
  * @returns {Array} Sections fuer openDetailView
  */
-function renderItemDetail(item) {
+function renderItemDetail(item, history, onDoneTrackedDate) {
   const bookingEntries = (item.linked_entries || []).map((link) => ({
     text: `${link.title} · ${formatMoney(link.amount, _householdCurrency)}`,
     sub: `${roleLabel(link.role)} · ${formatDate(link.date)}`,
@@ -768,13 +878,23 @@ function renderItemDetail(item) {
     // wessen Namen laeuft es.
     { icon: 'at-sign', label: t('inventory.accountUsernameLabel'), value: item.account_username || '' },
     { icon: 'shield', label: t('inventory.warrantyMonthsLabel'), value: warrantyDetailValue(item) },
+    { icon: 'gauge', label: t('inventory.odometerLabel'), value: odometerDetailValue(item) },
     { icon: 'gauge', label: t('inventory.conditionLabel'), value: t(`inventory.condition${item.condition.charAt(0).toUpperCase()}${item.condition.slice(1)}`) },
     { icon: 'info', label: t('inventory.statusLabel'), value: statusLabel(item.status) },
     { icon: 'align-left', label: t('inventory.notesLabel'), value: item.notes || '', multiline: true },
-    { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: inventoryDetailListNode(trackedDateDetailEntries(item)) },
+    { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: trackedDatesDetailNode(item, onDoneTrackedDate) },
     { icon: 'receipt', label: t('inventory.linkedBookingsLabel'), node: inventoryDetailListNode(bookingEntries) },
     { icon: 'paperclip', label: t('inventory.attachmentsLabel'), node: inventoryDetailListNode(attachmentEntries) },
+    { icon: 'history', label: t('inventory.historyLabel'), node: historyDetailNode(history, item.odometer_unit || 'km') },
   ];
+}
+
+/** Kilometerstand-Zeile: Wert + Einheit + Ablesedatum, oder leer ohne Wert. */
+function odometerDetailValue(item) {
+  if (item.odometer == null) return '';
+  const unit = t(`inventory.odometerUnit${item.odometer_unit === 'mi' ? 'Mi' : 'Km'}`);
+  const value = `${item.odometer} ${unit}`;
+  return item.odometer_on ? `${value} · ${formatDate(item.odometer_on)}` : value;
 }
 
 /**
@@ -785,14 +905,49 @@ function renderItemDetail(item) {
  * anstatt einen zweiten Weg fuer den Popover-Fall zu brauchen.
  *
  * Die Liste liefert bereits das volle Item (Anhaenge, Buchungen, Fristen) -
- * kein Einzelabruf noetig, anders als bei Kontakten.
+ * kein Einzelabruf noetig, anders als bei Kontakten. Die Verlaufs-Ansicht ist
+ * ein eigener Endpunkt (server/routes/inventory/service-log.js#loadHistory,
+ * reine Aggregation, kein Teil des Item-Datensatzes) und wird deshalb separat
+ * nachgeladen, bevor die Ansicht aufgeht.
  */
-function openItemDetail(item) {
+async function openItemDetail(item) {
+  let history = null;
+  try {
+    const res = await api.get(`/inventory/items/${item.id}/history`);
+    history = res.data;
+  } catch (err) {
+    console.error('[Inventory] Verlauf konnte nicht geladen werden:', err);
+  }
+
+  const onDoneTrackedDate = async (trackedDate) => {
+    // Die Detailansicht MUSS zu sein, BEVOR die Abschluss-Karte aufgeht: beide
+    // sind openModal()-Overlays, und ein zweiter Overlay ueber einem noch
+    // offenen zwingt dessen erzwungenes Schliessen (modal.js#openModal) - das
+    // reisst die Verlaufs-/Zurueck-Verwaltung der Detailansicht
+    // (overlay-history.js) mit, und die gerade erst geoeffnete Karte faellt
+    // im selben Zug wieder zu.
+    await closeDetailView({ force: true });
+    const completed = await openCompletionSheet(item, trackedDate);
+    if (completed) {
+      await loadItems();
+      renderList();
+      updateAttentionBadge();
+    }
+    // Ein voller Neu-Öffnen ist einfacher und robuster als ein In-Place-Update
+    // der Detailansicht - openDetailView bietet dafür keine Aktualisierungs-API,
+    // und das Item hat sich bei einem Abschluss an mehreren Stellen zugleich
+    // geändert (Frist, Erinnerung, ggf. Kilometerstand, Verlauf). Ohne
+    // Abschluss (abgebrochen) geht dieselbe, unveränderte Ansicht wieder auf.
+    const refreshed = (completed && state.items.find((i) => i.id === item.id)) || item;
+    await openItemDetail(refreshed);
+    refocusAfterRender();
+  };
+
   openDetailView({
     title: item.name,
     accentColor: 'var(--module-inventory)',
     size: 'md',
-    sections: renderItemDetail(item),
+    sections: renderItemDetail(item, history, onDoneTrackedDate),
     actions: [{
       id: 'inventory-detail-delete',
       label: t('common.delete'),
@@ -813,6 +968,83 @@ function openItemDetail(item) {
         form.wire(panel);
       },
     },
+  });
+}
+
+/**
+ * Abschluss-Karte fuer eine faellige getrackte Frist ("Erledigt"): Datum
+ * (Vorgabe heute), Kilometerstand, Haendler, Notiz - alle bis auf das Datum
+ * optional. Eigenes kleines Formular statt buildItemForm-Musters, weil es
+ * nichts mit dem Item-Formular teilt.
+ * @returns {Promise<boolean>} true, wenn die Frist erledigt wurde
+ */
+function openCompletionSheet(item, trackedDate) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = (result) => { if (!settled) { settled = true; resolve(result); } };
+
+    const content = `
+      <div class="form-group">
+        <label class="form-label" for="inv-complete-date">${esc(t('inventory.completePerformedOnLabel'))}</label>
+        <yuvomi-datepicker id="inv-complete-date" type="date" value="${esc(todayKey())}"></yuvomi-datepicker>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="inv-complete-odometer">${esc(t('inventory.odometerLabel'))}</label>
+        <input id="inv-complete-odometer" class="form-input" type="number" min="0" step="1" inputmode="numeric">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="inv-complete-vendor">${esc(t('inventory.vendorLabel'))}</label>
+        <input id="inv-complete-vendor" class="form-input" type="text">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="inv-complete-note">${esc(t('inventory.notesLabel'))}</label>
+        <textarea id="inv-complete-note" class="form-input" rows="3"></textarea>
+      </div>
+      <div class="modal-panel__footer modal-panel__footer--plain">
+        <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
+        <button type="button" class="btn btn--primary" id="inv-complete-save">${esc(t('inventory.markDoneAction'))}</button>
+      </div>`;
+
+    openSharedModal({
+      title: t('inventory.completeSheetTitle', { label: trackedDate.label }),
+      size: 'sm',
+      content,
+      onSave: (panel) => {
+        panel.querySelector('.modal-panel__footer [data-action="close-modal"]')
+          ?.addEventListener('click', () => { closeSharedModal(); });
+        panel.querySelector('#inv-complete-save').addEventListener('click', async () => {
+          const saveBtn = panel.querySelector('#inv-complete-save');
+          const performedOn = panel.querySelector('#inv-complete-date').value;
+          if (!performedOn) return;
+          const odometerRaw = panel.querySelector('#inv-complete-odometer').value.trim();
+          const payload = {
+            performed_on: performedOn,
+            odometer: odometerRaw === '' ? null : Number(odometerRaw),
+            vendor: panel.querySelector('#inv-complete-vendor').value.trim() || null,
+            note: panel.querySelector('#inv-complete-note').value.trim() || null,
+          };
+          saveBtn.disabled = true;
+          try {
+            await api.post(`/inventory/items/${item.id}/dates/${trackedDate.id}/complete`, payload);
+            // ERST settle(true), DANN das Modal schliessen: das Schliessen
+            // loest selbst den registrierten onClose-Callback aus (modal.js),
+            // auch bei einem erfolgreichen, selbst ausgeloesten Schliessen -
+            // ohne diese Reihenfolge wuerde dessen settle(false) zuerst
+            // greifen (settle() ist idempotent, "wer zuerst kommt" gewinnt)
+            // und der Abschluss saehe fuer den Aufrufer wie ein Abbruch aus,
+            // obwohl die Frist bereits serverseitig erledigt ist.
+            settle(true);
+            await closeSharedModal({ force: true });
+            window.yuvomi?.showToast(t('inventory.completed'), 'success');
+          } catch (err) {
+            saveBtn.disabled = false;
+            window.yuvomi?.showToast(err.data?.error ?? t('common.errorGeneric'), 'danger');
+          }
+        });
+        if (window.lucide) window.lucide.createIcons({ el: panel });
+      },
+      onClose: () => settle(false),
+    });
   });
 }
 
@@ -1077,7 +1309,9 @@ function updateWarrantyStatus(panel) {
   }
 }
 
-function trackedDateRowHtml({ label = '', date = '', reminder_offset_days = 30 } = {}) {
+function trackedDateRowHtml({
+  label = '', date = '', reminder_offset_days = 30, interval_months = '', interval_distance = '',
+} = {}) {
   return `
     <div class="inventory-tracked-date-row" data-tracked-date-row>
       <input class="form-input js-tracked-date-label" type="text" maxlength="100"
@@ -1090,6 +1324,16 @@ function trackedDateRowHtml({ label = '', date = '', reminder_offset_days = 30 }
               aria-label="${esc(t('inventory.removeTrackedDateAction'))}">
         <i data-lucide="x" class="icon-md" aria-hidden="true"></i>
       </button>
+      <div class="inventory-tracked-date-row__intervals">
+        <input class="form-input js-tracked-date-interval-months" type="number" min="1" max="600" step="1"
+               placeholder="${esc(t('inventory.trackedDateIntervalMonthsPlaceholder'))}"
+               aria-label="${esc(t('inventory.trackedDateIntervalMonthsLabel'))}"
+               value="${interval_months === null ? '' : esc(String(interval_months))}">
+        <input class="form-input js-tracked-date-interval-distance" type="number" min="1" step="1"
+               placeholder="${esc(t('inventory.trackedDateIntervalDistancePlaceholder'))}"
+               aria-label="${esc(t('inventory.trackedDateIntervalDistanceLabel'))}"
+               value="${interval_distance === null ? '' : esc(String(interval_distance))}">
+      </div>
     </div>`;
 }
 
@@ -1150,10 +1394,16 @@ function collectTrackedDates(panel) {
     // (input min="0", Server-Validator >= 0, DB-CHECK BETWEEN 0 AND 365).
     const rawOffset = row.querySelector('.js-tracked-date-offset').value.trim();
     const offset = Number(rawOffset);
+    const rawIntervalMonths = row.querySelector('.js-tracked-date-interval-months').value.trim();
+    const rawIntervalDistance = row.querySelector('.js-tracked-date-interval-distance').value.trim();
     return {
       label: row.querySelector('.js-tracked-date-label').value.trim(),
       date: row.querySelector('.js-tracked-date-date').value || null,
       reminder_offset_days: rawOffset === '' || !Number.isFinite(offset) ? 30 : offset,
+      // Leer bleibt NULL (heutiges Einmal-Verhalten) - kein Default wie beim
+      // Vorlauf oben, siehe server/routes/inventory/item-dates.js.
+      interval_months: rawIntervalMonths === '' ? null : Number(rawIntervalMonths),
+      interval_distance: rawIntervalDistance === '' ? null : Number(rawIntervalDistance),
     };
   }).filter((d) => d.label && d.date);
 }
@@ -1295,6 +1545,24 @@ function buildItemForm({ mode, item = null }) {
             <select id="inv-condition" class="form-input">${conditionOptions}</select>
           </div>
         </div>
+        <div class="inventory-form-row">
+          <div class="form-group">
+            <label class="form-label" for="inv-odometer">${esc(t('inventory.odometerLabel'))}</label>
+            <input id="inv-odometer" class="form-input" type="number" min="0" step="1" inputmode="numeric">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inv-odometer-unit">${esc(t('inventory.odometerUnitLabel'))}</label>
+            <select id="inv-odometer-unit" class="form-input">
+              <option value="km">${esc(t('inventory.odometerUnitKm'))}</option>
+              <option value="mi">${esc(t('inventory.odometerUnitMi'))}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="inv-odometer-on">${esc(t('inventory.odometerOnLabel'))}</label>
+            <yuvomi-datepicker id="inv-odometer-on" type="date"
+                               value="${esc(isEdit && item.odometer_on ? item.odometer_on : '')}"></yuvomi-datepicker>
+          </div>
+        </div>
         <div class="form-group">
           <span class="form-label">${esc(t('inventory.trackedDatesLabel'))}</span>
           <p class="inventory-tracked-dates-hint">${esc(t('inventory.trackedDatesHint'))}</p>
@@ -1318,7 +1586,13 @@ function buildItemForm({ mode, item = null }) {
           label: t('inventory.attachmentsLabel'),
           hint: t('inventory.attachmentsHint'),
         })}`,
-      { open: isEdit && (!!item.brand || !!item.model || !!item.serial_number || !!item.notes || !!item.photo_data || (item.attachments?.length ?? 0) > 0) })}
+      {
+        open: isEdit && (!!item.brand || !!item.model || !!item.serial_number || !!item.notes
+          || !!item.photo_data || (item.attachments?.length ?? 0) > 0
+          // Kilometerstand auf einen Blick zeigen: entweder schon gesetzt,
+          // oder die Kategorie, fuer die er am haeufigsten gebraucht wird.
+          || item.odometer != null || item.category === 'vehicles'),
+      })}
       <div class="modal-panel__footer modal-panel__footer--plain">
         ${isEdit ? `<button type="button" class="btn btn--danger-ghost" id="inv-delete">${esc(t('common.delete'))}</button>` : ''}
         <button type="button" class="btn btn--secondary" data-action="close-modal">${esc(t('common.cancel'))}</button>
@@ -1339,6 +1613,8 @@ function buildItemForm({ mode, item = null }) {
     panel.querySelector('#inv-warranty').value = isEdit && item.warranty_months != null ? String(item.warranty_months) : '';
     panel.querySelector('#inv-condition').value = isEdit ? item.condition : 'good';
     panel.querySelector('#inv-notes').value = isEdit && item.notes ? item.notes : '';
+    panel.querySelector('#inv-odometer').value = isEdit && item.odometer != null ? String(item.odometer) : '';
+    panel.querySelector('#inv-odometer-unit').value = isEdit && item.odometer_unit ? item.odometer_unit : 'km';
 
     updateWarrantyStatus(panel);
     panel.querySelector('#inv-purchase-date').addEventListener('input', () => updateWarrantyStatus(panel));
@@ -1483,6 +1759,7 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
 
   const priceRaw = panel.querySelector('#inv-purchase-price').value.trim();
   const warrantyRaw = panel.querySelector('#inv-warranty').value.trim();
+  const odometerRaw = panel.querySelector('#inv-odometer').value.trim();
 
   const payload = {
     name,
@@ -1501,6 +1778,9 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     notes: panel.querySelector('#inv-notes').value.trim() || null,
     tracked_dates: collectTrackedDates(panel),
     photo_data: photoData,
+    odometer: odometerRaw === '' ? null : Number(odometerRaw),
+    odometer_unit: odometerRaw === '' ? null : panel.querySelector('#inv-odometer-unit').value,
+    odometer_on: panel.querySelector('#inv-odometer-on').value || null,
   };
 
   saveBtn.disabled = true;
