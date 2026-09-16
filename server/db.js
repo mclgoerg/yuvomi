@@ -8354,6 +8354,60 @@ const MIGRATIONS = [
       CREATE INDEX idx_reminders_assigned_from ON reminders(assigned_from);
     `,
   },
+  {
+    version: 210,
+    description: 'Health: preventive care & vaccinations log (household type registry + per-person records)',
+    up: `
+      -- Haushalts-Register der Vorsorge-Arten (D2) - NICHTS VORBEFUELLT.
+      -- docs/SCOPE.md schliesst mitgelieferte Kataloge aus, die veralten
+      -- (deutsche U-Untersuchungen etc.); der Haushalt legt seine eigenen an.
+      CREATE TABLE health_prevention_types (
+        id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+        key                     TEXT    UNIQUE NOT NULL,
+        name                    TEXT    NOT NULL,
+        kind                    TEXT    NOT NULL CHECK (kind IN ('vaccination', 'checkup')),
+        default_interval_months INTEGER CHECK (default_interval_months IS NULL OR (default_interval_months BETWEEN 1 AND 600)),
+        icon                    TEXT    NOT NULL DEFAULT 'syringe',
+        sort_order              INTEGER NOT NULL DEFAULT 0,
+        created_at              TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+
+      -- Das eine Modell fuer Impfung UND Vorsorgeuntersuchung (D1) - eine
+      -- Tetanus-Auffrischung alle 10 Jahre und ein Zahnarzttermin alle 6 Monate
+      -- sind dieselbe Zeile: Person + Art + wann es war + Intervall zum
+      -- naechsten Mal. Zwei Tabellen wuerden docs/DECISIONS.md #6 ("ein
+      -- Modell, nicht zwei") erneut aufmachen.
+      CREATE TABLE health_prevention_records (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id              INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        type_id              INTEGER REFERENCES health_prevention_types(id) ON DELETE SET NULL,
+        -- Momentaufnahme/Ausweich-Name: bleibt lesbar, wenn der Typ umbenannt
+        -- oder geloescht wird (SET NULL oben) - Loeschen eines Typs darf seine
+        -- Historie nicht mitreissen.
+        name                 TEXT,
+        given_on             TEXT    NOT NULL,
+        dose_number          INTEGER,
+        batch                TEXT,
+        provider             TEXT,
+        note                 TEXT,
+        -- NULL = der Typ-Standard gilt; ein Wert hier ueberschreibt ihn nur
+        -- fuer DIESEN Datensatz.
+        interval_months      INTEGER CHECK (interval_months IS NULL OR (interval_months BETWEEN 1 AND 600)),
+        -- Explizite Faelligkeit; NULL = aus given_on + Intervall abgeleitet
+        -- (server/services/prevention-due.js, die einzige Stelle, die das rechnet).
+        next_due_on          TEXT,
+        -- NULL = Modul-Standard (30 Tage, DEFAULT_REMINDER_OFFSET_DAYS).
+        reminder_offset_days INTEGER CHECK (reminder_offset_days IS NULL OR (reminder_offset_days BETWEEN 0 AND 365)),
+        visibility           TEXT    NOT NULL CHECK (visibility IN ('private', 'family')),
+        created_by           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at           TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at           TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE TRIGGER trg_health_prevention_records_updated_at AFTER UPDATE ON health_prevention_records FOR EACH ROW BEGIN
+        UPDATE health_prevention_records SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
+      CREATE INDEX idx_health_prevention_records_user_date ON health_prevention_records(user_id, given_on);
+    `,
+  },
 ];
 
 /**

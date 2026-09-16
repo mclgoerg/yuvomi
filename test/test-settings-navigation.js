@@ -143,7 +143,7 @@ test('die Blätter verteilen sich wie beschlossen auf die vier Domänen', () => 
   // aus dem geteilten Toggle-Primitiv zulaesst, kein Zahlenfeld.
   const perDomain = {};
   for (const leaf of SETTINGS_LEAVES) perDomain[leaf.domainId] = (perDomain[leaf.domainId] ?? 0) + 1;
-  assert.deepEqual(perDomain, { personal: 11, modules: 6, sync: 5, admin: 8 });
+  assert.deepEqual(perDomain, { personal: 11, modules: 7, sync: 5, admin: 8 });
   // Jedes Blatt hängt an einer existierenden Domäne.
   const domainIds = new Set(SETTINGS_DOMAINS.map((domain) => domain.id));
   for (const leaf of SETTINGS_LEAVES) {
@@ -346,18 +346,28 @@ test('Mitglieder erreichen ihr eigenes Zyklus-Opt-out (#760)', () => {
   assert.equal(findSettingsLeaf('/settings/modules/options', member), null);
 });
 
-test('drei Ein-Schalter-Blätter teilen sich jetzt eines', () => {
+test('zwei Ein-Schalter-Blätter teilen sich jetzt eines', () => {
   // Budget, Gesundheit und Haushaltshilfe trugen zusammen drei Checkboxen und
   // kosteten drei Sidebar-Einträge und drei Requests (Critique 2026-07-27).
+  // Gesundheit ist seither wieder raus (siehe Test direkt darunter): Package B
+  // gab `/settings/modules/health` eigenen Inhalt zurück (das Vorsorge-
+  // Typregister) - der Haushalts-Schalter selbst bleibt trotzdem in `modules-options`.
   for (const legacyPath of [
     '/settings/modules/budget',
-    '/settings/modules/health',
     '/settings/modules/housekeeping',
   ]) {
     assert.equal(currentSettingsPath(legacyPath), '/settings/modules/options');
     assert.equal(findSettingsLeaf(legacyPath, admin)?.id, 'modules-options');
     assert.equal(findSettingsLeaf(legacyPath, member), null);
   }
+});
+
+test('/settings/modules/health führt zum Vorsorge-Typregister, nicht mehr zu modules-options (Package B)', () => {
+  assert.equal(currentSettingsPath('/settings/modules/health'), '/settings/modules/health');
+  const leaf = findSettingsLeaf('/settings/modules/health', admin);
+  assert.equal(leaf?.id, 'modules-health');
+  assert.equal(leaf?.module, 'health');
+  assert.equal(findSettingsLeaf('/settings/modules/health', member), null, 'bleibt adminOnly');
 });
 
 test('legacy settings tabs migrate to their new destinations', () => {

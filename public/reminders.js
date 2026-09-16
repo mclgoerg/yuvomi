@@ -175,6 +175,7 @@ const REMINDER_ORIGINS = {
   schedule_extra_entry:   { accent: 'var(--module-schedule)',  icon: 'calendar-clock', labelKey: 'nav.schedule' },
   waste_pickup:           { accent: 'var(--module-waste)',     icon: 'trash-2',      labelKey: 'nav.waste' },
   document_expiry:        { accent: 'var(--module-documents)', icon: 'calendar-clock', labelKey: 'nav.documents' },
+  health_prevention_due:  { accent: 'var(--module-health)',    icon: 'syringe',      labelKey: 'health.tabs.prevention' },
 };
 
 function createOriginSeal(entityType) {

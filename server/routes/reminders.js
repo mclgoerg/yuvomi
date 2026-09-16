@@ -16,7 +16,7 @@ import { tokenAllows } from '../scopes.js';
 const log    = createLogger('Reminders');
 const router = express.Router();
 
-const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry'];
+const VALID_ENTITY_TYPES = ['task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry', 'health_prevention_due'];
 
 /**
  * Nach jedem Schreibvorgang an den Erinnerungen eines Termins: die Zugewiesenen
@@ -80,10 +80,15 @@ function syncEventFanout(entityType, entityId, userId) {
  * sind beide keine gespeicherte Zeile, an die man von Hand eine Erinnerung
  * hängen könnte.
  *
+ * `health_prevention_due` gehört ebenfalls dazu: server/services/prevention-reminders.js
+ * stellt sie bei jedem periodischen Lauf, nach jedem Schreiben eines Eintrags
+ * und nach jeder Betreuungs-Änderung neu her - ein von Hand gesetzter Termin
+ * wäre binnen einer Minute weg, wie bei `pantry_item`.
+ *
  * Die LESEWEGE (GET) kennen alle Typen weiter: der Erinnerungs-Toast muss eine
  * abgeleitete Meldung anzeigen und wegwischen können.
  */
-const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup'];
+const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'health_prevention_due'];
 
 /* DIESER ROUTER IST EINE MISCHSTELLE, UND SEIN PFAD SAGT DAS NICHT.
  *
@@ -121,6 +126,7 @@ const ORIGIN_MODULE = Object.freeze({
   schedule_extra_entry:   'schedule',
   waste_pickup:           'waste',
   document_expiry:        'documents',
+  health_prevention_due:  'health',
 });
 
 /**
@@ -198,6 +204,11 @@ router.get('/pending', (req, res) => {
             WHERE e.id = r.entity_id
           )
           WHEN 'document_expiry' THEN (SELECT name FROM family_documents WHERE id = r.entity_id)
+          WHEN 'health_prevention_due' THEN (
+            SELECT COALESCE(t.name, pr.name) FROM health_prevention_records pr
+            LEFT JOIN health_prevention_types t ON t.id = pr.type_id
+            WHERE pr.id = r.entity_id
+          )
         END AS entity_title
       FROM reminders r
       WHERE r.created_by  = ?

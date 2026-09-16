@@ -42,9 +42,9 @@ const {
 // --------------------------------------------------------
 // health-tabs.js: Konstanten & Tab-Definitionen
 // --------------------------------------------------------
-test('HEALTH_ROUTES enthält die sechs Sub-Routen in kanonischer Reihenfolge', () => {
+test('HEALTH_ROUTES enthält die sieben Sub-Routen in kanonischer Reihenfolge', () => {
   assert.deepEqual(HEALTH_ROUTES, [
-    '/health', '/health/vitals', '/health/cycle', '/health/meds', '/health/labs', '/health/activity',
+    '/health', '/health/vitals', '/health/cycle', '/health/meds', '/health/prevention', '/health/labs', '/health/activity',
   ]);
 });
 
@@ -56,25 +56,25 @@ test('HEALTH_STORAGE_KEY ist korrekt', () => {
   assert.equal(HEALTH_STORAGE_KEY, 'yuvomi-health-tab');
 });
 
-test('HEALTH_TABS(): sechs Tabs mit passenden Routen, Label-Keys und Icons', () => {
+test('HEALTH_TABS(): sieben Tabs mit passenden Routen, Label-Keys und Icons', () => {
   const tabs = HEALTH_TABS();
-  assert.equal(tabs.length, 6);
+  assert.equal(tabs.length, 7);
   assert.deepEqual(tabs.map((tab) => tab.route), HEALTH_ROUTES);
   assert.deepEqual(tabs.map((tab) => tab.labelKey), [
     'health.tabs.overview', 'health.tabs.vitals', 'health.tabs.cycle',
-    'health.tabs.meds', 'health.tabs.labs', 'health.tabs.activity',
+    'health.tabs.meds', 'health.tabs.prevention', 'health.tabs.labs', 'health.tabs.activity',
   ]);
   assert.deepEqual(tabs.map((tab) => tab.icon), [
-    'heart-pulse', 'activity', 'droplet', 'pill', 'flask-conical', 'dumbbell',
+    'heart-pulse', 'activity', 'droplet', 'pill', 'syringe', 'flask-conical', 'dumbbell',
   ]);
 });
 
 test('HEALTH_TABS({ cycleEnabled: false }): blendet den Zyklus-Tab aus', () => {
   const tabs = HEALTH_TABS({ cycleEnabled: false });
-  assert.equal(tabs.length, 5);
+  assert.equal(tabs.length, 6);
   assert.ok(!tabs.some((tab) => tab.route === '/health/cycle'), 'kein Zyklus-Tab');
   assert.deepEqual(tabs.map((tab) => tab.route), [
-    '/health', '/health/vitals', '/health/meds', '/health/labs', '/health/activity',
+    '/health', '/health/vitals', '/health/meds', '/health/prevention', '/health/labs', '/health/activity',
   ]);
 });
 
@@ -183,8 +183,8 @@ test('i18n: nav.health, shortcuts.goHealth und health.* in allen Locales', () =>
   const files = readdirSync(join(ROOT, 'public/locales')).filter((f) => f.endsWith('.json'));
   assert.ok(files.length >= 20, 'erwartet mindestens 20 Locales');
 
-  const tabKeys = ['overview', 'vitals', 'cycle', 'meds', 'labs', 'activity'];
-  const panels = ['overview', 'vitals', 'cycle', 'meds', 'labs', 'activity'];
+  const tabKeys = ['overview', 'vitals', 'cycle', 'meds', 'prevention', 'labs', 'activity'];
+  const panels = ['overview', 'vitals', 'cycle', 'meds', 'prevention', 'labs', 'activity'];
 
   for (const file of files) {
     const data = JSON.parse(read(join('public/locales', file)));
