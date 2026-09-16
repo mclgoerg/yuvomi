@@ -226,6 +226,45 @@ test('POST /items: photo_data ohne gueltigen Bild-MIME-Typ -> 400', async () => 
   assert.equal(r.status, 400);
 });
 
+// --------------------------------------------------------
+// odometer / odometer_unit / odometer_on (Proposal 5, Paket C)
+// --------------------------------------------------------
+test('POST /items: odometer wird mit Einheit und Ablesedatum gespeichert', async () => {
+  const r = await call('POST', '/items', {
+    name: 'Auto', category: 'vehicles', odometer: 50000, odometer_unit: 'mi', odometer_on: '2026-09-01',
+  });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.data.odometer, 50000);
+  assert.equal(r.body.data.odometer_unit, 'mi');
+  assert.equal(r.body.data.odometer_on, '2026-09-01');
+});
+
+test('POST /items: odometer ohne explizite Einheit faellt auf km zurueck', async () => {
+  const r = await call('POST', '/items', { name: 'Rasenmaeher', odometer: 120 });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.data.odometer_unit, 'km');
+});
+
+test('POST /items: negativer odometer -> 400', async () => {
+  const r = await call('POST', '/items', { name: 'X', odometer: -1 });
+  assert.equal(r.status, 400);
+});
+
+test('POST /items: ungueltige odometer_unit -> 400', async () => {
+  const r = await call('POST', '/items', { name: 'X', odometer: 10, odometer_unit: 'furlongs' });
+  assert.equal(r.status, 400);
+});
+
+test('PUT /items/:id: odometer ist volles Replace - weglassen loescht es (deliberate, wie photo_data)', async () => {
+  const created = await call('POST', '/items', { name: 'Auto', odometer: 1000, odometer_unit: 'km', odometer_on: '2026-01-01' });
+  const id = created.body.data.id;
+  const withoutOdometer = await call('PUT', `/items/${id}`, { name: 'Auto' });
+  assert.equal(withoutOdometer.status, 200);
+  assert.equal(withoutOdometer.body.data.odometer, null);
+  assert.equal(withoutOdometer.body.data.odometer_unit, null);
+  assert.equal(withoutOdometer.body.data.odometer_on, null);
+});
+
 test('PUT /items/:id: photo_data ist volles Replace - weglassen loescht es', async () => {
   const validPhoto = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
   const created = await call('POST', '/items', { name: 'Item To Update', photo_data: validPhoto });
