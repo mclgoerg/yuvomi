@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The jump-to-now reset sits behind the period stepper in all three period-navigation headers,
+  and hides while the current period is on screen** (#1164). Calendar, Meals, and Budget each reset
+  their period a different way: Calendar's "Today" stood before the arrows, Meals' "Today" lived far
+  from its stepper among the content actions next to "Randomize plan" - and dropped onto a second
+  row, detached from the week it resets, on narrow screens - and only Budget had it right, behind
+  the stepper, where its code records the rule: a reset is not a navigation step. Calendar and Meals
+  now follow that rule; Budget's position is untouched. Visibility follows Calendar's rule
+  everywhere: the reset is hidden while the current period is displayed - a button that silently
+  does nothing on the current week or month tells a screen-reader user about a control that has no
+  effect - and it keeps its slot: hiding it now toggles `visibility` and `inert` on a class, not the
+  `hidden` attribute, so its box stays in the layout and the arrow next to it never moves, whether
+  the reset is showing or not. Toggling the reset's own visibility no longer changes header height
+  at any width by itself; a header can still change height between two periods for reasons that
+  have nothing to do with this reset (a label whose text wraps differently at very narrow widths,
+  for one, on both this branch and main), and that is unchanged by this fix.
+
 ## [2.67.0] - 2026-09-16
 
 ### Added
@@ -159,21 +177,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **The jump-to-now reset sits behind the period stepper in all three period-navigation headers,
-  and hides while the current period is on screen** (#1164). Calendar, Meals, and Budget each reset
-  their period a different way: Calendar's "Today" stood before the arrows, Meals' "Today" lived far
-  from its stepper among the content actions next to "Randomize plan" - and dropped onto a second
-  row, detached from the week it resets, on narrow screens - and only Budget had it right, behind
-  the stepper, where its code records the rule: a reset is not a navigation step. Calendar and Meals
-  now follow that rule; Budget's position is untouched. Visibility follows Calendar's rule
-  everywhere: the reset is hidden while the current period is displayed - a button that silently
-  does nothing on the current week or month tells a screen-reader user about a control that has no
-  effect - and it keeps its slot: hiding it now toggles `visibility` and `inert` on a class, not the
-  `hidden` attribute, so its box stays in the layout and the arrow next to it never moves, whether
-  the reset is showing or not. Toggling the reset's own visibility no longer changes header height
-  at any width by itself; a header can still change height between two periods for reasons that
-  have nothing to do with this reset (a label whose text wraps differently at very narrow widths,
-  for one, on both this branch and main), and that is unchanged by this fix.
 - **Housekeeping staff and shared-expense guests no longer appear where you pick or list household
   members** (#1207). The pickers for task assignees, calendar attendees, budget responsibles,
   schedule owners, medication owners, synced-calendar assignees and the Outlook account owner, the
