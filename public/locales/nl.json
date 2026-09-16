@@ -404,7 +404,7 @@
         "historyUnknownMember": "Niet meer in het huishouden",
         "historyEmptyTitle": "Nog niets vastgelegd",
         "historyEmptyPersonTitle": "Niets vastgelegd voor deze persoon",
-        "historyEmptyDescription": "Hier zie je wie welke taak heeft afgevinkt, en wanneer.",
+        "historyEmptyDescription": "Hier zie je wie welke taak heeft gedaan, en wanneer.",
         "historyEmptyHint": "Vastleggen begint nu - wat eerder klaar was, is nergens genoteerd.",
         "historyLoadError": "Geschiedenis kon niet worden geladen",
         "historyLoadMore": "Meer tonen",
@@ -498,7 +498,10 @@
         "tagsSkippedLocked_one": "{{count}} vergrendelde taak overgeslagen.",
         "listLoadError": "Taken konden niet worden geladen.",
         "checklistToggle": "Item afvinken",
-        "checkConflict": "De taak is intussen gewijzigd. Open deze opnieuw."
+        "checkConflict": "De taak is intussen gewijzigd. Open deze opnieuw.",
+        "doneByPick": "Wie heeft “{{title}}” gedaan?",
+        "doneByToast": "Gedaan door {{name}}.",
+        "historyTickedBy": "afgevinkt door {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} maaltijden",
@@ -2697,7 +2700,30 @@
         "healthVisibilityApplied_one": "Eén item aangepast.",
         "mealTypeNamesLabel": "Eigen namen",
         "mealTypeNamesHint": "Hoe jouw huishouden de vier maaltijden noemt. Laat leeg voor de ingebouwde naam. De naam verschijnt in elke taal precies zoals je hem typt.",
-        "mealTypeNamesSaved": "Namen opgeslagen."
+        "mealTypeNamesSaved": "Namen opgeslagen.",
+        "pageDisplays": "Wandtablets",
+        "pageDisplaysDescription": "Een wandtablet aanmaken, een apparaat koppelen en de toegang ervan intrekken.",
+        "displaysTitle": "Wandtablets",
+        "displaysHint": "Een wandtablet krijgt een eigen account dat alleen dit apparaat kan gebruiken. Het is geen gezinslid, meldt zich niet aan en ziet alleen wat zichtbaar is voor het huishouden.",
+        "displayDeviceNameLabel": "Naam van het tablet",
+        "displayDeviceNameHint": "Bijvoorbeeld “Keuken” of “Gang” - alleen om ze in deze lijst uit elkaar te houden.",
+        "displayCreate": "Wandtablet toevoegen",
+        "displayEmpty": "Nog geen wandtablet aangemaakt.",
+        "displayPaired": "Gekoppeld",
+        "displayNotPaired": "Nog niet gekoppeld",
+        "displayIssueCode": "Koppelcode genereren",
+        "displayDelete": "Verwijderen",
+        "displayDeleteConfirm": "“{{name}}” verwijderen?",
+        "displayPairingCodeLabel": "Koppelcode",
+        "displayPairingCodeHint": "15 minuten geldig en precies één keer te gebruiken. Open /pair op het tablet en voer hem daar in. Hij wordt alleen nu getoond.",
+        "displayDeviceUnnamed": "Naamloos apparaat",
+        "displayDeviceLastSeen": "Laatst gezien: {{when}}",
+        "displayDeviceNeverSeen": "Nog nooit verbonden",
+        "displayDeviceRevokedAt": "Ingetrokken: {{when}}",
+        "displayRevokeDevice": "Intrekken",
+        "displayRevokeConfirm": "Toegang van dit apparaat beëindigen?",
+        "displayRevokeDetail": "Het tablet toont onmiddellijk niets meer. Om het weer te gebruiken moet het opnieuw worden gekoppeld.",
+        "displayDeleteDetail": "Het account en alle gekoppelde apparaten worden verwijderd. Dit kan niet ongedaan worden gemaakt."
     },
     "login": {
         "tagline": "Welkom terug bij je gezinsplanner.",
@@ -5398,5 +5424,15 @@
         "continuesUntil": "…loopt door tot {{time}}",
         "overviewEmptyTitle": "Kies personen om te vergelijken",
         "overviewEmptyDescription": "Selecteer hierboven minstens één huisgenoot om de weekroosters naast elkaar te zien."
+    },
+    "pairDisplay": {
+        "title": "Tablet koppelen",
+        "intro": "Voer de koppelcode in die de instellingen tonen.",
+        "codeLabel": "Koppelcode",
+        "codeHint": "Tien tekens, hoofdletters of kleine letters maakt niet uit.",
+        "labelLabel": "Naam van dit apparaat (optioneel)",
+        "labelHint": "Helpt later te herkennen welk apparaat wordt bedoeld.",
+        "submit": "Koppelen",
+        "failed": "Deze koppelcode is niet geldig."
     }
 }

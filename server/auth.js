@@ -15,6 +15,10 @@ import { collectErrors, date as validateDate, str, MAX_SHORT, MAX_TITLE } from '
 import { createLogger } from './logger.js';
 import { memberEmail } from './services/member-email.js';
 import { accessScopeSql, householdMemberSql } from './services/household-members.js';
+import {
+  DISPLAY_COOKIE, DISPLAY_SCOPES, authenticateDisplayDevice, displayCookieIdentity, displayCookieOptions,
+  displayMayRead, displayTokenFromRequest, isDisplayAccount, markDisplayCookieRefreshed,
+} from './services/display-accounts.js';
 import { deleteBirthdayArtifacts, syncBirthdayArtifacts } from './services/birthdays.js';
 import * as oidcClient from 'openid-client';
 import {
@@ -100,11 +104,25 @@ function householdSize(database) {
  */
 const PRIVACY_MODULES = ['calendar', 'documents', 'tasks'];
 function othersCanRead(database, userId) {
+  // DISPLAYS ZAEHLEN MIT (#1208). Der Kommentar ueber dieser Funktion nennt die
+  // Regel schon richtig - "kann ausser dem Nutzer irgendein Konto das Modul
+  // lesen" -, die Abfrage zaehlte aber nur `family`. Ein Wandtablett fiel damit
+  // heraus, und in einem Ein-Personen-Haushalt MIT Tablett verschwanden die
+  // Sichtbarkeitsfelder: jeder neue Eintrag blieb auf „alle" und stand an der
+  // Kuechenwand, ohne dass die Person ihn haette privat stellen koennen. Genau
+  // die Art stiller Preisgabe, gegen die DECISIONS 1 gebaut ist.
+  //
+  // Ein Display wird dabei mit SEINEN Rechten aufgeloest, nicht mit denen eines
+  // Mitglieds: es liest Kalender und Aufgaben, aber nicht Budget oder
+  // Gesundheit - dort bleiben die Felder also weiterhin weg, wenn sonst niemand
+  // da ist.
   const others = database.prepare(`
-    SELECT u.id, u.role, u.family_role FROM users u
-    WHERE u.id != ? AND ${accessScopeSql('u')} = 'family'
+    SELECT u.id, u.role, u.family_role, ${accessScopeSql('u')} AS access_scope FROM users u
+    WHERE u.id != ? AND ${accessScopeSql('u')} IN ('family', 'display')
   `).all(userId);
-  const resolved = others.map((other) => resolvePermissions(database, other).modules);
+  const resolved = others.map((other) => resolvePermissions(database, other, {
+    isDisplay: other.access_scope === 'display',
+  }).modules);
   return PRIVACY_MODULES.filter((key) => resolved.some((modules) => (modules[key] ?? 'write') !== 'none'));
 }
 
@@ -115,7 +133,10 @@ function othersCanRead(database, userId) {
  * angehoben werden muss diese Zahl nur dort, wo eine kuenftige Aenderung eine
  * erneute Einfuehrung rechtfertigt (siehe Migration 168 in db.js).
  */
-const CURRENT_ONBOARDING_VERSION = 1;
+// Exportiert, seit die Display-Route sie beim Anlegen setzt (#1208): ein
+// Wandtablett ueberspringt die Begruessungstour. Eine zweite `1` dort waere eine
+// Zahl, die beim naechsten Anheben stillschweigend zurueckbliebe.
+export const CURRENT_ONBOARDING_VERSION = 1;
 
 const USER_PUBLIC_COLUMNS = `
   id,
@@ -411,6 +432,37 @@ router.use((req, res, next) => {
   if (scopes != null) {
     return res.status(403).json({ error: 'Token scope does not permit this operation.', code: 403 });
   }
+  // DASSELBE FUER EIN GEKOPPELTES DISPLAY (#1208). Es traegt ebenfalls Scopes
+  // und wuerde vom globalen Gate ebenso verworfen - und kommt hier ebenso wenig
+  // vorbei. Gepruefte Gueltigkeit statt blosser Cookie-Anwesenheit: ein altes
+  // oder widerrufenes Display-Cookie im Browser darf einem Menschen nicht die
+  // Anmeldung versperren.
+  //
+  // Die Abweisung ist 403 und nicht 401: das Credential IST gueltig, es darf
+  // hier nur nichts. Ein 401 hiesse "melde dich an", und genau das kann ein
+  // Display nicht.
+  const displayToken = displayTokenFromRequest(req);
+  if (displayToken) {
+    let device = null;
+    try { device = authenticateDisplayDevice(displayToken); } catch { device = null; }
+    // `GET /auth/me` ist die eine Ausnahme, und sie ist keine Grosszuegigkeit,
+    // sondern die Voraussetzung dafuer, dass die App auf dem Tablett ueberhaupt
+    // startet: der Auth-Guard in public/router.js fragt sie als erstes und
+    // schickt bei einem Fehler auf die Anmeldeseite (im Browser gemessen).
+    // Sie liefert die EIGENE Zeile und keine Haushaltsdaten - dasselbe
+    // Zugestaendnis, das der Ausgaben-Gast in server/index.js schon hat.
+    // `/auth` davor, weil `req.path` HIER relativ zum Mount ist (`/me`), die
+    // Liste aber `/api/v1`-relativ gefuehrt wird - eine Liste, zwei Verankerungen
+    // waeren zwei Wahrheiten darueber, was ein Display lesen darf.
+    if (device && !displayMayRead(req.method, `/auth${req.path}`)) {
+      return res.status(403).json({ error: 'A paired display cannot use the account routes.', code: 403 });
+    }
+    // Ein Cookie OHNE gueltiges Geraet dahinter kommt hier durch - ein Mensch
+    // soll sich an einem zurueckgebauten Tablett anmelden koennen. Es wird dabei
+    // gleich abgeraeumt, sonst scheitert der erste Request NACH der Anmeldung
+    // wieder an `requireAuth` und die App wirft ihn auf die Anmeldeseite zurueck.
+    if (!device) res.clearCookie(DISPLAY_COOKIE, displayCookieIdentity());
+  }
   next();
 });
 
@@ -568,7 +620,26 @@ function assertAdminWouldRemain(targetUserId, nextRole) {
   if (nextRole === 'admin') return null;
   const current = db.get().prepare('SELECT role FROM users WHERE id = ?').get(targetUserId);
   if (!current || current.role !== 'admin') return null;
-  const row = db.get().prepare('SELECT COUNT(*) AS count FROM users WHERE role = ? AND id != ?').get('admin', targetUserId);
+  // EIN KONTO, DAS NICHT ADMINISTRATOR SEIN KANN, IST KEIN VERBLEIBENDER.
+  //
+  // Drei Arten `users`-Zeilen sind keine Menschen im Haushalt, und keine davon
+  // kaeme je an `requireAdmin` vorbei: Hauspersonal und ein Wandtablett weist
+  // `canSignIn()` ab (Zeile 903 und 909), ein Ausgaben-Gast kommt zwar herein,
+  // aber das Gast-Gate in server/index.js laesst ihn nur an die geteilten
+  // Ausgaben. Zaehlte eine von ihnen hier mit, koennte ein Administrator sie
+  // zum Administrator machen, sich selbst herabstufen - und der Haushalt haette
+  // niemanden mehr, der an `requireAdmin` vorbeikommt. `/setup` hilft nicht, es
+  // haengt an einer leeren `users`-Tabelle.
+  //
+  // `householdMemberSql()` IST GENAU DIESE MENGE und die einzige Stelle, an der
+  // sie gepflegt wird - ein selbstgebautes `accessScopeSql(...) = 'family'`
+  // stand hier zuerst und liess das Hauspersonal durch, weil es in diesem
+  // Ausdruck als `family` gilt (Review zu #1241). Wer die Frage "ist das ein
+  // Mitglied" zweimal beantwortet, beantwortet sie irgendwann verschieden.
+  const row = db.get().prepare(`
+    SELECT COUNT(*) AS count FROM users u
+     WHERE u.role = ? AND u.id != ? AND ${householdMemberSql('u')}
+  `).get('admin', targetUserId);
   return row.count > 0 ? null : 'At least one system admin must remain.';
 }
 
@@ -692,7 +763,9 @@ function applyRoleModuleAccess(req) {
       .prepare('SELECT id, role, family_role FROM users WHERE id = ?')
       .get(req.authUserId);
     if (user) {
-      req.sessionModuleAccess = buildSessionModuleAccess(resolvePermissions(db.get(), user));
+      req.sessionModuleAccess = buildSessionModuleAccess(
+        resolvePermissions(db.get(), user, { isDisplay: req.authMethod === 'display' }),
+      );
     }
   } catch (err) {
     log.error('Permission resolution failed:', err.message);
@@ -713,6 +786,60 @@ function requireAuth(req, res, next) {
     req.authScopes = parseScopes(apiToken.scopes);
     applyRoleModuleAccess(req);
     return next();
+  }
+
+  // DER ERSTE BROWSER-PFAD MIT SCOPES (#1208). Er steht VOR dem Sitzungszweig,
+  // damit ein Tablett, auf dem jemand versehentlich auch eine Sitzung
+  // hinterlassen hat, trotzdem als Display laeuft - die engere Berechtigung
+  // gewinnt, nie die weitere.
+  //
+  // Die Scopes sind die feste Liste aus dem Dienst, nicht etwas Gespeichertes:
+  // was ein Display darf, ist eine Produktentscheidung und kein Feld, das ein
+  // Administrator aufbohren kann. Alles Weitere erbt es damit unveraendert von
+  // der Token-Maschinerie - das globale Scope-Gate, das Modul-Gate und die
+  // Sichtbarkeitsregel sehen ein Display wie ein gescoptes Token.
+  const displayToken = displayTokenFromRequest(req);
+  if (displayToken) {
+    const device = authenticateDisplayDevice(displayToken);
+    if (device) {
+      req.authMethod = 'display';
+      req.authUserId = device.userId;
+      req.authRole = 'member';
+      req.authScopes = [...DISPLAY_SCOPES];
+      req.displayDeviceId = device.deviceId;
+      // DAS COOKIE WIRD NACHDATIERT, ABER NICHT BEI JEDEM ZUGRIFF. Browser
+      // kappen die Lebensdauer persistenter Cookies (Chromium: 400 Tage), eine
+      // einmal geschriebene Jahreszahl haelt also nicht, was sie sagt - ein
+      // Tablett an der Wand waere irgendwann von selbst leer, ohne dass jemand
+      // etwas widerrufen haette. Warum trotzdem gedrosselt: das Credential
+      // steht im Klartext im Set-Cookie-Kopf, und an jede Antwort geheftet
+      // landet es auch an der einen oeffentlich cachebaren hinter diesem Guard
+      // (`/weather/icon/:code`). Beide Begruendungen samt Zahlen stehen bei
+      // `DISPLAY_COOKIE_MAX_AGE` und `DISPLAY_COOKIE_REFRESH_AFTER_MS`.
+      if (device.refreshCookie) {
+        res.cookie(DISPLAY_COOKIE, displayToken, displayCookieOptions());
+        // Erst JETZT ist die Frist verbraucht - hier geht das Cookie wirklich
+        // hinaus. Der Riegel des Auth-Routers oben ruft dieselbe Pruefung und
+        // wirft ihr Ergebnis weg; verbrauchte schon sie, bekaeme `/auth/me` nie
+        // eine Auffrischung.
+        markDisplayCookieRefreshed(device.deviceId);
+      }
+      applyRoleModuleAccess(req);
+      return next();
+    }
+    // Ein Credential, das es nicht mehr gibt, faellt NICHT auf die Sitzung
+    // zurueck: ein widerrufenes Tablett soll leer bleiben, nicht heimlich als
+    // die Person weiterlaufen, die es zuletzt eingerichtet hat.
+    //
+    // DAS COOKIE WIRD DABEI GELOESCHT, sonst ist das Geraet fuer immer
+    // unbrauchbar: es ist httpOnly, also kommt kein Skript der Seite daran, und
+    // dieser Zweig griffe bei JEDEM weiteren Request - auch nach einer
+    // erfolgreichen Anmeldung als Mensch. Wer ein Tablett zurueckbaut, muesste
+    // sonst die Websitedaten von Hand loeschen oder einen neuen Kopplungscode
+    // holen. Der Request selbst bleibt abgewiesen; erst der naechste kommt ohne
+    // das tote Cookie und wird normal behandelt.
+    res.clearCookie(DISPLAY_COOKIE, displayCookieIdentity());
+    return res.status(401).json({ error: 'Not authenticated.', code: 401 });
   }
 
   if (req.session && req.session.userId) {
@@ -782,7 +909,14 @@ function setupAuthSession(req, res, user) {
  * @returns {boolean}
  */
 function canSignIn(database, userId) {
-  return !database.prepare('SELECT 1 FROM housekeeping_workers WHERE user_id = ?').get(userId);
+  if (database.prepare('SELECT 1 FROM housekeeping_workers WHERE user_id = ?').get(userId)) return false;
+  // Ein Wandtablett meldet sich nicht an, es wird gekoppelt (#1208). Die Regel
+  // steht HIER und nicht je Anmeldeweg, weil genau das der Fehler war, den
+  // GHSA-4jcg-7jvj-p4v9 ausgemacht hat: Personal war beim Passwort-Login
+  // gesperrt und beim OIDC-Rueckweg nicht. Diese eine Zeile schliesst beide
+  // Wege und die Konten-Verknuepfung per E-Mail zugleich.
+  if (isDisplayAccount(userId, { db: database })) return false;
+  return true;
 }
 
 /**
@@ -2022,7 +2156,10 @@ router.get('/me', requireAuth, (req, res) => {
 
     res.json({
       user: publicUser(user),
-      permissions: clientPermissions(db.get(), user),
+      // Hier und nur hier kann das Subjekt ein Wandtablett sein: die beiden
+      // anderen Aufrufer sind Anmeldewege, und ein Display meldet sich nicht an
+      // (`canSignIn()` weist es ab). Sie bleiben deshalb beim Standard `false`.
+      permissions: clientPermissions(db.get(), user, { isDisplay: req.authMethod === 'display' }),
       householdSize: householdSize(db.get()),
       othersCanRead: othersCanRead(db.get(), user.id),
       csrfToken: req.session.csrfToken,
@@ -2345,18 +2482,27 @@ router.get('/users', requireAuth, (req, res) => {
     // Admin-Cookie bekaeme es umgekehrt zu Unrecht. Jede andere Rollenpruefung
     // in dieser Datei fragt aus genau diesem Grund `authRole`.
     const isAdmin = req.authRole === 'admin';
+    // WANDTABLETTS STEHEN HIER NICHT (#1208). Diese Liste ist die
+    // Kontenverwaltung, und die Familien-Seite rendert jede Zeile daraus als
+    // bearbeitbares Familienmitglied - samt Familienrolle, Loeschknopf und,
+    // beim Speichern, `syncFamilyMemberArtifacts`, das dem Geraet einen Kontakt
+    // und einen Geburtstag anlegen wuerde. Ein Display ist kein Konto, das man
+    // hier verwaltet: es hat seine eigene Seite, auf der es angelegt, gekoppelt
+    // und widerrufen wird.
     const users = isAdmin
       ? db.get().prepare(`
           SELECT ${USER_PUBLIC_COLUMNS},
                  EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker,
                  (password_hash = ?) AS sso_only
           FROM users
+          WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
           ORDER BY display_name
         `).all(OIDC_PASSWORD_SENTINEL)
       : db.get().prepare(`
           SELECT ${USER_PUBLIC_COLUMNS},
                  EXISTS(SELECT 1 FROM housekeeping_workers hw WHERE hw.user_id = users.id) AS is_worker
           FROM users
+          WHERE NOT EXISTS (SELECT 1 FROM display_accounts da WHERE da.user_id = users.id)
           ORDER BY display_name
         `).all();
     res.json({ data: users.map(publicUser) });
@@ -2445,6 +2591,19 @@ router.post('/api-tokens', requireAuth, requireAdmin, csrfMiddleware, (req, res)
     if (!subject) return res.status(400).json({ error: 'Token subject user was not found.', code: 400 });
     if (subject.is_split_guest) {
       return res.status(400).json({ error: 'A split-expense guest cannot be an API token subject.', code: 400 });
+    }
+    // EIN DISPLAY IST NUR UEBER SEIN GERAET ERREICHBAR - auch hier (#1208).
+    //
+    // Ohne diese Zeile waere der Weg drumherum offen: ein Administrator traegt
+    // die Display-Id als `subject_user_id` ein und bekommt ein API-Token auf
+    // dieses Konto. Der Token-Zweig in `requireAuth` loest Rechte OHNE
+    // `isDisplay` auf - die feste Leseliste aus display-scopes.js greift also
+    // nicht, und ein ungescoptes Token haette die vollen Schreibrechte eines
+    // gewoehnlichen Mitglieds unter dem Namen des Wandtabletts. Ein Konto, das
+    // sich nicht anmelden kann, darf auch kein Credential neben seinem Geraet
+    // bekommen; dieselbe Erwaegung wie beim Ausgaben-Gast eine Zeile darueber.
+    if (isDisplayAccount(subjectUserId, { db: db.get() })) {
+      return res.status(400).json({ error: 'A display cannot be an API token subject.', code: 400 });
     }
 
     const result = db.get().prepare(`
@@ -2685,6 +2844,18 @@ router.patch('/users/:id', requireAuth, requireAdmin, csrfMiddleware, async (req
 
     const existing = db.get().prepare(`SELECT ${USER_PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(userId);
     if (!existing) return res.status(404).json({ error: 'User not found.', code: 404 });
+    // EIN DISPLAY IST KEIN MITGLIED, ALSO AUCH HIER NICHT (#1208). Die Liste
+    // darunter kennt es nicht mehr, diese Route kannte es noch: eine Id aus
+    // `GET /displays` reichte, um dem Tablett einen Familiennamen, eine Rolle
+    // und - ueber `syncFamilyMemberArtifacts` - einen Kontakt zu geben, also
+    // genau die Eintraege, aus denen es herausgehalten wird. Mit
+    // `system_admin` obendrein waere es ein Administrator, der sich nicht
+    // anmelden kann; ein echter Administrator koennte sich dann selbst
+    // herabstufen und den Haushalt ohne jeden Zugang zurueck lassen.
+    // Verwaltet wird ein Display unter /displays, sonst nirgends.
+    if (isDisplayAccount(userId, { db: db.get() })) {
+      return res.status(404).json({ error: 'User not found.', code: 404 });
+    }
 
     const username = req.body.username !== undefined ? String(req.body.username || '').trim() : existing.username;
     const displayName = req.body.display_name !== undefined ? String(req.body.display_name || '').trim() : existing.display_name;
@@ -2905,6 +3076,12 @@ router.delete('/users/:id', requireAuth, requireAdmin, csrfMiddleware, (req, res
     if (userId === req.authUserId) {
       return res.status(400).json({ error: 'You cannot delete your own account.', code: 400 });
     }
+    // Wie beim Aendern: ein Display wird unter /displays verwaltet, nicht hier.
+    // Zwei Tueren zu demselben Konto waeren zwei Stellen, an denen die Regeln
+    // dieses Kontotyps gelten muessten.
+    if (isDisplayAccount(userId, { db: db.get() })) {
+      return res.status(404).json({ error: 'User not found.', code: 404 });
+    }
 
     // Der dritte Weg, auf dem der letzte SSO-Administrator verschwinden kann
     // (#847). `null` = das Konto bleibt gar keine Rolle uebrig.
@@ -2962,3 +3139,5 @@ setInterval(() => {
 }, 60 * 60_000).unref();
 
 export { router, sessionMiddleware, requireAuth, requireAdmin, syncFamilyMemberArtifacts, normalizeAvatarData };
+// Die Kopplungsroute raeumt beide beim Uebergang zum Display (routes/displays.js).
+export { SESSION_COOKIE, LEGACY_SESSION_COOKIE };

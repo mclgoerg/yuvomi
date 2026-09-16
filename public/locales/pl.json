@@ -399,7 +399,7 @@
         "historyUnknownMember": "Już nie w gospodarstwie domowym",
         "historyEmptyTitle": "Jeszcze nic nie zapisano",
         "historyEmptyPersonTitle": "Brak zapisów dla tej osoby",
-        "historyEmptyDescription": "Tutaj widać, kto i kiedy odhaczył które zadanie.",
+        "historyEmptyDescription": "Tutaj zobaczysz, kto wykonał które zadanie i kiedy.",
         "historyEmptyHint": "Zapisywanie zaczyna się teraz - tego, co zrobiono wcześniej, nikt nie notował.",
         "historyLoadError": "Nie udało się wczytać historii",
         "historyLoadMore": "Pokaż więcej",
@@ -510,7 +510,10 @@
         "tagsSkippedLocked_one": "Pominięto {{count}} zablokowane zadanie.",
         "listLoadError": "Nie udało się załadować zadań.",
         "checklistToggle": "Odhacz pozycję",
-        "checkConflict": "Zadanie zostało w międzyczasie zmienione. Otwórz je ponownie."
+        "checkConflict": "Zadanie zostało w międzyczasie zmienione. Otwórz je ponownie.",
+        "doneByPick": "Kto wykonał „{{title}}”?",
+        "doneByToast": "Wykonał(a) {{name}}.",
+        "historyTickedBy": "odhaczone przez {{name}}"
     },
     "shopping": {
         "importMealsPreviewMeals_few": "{{count}} posiłki",
@@ -2709,7 +2712,30 @@
         "healthVisibilityApplied_one": "Zmieniono jeden wpis.",
         "mealTypeNamesLabel": "Własne nazwy",
         "mealTypeNamesHint": "Jak twoje gospodarstwo domowe nazywa cztery posiłki. Pozostaw puste, aby użyć nazwy wbudowanej. Nazwa wyświetla się tak samo we wszystkich językach.",
-        "mealTypeNamesSaved": "Nazwy zapisane."
+        "mealTypeNamesSaved": "Nazwy zapisane.",
+        "pageDisplays": "Tablety ścienne",
+        "pageDisplaysDescription": "Dodać tablet ścienny, sparować urządzenie i unieważnić jego dostęp.",
+        "displaysTitle": "Tablety ścienne",
+        "displaysHint": "Tablet ścienny otrzymuje własne konto, z którego może korzystać tylko to urządzenie. Nie jest członkiem rodziny, nie loguje się i widzi tylko to, co jest widoczne dla gospodarstwa domowego.",
+        "displayDeviceNameLabel": "Nazwa tabletu",
+        "displayDeviceNameHint": "Na przykład „Kuchnia” lub „Przedpokój” - służy tylko do rozróżnienia na tej liście.",
+        "displayCreate": "Dodaj tablet ścienny",
+        "displayEmpty": "Nie utworzono jeszcze żadnego tabletu ściennego.",
+        "displayPaired": "Sparowany",
+        "displayNotPaired": "Jeszcze nie sparowany",
+        "displayIssueCode": "Wygeneruj kod parowania",
+        "displayDelete": "Usuń",
+        "displayDeleteConfirm": "Usunąć „{{name}}”?",
+        "displayPairingCodeLabel": "Kod parowania",
+        "displayPairingCodeHint": "Ważny 15 minut i działa dokładnie raz. Otwórz na tablecie /pair i wpisz go tam. Jest pokazywany tylko teraz.",
+        "displayDeviceUnnamed": "Urządzenie bez nazwy",
+        "displayDeviceLastSeen": "Ostatnio widziane: {{when}}",
+        "displayDeviceNeverSeen": "Nigdy nie połączono",
+        "displayDeviceRevokedAt": "Unieważniono: {{when}}",
+        "displayRevokeDevice": "Unieważnij",
+        "displayRevokeConfirm": "Zakończyć dostęp tego urządzenia?",
+        "displayRevokeDetail": "Tablet natychmiast przestaje cokolwiek pokazywać. Aby znów go używać, trzeba go ponownie sparować.",
+        "displayDeleteDetail": "Konto i wszystkie sparowane urządzenia zostaną usunięte. Tego nie można cofnąć."
     },
     "login": {
         "tagline": "Witaj ponownie w swoim planerze rodzinnym.",
@@ -5398,5 +5424,15 @@
         "continuesUntil": "…trwa do {{time}}",
         "overviewEmptyTitle": "Wybierz osoby do porównania",
         "overviewEmptyDescription": "Wybierz powyżej co najmniej jednego członka gospodarstwa domowego, aby zobaczyć tygodniowe plany obok siebie."
+    },
+    "pairDisplay": {
+        "title": "Sparuj tablet",
+        "intro": "Wpisz kod parowania pokazany w ustawieniach.",
+        "codeLabel": "Kod parowania",
+        "codeHint": "Dziesięć znaków, wielkość liter nie ma znaczenia.",
+        "labelLabel": "Nazwa tego urządzenia (opcjonalnie)",
+        "labelHint": "Pomaga później rozpoznać, o które urządzenie chodzi.",
+        "submit": "Sparuj",
+        "failed": "Ten kod parowania jest nieprawidłowy."
     }
 }

@@ -167,6 +167,16 @@ function buildOidcTestDb() {
       id      INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE
     );
+    -- Die dritte Markierungstabelle neben Personal und Gaesten (#1208). Sie
+    -- steht hier, weil canSignIn() sie liest: ein Wandtablett meldet sich nicht
+    -- an, weder mit Passwort noch ueber SSO. Das ist die EINZIGE Stelle, an der
+    -- eine fremde Suite die Tabelle braucht - die Rechteaufloesung bekommt ihre
+    -- Antwort seit dem Umbau vom Aufrufer, nicht aus der Datenbank.
+    CREATE TABLE display_accounts (
+      user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
     CREATE TABLE contacts (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       name           TEXT NOT NULL,

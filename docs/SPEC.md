@@ -286,7 +286,31 @@ last done, or who did it. This table records the transition.
 | task_id | INTEGER | FK → Tasks (CASCADE delete), NOT NULL, UNIQUE |
 | series_id | INTEGER | NOT NULL — root of the repetition chain, or the task itself. No FK: the root may be deleted without taking later entries with it |
 | user_id | INTEGER | FK → Users (SET NULL) — **who ticked it off** |
+| done_by_user_id | INTEGER | FK → Users (SET NULL), nullable — **who did it**, when somebody was named (migration v214, #1205) |
 | completed_at | TEXT | ISO 8601 UTC, default now |
+
+**Two people, because there are two questions (migration v214, #1205).** `user_id` keeps its meaning
+exactly: whoever ticked the task off. It cannot answer who did the work - on a shared wall tablet
+those are routinely different people, and a child who emptied the dishwasher used to need a parent
+to assign the task first before the points could reach them. `done_by_user_id` answers the second
+question and is **null in the normal case**, which means "nobody was asked", not "nobody did it".
+Existing rows are deliberately **not** backfilled from `user_id`: that would put a claim into the
+record that was never made. Both read paths resolve the pair once, in SQL, into `person_user_id`
+(`COALESCE(done_by_user_id, user_id)`) - the fallback lives in one place rather than in every
+renderer, and the person filter uses the same expression, so the history cannot show one name and
+filter by another. The named person must be a household member (DECISIONS entry 4); a guest or
+housekeeping worker is refused with 400, the same boundary that assignment draws.
+
+The naming is as idempotent as the entry itself: `INSERT OR IGNORE` leaves an existing row alone, so
+a second status change neither moves the timestamp nor rewrites the person. Correcting it means
+reopening the task and ticking it off again - the same path the points take.
+
+**Where the points go.** A named member who takes part in rewards receives them instead of the
+assignees (`rewardTargets`). A named member who does not take part means **no points at all**, with
+no fallback to the assignees: crediting somebody the record just said did not do the work would be
+the worst of the three possible answers. Reversing a completion still deletes every `earn` row for
+the task regardless of who received it - a person filter there would leave standing exactly the
+booking that the undo exists to remove.
 
 **Why a table and not two columns.** A completed recurring task spawns a follow-up instance
 (`recurrence_origin_id`), so the history of one series is spread across a chain of rows whose links
@@ -1913,6 +1937,67 @@ Tokens can optionally be **scoped** to individual modules and access levels — 
 **Subject vs. creator (v2.4.0 · migration v135):** only an admin can mint a token, so without a subject every request it makes is the admin's - and `budget_entries.owner_id` is fixed to whoever creates the entry (see [Budget Entries](#budget-entries), migration v88). A bank-import connector could therefore only ever file transactions under the administrator, never under the household member they belong to. The two roles are now separate: `created_by` stays with the admin who is accountable for the credential and is what the token list shows for audit, while `subject_user_id` supplies the identity, role, ownership and module permissions of the requests. Making `owner_id` settable per request would have been the alternative and is the weaker one - it lets any caller claim any ownership on every call, where the subject is fixed once by an admin and not selectable afterwards.
 
 The subject can only narrow, never widen: module permissions (#467) are resolved for the subject on every request, a non-admin subject cannot reach admin-only routes, and token scopes remain an additional allow-list on top. A split-expense guest cannot be a subject (the household guard would refuse its requests anyway). Deleting either user removes the token via `ON DELETE CASCADE`, and existing tokens keep behaving as before because the migration backfills `subject_user_id = created_by`.
+
+### Display Accounts (migration v215, #1208, decided in #913)
+
+A wall tablet gets an account only a **paired device** can use. A display is a `users` row of its own
+kind, not a second account model ([DECISIONS entry 4](DECISIONS.md#4-a-household-is-people-not-accounts)):
+`display_accounts` is the third marker table beside `housekeeping_workers` and
+`split_expense_guest_users`, and `householdMemberSql()` gained one more `NOT EXISTS` clause, so a
+display is out of **every** list of people at once. `accessScopeSql()` resolves it to `display`.
+
+**Why not a normal account.** A session ends after seven days, so somebody would regularly type a
+password on a device that hangs on a wall - and that password is the most valuable thing on the
+tablet. In a household that signs in only through SSO such an account could not exist at all. And a
+second factor on a device nobody ever signs out of protects nothing. The row therefore carries the
+placeholder `$display$` in `password_hash` (`NOT NULL`, the same shape SSO-only accounts use with
+`$oidc$`), and `canSignIn()` refuses it - one rule that closes password login, the OIDC callback and
+email linking together, exactly where GHSA-4jcg-7jvj-p4v9 showed what a per-path rule costs.
+
+**The first browser path with scopes.** `requireAuth()` knew scopes only on the token path;
+interactive sessions carry `authScopes = null`. A paired display now carries the fixed list
+`dashboard:read`, `calendar:read`, `tasks:read`, `rewards:read`, `weather:read` (`DISPLAY_SCOPES`,
+not stored and not configurable - what a display may do is a product decision, not a field an admin
+can widen). Weather is on the list for the obvious reason a tablet ends up on a kitchen wall at all,
+and it carries no household data: a forecast for a location the household already set.
+The global gate in `server/index.js` therefore asks about the **scopes**, not the sign-in method:
+that condition read `authMethod !== 'api_token' || authScopes == null`, of which only the second
+half was ever the rule. Sessions are unaffected. The auth router, mounted ahead of the gates, refuses
+a valid display credential at its own entry with 403, the same way it refuses a scoped token
+(GHSA-xcv5-6w6x-x5q2). The display branch runs **before** the session branch: the narrower
+credential wins, so a tablet somebody once signed in on does not quietly stay a full account.
+
+Visibility needs no special case. A display creates nothing and is assigned nothing, so
+`visibilityWhere()` leaves it exactly the rows marked `all`.
+
+| Table | Column | Type | Constraint |
+|-------|--------|------|-----------|
+| display_accounts | user_id | INTEGER | PRIMARY KEY, FK → Users (CASCADE delete) |
+| display_accounts | created_by | INTEGER | FK → Users (SET NULL on delete), nullable |
+| display_pairing_codes | code_hash | TEXT | NOT NULL UNIQUE (SHA-256) |
+| display_pairing_codes | expires_at | TEXT | ISO 8601 NOT NULL (15 minutes) |
+| display_pairing_codes | used_at | TEXT | ISO 8601, nullable - spent rather than deleted, so "valid once" stays a checked fact |
+| display_devices | token_hash | TEXT | NOT NULL UNIQUE (SHA-256) |
+| display_devices | label | TEXT | nullable, set by the tablet at pairing |
+| display_devices | last_seen_at | TEXT | ISO 8601, nullable - written on every request |
+| display_devices | revoked_at | TEXT | ISO 8601, nullable |
+
+**Pairing.** An admin issues a ten-character code from an alphabet without lookalike pairs; the
+tablet types it in at `POST /api/v1/displays/pair`, the only route a display calls and the only one
+that needs no authentication - a freshly mounted tablet has nothing to identify itself with, the same
+reason `/auth/login` is public. A **code**, not a link: a link carries the one-time secret in a URL
+and therefore into history, bookmarks, referrers and logs, and a wall tablet is set up by hand once
+anyway. The credential comes back **only** as an httpOnly cookie, never in the body, so no script on
+the page can read it. Unknown, expired and already-used codes all answer the same 400, and the route
+is rate-limited: ten characters are entropy, not a lock. Issuing a new code spends the previous one,
+and a successful exchange revokes the display's previous device - one display, one tablet.
+
+**No expiry, only revocation.** The credential has no `expires_at`. An expiry nobody notices until
+the tablet is dark on a Sunday morning is not security, it is an outage; the control is the
+revocation, and `last_seen_at` stands next to it so that revoking can be an informed decision.
+Revoking sets `revoked_at` rather than deleting, like an API token, and takes effect on the device's
+next request - the credential is checked against the database every time, so there is no cached state
+to catch up with.
 
 ### ICS Subscriptions
 External calendar feeds subscribed by users (read-only, auto-synced).

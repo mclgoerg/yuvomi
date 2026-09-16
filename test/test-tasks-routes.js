@@ -1045,3 +1045,128 @@ test('PUT: die Wiederholung laesst sich einschalten, auch ohne Nachfolger', asyn
   assert.equal(ok.status, 200, `erwartet 200, bekommen ${ok.status}`);
   assert.equal(ok.body.data.due_date, '2026-01-15', 'und das Datum bleibt stehen');
 });
+
+// --------------------------------------------------------
+// PATCH /:id/status: wer hat es getan (#1205)
+// --------------------------------------------------------
+test('PATCH status: done_by_user_id landet im Verlauf und bucht die Punkte dorthin', async () => {
+  const admin = { id: ALICE, role: 'admin' };
+  db.prepare('INSERT OR IGNORE INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(BOB);
+
+  const created = await call('POST', '/', { as: admin, body: { title: `getan-von-${randomUUID().slice(0, 8)}`, points: 7 } });
+  assert.equal(created.status, 201);
+  const id = created.body.data.id;
+
+  // ALICE hakt ab, BOB hat es getan - die Aufgabe ist niemandem zugewiesen.
+  const r = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done', done_by_user_id: BOB } });
+  assert.equal(r.status, 200);
+
+  const row = db.prepare('SELECT user_id, done_by_user_id FROM task_completions WHERE task_id = ?').get(id);
+  assert.equal(row.user_id, ALICE, 'wer abgehakt hat');
+  assert.equal(row.done_by_user_id, BOB, 'wer es getan hat');
+
+  const earn = db.prepare("SELECT user_id, delta FROM reward_ledger WHERE task_id = ? AND type = 'earn'").all(id);
+  assert.equal(earn.length, 1);
+  assert.equal(earn[0].user_id, BOB, 'ohne die Angabe haette ALICE als handelnde Person gebucht');
+  assert.equal(earn[0].delta, 7);
+});
+
+test('PATCH status: das Zuruecknehmen holt die Punkte der benannten Person zurueck', async () => {
+  const admin = { id: ALICE, role: 'admin' };
+  db.prepare('INSERT OR IGNORE INTO reward_participants (user_id, enabled) VALUES (?, 1)').run(BOB);
+
+  const created = await call('POST', '/', { as: admin, body: { title: `zurueck-${randomUUID().slice(0, 8)}`, points: 9 } });
+  const id = created.body.data.id;
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done', done_by_user_id: BOB } });
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'open' } });
+
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ?').get(id).n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM reward_ledger WHERE task_id = ? AND type = 'earn'").get(id).n, 0);
+});
+
+test('PATCH status: eine Person ausserhalb des Haushalts wird abgewiesen', async () => {
+  // WORKER ist Haushaltshilfe, also kein Mitglied (#1207) - dieselbe Grenze,
+  // die auch das Zuweisen zieht.
+  const admin = { id: ALICE, role: 'admin' };
+  const created = await call('POST', '/', { as: admin, body: { title: `fremd-${randomUUID().slice(0, 8)}` } });
+  const id = created.body.data.id;
+
+  const r = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done', done_by_user_id: WORKER } });
+  assert.equal(r.status, 400);
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(id).status, 'open',
+    'der abgewiesene Request darf den Status nicht trotzdem gesetzt haben');
+});
+
+test('PATCH status: eine Angabe an einem Wechsel ohne Erledigung wird still verworfen', async () => {
+  // Eine Sammelaktion, die alles auf 'open' setzt, schickt dasselbe Feld mit -
+  // sie soll daran nicht scheitern, und es soll auch nichts entstehen.
+  const admin = { id: ALICE, role: 'admin' };
+  const created = await call('POST', '/', { as: admin, body: { title: `kein-done-${randomUUID().slice(0, 8)}` } });
+  const id = created.body.data.id;
+
+  const r = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'in_progress', done_by_user_id: BOB } });
+  assert.equal(r.status, 200);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ?').get(id).n, 0);
+});
+
+test('PATCH status: ohne die Angabe verhaelt sich die Route wie vorher', async () => {
+  const admin = { id: ALICE, role: 'admin' };
+  const created = await call('POST', '/', { as: admin, body: { title: `wie-vorher-${randomUUID().slice(0, 8)}` } });
+  const id = created.body.data.id;
+
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done' } });
+  const row = db.prepare('SELECT user_id, done_by_user_id FROM task_completions WHERE task_id = ?').get(id);
+  assert.equal(row.user_id, ALICE);
+  assert.equal(row.done_by_user_id, null);
+});
+
+test('PATCH status: eine Person, die es gar nicht gibt, ist 400 und nicht 500', async () => {
+  // `newNonMembers` meldet bewusst NUR existierende Nicht-Mitglieder (es sagt
+  // das selbst in seinem Kommentar) - eine geloeschte oder erfundene ID kommt
+  // durch. Sie landete dann im FK der neuen Spalte, `INSERT OR IGNORE`
+  // unterdrueckt FOREIGN-KEY-Verletzungen nicht, die ganze Transaktion rollte
+  // zurueck und der Aufrufer bekam 500 statt der zugesagten 400 - samt einem
+  // Statuswechsel, der stillschweigend nicht stattgefunden hatte.
+  const admin = { id: ALICE, role: 'admin' };
+  const created = await call('POST', '/', { as: admin, body: { title: `geist-${randomUUID().slice(0, 8)}` } });
+  const id = created.body.data.id;
+
+  const r = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done', done_by_user_id: 999999 } });
+  assert.equal(r.status, 400);
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(id).status, 'open');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ?').get(id).n, 0);
+});
+
+test('PATCH status: ein unbrauchbares done_by_user_id blockiert keinen Wechsel, der gar nicht abhakt', async () => {
+  // Der vorige Test deckt den Weg NACH done ab; hier geht es um jeden anderen.
+  // Eine Sammelaktion schickt dieselbe Nutzlast fuer alle Zeilen - sie darf
+  // nicht daran scheitern, dass ein Feld mitfaehrt, das an diesem Uebergang
+  // ohnehin nichts bewirkt. Der erste Test dazu nahm ein GUELTIGES Mitglied und
+  // haette diesen Fall nie gesehen.
+  const admin = { id: ALICE, role: 'admin' };
+  const created = await call('POST', '/', { as: admin, body: { title: `mitgeschickt-${randomUUID().slice(0, 8)}` } });
+  const id = created.body.data.id;
+
+  const toProgress = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'in_progress', done_by_user_id: 999999 } });
+  assert.equal(toProgress.status, 200);
+  assert.equal(db.prepare('SELECT status FROM tasks WHERE id = ?').get(id).status, 'in_progress');
+
+  const toWorker = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'open', done_by_user_id: WORKER } });
+  assert.equal(toWorker.status, 200, 'auch ein Nicht-Mitglied blockiert den Weg zurueck nicht');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM task_completions WHERE task_id = ?').get(id).n, 0);
+});
+
+test('PATCH status: eine bereits erledigte Aufgabe nimmt keine neue Benennung an', async () => {
+  // done -> done ist kein Uebergang. Wuerde die Pruefung hier greifen, waere
+  // das eine Fehlermeldung fuer etwas, das ohnehin nichts schreibt; wuerde die
+  // Benennung greifen, waere es eine zweite, stille Korrekturmoeglichkeit neben
+  // dem dokumentierten Weg (zuruecknehmen und neu abhaken).
+  const admin = { id: ALICE, role: 'admin' };
+  const created = await call('POST', '/', { as: admin, body: { title: `schon-done-${randomUUID().slice(0, 8)}` } });
+  const id = created.body.data.id;
+  await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done', done_by_user_id: BOB } });
+
+  const again = await call('PATCH', `/${id}/status`, { as: admin, body: { status: 'done', done_by_user_id: 999999 } });
+  assert.equal(again.status, 200);
+  assert.equal(db.prepare('SELECT done_by_user_id FROM task_completions WHERE task_id = ?').get(id).done_by_user_id, BOB);
+});

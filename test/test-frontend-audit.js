@@ -2511,6 +2511,56 @@ test('More button active state keeps visible More identity and accessible active
   assert.doesNotMatch(source, /moreBtn\.toggleAttribute\('aria-current',\s*inMoreSheet\)/);
 });
 
+test('wer die Zahl der Mitleser aendert, holt othersCanRead nach', () => {
+  // `othersCanRead` entscheidet, ob Aufgaben und Kalender ihre
+  // Sichtbarkeitsfelder ueberhaupt zeigen. Der Wert kommt aus /auth/me und
+  // liegt im Speicher - wer ihn nicht nachholt, laesst die Felder bis zum
+  // naechsten vollen Laden verborgen, und alles, was in derselben Sitzung
+  // entsteht, ist "fuer alle". Im Ein-Personen-Haushalt ist genau das der
+  // Sprung von 0 auf 1: ein angelegtes Wandtablett, ein eingerichtetes
+  // Hauspersonal, geaenderte Modulrechte.
+  // AN DIE MUTIERENDE STELLE GEBUNDEN, nicht an die Datei. Die erste Fassung
+  // fragte nur, ob `auth.me()` IRGENDWO in der Datei vorkommt - damit blieb sie
+  // gruen, wenn man die Auffrischung allein aus dem Loesch-Pfad entfernte,
+  // obwohl das der eigene, zweite Fall ist (gegengeprueft: 397 pass).
+  const STELLEN = [
+    { datei: '../public/settings/pages/admin-displays.js', was: 'Display anlegen', ruf: /api\.post\('\/displays'/ },
+    { datei: '../public/settings/pages/admin-displays.js', was: 'Display loeschen', ruf: /api\.delete\(`\/displays\// },
+    { datei: '../public/settings/pages/admin-permissions.js', was: 'Rechte speichern', ruf: /api\.put\(url/ },
+    { datei: '../public/pages/housekeeping.js', was: 'Hauspersonal anlegen', ruf: /api\.post\('\/housekeeping\/worker'/ },
+  ];
+  const fehlend = [];
+  for (const { datei, was, ruf } of STELLEN) {
+    const src = withoutCommentsKeepingLines(read(datei));
+    const importiert = /import\s*\{[^}]*\bauth\b[^}]*\}\s*from\s*'\/api\.js'/.test(src);
+    const stelle = src.search(ruf);
+    // Die Auffrischung muss NACH der Mutation stehen und nah dabei. 1500 Zeichen,
+    // weil der weiteste der vier Faelle 916 braucht (das Anlegen einer
+    // Haushaltshilfe reicht ein langes Objekt mit) - gemessen, nicht geraten,
+    // und immer noch etwas voellig anderes als "irgendwo in der Datei".
+    const nah = stelle >= 0 && /auth\.me\(\)/.test(src.slice(stelle, stelle + 1500));
+    if (!importiert || stelle < 0 || !nah) fehlend.push(`${datei} (${was})`);
+  }
+  assert.deepEqual(fehlend, [],
+    `Diese Stellen aendern die Zahl der Mitleser, ohne sie nachzuholen:\n  ${fehlend.join('\n  ')}`);
+});
+
+test('die Display-Leiste filtert haushaltweit abgeschaltete Module', () => {
+  // ROUTER.JS IST BROWSER-GEKOPPELT UND NICHT IMPORTIERBAR, deshalb misst diese
+  // Suite ihn am Quelltext (dieselbe Begruendung wie test-router-guest-guard.js).
+  // Der Display-Zweig gibt eine FESTE Liste zurueck - was ein Wandtablett darf,
+  // steht fest, was es GIBT, entscheidet der Haushalt. Ohne den Filter stuende
+  // ein abgeschalteter Kalender in der Leiste und schickte beim Antippen auf
+  // die Uebersicht zurueck, weil `navigate()` ihn ohnehin abweist.
+  const source = read('../public/router.js');
+  const zweig = source.match(/access_scope === 'display'\)\s*\{[\s\S]*?\n  \}/);
+  assert.ok(zweig, 'der Display-Zweig in navItems() steht noch da');
+  assert.match(zweig[0], /_disabledModules\.has\(/, 'er filtert die abgeschalteten Module');
+  // Das Dashboard ist die Startseite und laesst sich nicht abschalten - es darf
+  // nicht mit herausfallen, sonst haette ein Tablett gar keine Leiste mehr.
+  assert.match(zweig[0], /'dashboard'/);
+});
+
 test('mobile navigation derives five stable destinations from three favorites', () => {
   const source = read('../public/router.js');
 
@@ -15950,8 +16000,25 @@ test('PAGE-000: der Geltungsbereich ist nicht leer und deckt fast alle Seiten', 
     'Login und Setup zeichnen ohne App-Shell und gehoeren nicht in den Geltungsbereich');
   assert.ok(scope.length >= 15,
     `Nur ${scope.length} Seiten im Geltungsbereich - die Regeln pruefen fast nichts`);
-  assert.ok(scope.length >= all - 8,
-    `${all - scope.length} von ${all} Seiten sind ausgenommen - das ist wieder eine Allowlist`);
+  // ZWEI GRUENDE, NICHT EINER. Aussen vor bleibt eine Seite entweder, WEIL SIE
+  // NICHT HINTER DER SHELL ZEICHNET (Login, Setup, Einladung, Reset, Kopplung) -
+  // das ist Bauart und keine Schuld -, oder weil sie noch nicht migriert ist
+  // (COMPOSITION_PENDING). Die Zahl stand bis zum 16.09.2026 als flaches `- 8`
+  // da und warf beides zusammen; das Budget war damit genau aufgebraucht, und
+  // die naechste eigenstaendige Seite (die Display-Kopplung, #1208) liess den
+  // Nachweis rot werden, obwohl an der Ausnahmeliste nichts gewachsen war.
+  //
+  // Jetzt zaehlt jeder Grund fuer sich. Aufweichen laesst sich das nicht: die
+  // eigenstaendigen Seiten kommen aus `requiresAuth: false` im Router (eine
+  // Seite dort einzutragen hiesse, sie faende die App-Shell nicht mehr - das
+  // faellt sofort auf), und die Ausnahmeliste deckelt PAGE-011 bei
+  // COMPOSITION_PENDING_MAX.
+  const standaloneFiles = rows.filter((r) => !r.auth)
+    .filter((r) => existsSync(new URL(`../public/pages/${r.name}`, import.meta.url))).length;
+  const exempt = all - scope.length;
+  assert.ok(exempt <= standaloneFiles + COMPOSITION_PENDING_MAX,
+    `${exempt} von ${all} Seiten sind ausgenommen, erlaubt sind ${standaloneFiles} eigenstaendige `
+    + `plus ${COMPOSITION_PENDING_MAX} noch nicht migrierte - das ist wieder eine Allowlist`);
   assert.ok(compositionScopeCss().length >= 12,
     'Zu wenige Seiten-CSS im Geltungsbereich - die CSS-Regeln laufen ins Leere');
 });
@@ -17502,6 +17569,54 @@ test('withoutCommentsKeepingLines liest nach `${` einen Ausdruck', () => {
  * (Review zu #1070). Er schadet nicht, aber er behauptet eine Beteiligung, die
  * es nicht gibt - und beim naechsten Lesen sucht jemand den Aufruf.
  */
+/**
+ * WER DAS HANDELNDE KONTO WECHSELT, LEERT DEN OFFLINE-CACHE.
+ *
+ * Der Service Worker haelt Antworten von `/dashboard`, `/tasks` und `/calendar`
+ * nach Request-URL vor und liefert sie aus, wenn das Netz fehlt. Am selben
+ * Geraet ist das ein Datenleck ueber den Nutzerwechsel hinweg: die naechste
+ * Person bekaeme offline die Daten der vorigen.
+ *
+ * Abmelden und Sitzungsende taten es laengst richtig. Die Kopplung eines
+ * Wandtabletts war der dritte Wechsel und tat es zuerst NICHT (#1208, Review) -
+ * ein Tablett, auf dem vorher jemand angemeldet war, haette die privaten
+ * Nutzlasten dieser Person weiter ausgeliefert, und zwar an ein Konto, das sie
+ * ausdruecklich nicht sehen darf.
+ *
+ * Die Liste ist eine Allowlist der Wechsel, nicht ein Suchmuster: ein vierter
+ * Wechsel faellt hier auf, weil ihn jemand eintragen muss.
+ */
+test('jeder Wechsel des handelnden Kontos leert den API-Cache', () => {
+  const WECHSEL = [
+    { datei: '../public/api.js', was: 'Abmelden und Sitzungsende' },
+    { datei: '../public/router.js', was: 'der Rueckweg auf die Anmeldeseite' },
+    { datei: '../public/pages/pair-display.js', was: 'die Kopplung eines Wandtabletts' },
+  ];
+  const fehlend = [];
+  for (const { datei, was } of WECHSEL) {
+    const src = withoutCommentsKeepingLines(read(datei));
+    const importiert = /import\s*\{[^}]*\bclearApiCache\b[^}]*\}\s*from\s*'\/sw-register\.js'/.test(src);
+    const ruft = /clearApiCache\s*\(/.test(src);
+    if (!importiert || !ruft) fehlend.push(`${datei} (${was})`);
+  }
+  assert.deepEqual(fehlend, [],
+    `Diese Kontowechsel leeren den Offline-Cache nicht:\n  ${fehlend.join('\n  ')}`);
+
+  // DAS ABSCHICKEN ALLEIN REICHT NICHT. `clearApiCache()` schickt eine
+  // Nachricht an den Service Worker; das Loeschen laeuft dort in einem
+  // `waitUntil`. Wer unmittelbar danach neu laedt, kann noch aus dem alten
+  // Cache bedient werden - bei der Kopplung waeren das die privaten Antworten
+  // der Person, die das Tablett vorher benutzt hat. Deshalb quittiert der
+  // Worker, und die Kopplungsseite WARTET darauf, bevor sie neu laedt.
+  const worker = withoutCommentsKeepingLines(read('../public/sw.js'));
+  assert.match(worker, /event\.ports/, 'der Worker nimmt einen Antwortport entgegen');
+  assert.match(worker, /port\.postMessage/, 'und quittiert darueber');
+  const register = withoutCommentsKeepingLines(read('../public/sw-register.js'));
+  assert.match(register, /new MessageChannel\(\)/, 'clearApiCache oeffnet den Kanal');
+  const kopplung = withoutCommentsKeepingLines(read('../public/pages/pair-display.js'));
+  assert.match(kopplung, /await clearApiCache\(/, 'die Kopplung wartet auf die Quittung');
+});
+
 test('wer refocusAfterRender importiert, ruft es auch', () => {
   const tot = [];
   for (const dir of ['../public/pages', '../public/components', '../public/settings/pages']) {
