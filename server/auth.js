@@ -741,6 +741,14 @@ function requireAuth(req, res, next) {
  */
 function setupAuthSession(req, res, user) {
   return new Promise((resolve, reject) => {
+    // Letzte Linie, nicht die Pruefung selbst: jeder Weg hierher fragt
+    // `canSignIn` schon vorher und antwortet mit seinem eigenen Grund. Kommt
+    // trotzdem ein Konto an, das sich nicht anmelden darf, hat ein Weg die Regel
+    // vergessen - dann entsteht keine Sitzung, und der Fehler faellt auf.
+    if (!canSignIn(db.get(), user.id)) {
+      log.error('Session refused: this account cannot sign in', { userId: user.id });
+      return reject(new Error('This account cannot sign in.'));
+    }
     req.session.regenerate((err) => {
       if (err) return reject(err);
       req.session.userId    = user.id;
@@ -755,6 +763,26 @@ function setupAuthSession(req, res, user) {
       resolve();
     });
   });
+}
+
+/**
+ * Darf dieses Konto eine Sitzung bekommen?
+ *
+ * Konten der Haushaltshilfe (`housekeeping_workers`, #243) sind Eintraege fuer
+ * Besuche, Abrechnung und Kalender, keine Zugaenge. Die Regel stand zuerst nur
+ * im Passwort-Login - und galt damit nicht fuer die SSO-Anmeldung, die dasselbe
+ * Konto ueber den `sub` oder eine verifizierte Kontakt-E-Mail findet. Deshalb
+ * steht sie EINMAL hier und wird von jedem Weg in eine Sitzung gefragt: vom
+ * Passwort-Login, vom OIDC-Callback vor zweitem Faktor und Sitzung, von der
+ * E-Mail-Verknuepfung (die ein solches Konto nicht bindet) und zuletzt von
+ * `setupAuthSession` selbst.
+ *
+ * @param {import('better-sqlite3-multiple-ciphers').Database} database
+ * @param {number} userId
+ * @returns {boolean}
+ */
+function canSignIn(database, userId) {
+  return !database.prepare('SELECT 1 FROM housekeeping_workers WHERE user_id = ?').get(userId);
 }
 
 /**
@@ -879,6 +907,13 @@ export function findOrCreateOidcUser(database, claims) {
     `).all(email, email);
 
     if (matches.length === 1) {
+      // Ein Konto, das sich nicht anmelden darf, wird nicht verknuepft: es
+      // truege sonst den sub, und jede weitere Anmeldung faende es schon in
+      // Schritt 1. Zurueck kommt es trotzdem, unverknuepft - der Callback weist
+      // es mit eigenem Grund ab, statt derselben Person ein Ersatzkonto anzulegen.
+      if (!canSignIn(database, matches[0].id)) {
+        return database.prepare('SELECT * FROM users WHERE id = ?').get(matches[0].id);
+      }
       database.prepare(
         'UPDATE users SET oidc_sub = ?, oidc_provider = ? WHERE id = ?',
       ).run(sub, provider, matches[0].id);
@@ -1135,8 +1170,7 @@ router.post('/login', loginLimiter, async (req, res) => {
       }
     }
 
-    const isStaff = db.get().prepare('SELECT 1 FROM housekeeping_workers WHERE user_id = ?').get(user.id);
-    if (isStaff) {
+    if (!canSignIn(db.get(), user.id)) {
       log.warn('Login blocked for housekeeping staff account', { ip: req.ip, username });
       return res.status(403).json({ error: 'This account cannot sign in.', code: 403 });
     }
@@ -1839,6 +1873,14 @@ router.get('/oidc/callback', async (req, res) => {
     if (!user) {
       log.warn(`OIDC signup blocked (OIDC_ALLOW_SIGNUP=false): sub=${claims.sub}`);
       return res.redirect('/login?error=oidc_signup_disabled');
+    }
+
+    // Ein Konto der Haushaltshilfe meldet sich auch ueber SSO nicht an (#243).
+    // Die Pruefung steht VOR dem zweiten Faktor: dahinter legte der Callback
+    // erst einen Wartezustand an, und der Code oeffnete dann die Sitzung.
+    if (!canSignIn(db.get(), user.id)) {
+      log.warn(`OIDC sign-in blocked: account cannot sign in, userId=${user.id}`);
+      return res.redirect('/login?error=oidc_sign_in_blocked');
     }
 
     // Der zweite Faktor gilt AUCH auf diesem Weg (#672).

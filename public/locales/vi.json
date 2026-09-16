@@ -3884,13 +3884,90 @@
         "accountUsernameHint": "Địa chỉ e-mail hoặc tên đăng nhập. Đây không phải ô mật khẩu - Yuvomi không lưu mật khẩu."
     },
     "health": {
+        "fasting": {
+            "title": "Nhịn ăn",
+            "emptyTitle": "Nhịn ăn",
+            "emptyDesc": "Bắt đầu bộ hẹn giờ nhịn ăn cá nhân và theo dõi lịch sử của bạn.",
+            "permissionLabel": "Dùng nhịn ăn",
+            "start": "Bắt đầu nhịn ăn",
+            "finish": "Kết thúc nhịn ăn",
+            "history": "Lịch sử",
+            "export": "Xuất CSV",
+            "noHistory": "Chưa có lần nhịn ăn nào hoàn tất",
+            "ready": "Sẵn sàng cho lần nhịn ăn tiếp theo",
+            "startedAt": "Bắt đầu {{date}}",
+            "elapsedDays": "Ngày {{days}}",
+            "goalReached": "Đã đạt mục tiêu",
+            "goalTitle": "Mục tiêu của bạn",
+            "goalHours": "Mục tiêu theo giờ",
+            "earlier": "Tôi đã bắt đầu sớm hơn",
+            "backfill": "Thêm lần nhịn ăn đã hoàn thành",
+            "editStart": "Sửa thời gian bắt đầu",
+            "undoEnd": "Hoàn tác kết thúc",
+            "deleted": "Đã xóa lần nhịn ăn",
+            "person": "Người",
+            "readOnly": "Nhật ký nhịn ăn chỉ đọc",
+            "completedFrom": "Hoàn thành từ ngày",
+            "completedTo": "Hoàn thành đến hết ngày",
+            "applyFilter": "Áp dụng ngày",
+            "targetAt": "Mục tiêu: {{date}}",
+            "utcOffset": "Độ lệch UTC (giờ địa phương lặp lại)",
+            "wallTimeError": "Giờ địa phương này không tồn tại trong múi giờ đã ghi. Hãy chọn giờ khác.",
+            "offline": "Kết nối lại trước khi thay đổi lần nhịn ăn.",
+            "zoneMode": "Thông tin mặt đồng hồ",
+            "zoneTimer": "Chỉ bộ đếm giờ",
+            "zoneEducational": "Các giai đoạn tham khảo",
+            "zoneDetails": "Về các giai đoạn này",
+            "zoneMeal": "Xử lý bữa ăn gần nhất",
+            "zoneStored": "Sử dụng năng lượng dự trữ",
+            "zoneKetones": "Tăng sử dụng chất béo và thể ketone",
+            "zoneLater": "Từ 24 giờ: phản ứng ở mỗi người khác nhau",
+            "zoneVariability": "Các giai đoạn khái quát này chồng lấn nhau. Quá trình chuyển sang sử dụng nhiều chất béo và thể ketone hơn thay đổi tùy người, thường trong 12-36 giờ. Bộ đếm giờ này không đo trạng thái chuyển hóa, và nhịn ăn lâu hơn không nhất thiết tốt hơn.",
+            "extraDays": "+{{count}} ngày",
+            "extraDays_one": "+{{count}} ngày",
+            "extraDays_few": "+{{count}} ngày",
+            "safetyDialog": "Yuvomi là công cụ theo dõi, không phải thiết bị y tế hay lời khuyên y khoa. Nhịn ăn không phù hợp với tất cả mọi người. Hãy tìm hướng dẫn chuyên môn, đặc biệt khi mang thai hoặc cho con bú, đối với trẻ em và thanh thiếu niên, có tiền sử rối loạn ăn uống, tiểu đường, dùng thuốc liên quan hoặc mắc bệnh mạn tính. Bạn có thể kết thúc nhịn ăn bất cứ lúc nào.",
+            "dateReadOnly": "Không thể sửa ngày này trong bộ chọn ngày. Dấu thời gian gốc được giữ nguyên; bạn có thể thay đổi các trường khác.",
+            "saveError": "Không thể lưu lần nhịn ăn.",
+            "loadError": "Không thể tải lần nhịn ăn.",
+            "zone": {
+                "early": "Giai đoạn đầu",
+                "fatBurning": "Giai đoạn trung tính",
+                "ketosis": "Giai đoạn sau"
+            },
+            "custom": "Tùy chỉnh",
+            "startDate": "Ngày bắt đầu",
+            "endDate": "Ngày kết thúc",
+            "note": "Ghi chú",
+            "remaining": "Còn lại",
+            "noGoal": "Không mục tiêu",
+            "goalHint": "Số giờ nguyên, tối đa 336 (14 ngày).",
+            "clockDefault": "Hiển thị bộ đếm giờ mặc định",
+            "clockAuto": "Tự động (theo mục tiêu)",
+            "clockElapsed": "Đã qua",
+            "clockRemaining": "Còn lại",
+            "loadMore": "Tải thêm 10",
+            "goalNextHint": "Thay đổi mục tiêu sẽ cập nhật lần nhịn ăn hiện tại và mục tiêu mặc định cho những lần nhịn ăn sau.",
+            "safetyTitle": "Trước khi bắt đầu",
+            "conflict": "Bản ghi đã thay đổi. Tải lại trang và thử lại.",
+            "finishedTitle": "Đã kết thúc nhịn ăn",
+            "editTitle": "Sửa lần nhịn ăn",
+            "rating": "Bạn cảm thấy thế nào?",
+            "ratingValue": "{{value}} trên 5 sao",
+            "clearRating": "Xóa đánh giá",
+            "finishedHint": "Đã lưu thời điểm kết thúc. Bạn có thể sửa thời gian, thêm đánh giá hoặc ghi chú.",
+            "rangeError": "Kết thúc phải sau bắt đầu và không được ở tương lai.",
+            "elapsed": "Thời gian nhịn ăn",
+            "sinceLast": "Từ lần nhịn ăn trước"
+        },
         "tabs": {
             "overview": "Tổng quan",
             "vitals": "Chỉ số sinh tồn",
             "meds": "Thuốc",
             "labs": "Xét nghiệm",
             "activity": "Hoạt động",
-            "cycle": "Chu kỳ"
+            "cycle": "Chu kỳ",
+            "fasting": "Nhịn ăn"
         },
         "overview": {
             "title": "Tổng quan",
@@ -4327,7 +4404,11 @@
                 "regular": "Đều đặn",
                 "irregular": "Không đều",
                 "notEnoughData": "Chưa đủ dữ liệu",
-                "noPrediction": "Ghi một kỳ kinh để có dự đoán."
+                "noPrediction": "Ghi một kỳ kinh để có dự đoán.",
+                "fertilitySuppressedNote": "Cửa sổ thụ thai đang tạm dừng: tránh thai nội tiết.",
+                "nextPeriodRangeSub": "Trung bình: {{date}}",
+                "partnerNextPeriod": "Kinh nguyệt của {{name}} dự kiến bắt đầu vào {{date}}.",
+                "partnerNextPeriodNeutral": "Nhắc nhở cho đối tác: kinh nguyệt"
             },
             "stats": {
                 "source": {
@@ -4335,11 +4416,14 @@
                     "history_one": "Dựa trên chu kỳ gần nhất của bạn",
                     "insufficientHistory": "Hiện đang dùng giá trị mặc định - hãy ghi thêm {{count}} chu kỳ để có dự đoán cá nhân hóa",
                     "insufficientHistory_one": "Hiện đang dùng giá trị mặc định - hãy ghi thêm {{count}} chu kỳ để có dự đoán cá nhân hóa",
-                    "default": "Giả định mặc định (chưa có lịch sử được ghi)"
+                    "default": "Giả định mặc định (chưa có lịch sử được ghi)",
+                    "historyOther": "Dựa trên {{count}} chu kỳ gần nhất",
+                    "historyOther_one": "Dựa trên chu kỳ gần nhất"
                 }
             },
             "unit": {
-                "days": "{{value}} ngày"
+                "days": "{{value}} ngày",
+                "days_one": "{{value}} ngày"
             },
             "today": {
                 "title": "Hôm nay",
@@ -4353,7 +4437,9 @@
             "calendar": {
                 "title": "Lịch",
                 "prevMonth": "Tháng trước",
-                "nextMonth": "Tháng sau"
+                "nextMonth": "Tháng sau",
+                "likelihoodTitle": "Mẫu hình triệu chứng",
+                "likelihoodCaption": "Chọn một triệu chứng để xem nó thường xuất hiện vào những ngày nào, dựa trên lịch sử của bạn."
             },
             "weekday": {
                 "mon": "T2",
@@ -4370,13 +4456,16 @@
                 "fertile": "Dễ thụ thai",
                 "ovulation": "Rụng trứng",
                 "today": "Hôm nay",
-                "logged": "Mục"
+                "logged": "Mục",
+                "pms": "Cửa sổ PMS (mẫu hình)"
             },
             "history": {
                 "title": "Xu hướng",
                 "ongoing": "đang diễn ra",
                 "empty": "Chưa ghi kỳ kinh nào.",
-                "cycleLength": "Chu kỳ {{value}} ngày"
+                "cycleLength": "Chu kỳ {{value}} ngày",
+                "cycleLength_one": "Chu kỳ {{value}} ngày",
+                "flowHeaviest": "Tối đa: {{value}}"
             },
             "trends": {
                 "title": "Xu hướng",
@@ -4392,12 +4481,21 @@
                 "typical": "Điển hình",
                 "atypical": "Không điển hình",
                 "typicalRangeLabel": "Phạm vi điển hình: {{min}}-{{max}} ngày",
-                "likelihoodTitle": "Mẫu hình triệu chứng",
-                "likelihoodCaption": "Chọn một triệu chứng để xem nó thường xuất hiện vào những ngày nào, dựa trên lịch sử của bạn.",
-                "likelyToday": "{{symptom}} thường xuất hiện quanh ngày này trong chu kỳ của bạn.",
                 "symptomTracked": "Đã ghi",
                 "symptomPredicted": "Thường xuất hiện ở đây",
-                "phaseOther": "Khác"
+                "phaseOther": "Khác",
+                "details": "Chi tiết",
+                "feelingFrequency": "Tần suất cảm xúc",
+                "flowLoad": "Cường độ ra máu theo chu kỳ",
+                "flowLoadCaption": "Dựa trên các mục ghi lượng máu của bạn - bạn ghi càng đầy đủ, dữ liệu này càng có ý nghĩa.",
+                "flowLoadColumn": "Mức độ ra máu",
+                "flowLoadValue": "{{load}} (đã ghi {{days}})",
+                "heavyBleedingHintHeavy": "Các kỳ kinh gần đây của bạn nhiều lần được ghi là \"ra nhiều\" - điều này đáng để đề cập khi khám bác sĩ.",
+                "heavyBleedingHintLong": "Ít nhất một trong các kỳ kinh gần đây của bạn kéo dài hơn một tuần - điều này đáng để đề cập khi khám bác sĩ.",
+                "painTitle": "Đau",
+                "painCurrentCycleLabel": "Số ngày đau trong chu kỳ này",
+                "painAvgPerCycleLabel": "TB số ngày đau mỗi chu kỳ",
+                "painAvgIntensityLabel": "Cường độ TB"
             },
             "flow": {
                 "label": "Lượng máu",
@@ -4466,7 +4564,9 @@
             },
             "period": {
                 "add": "Ghi kỳ kinh",
-                "edit": "Sửa kỳ kinh"
+                "edit": "Sửa kỳ kinh",
+                "warningFuture": "Ngày bắt đầu nằm trong tương lai - dự đoán chỉ dựa trên các chu kỳ trong quá khứ.",
+                "warningOverlap": "Trùng với một chu kỳ đã được ghi lại."
             },
             "dayLog": {
                 "title": "Ghi lại ngày",
@@ -4505,8 +4605,91 @@
                 "pregnancyMode": "Chế độ thai kỳ",
                 "dueDate": "Ngày dự sinh",
                 "pregnancyHint": "Ở chế độ thai kỳ, dự đoán kinh nguyệt và rụng trứng được tạm dừng. Ghi nhật ký hằng ngày vẫn khả dụng.",
-                "saved": "Đã lưu cài đặt."
-            }
+                "saved": "Đã lưu cài đặt.",
+                "contraception": "Phương pháp tránh thai",
+                "contraceptionHint": "Các phương pháp nội tiết tự động tạm dừng dự đoán cửa sổ thụ thai.",
+                "contraceptionUnset": "Chưa xác định",
+                "contraceptionOptions": {
+                    "none": "Không",
+                    "pill": "Thuốc tránh thai",
+                    "hormonal_iud": "Vòng tránh thai nội tiết",
+                    "copper_iud": "Vòng tránh thai đồng",
+                    "implant": "Que cấy tránh thai",
+                    "injection": "Thuốc tiêm tránh thai",
+                    "patch": "Miếng dán tránh thai",
+                    "ring": "Vòng âm đạo",
+                    "condom": "Bao cao su",
+                    "other": "Khác"
+                },
+                "perimenopauseMode": "Chế độ tiền mãn kinh",
+                "perimenopauseModeHint": "Dự đoán hiện hiển thị dưới dạng khoảng thay vì một ngày duy nhất; đánh giá tính đều đặn sẽ tắt.",
+                "showPms": "Hiển thị khung PMS",
+                "notifyPartner": "Thông báo cho bạn đời",
+                "notifyPartnerHint": "Người được chọn chỉ nhận được ngày dự đoán, không bao giờ nhận triệu chứng, ghi chú hay mục nhập khác.",
+                "notifyPartnerNoEligible": "Không có thành viên hộ gia đình phù hợp - chỉ những thành viên có quyền truy cập mô-đun Sức khỏe mới có thể được thông báo.",
+                "notifyPartnerDaysBefore": "Nhắc nhở cho bạn đời"
+            },
+            "mucus": {
+                "label": "Dịch nhầy cổ tử cung",
+                "hint": "Tùy chọn. Thay đổi kết cấu có thể giúp xác định cửa sổ dễ thụ thai.",
+                "none": "Không có",
+                "dry": "Khô",
+                "sticky": "Dính",
+                "creamy": "Như kem",
+                "watery": "Loãng",
+                "eggwhite": "Như lòng trắng trứng"
+            },
+            "test": {
+                "label": "Xét nghiệm",
+                "lhLabel": "Xét nghiệm LH",
+                "pregnancyLabel": "Que thử thai",
+                "unset": "Chưa xét nghiệm",
+                "negative": "Âm tính",
+                "positive": "Dương tính"
+            },
+            "feelings": {
+                "label": "Cảm xúc"
+            },
+            "intimacy": {
+                "label": "Sự thân mật",
+                "hint": "Vẫn ở chế độ riêng tư ngay cả khi ngày này được chia sẻ với gia đình.",
+                "none": "Chưa xác định",
+                "protected": "Có bảo vệ",
+                "unprotected": "Không bảo vệ",
+                "solo": "Một mình"
+            },
+            "quickLink": {
+                "painkiller": "Ghi lại thuốc giảm đau",
+                "weight": "Ghi lại cân nặng"
+            },
+            "bubble": {
+                "ariaLabel": "Trạng thái chu kỳ hôm nay",
+                "line1": "Ngày {{day}} của chu kỳ · {{phase}}",
+                "periodToday": "Dự kiến có kinh hôm nay - bắt đầu ngay?",
+                "periodOverdue": "Kinh nguyệt trễ {{count}} ngày - bắt đầu ngay?",
+                "periodOverdue_one": "Kinh nguyệt trễ {{count}} ngày - bắt đầu ngay?",
+                "periodStillOpen": "Kỳ kinh của bạn vẫn được ghi nhận là đang diễn ra - kết thúc ngay?",
+                "peakPainDay": "Theo mẫu hình của bạn, hôm nay thường là ngày đau nhiều nhất ({{symptom}}).",
+                "likelySymptomsToday": "Có khả năng hôm nay: {{symptoms}}",
+                "pmsWindow": "Khung PMS có khả năng bắt đầu từ {{weekday}}",
+                "upcomingSymptom": "Có khả năng từ {{weekday}}: {{symptom}}",
+                "fertile": "Cửa sổ thụ thai đến {{date}}",
+                "fertileConfirmed": "Cửa sổ thụ thai (đã xác nhận rụng trứng) đến {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Sự rụng trứng của chu kỳ này đã được xác nhận bằng mức tăng nhiệt độ. Các chu kỳ tương lai vẫn dựa trên phương pháp lịch; điều này không thay thế biện pháp tránh thai hay tư vấn y tế.",
+            "import": {
+                "button": "Nhập",
+                "title": "Nhập lịch sử chu kỳ",
+                "explainer": "Tệp CSV hoặc văn bản dán vào: mỗi dòng một kỳ kinh theo dạng „start_date,end_date” (ngày kết thúc là tùy chọn), ngày theo định dạng YYYY-MM-DD hoặc DD.MM.YYYY, phân tách bằng dấu phẩy hoặc dấu chấm phẩy.",
+                "fileLabel": "Chọn tệp CSV",
+                "pasteLabel": "Hoặc dán văn bản CSV",
+                "submit": "Nhập",
+                "resultToast": "Đã nhập {{imported}}, đã bỏ qua {{skipped}}.",
+                "errorsTitle": "Những dòng sau không thể nhập:",
+                "emptyError": "Vui lòng chọn tệp CSV hoặc dán văn bản.",
+                "error": "Nhập không thành công."
+            },
+            "discoveryHint": "Mẹo: bạn có thể đăng ký chu kỳ dự đoán dưới dạng feed ICS tại <a href=\"/settings/personal/feeds\">Cài đặt → Cá nhân → Feed</a>, hoặc hiển thị tiện ích chu kỳ trên <a href=\"/\">Tổng quan</a> qua chế độ tùy chỉnh."
         },
         "duration": {
             "hm": "{{hours}} giờ {{minutes}} phút",

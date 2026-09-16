@@ -7,7 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.67.0] - 2026-09-16
+
 ### Added
+
+- **The cycle tab grows into a full tracker: visible flow strength, feelings, more fertility
+  signals, hard-private intimacy logging, PMS patterns, and a "today" insight bubble.** The day log
+  gains cervical mucus, LH and pregnancy tests, multi-select feelings (replacing the single mood),
+  and intimacy - cervical mucus, the two test results and intimacy are never shown to anyone but
+  yourself, even on days shared with the family, enforced by the server. On
+  `POST /api/v1/health/cycle/logs`, `mood` (kept for older clients) and `feelings` now both accept
+  only the fixed feelings list - an out-of-list value is a 400 instead of being stored as free text.
+  Saving a day log through the app always sends the current feelings selection, so an older
+  free-text mood value is cleared the next time that day is edited in the app; only a save that
+  omits both fields entirely (outside the app's own form) leaves it as-is. Flow strength finally
+  shows up everywhere it matters: a four-step dot scale on the calendar, a heaviest-flow chip per
+  period in the history, a per-cycle flow intensity chart, and a calm hint when recent periods run
+  repeatedly heavy or over a week. A bubble at the top answers the daily question at a glance -
+  cycle day and phase, plus whichever of these applies: period expected today (start it right
+  there), symptoms likely today, a PMS window approaching, or the fertile window. Predictions got
+  more honest along the way: a temperature-confirmed ovulation now also moves the month calendar
+  (ring and calendar can no longer disagree), implausible gaps from overlapping or future-dated
+  periods no longer poison the averages (the period dialog warns about both), the BBT chart spaces
+  its points by real dates and breaks across logging gaps, and the likelihood overlay projects into
+  the next cycle instead of only backwards. New per-person settings: contraception (hormonal methods
+  pause the fertile-window prediction, with the reason shown instead of an empty tile), a
+  perimenopause mode that predicts a date range rather than a false-precision single day, a
+  PMS-window toggle, and an opt-in partner reminder that shares only the predicted date - never any
+  log content. Period history can be imported from CSV (German date and separator formats included),
+  the Health overview shows the next period at a glance, and the trends section was restructured
+  around one expander per symptom with an added feelings-by-phase view and a pain summary.
 
 - **New optional module: Waste collection** (#1063). Define your household's waste types
   (recycling, organic, general, or your own, each with an icon and color) and a weekly or
@@ -56,6 +85,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A type's color comes from a curated palette instead of a free color picker, which had happily
   accepted a white or black icon that then disappeared against the light or dark background - an
   existing color outside the palette is kept, not silently overwritten.
+- **A fasting journal records timers and past fasts in Health** (Refs #1173).
+  Start now or earlier, record completed intervals, and edit or undo changes with
+  conflict protection. Elapsed/remaining clocks, personal goals and an optional
+  educational dial preserve the recorded time zone. History loads ten records at
+  a time; date filters and CSV cover the complete visible history. Family members
+  can read shared records; personal settings stay private. Fasting is available to
+  every member by default and an admin can switch it off per family role or person.
+  Yuvomi records fasting and does not provide medical advice.
 
 - **A calendar's default assignee can now be applied to the events it already imported** (#1154).
   Until now the mapping only reached events that arrived after it was set, so the first thing
@@ -165,6 +202,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A request with an API token is judged by the token's own role, even when an admin session comes
+  along.** If the same client also sent the session cookie of a signed-in administrator, a request
+  made with a member's API token could still pass as an administrator in several places: calendar
+  subscriptions and events, locked tasks, household note categories, documents and DMS connections,
+  recipe providers, the shift schedule and split expenses. Each of them had its own admin check that
+  also looked at the session. They now use the same check as every other route, which looks only at
+  the role of the person the token belongs to. Signing in as an administrator without a token keeps
+  full access, and a request with only a session or only a token behaves as before.
 - **Form fields have a clearly visible edge in both themes.** Text inputs, selects and text areas
   drew their resting edge in the same faint shade as card and group outlines, which rendered at 1.2
   to 1.5:1 against the surface around them - well below the 3:1 a control boundary needs for people
@@ -388,6 +433,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead, and nothing brought it back. The same could pull focus out of an open date picker. The
   first field now stays out of the way once focus has moved inside the dialog or into something on
   top of it, such as a date picker; focus that lands on the page behind the dialog still moves in.
+
+- **The warning about a password login that is still open now names the administrator condition**
+  (#1194). `AUTH_ALLOW_PASSWORD_LOGIN=false` only takes effect once an administrator account is
+  linked to the OIDC provider; a member signing in through SSO does not arm it, so that an
+  administrator without a linked account cannot be locked out of the administration. The startup
+  warning said that no account was linked, so an operator whose member had already signed in through
+  SSO read the switch as armed while the login form was still open. It now says administrator. In
+  the same pass the Portainer compose file stopped defaulting `OPENWEATHER_LANG` to `de`, where the
+  code, `.env.example`, the Unraid template and the installation guide all use `en`.
+
+- **Shared expenses embedded in Budget no longer skip a heading level** (#1190). The embedded tab
+  title is a level-2 heading, which left the group name beside it at the same level and its
+  Balances, Recent expenses and Activity cards directly under the title instead of under the group.
+  The group name is now a level-3 heading and those cards level 4, so the outline a screen reader
+  announces reads Budget, then Shared expenses, then the group, then the section. Nothing moves
+  visually: size, weight, line height, margin and color are unchanged.
+
+## [2.66.2] - 2026-09-16
+
+### Security
+
+- **A housekeeping staff account can no longer be signed in through SSO (GHSA-4jcg-7jvj-p4v9).**
+  Staff accounts have been refused at the password sign-in since v0.63.0, but the rule lived only in
+  that route. The OIDC callback found the same account through an identity already linked to it, or
+  linked it through a provider-verified email matching the account's contact email, and opened a
+  full session - with the second factor enabled, by way of the code prompt. The rule now sits in one
+  place that every sign-in path asks: the callback checks it before linking, before the second
+  factor and before the session, a staff account is never linked by email, and the session setup
+  itself refuses such an account as a last line. Only installations with OIDC configured were
+  affected; password sign-in and members signing in through SSO behave as before.
 
 ## [2.66.1] - 2026-09-14
 

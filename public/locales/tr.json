@@ -3884,13 +3884,90 @@
         "accountUsernameHint": "E-posta adresi veya kullanıcı adı. Parola alanı değildir - Yuvomi parola saklamaz."
     },
     "health": {
+        "fasting": {
+            "title": "Oruç",
+            "emptyTitle": "Oruç",
+            "emptyDesc": "Kişisel oruç zamanlayıcınızı başlatın ve geçmişinizi takip edin.",
+            "permissionLabel": "Orucu kullan",
+            "start": "Orucu başlat",
+            "finish": "Orucu bitir",
+            "history": "Geçmiş",
+            "export": "CSV dışa aktar",
+            "noHistory": "Henüz tamamlanmış oruç yok",
+            "ready": "Sonraki oruç için hazır",
+            "startedAt": "Başlangıç {{date}}",
+            "elapsedDays": "{{days}}. gün",
+            "goalReached": "Hedefe ulaşıldı",
+            "goalTitle": "Hedefiniz",
+            "goalHours": "Saat cinsinden hedef",
+            "earlier": "Daha önce başladım",
+            "backfill": "Tamamlanmış oruç ekle",
+            "editStart": "Başlangıcı düzenle",
+            "undoEnd": "Bitişi geri al",
+            "deleted": "Oruç silindi",
+            "person": "Kişi",
+            "readOnly": "Salt okunur oruç günlüğü",
+            "completedFrom": "Tamamlanma başlangıç tarihi",
+            "completedTo": "Tamamlanma bitiş tarihi",
+            "applyFilter": "Tarihleri uygula",
+            "targetAt": "Hedef: {{date}}",
+            "utcOffset": "UTC farkı (tekrarlanan yerel saat)",
+            "wallTimeError": "Bu yerel saat, kaydedilen saat diliminde mevcut değil. Başka bir saat seçin.",
+            "offline": "Orucu değiştirmeden önce yeniden bağlanın.",
+            "zoneMode": "Kadran bilgileri",
+            "zoneTimer": "Yalnızca zamanlayıcı",
+            "zoneEducational": "Bilgilendirici evreler",
+            "zoneDetails": "Bu evreler hakkında",
+            "zoneMeal": "Son öğünün işlenmesi",
+            "zoneStored": "Depolanmış enerjinin kullanılması",
+            "zoneKetones": "Yağ ve keton kullanımının artması",
+            "zoneLater": "24 saat ve sonrası: bireysel tepkiler değişir",
+            "zoneVariability": "Bu genel evreler birbiriyle örtüşür. Yağ ve ketonların daha fazla kullanımına geçiş değişkenlik gösterir ve genellikle 12-36 saat içinde gerçekleşir. Bu zamanlayıcı metabolik durumu ölçmez ve daha uzun oruç mutlaka daha iyi değildir.",
+            "extraDays": "+{{count}} gün",
+            "extraDays_one": "+{{count}} gün",
+            "extraDays_few": "+{{count}} gün",
+            "safetyDialog": "Yuvomi bir takip aracıdır, tıbbi cihaz veya tıbbi tavsiye değildir. Oruç herkes için uygun değildir. Özellikle hamilelik veya emzirme döneminde, çocuklar ve ergenler için, yeme bozukluğu öyküsü, diyabet, ilgili ilaçlar veya kronik rahatsızlıklar durumunda profesyonel rehberlik alın. Orucu istediğiniz zaman sonlandırabilirsiniz.",
+            "dateReadOnly": "Bu tarih, tarih seçicide düzenlenemez. Özgün zaman damgası korunur; diğer alanları değiştirebilirsiniz.",
+            "saveError": "Oruç kaydedilemedi.",
+            "loadError": "Oruç yüklenemedi.",
+            "zone": {
+                "early": "Erken aşama",
+                "fatBurning": "Tarafsız aşama",
+                "ketosis": "Geç aşama"
+            },
+            "custom": "Özel",
+            "startDate": "Başlangıç tarihi",
+            "endDate": "Bitiş tarihi",
+            "note": "Not",
+            "remaining": "Kalan",
+            "noGoal": "Hedef yok",
+            "goalHint": "Tam saat, en fazla 336 (14 gün).",
+            "clockDefault": "Varsayılan zamanlayıcı görünümü",
+            "clockAuto": "Otomatik (hedefe göre)",
+            "clockElapsed": "Geçen",
+            "clockRemaining": "Kalan",
+            "loadMore": "10 tane daha yükle",
+            "goalNextHint": "Hedefi değiştirmek mevcut orucu ve sonraki oruçlar için varsayılan hedefi günceller.",
+            "safetyTitle": "Başlamadan önce",
+            "conflict": "Kayıt değişti. Sayfayı yenileyip tekrar deneyin.",
+            "finishedTitle": "Oruç tamamlandı",
+            "editTitle": "Orucu düzenle",
+            "rating": "Nasıl hissediyorsunuz?",
+            "ratingValue": "5 üzerinden {{value}} yıldız",
+            "clearRating": "Puanı kaldır",
+            "finishedHint": "Bitiş kaydedildi. Saatleri düzenleyebilir, puan veya not ekleyebilirsiniz.",
+            "rangeError": "Bitiş başlangıçtan sonra olmalı ve gelecekte olmamalıdır.",
+            "elapsed": "Oruç süresi",
+            "sinceLast": "Son oruçtan bu yana"
+        },
         "tabs": {
             "overview": "Genel bakış",
             "vitals": "Yaşamsal değerler",
             "meds": "İlaçlar",
             "labs": "Laboratuvar",
             "activity": "Aktivite",
-            "cycle": "Döngü"
+            "cycle": "Döngü",
+            "fasting": "Oruç"
         },
         "overview": {
             "title": "Genel bakış",
@@ -4327,7 +4404,11 @@
                 "regular": "Düzenli",
                 "irregular": "Düzensiz",
                 "notEnoughData": "Yetersiz veri",
-                "noPrediction": "Tahminler için bir adet dönemi kaydet."
+                "noPrediction": "Tahminler için bir adet dönemi kaydet.",
+                "fertilitySuppressedNote": "Doğurgan pencere duraklatıldı: hormonal doğum kontrolü.",
+                "nextPeriodRangeSub": "Ortalama: {{date}}",
+                "partnerNextPeriod": "{{name}} adlı kişinin adetinin {{date}} tarihinde başlaması bekleniyor.",
+                "partnerNextPeriodNeutral": "Partner hatırlatması: adet"
             },
             "stats": {
                 "source": {
@@ -4335,11 +4416,14 @@
                     "history_one": "Son döngüne göre",
                     "insufficientHistory": "Şimdilik varsayılan değer - kişiselleştirilmiş tahmin için {{count}} döngü daha kaydet",
                     "insufficientHistory_one": "Şimdilik varsayılan değer - kişiselleştirilmiş tahmin için {{count}} döngü daha kaydet",
-                    "default": "Varsayılan kabul (henüz geçmiş kaydı yok)"
+                    "default": "Varsayılan kabul (henüz geçmiş kaydı yok)",
+                    "historyOther": "Son {{count}} döngüye göre",
+                    "historyOther_one": "Son döngüye göre"
                 }
             },
             "unit": {
-                "days": "{{value}} gün"
+                "days": "{{value}} gün",
+                "days_one": "{{value}} gün"
             },
             "today": {
                 "title": "Bugün",
@@ -4353,7 +4437,9 @@
             "calendar": {
                 "title": "Takvim",
                 "prevMonth": "Önceki ay",
-                "nextMonth": "Sonraki ay"
+                "nextMonth": "Sonraki ay",
+                "likelihoodTitle": "Semptom örüntüleri",
+                "likelihoodCaption": "Geçmişine göre hangi günlerde sık görüldüğünü görmek için bir semptom seç."
             },
             "weekday": {
                 "mon": "Pzt",
@@ -4370,13 +4456,16 @@
                 "fertile": "Doğurgan",
                 "ovulation": "Yumurtlama",
                 "today": "Bugün",
-                "logged": "Kayıt"
+                "logged": "Kayıt",
+                "pms": "PMS penceresi (örüntü)"
             },
             "history": {
                 "title": "Eğilim",
                 "ongoing": "devam ediyor",
                 "empty": "Henüz adet dönemi kaydedilmedi.",
-                "cycleLength": "Döngü {{value}} gün"
+                "cycleLength": "Döngü {{value}} gün",
+                "cycleLength_one": "Döngü {{value}} gün",
+                "flowHeaviest": "Maks. {{value}}"
             },
             "trends": {
                 "title": "Eğilimler",
@@ -4392,12 +4481,21 @@
                 "typical": "Tipik",
                 "atypical": "Atipik",
                 "typicalRangeLabel": "Tipik aralık: {{min}}-{{max}} gün",
-                "likelihoodTitle": "Semptom örüntüleri",
-                "likelihoodCaption": "Geçmişine göre hangi günlerde sık görüldüğünü görmek için bir semptom seç.",
-                "likelyToday": "{{symptom}} döngünde genellikle bu günün civarında görülür.",
                 "symptomTracked": "Kaydedildi",
                 "symptomPredicted": "Genellikle burada görülür",
-                "phaseOther": "Diğer"
+                "phaseOther": "Diğer",
+                "details": "Ayrıntılar",
+                "feelingFrequency": "Duygu sıklığı",
+                "flowLoad": "Döngü başına kanama yoğunluğu",
+                "flowLoadCaption": "Kanama kayıtlarına dayanır - kayıtların ne kadar eksiksiz olursa, bu o kadar anlamlı olur.",
+                "flowLoadColumn": "Kanama yükü",
+                "flowLoadValue": "{{load}} ({{days}} kaydedildi)",
+                "heavyBleedingHintHeavy": "Son adet dönemlerin tekrar tekrar \"yoğun\" olarak kaydedildi - bunu bir doktor görüşmesinde belirtmekte fayda var.",
+                "heavyBleedingHintLong": "Son adet dönemlerinden en az biri bir haftadan uzun sürdü - bunu bir doktor görüşmesinde belirtmekte fayda var.",
+                "painTitle": "Ağrı",
+                "painCurrentCycleLabel": "Bu döngüdeki ağrılı gün sayısı",
+                "painAvgPerCycleLabel": "Döngü başına ort. ağrılı gün",
+                "painAvgIntensityLabel": "Ort. yoğunluk"
             },
             "flow": {
                 "label": "Kanama yoğunluğu",
@@ -4466,7 +4564,9 @@
             },
             "period": {
                 "add": "Adeti kaydet",
-                "edit": "Adeti düzenle"
+                "edit": "Adeti düzenle",
+                "warningFuture": "Başlangıç tarihi gelecekte - tahminler yalnızca geçmiş döngülere dayanır.",
+                "warningOverlap": "Zaten kaydedilmiş bir döngüyle çakışıyor."
             },
             "dayLog": {
                 "title": "Günü kaydet",
@@ -4505,8 +4605,91 @@
                 "pregnancyMode": "Gebelik modu",
                 "dueDate": "Tahmini doğum tarihi",
                 "pregnancyHint": "Gebelik modunda regl ve yumurtlama tahminleri duraklatılır. Günlük kayıt kullanılmaya devam eder.",
-                "saved": "Ayarlar kaydedildi."
-            }
+                "saved": "Ayarlar kaydedildi.",
+                "contraception": "Doğum kontrol yöntemi",
+                "contraceptionHint": "Hormonal yöntemler doğurgan pencere tahminini otomatik olarak duraklatır.",
+                "contraceptionUnset": "Belirtilmedi",
+                "contraceptionOptions": {
+                    "none": "Yok",
+                    "pill": "Doğum kontrol hapı",
+                    "hormonal_iud": "Hormonlu spiral",
+                    "copper_iud": "Bakırlı spiral",
+                    "implant": "İmplant",
+                    "injection": "İğne",
+                    "patch": "Bant",
+                    "ring": "Vajinal halka",
+                    "condom": "Prezervatif",
+                    "other": "Diğer"
+                },
+                "perimenopauseMode": "Perimenopoz modu",
+                "perimenopauseModeHint": "Tahminler tek bir tarih yerine bir aralık olarak gösterilir; düzenlilik değerlendirmesi kapatılır.",
+                "showPms": "PMS penceresini göster",
+                "notifyPartner": "Bir partnere bildir",
+                "notifyPartnerHint": "Seçilen kişi yalnızca tahmini tarihi alır, asla semptomları, notları veya diğer kayıtları almaz.",
+                "notifyPartnerNoEligible": "Uygun bir hane üyesi yok - yalnızca Sağlık modülüne erişimi olan üyelere bildirim gönderilebilir.",
+                "notifyPartnerDaysBefore": "Partner hatırlatması"
+            },
+            "mucus": {
+                "label": "Serviks mukusu",
+                "hint": "İsteğe bağlı. Kıvamdaki değişiklikler doğurgan pencereyi daraltmaya yardımcı olabilir.",
+                "none": "Yok",
+                "dry": "Kuru",
+                "sticky": "Yapışkan",
+                "creamy": "Kremsi",
+                "watery": "Sulu",
+                "eggwhite": "Yumurta akı gibi"
+            },
+            "test": {
+                "label": "Testler",
+                "lhLabel": "LH testi",
+                "pregnancyLabel": "Gebelik testi",
+                "unset": "Test yapılmadı",
+                "negative": "Negatif",
+                "positive": "Pozitif"
+            },
+            "feelings": {
+                "label": "Duygular"
+            },
+            "intimacy": {
+                "label": "Mahremiyet",
+                "hint": "Bu gün aileyle paylaşılsa bile özel kalır.",
+                "none": "Belirtilmedi",
+                "protected": "Korunmalı",
+                "unprotected": "Korunmasız",
+                "solo": "Tek başına"
+            },
+            "quickLink": {
+                "painkiller": "Ağrı kesici kaydet",
+                "weight": "Kilo kaydet"
+            },
+            "bubble": {
+                "ariaLabel": "Bugünkü döngü durumu",
+                "line1": "Döngü günü {{day}} · {{phase}}",
+                "periodToday": "Adet bugün bekleniyor - şimdi başlatılsın mı?",
+                "periodOverdue": "Adet {{count}} gündür gecikti - şimdi başlatılsın mı?",
+                "periodOverdue_one": "Adet {{count}} gündür gecikti - şimdi başlatılsın mı?",
+                "periodStillOpen": "Kayda göre adetin hâlâ devam ediyor - şimdi bitirilsin mi?",
+                "peakPainDay": "Örüntüne göre bugün genellikle en yoğun ağrı günün oluyor ({{symptom}}).",
+                "likelySymptomsToday": "Bugün muhtemel: {{symptoms}}",
+                "pmsWindow": "PMS penceresi muhtemelen {{weekday}} itibarıyla",
+                "upcomingSymptom": "{{weekday}} itibarıyla muhtemel: {{symptom}}",
+                "fertile": "Doğurgan pencere {{date}} tarihine kadar",
+                "fertileConfirmed": "Doğurgan pencere (yumurtlama doğrulandı) {{date}} tarihine kadar"
+            },
+            "fertilityDisclaimerConfirmed": "Bu döngüdeki yumurtlama bir sıcaklık artışıyla doğrulandı. Gelecekteki döngüler yine takvim yöntemine dayanır; bu doğum kontrolünün veya tıbbi tavsiyenin yerini tutmaz.",
+            "import": {
+                "button": "İçe Aktar",
+                "title": "Adet geçmişini içe aktar",
+                "explainer": "CSV dosyası veya yapıştırılan metin: her satır bir döngü için „start_date,end_date” biçiminde (bitiş tarihi isteğe bağlı), tarihler YYYY-AA-GG veya GG.AA.YYYY biçiminde, virgül veya noktalı virgülle ayrılmış.",
+                "fileLabel": "CSV dosyası seç",
+                "pasteLabel": "Veya CSV metnini yapıştır",
+                "submit": "İçe Aktar",
+                "resultToast": "{{imported}} içe aktarıldı, {{skipped}} atlandı.",
+                "errorsTitle": "Bu satırlar içe aktarılamadı:",
+                "emptyError": "Lütfen bir CSV dosyası seçin veya metin yapıştırın.",
+                "error": "İçe aktarma başarısız oldu."
+            },
+            "discoveryHint": "İpucu: tahmini döngüye <a href=\"/settings/personal/feeds\">Ayarlar → Kişisel → Beslemeler</a> altında ICS beslemesi olarak abone olabilirsin, ya da döngü widget'ını <a href=\"/\">Genel Bakış</a>'ta özelleştirme modundan gösterebilirsin."
         },
         "duration": {
             "hm": "{{hours}} sa {{minutes}} dk",

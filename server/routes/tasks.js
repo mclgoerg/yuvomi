@@ -23,6 +23,7 @@ import { parseSyncTargetValue } from '../../public/utils/sync-target.js';
 import { mentionedUserIds } from '../../public/utils/mentions.js';
 import { toggleChecklistLine } from '../../public/utils/markdown-checklist.js';
 import { resolvePermissions } from '../permissions.js';
+import { isAdminRequest } from '../middleware/require-admin.js';
 import { householdMemberSql, newNonMembers, nonMemberMessage } from '../services/household-members.js';
 import { pushService } from '../services/push.js';
 import { todayKey } from '../utils/timezone.js';
@@ -316,9 +317,6 @@ function lockingTask(task) {
   return parent && parent.locked ? parent : null;
 }
 
-/** Admin - hier lokal, weil die Regel in der Route wohnt und nicht in einer Middleware. */
-function isAdmin(req) { return req.authRole === 'admin' || req.session?.role === 'admin'; }
-
 /**
  * Darf diese Person die DEFINITION der Aufgabe aendern oder sie loeschen? (#830)
  *
@@ -333,7 +331,7 @@ function isAdmin(req) { return req.authRole === 'admin' || req.session?.role ===
 function mayEditTaskDefinition(task, req) {
   const lock = lockingTask(task);
   if (!lock) return true;
-  if (isAdmin(req)) return true;
+  if (isAdminRequest(req)) return true;
   return lock.created_by === (req.authUserId || req.session?.userId);
 }
 
@@ -1139,7 +1137,7 @@ router.put('/:id', (req, res) => {
     const status = (req.body.status === undefined || archiveRequested)
       ? task.status
       : req.body.status;
-    if (reopensSettledVisit(db.get(), task.id, task.status, status) && req.authRole !== 'admin') {
+    if (reopensSettledVisit(db.get(), task.id, task.status, status) && !isAdminRequest(req)) {
       return res.status(403).json({ error: 'Permission denied.', code: 403 });
     }
 
@@ -1536,7 +1534,7 @@ router.patch('/:id/status', (req, res) => {
       return res.json({ data: { id: Number(req.params.id), status: prev.status, archived_at: archivedAt } });
     }
 
-    if (reopensSettledVisit(db.get(), prev.id, prev.status, status) && req.authRole !== 'admin') {
+    if (reopensSettledVisit(db.get(), prev.id, prev.status, status) && !isAdminRequest(req)) {
       return res.status(403).json({ error: 'Permission denied.', code: 403 });
     }
 
@@ -1925,7 +1923,7 @@ function commentForWrite(req, { allowAdmin = false } = {}) {
     .get(req.params.commentId, task.id);
   if (!row) return { error: 404 };
 
-  const mayWrite = row.user_id === me || (allowAdmin && req.authRole === 'admin');
+  const mayWrite = row.user_id === me || (allowAdmin && isAdminRequest(req));
   if (!mayWrite) return { error: 403 };
   return { task, row, me };
 }
@@ -2066,7 +2064,7 @@ router.get('/meta/options', (req, res) => {
 // dasselbe Admin-Gate wie beim Setzen des Standards und beim Nachziehen.
 router.get('/points/affected', (req, res) => {
   try {
-    if (req.authRole !== 'admin') {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Admin access required.', code: 403 });
     }
     const points = Number(req.query.points);
@@ -2088,7 +2086,7 @@ router.get('/points/affected', (req, res) => {
 // steht vorab im Bestätigungsdialog, der Wechsel ist also nie verdeckt.
 router.post('/points/rebase', (req, res) => {
   try {
-    if (req.authRole !== 'admin') {
+    if (!isAdminRequest(req)) {
       return res.status(403).json({ error: 'Admin access required.', code: 403 });
     }
     const from = Number(req.body.from);

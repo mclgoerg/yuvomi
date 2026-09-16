@@ -1033,6 +1033,14 @@ const SHAPE_EXEMPT = new Map([
   ['month-day', 'Rasterzelle: Tag im Kalender-Monat'],
   ['more-action', 'Rasterzelle: Kachel im More-Sheet-Raster'],
   ['metric-card--select', 'Rasterzelle: waehlbare Kennzahlkachel (.metric-card, Block-2-Konsolidierung)'],
+  // Die Zyklus-Kachel ist seit #1181 ein <button>, der als GANZE Kachel zum
+  // Zyklus-Tab durchklickt (health.css:1311). Sie steht in derselben
+  // Kachelanordnung wie ihre nicht klickbaren Schwestern und traegt deren
+  // Radius aus derselben Regel (.health-overview__card). Eine Kapsel waere hier
+  // nicht die eine Form, sondern eine ZWEITE neben optisch identischen
+  // Nachbarn - dieselbe Begruendung wie bei .cal-task-chip. Gefunden vom
+  // Handlauf des Releases v2.67.0, dem ersten vollen Lauf seit dem Merge.
+  ['health-overview__card--link', 'Rasterzelle: klickbare Kachel der Health-Uebersicht, gleiche Optik wie die Nachbarkacheln (.health-overview__card)'],
   // 4. Zeilen einer Zeilenliste
   ['nav-item', 'Zeile: Eintrag der Sidebar-Navigation'],
   ['settings-shell__navigation-toggle', 'Zeile: Domaenenkopf der Settings-Navigation (Akkordeon)'],

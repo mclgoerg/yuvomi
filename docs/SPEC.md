@@ -2843,6 +2843,83 @@ tables (schedules, logs, results) inherit visibility from their parent record. H
 `DB_ENCRYPTION_KEY` (SQLCipher) is strongly recommended. Yuvomi is **not** a medical device and
 makes **no diagnostic claims**; reference ranges and flags are neutral, user-supplied values.
 
+#### Fasting journal (migration 209)
+
+`/health/fasting` requires `health_use_fasting` and Health module access. The MVP
+provides own-person controls and a family read selector. Other-person views are
+read-only in the UI, including for caregivers. The API retains explicit Health
+caregiver grants: both people need the fasting capability, and mutations require
+the caller's Health write access. Admin status does not replace a caregiver grant.
+Family readers see family-visible records; owners and granted caregivers may read
+private records. Ungranted readers receive null settings and acknowledgement.
+Personal settings and safety acknowledgement are owner-only. A caregiver cannot
+acknowledge the first-use safety information on the fasting person's behalf.
+The fasting capability also protects the generic fasting visibility-default and
+bulk-apply mutations; hiding the fasting page is never the only enforcement.
+
+`health_fasts` (migration 209) stores actual intervals:
+
+| Column | Type | Contract |
+|---|---|---|
+| id | INTEGER | Primary key |
+| user_id | INTEGER | Required owner; user deletion cascades |
+| start_at, end_at | TEXT | Canonical UTC instants; null end means active |
+| start_tzid | TEXT | Captured runtime-supported IANA zone |
+| goal_minutes | INTEGER | Nullable; whole hours from 60 to 20160 minutes |
+| rating | INTEGER | Nullable subjective value 1 through 5 |
+| note | TEXT | Nullable; at most 2000 characters |
+| visibility | TEXT | private or family |
+| revision | INTEGER | Starts at 1; increments on mutation |
+| created_by, updated_by | INTEGER | Required on write; actor deletion sets null |
+| created_at, updated_at | TEXT | UTC audit timestamps |
+
+`idx_health_fasts_one_active` is a partial unique index per owner. Service-owned
+immediate transactions validate overlap/revision and perform writes atomically.
+End must follow start; neither may be in the future.
+Actual duration is unbounded and uses UTC elapsed time across DST. Ordinary edits
+retain the captured zone and unchanged timestamp precision. Repeated local hours
+retain the original offset; missing spring-forward times are rejected.
+
+`health_fasting_settings` (migration 209) is keyed by user_id with cascading owner
+deletion. It holds nullable default_goal_minutes, zone_mode (`timer`/`educational`),
+safety_acknowledged_at, nullable safety_acknowledged_by (actor deletion sets null),
+and timestamps. clock_mode (`auto`/`elapsed`/`remaining`) lives in sync_config under
+`fasting_clock_mode:user:<id>`. Missing settings mean no goal, timer mode and no
+acknowledgement. Visibility defaults use health_visibility_defaults scope `fasting`,
+default private, with the existing own-record bulk visibility action.
+
+The page supports immediate/earlier start, completed backfill, active-start
+correction, and completed-record edits. First creation requires explicit safety
+acknowledgement on the page: Yuvomi records fasting and is not a
+medical device or medical advice. Finish persists before the optional summary;
+closing it keeps the fast completed. Undo end PATCHes end_at:null with the returned
+revision. Deletion uses the shared undoable-delete window. Offline display keeps
+ticking; writes require connection. Resume and route re-entry refresh authoritative
+state, retaining the same person's clock if that refresh fails. The state payload
+includes `server_now`; completed-entry forms derive their initial end from that UTC
+instant rather than the device clock, so clock skew cannot manufacture a future end.
+
+Presets are 12:12, 14:10, 15:9, 16:8, 18:6, 20:4 and 23:1, plus no goal or whole
+hours up to 336. Page goal changes update the active goal and future default
+together without changing start or completed history. API callers may update only
+the default by omitting active_id. Supplying active_id (null when none) checks active
+identity; an active row also requires expected_revision. The dial separates up to
+fourteen days and collapses further visual days while retaining exact duration.
+Reaching a goal never stops the timer. Optional broad educational phases overlap
+on day one and have a text legend/dialog; they do not assert measured metabolism
+or benefits from longer fasting. Active metadata shows recorded-zone start/target.
+
+History uses keyset pages (default 10, maximum 100), ordered by start_at DESC,
+id DESC. Both before_at and before_id come from next_cursor. GET /fasting aliases
+/fasting/history. user_id/from/to apply to history and CSV; from/to are inclusive
+YYYY-MM-DD completion dates in each record's captured zone. Invalid/reversed dates
+return 400 FASTING_DATE_RANGE_INVALID. CSV columns are start_at,end_at,start_tzid,
+duration_minutes,goal_minutes,goal_reached,rating,note,visibility, with spreadsheet
+formula-safe escaping. Revision conflicts return numeric code 409 and separate
+reason FASTING_REVISION_CONFLICT, FASTING_ACTIVE_EXISTS or FASTING_OVERLAP; current
+contains a conflicting row where available. Missing acknowledgement returns
+FASTING_ACK_REQUIRED. POST retries use Idempotency-Key. API data is not SW-cached.
+
 **`health_vitals`** — one row per measurement.
 
 | Column | Type | Constraint |
@@ -3051,12 +3128,25 @@ is writable by anyone for themselves.
 | log_date | TEXT | NOT NULL — YYYY-MM-DD |
 | flow | TEXT | `spotting` \| `light` \| `medium` \| `heavy` (nullable) |
 | symptoms | TEXT | **Legacy, frozen as of migration 178.** Comma-separated symptom keys; no longer written or read by the API — see `cycle_day_log_symptoms` below. Kept only so a raw DB backup from before that migration stays readable. |
-| mood | TEXT | |
+| mood | TEXT | **Legacy, frozen as of migration 211.** Single feeling key; no longer written - see `cycle_day_log_feelings` below. Still returned read-only and accepted as input (treated as `feelings: [mood]`) for older clients. |
+| cervix_mucus | TEXT | nullable (migration 210) - `dry` \| `sticky` \| `creamy` \| `watery` \| `eggwhite`, route-enforced like `basal_temp_unit`. Owner-only, see below. |
+| lh_test | TEXT | nullable (migration 210) - `negative` \| `positive`. Owner-only, see below. |
+| pregnancy_test | TEXT | nullable (migration 210) - `negative` \| `positive`. Owner-only, see below. |
+| intimacy | TEXT | nullable (migration 210) - `protected` \| `unprotected` \| `solo`. Owner-only, see below. |
 | note | TEXT | |
 | visibility | TEXT | `private` \| `family`, default `private` |
 | basal_temp | REAL | nullable (migration 179) — optional daily basal body temperature |
 | basal_temp_unit | TEXT | nullable, `c` \| `f` — required together with `basal_temp`; free-text-per-entry like `health_vitals.unit` (no household-wide C/F setting exists), but constrained to these two at the route since the shift-detection algorithm must convert reliably |
 | created_at / updated_at | TEXT | ISO 8601, default now |
+
+**Owner-only axis:** `cervix_mucus`, `lh_test`, `pregnancy_test` and `intimacy` are stripped from
+every non-owner read (family visibility, foreign person view, family CSV export) regardless of the
+row's own `visibility`, and never exposed by the bulk "set all to family" action - the per-row
+visibility flag governs the day log as a whole, but a household member reading a day a family
+member chose to share should not incidentally learn that member's fertility-test results or sex
+life. Sharing these four specifically is not offered as a finer-grained visibility choice; there is
+no use case for a partial share of exactly these fields that visibility alone doesn't already cover
+for the rest of the day log.
 
 **`cycle_day_log_symptoms`** (migration 178) — graded symptom selections for a day log, normalized
 out of the legacy `symptoms` column so each selection can carry its own severity.
@@ -3087,7 +3177,55 @@ string or plain string array (both yield `intensity: null`).
 | default_visibility | TEXT | `private` \| `family`, default `private` (migration 96) — pre-selects the visibility for newly logged periods and day logs; per-entry override always available |
 | remind_period_days_before | INTEGER | nullable, 0–14 (migration 177) — NULL = off; days of lead time before the predicted next period for a `cycle_period` reminder |
 | remind_log_daily | INTEGER | 0/1, default 0 (migration 177) — daily nudge to log today, suppressed once a `cycle_day_logs` row exists for the day |
+| contraception | TEXT | nullable (migration 212) - `none` \| `pill` \| `hormonal_iud` \| `copper_iud` \| `implant` \| `injection` \| `patch` \| `ring` \| `condom` \| `other`. The hormonal subset (`pill`, `hormonal_iud`, `implant`, `injection`, `patch`, `ring`) suppresses fertile-window/ovulation prediction (`fertilitySuppressed: 'contraception'`), with an explanatory note where the fertile-window tile would be - hidden-but-explained, never silently broken. |
+| perimenopause_mode | INTEGER | 0/1, default 0 (migration 212) - next period becomes a min-max date range from the recent plausible gaps (`nextStartRange`), the Regular/Irregular judgement is suppressed (irregularity is expected, not an alarm) |
+| show_pms | INTEGER | 0/1, default 1 (migration 212) - toggles the derived PMS-window shading on the calendar; the window itself is computed, never stored (`pmsWindow()`) |
+| notify_partner_user_id | INTEGER | nullable (migration 212), FK → Users (SET NULL) - owner-opt-in partner reminder; must be another household member |
+| notify_partner_days_before | INTEGER | nullable, 0-14 (migration 212) - lead time for the partner's reminder |
 | created_at / updated_at | TEXT | ISO 8601, default now |
+
+**`cycle_day_log_feelings`** (migration 211) - multi-select feelings for a day log, normalized out
+of the legacy scalar `mood` column the same way migration 178 normalized symptoms, but the backfill
+is narrower: only `mood` values that match (after `LOWER(TRIM(...))`) one of the 7 `MOOD_TYPES`
+keys are copied into a row; any legacy value outside that list is skipped and stays readable only
+in the frozen `mood` column, never backfilled. The API's `feelings` field is this table's keys
+(validated against the same 7 values - unlike symptom keys, an unknown feeling is a 400); a save
+that provides either `feelings` or the legacy `mood` in the request body fully replaces the log's
+feelings rows (delete + re-insert, no diffing) and sets the legacy `mood` column to NULL, so a
+cleared selection stays cleared on pre-migration rows. A save that provides neither key leaves both
+the existing feelings rows and the `mood` column untouched, so an unrelated change (flow, note,
+basal temperature) cannot silently wipe a frozen legacy value. This is the opposite of how
+`symptoms` behaves: every save is authoritative for `symptoms` (an omitted `symptoms` array is
+normalized to empty and clears any existing rows), while a save is only sometimes authoritative for
+feelings/mood - only when the request actually names one of those two keys. Readers fall back to
+`mood` only when `feelings` is absent entirely, never when it is an empty array.
+
+| Column | Type | Constraint |
+|--------|------|-----------|
+| day_log_id | INTEGER | FK → `cycle_day_logs` (CASCADE delete), NOT NULL |
+| feeling_key | TEXT | NOT NULL - one of `MOOD_TYPES` (`public/utils/health-cycle.js`) |
+
+**Partner period reminder** (migration 213) widens `cycle_reminder_anchors.kind` with
+`partner_period`. The owner's opt-in (`notify_partner_user_id` + `notify_partner_days_before`)
+maintains one additional `cycle_period` reminder row whose recipient is the partner while the
+anchor identity stays with the owner - no fourth reminder entity type, zero new registry entries.
+The partner receives the predicted **date only**, never any log content, and gains no read access;
+the notification body names the owner (`health.cycle.status.partnerNextPeriod`), and
+`GET /reminders/pending` carries `cycle_anchor_kind` (plus `cycle_owner_name` for
+`partner_period`) so the in-app list renders the partner case with the owner's name instead of
+claiming it as the recipient's own period. Switching the partner re-targets the existing reminder
+(the upsert compares the recipient, not only the date). The reminder is dropped when the opt-in is
+cleared, pregnancy mode turns on, or **either side** loses health-module access or disables the
+cycle tab for themselves.
+
+**Period-history import** - `POST /api/v1/health/cycle/import`, body `{ csv }` (≤100 KB, ≤500 data
+rows): header-tolerant CSV of `start_date,end_date` in the export's own column order, comma or
+semicolon separated, dates as `YYYY-MM-DD` or `DD.MM.YYYY` (German spreadsheet exports). One
+atomic transaction: any invalid row rejects the whole import with a per-row error list (first 10),
+nothing inserted; a row whose `start_date` matches an existing period is skipped and counted, not
+an error (further overlaps stay allowed - same soft-warning philosophy as the period modal). New
+rows take the caller's `default_visibility`; reminders re-sync once after commit. Response
+`{ imported, skipped, errors: [] }`.
 
 **Cycle reminders** (migration 177) widen `reminders.entity_type` with `cycle_period` and
 `cycle_log_nudge`, following the same pipeline as every other reminder source (Web Push +
@@ -3238,6 +3376,51 @@ The subscribe UI is a third section on the existing personal-feeds settings page
 (`public/settings/pages/personal-feeds.js`, alongside the calendar and inventory feeds it already
 manages), not a new page and not inside the cycle tab's own settings modal - keeping every "export my
 own data as a link" control in the one place a person already goes to manage the other two.
+
+**Cycle v2 UI behaviors** (no new endpoints beyond the import above; everything below is computed
+client-side in `public/utils/health-cycle.js` / rendered in `public/pages/health.js`):
+- **A confirmed ovulation now also moves the month calendar**, not just the ring/stats:
+  `buildCycleCalendar()` takes the current cycle's fertile window and ovulation day from
+  `predictCycle()` (which prefers the BBT-confirmed date) instead of the raw calendar-method
+  projection, so the two views can no longer contradict each other on one screen. Confirmed cells
+  render solid where predictions render as outline/hatch (`confirmed: true`, same
+  measured-vs-guessed grammar as the ring), with a legend row appended only when visible.
+- **Prediction inputs are gap-guarded**: cycle gaps under 10 days, over 365 days, or involving a
+  future-dated start are always excluded from the averages (`stats.excludedGaps` counts them); gaps
+  of 90-365 days are excluded only when enough 10-90-day gaps exist on their own - a user with
+  consistently long cycles (oligomenorrhea) keeps a history-derived average instead of silently
+  falling back to the 28-day default. The period modal warns (non-blocking) on a future start date
+  or an overlap. `projectFutureCycles()` and `predictCycle()` share one anchor rule
+  (`latestNonFutureStart()`), so a future-dated period can no longer split the calendar between two
+  contradictory anchors.
+- **Symptom likelihood looks forward**: `predictSymptomLikelihood()` maps likely cycle days onto
+  the next projected cycle too (`nextLikelyDate`), so an early-cycle symptom pattern is visible as
+  an upcoming marker instead of only a past one.
+- **A "Today" insight bubble** tops the own-view cycle tab: always the cycle day + phase (SSW line
+  in pregnancy mode), plus the single most relevant second line by fixed priority - period expected
+  today/overdue (with an inline start action - or, when a logged period is still open, an
+  "end it?" action instead, so the bubble can never suggest starting an overlapping period),
+  today often being the strongest pain day per the graded-intensity pattern, symptoms likely today,
+  PMS window starting, upcoming likely symptom within 7 days, or the fertile window - and
+  deliberately nothing when there is nothing to say.
+- **Flow is a first-class visual**: the calendar's log dot scales in size and tint with the
+  4-step flow value (legend row included), History rows carry a heaviest-flow chip
+  (`periodFlowSummary()`), Trends gains a per-episode flow-load bar chart (`periodFlowLoad()`,
+  ranks summed over logged days) and a calm, non-diagnostic hint when recent episodes are
+  repeatedly heavy or longer than a week (`heavyBleedingSignal()`).
+- **Trends v2**: the BBT chart is date-proportional and breaks its line across logging gaps > 5
+  days; the severity chart pins its ordinal axis to exactly 1-3; feelings get their own
+  frequency-by-phase list (`feelingFrequencyByPhase()`, sharing `reconstructCycles()`); a pain
+  summary tile aggregates the four pain symptoms; each symptom row has one details expander
+  (pattern + severity) instead of two stacked disclosures.
+- **PMS window** (`pmsWindow()`): derived from luteal symptom patterns
+  (`typicalDaysBeforePeriod`), rendered as a subtle wash on otherwise-unphased calendar days and in
+  the Today bubble - pattern language only, never diagnostic, off via `show_pms`, and **own view
+  only** (settings are private, so a family viewer can neither see the shading nor bypass the
+  owner's opt-out; computed once per render and passed to bubble + calendar).
+- The Health **Overview tab** gains a next-period tile (range-aware in perimenopause mode, SSW in
+  pregnancy mode) linking to the cycle tab, and the cycle footer links the ICS feed and dashboard
+  widget so the two opt-in surfaces are discoverable.
 
 Medication reminders reuse the existing push/notification-channel layer (no dedicated reminder
 table): `server/services/medication-scheduler.js` turns due schedule slots into `pending` logs and
@@ -3622,11 +3805,14 @@ were refused for a capitalised path to a module they may use; that works now as 
 
 Primary key: `(subject_type, subject_id, resource_type, resource_key)`. **`capability` arrived as a
 schema-level allowance (migration v175, #996) and got its first consumer in the next release
-(#991):** `PERMISSION_CAPABILITIES` in `server/permissions.js` registers
-`notes_manage_household_categories` (module `notes`), `resolvePermissions()` and
-`getSubjectPermissions()` read `capability` rows for registered keys with `none` | `allow`, default
-`none`, admins `allow`. A save of the permission matrix replaces the module and widget axes on every
-call and the capability axis only when the body carries the field, so a client that does not know
+(#991):** `PERMISSION_CAPABILITIES` in `server/permissions.js` registers both
+`notes_manage_household_categories` (module `notes`, default `none`) and
+`health_use_fasting` (module `health`, default `allow`). `resolvePermissions()` and
+`getSubjectPermissions()` read registered capability rows with `none` | `allow`; each item's own
+default wins, while the catalog-level `none` remains only as the fallback for entries without one.
+Admins resolve to `allow`. Role rows equal to the item's default are not stored; a member-level
+`none` may still override inherited fasting access. A save of the permission matrix replaces the
+module and widget axes on every call and the capability axis only when the body carries the field, so a client that does not know
 about capabilities cannot erase them. A key that no feature registers is ignored on read, so a
 capability row written by a later feature survives an older release. Since #1044 the permission
 matrix in Settings shows each registered capability as its own row under its module (blocked or

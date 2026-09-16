@@ -26,6 +26,7 @@ Independent modules - turn on what fits, ignore the rest:
 - Rewards - points on chores, a parent-approved catalogue and an auditable ledger
 - Inventory - what you own, with warranties and deadlines (off by default)
 - Housekeeping - chores, supplies and staff/session tracking
+- Waste collection - pickup schedules per waste type, or a subscribed municipal ICS calendar (off by default)
 - Documents - store and find important household files
 - Notes, Contacts &amp; Birthdays - everything else in one tidy place
 

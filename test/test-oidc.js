@@ -163,6 +163,10 @@ function buildOidcTestDb() {
     CREATE TABLE split_expense_guest_users (
       user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE
     );
+    CREATE TABLE housekeeping_workers (
+      id      INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE
+    );
     CREATE TABLE contacts (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       name           TEXT NOT NULL,
@@ -301,6 +305,20 @@ test('verknüpft NICHT mit bereits OIDC-gebundenem Account', () => {
   const count = db.prepare('SELECT count(*) as n FROM users').get();
   assert(count.n === 2, 'Ein bereits gebundener Account darf nicht erneut verknüpft werden');
   assert(user.oidc_sub === 'link-sub-007', 'Neuer Account muss eigenen sub tragen');
+});
+
+test('verknüpft KEIN Konto der Haushaltshilfe über die E-Mail', () => {
+  // Sonst truege das Personal-Konto den sub, und jede spaetere SSO-Anmeldung
+  // faende es in Schritt 1. Dass der Callback es abweist, prueft
+  // test-staff-sign-in.js am echten Router.
+  const db = buildOidcTestDb();
+  const staffId = addLocalUserWithEmail(db, 'hilfe', 'hilfe@example.com');
+  db.prepare('INSERT INTO housekeeping_workers (user_id) VALUES (?)').run(staffId);
+  const user = findOrCreateOidcUser(db, { sub: 'link-sub-staff', email: 'hilfe@example.com', email_verified: true });
+  assert(user.id === staffId, `Erwartet das Personal-Konto ${staffId}, war ${user.id}`);
+  assert(user.oidc_sub === null, `sub an ein Personal-Konto geschrieben: ${user.oidc_sub}`);
+  const count = db.prepare('SELECT count(*) as n FROM users').get();
+  assert(count.n === 1, 'Es darf auch kein Ersatzkonto entstehen');
 });
 
 test('vergibt eindeutigen username bei Kollision', () => {

@@ -3884,13 +3884,90 @@
         "accountUsernameHint": "Email address o username. Hindi ito password field - hindi nag-iimbak ng password ang Yuvomi."
     },
     "health": {
+        "fasting": {
+            "title": "Pag-aayuno",
+            "emptyTitle": "Pag-aayuno",
+            "emptyDesc": "Magsimula ng personal na timer ng pag-aayuno at tingnan ang iyong kasaysayan.",
+            "permissionLabel": "Gamitin ang pag-aayuno",
+            "start": "Simulan ang pag-aayuno",
+            "finish": "Tapusin ang pag-aayuno",
+            "history": "Kasaysayan",
+            "export": "I-export ang CSV",
+            "noHistory": "Wala pang natapos na pag-aayuno",
+            "ready": "Handa para sa susunod na pag-aayuno",
+            "startedAt": "Nagsimula {{date}}",
+            "elapsedDays": "Araw {{days}}",
+            "goalReached": "Naabot ang layunin",
+            "goalTitle": "Iyong layunin",
+            "goalHours": "Layunin sa oras",
+            "earlier": "Mas maaga akong nagsimula",
+            "backfill": "Magdagdag ng natapos na pag-aayuno",
+            "editStart": "Baguhin ang simula",
+            "undoEnd": "Bawiin ang pagtatapos",
+            "deleted": "Nabura ang pag-aayuno",
+            "person": "Tao",
+            "readOnly": "Talaan ng pag-aayuno na mababasa lamang",
+            "completedFrom": "Natapos mula",
+            "completedTo": "Natapos hanggang",
+            "applyFilter": "Ilapat ang mga petsa",
+            "targetAt": "Layunin: {{date}}",
+            "utcOffset": "Pagkakaiba sa UTC (nauulit na lokal na oras)",
+            "wallTimeError": "Walang ganitong lokal na oras sa naitalang sona ng oras. Pumili ng ibang oras.",
+            "offline": "Kumonekta muli bago baguhin ang pag-aayuno.",
+            "zoneMode": "Impormasyon sa mukha ng orasan",
+            "zoneTimer": "Tagabilang ng oras lamang",
+            "zoneEducational": "Mga yugto para sa kaalaman",
+            "zoneDetails": "Tungkol sa mga yugtong ito",
+            "zoneMeal": "Pagproseso ng huling pagkain",
+            "zoneStored": "Paggamit ng nakaimbak na enerhiya",
+            "zoneKetones": "Dumaraming paggamit ng taba at mga ketone",
+            "zoneLater": "24 oras pataas: magkakaiba ang tugon ng bawat tao",
+            "zoneVariability": "Nagkakapatong ang mga pangkalahatang yugtong ito. Nag-iiba ang paglipat tungo sa mas malaking paggamit ng taba at mga ketone, kadalasan sa loob ng 12-36 oras. Hindi sinusukat ng orasan na ito ang kalagayan ng metabolismo, at hindi nangangahulugang mas mabuti ang mas mahabang pag-aayuno.",
+            "extraDays": "+{{count}} araw",
+            "extraDays_one": "+{{count}} araw",
+            "extraDays_few": "+{{count}} araw",
+            "safetyDialog": "Ang Yuvomi ay kasangkapan sa pagtatala, hindi aparatong medikal o payong medikal. Hindi angkop ang pag-aayuno para sa lahat. Humingi ng gabay ng propesyonal, lalo na habang buntis o nagpapasuso, para sa mga bata at kabataan, kung may kasaysayan ng mga karamdaman sa pagkain, diyabetis, kaugnay na gamot o malalang kondisyon. Maaari mong tapusin ang pag-aayuno anumang oras.",
+            "dateReadOnly": "Hindi mababago ang petsang ito sa tagapili ng petsa. Pinapanatili ang orihinal na oras at petsa; maaari mong baguhin ang iba pang mga patlang.",
+            "saveError": "Hindi mai-save ang pag-aayuno.",
+            "loadError": "Hindi mai-load ang pag-aayuno.",
+            "zone": {
+                "early": "Maagang yugto",
+                "fatBurning": "Neutral na yugto",
+                "ketosis": "Huling yugto"
+            },
+            "custom": "Custom",
+            "startDate": "Petsa ng simula",
+            "endDate": "Petsa ng pagtatapos",
+            "note": "Tala",
+            "remaining": "Natitira",
+            "noGoal": "Walang layunin",
+            "goalHint": "Buong oras, hanggang 336 (14 araw).",
+            "clockDefault": "Default na display ng timer",
+            "clockAuto": "Awtomatiko (batay sa layunin)",
+            "clockElapsed": "Lumipas",
+            "clockRemaining": "Natitira",
+            "loadMore": "Mag-load ng 10 pa",
+            "goalNextHint": "Kapag binago ang layunin, maa-update ang kasalukuyang pag-aayuno at ang default na layunin para sa mga susunod na pag-aayuno.",
+            "safetyTitle": "Bago magsimula",
+            "conflict": "Nagbago ang tala. I-reload ang pahina at subukan muli.",
+            "finishedTitle": "Tapos na ang pag-aayuno",
+            "editTitle": "I-edit ang pag-aayuno",
+            "rating": "Kumusta ang pakiramdam mo?",
+            "ratingValue": "{{value}} sa 5 bituin",
+            "clearRating": "Alisin ang marka",
+            "finishedHint": "Nai-save ang pagtatapos. Maaari mong baguhin ang oras at magdagdag ng marka o tala.",
+            "rangeError": "Dapat pagkatapos ng simula ang pagtatapos at hindi nasa hinaharap.",
+            "elapsed": "Tagal ng pag-aayuno",
+            "sinceLast": "Mula sa huling pag-aayuno"
+        },
         "tabs": {
             "overview": "Pangkalahatang-tanaw",
             "vitals": "Bayolohikal na palatandaan",
             "meds": "Mga Gamot",
             "labs": "Resulta ng lab",
             "activity": "Aktibidad",
-            "cycle": "Siklo"
+            "cycle": "Siklo",
+            "fasting": "Pag-aayuno"
         },
         "overview": {
             "title": "Pangkalahatang-tanaw",
@@ -4327,7 +4404,11 @@
                 "regular": "Regular",
                 "irregular": "Iregular",
                 "notEnoughData": "Kulang ang datos",
-                "noPrediction": "Magtala ng regla para makita ang mga hula."
+                "noPrediction": "Magtala ng regla para makita ang mga hula.",
+                "fertilitySuppressedNote": "Naka-pause ang fertile window: hormonal na contraception.",
+                "nextPeriodRangeSub": "Katamtaman: {{date}}",
+                "partnerNextPeriod": "Inaasahang magsisimula ang regla ni {{name}} sa {{date}}.",
+                "partnerNextPeriodNeutral": "Paalala para sa partner: regla"
             },
             "stats": {
                 "source": {
@@ -4335,11 +4416,14 @@
                     "history_one": "Base sa huling siklo mo",
                     "insufficientHistory": "Default na halaga sa ngayon - mag-log pa ng {{count}} siklo para sa personalized na hula",
                     "insufficientHistory_one": "Default na halaga sa ngayon - mag-log pa ng {{count}} siklo para sa personalized na hula",
-                    "default": "Default na palagay (wala pang naitalang kasaysayan)"
+                    "default": "Default na palagay (wala pang naitalang kasaysayan)",
+                    "historyOther": "Batay sa huling {{count}} siklo",
+                    "historyOther_one": "Batay sa huling siklo"
                 }
             },
             "unit": {
-                "days": "{{value}} araw"
+                "days": "{{value}} araw",
+                "days_one": "{{value}} araw"
             },
             "today": {
                 "title": "Ngayon",
@@ -4353,7 +4437,9 @@
             "calendar": {
                 "title": "Kalendaryo",
                 "prevMonth": "Nakaraang buwan",
-                "nextMonth": "Susunod na buwan"
+                "nextMonth": "Susunod na buwan",
+                "likelihoodTitle": "Mga pattern ng sintomas",
+                "likelihoodCaption": "Pumili ng sintomas para makita kung anong mga araw ito madalas lumitaw, base sa iyong kasaysayan."
             },
             "weekday": {
                 "mon": "Lun",
@@ -4370,13 +4456,16 @@
                 "fertile": "Mataba",
                 "ovulation": "Obulasyon",
                 "today": "Ngayon",
-                "logged": "Entry"
+                "logged": "Entry",
+                "pms": "Bintana ng PMS (pattern)"
             },
             "history": {
                 "title": "Kasaysayan",
                 "ongoing": "kasalukuyan",
                 "empty": "Wala pang naitalang regla.",
-                "cycleLength": "Siklo {{value}} araw"
+                "cycleLength": "Siklo {{value}} araw",
+                "cycleLength_one": "Siklo {{value}} araw",
+                "flowHeaviest": "Pinakamataas: {{value}}"
             },
             "trends": {
                 "title": "Mga Trend",
@@ -4392,12 +4481,21 @@
                 "typical": "Karaniwan",
                 "atypical": "Hindi karaniwan",
                 "typicalRangeLabel": "Karaniwang saklaw: {{min}}-{{max}} araw",
-                "likelihoodTitle": "Mga pattern ng sintomas",
-                "likelihoodCaption": "Pumili ng sintomas para makita kung anong mga araw ito madalas lumitaw, base sa iyong kasaysayan.",
-                "likelyToday": "Madalas lumitaw ang {{symptom}} sa palibot ng araw na ito ng iyong siklo.",
                 "symptomTracked": "Naitala",
                 "symptomPredicted": "Madalas lumitaw dito",
-                "phaseOther": "Iba pa"
+                "phaseOther": "Iba pa",
+                "details": "Mga detalye",
+                "feelingFrequency": "Dalas ng damdamin",
+                "flowLoad": "Tindi ng daloy bawat siklo",
+                "flowLoadCaption": "Base sa iyong mga tala ng daloy - kung mas kumpleto ang pagta-tala mo, mas makabuluhan ito.",
+                "flowLoadColumn": "Bigat ng daloy",
+                "flowLoadValue": "{{load}} ({{days}} naitala)",
+                "heavyBleedingHintHeavy": "Ang iyong mga huling regla ay paulit-ulit na naitala bilang \"malakas\" - sulit itong banggitin sa isang konsultasyong medikal.",
+                "heavyBleedingHintLong": "Kahit isa sa iyong mga huling regla ay tumagal nang higit sa isang linggo - sulit itong banggitin sa isang konsultasyong medikal.",
+                "painTitle": "Sakit",
+                "painCurrentCycleLabel": "Mga araw ng sakit sa siklong ito",
+                "painAvgPerCycleLabel": "Avg. araw ng sakit bawat siklo",
+                "painAvgIntensityLabel": "Avg. tindi"
             },
             "flow": {
                 "label": "Daloy",
@@ -4466,7 +4564,9 @@
             },
             "period": {
                 "add": "Itala ang regla",
-                "edit": "I-edit ang regla"
+                "edit": "I-edit ang regla",
+                "warningFuture": "Ang petsa ng simula ay nasa hinaharap - batay lang ang hula sa nakaraang mga siklo.",
+                "warningOverlap": "Nagsasapawan sa isang siklo na naitala na."
             },
             "dayLog": {
                 "title": "Itala ang araw",
@@ -4505,8 +4605,91 @@
                 "pregnancyMode": "Mode ng pagbubuntis",
                 "dueDate": "Tinatayang takdang petsa",
                 "pregnancyHint": "Sa mode ng pagbubuntis, nakahinto ang mga hula sa regla at obulasyon. Nananatiling available ang pang-araw-araw na pagtatala.",
-                "saved": "Na-save ang mga setting."
-            }
+                "saved": "Na-save ang mga setting.",
+                "contraception": "Paraan ng pagpaplano ng pamilya",
+                "contraceptionHint": "Awtomatikong ipinapahinto ng mga hormonal na paraan ang prediksyon ng fertile window.",
+                "contraceptionUnset": "Hindi tinukoy",
+                "contraceptionOptions": {
+                    "none": "Wala",
+                    "pill": "Pildoras",
+                    "hormonal_iud": "Hormonal na IUD",
+                    "copper_iud": "Kobreng IUD",
+                    "implant": "Implant",
+                    "injection": "Iniksyon",
+                    "patch": "Patch",
+                    "ring": "Vaginal ring",
+                    "condom": "Condom",
+                    "other": "Iba pa"
+                },
+                "perimenopauseMode": "Moda ng perimenopause",
+                "perimenopauseModeHint": "Ipinapakita ang mga prediksyon bilang saklaw sa halip na iisang petsa; naka-off ang pagtataya ng regularidad.",
+                "showPms": "Ipakita ang PMS window",
+                "notifyPartner": "Abisuhan ang isang partner",
+                "notifyPartnerHint": "Ang piniling tao ay tatanggap lamang ng inaasahang petsa, hindi kailanman ng mga sintomas, tala, o iba pang entry.",
+                "notifyPartnerNoEligible": "Walang kwalipikadong miyembro ng sambahayan - tanging mga miyembrong may access sa Health module lang ang maaabisuhan.",
+                "notifyPartnerDaysBefore": "Paalala para sa partner"
+            },
+            "mucus": {
+                "label": "Mucus sa cervix",
+                "hint": "Opsyonal. Ang pagbabago sa texture ay makakatulong para matukoy ang fertile window.",
+                "none": "Wala",
+                "dry": "Tuyo",
+                "sticky": "Malagkit",
+                "creamy": "Parang cream",
+                "watery": "Malabnaw",
+                "eggwhite": "Parang puti ng itlog"
+            },
+            "test": {
+                "label": "Mga Pagsusuri",
+                "lhLabel": "LH test",
+                "pregnancyLabel": "Pagsusuri sa pagbubuntis",
+                "unset": "Hindi pa nasusuri",
+                "negative": "Negatibo",
+                "positive": "Positibo"
+            },
+            "feelings": {
+                "label": "Mga Nararamdaman"
+            },
+            "intimacy": {
+                "label": "Pagiging Malapit",
+                "hint": "Mananatiling pribado kahit ibahagi ang araw na ito sa pamilya.",
+                "none": "Hindi tinukoy",
+                "protected": "May proteksyon",
+                "unprotected": "Walang proteksyon",
+                "solo": "Mag-isa"
+            },
+            "quickLink": {
+                "painkiller": "Itala ang gamot sa sakit",
+                "weight": "Itala ang timbang"
+            },
+            "bubble": {
+                "ariaLabel": "Estado ng cycle ngayon",
+                "line1": "Araw {{day}} ng cycle · {{phase}}",
+                "periodToday": "Inaasahan ang regla ngayon - simulan na?",
+                "periodOverdue": "Naantala na ng {{count}} araw ang regla - simulan na?",
+                "periodOverdue_one": "Naantala na ng {{count}} araw ang regla - simulan na?",
+                "periodStillOpen": "Naka-log pa rin ang iyong regla bilang kasalukuyan - tapusin na ngayon?",
+                "peakPainDay": "Ayon sa iyong pattern, madalas na ngayon ang pinakamatinding araw ng sakit ({{symptom}}).",
+                "likelySymptomsToday": "Malamang ngayon: {{symptoms}}",
+                "pmsWindow": "Malamang magkaroon ng PMS window simula {{weekday}}",
+                "upcomingSymptom": "Malamang simula {{weekday}}: {{symptom}}",
+                "fertile": "Fertile window hanggang {{date}}",
+                "fertileConfirmed": "Fertile window (nakumpirmang obulasyon) hanggang {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Nakumpirma ang obulasyon ng cycle na ito sa pamamagitan ng pagtaas ng temperatura. Ang mga susunod na cycle ay nakabatay pa rin sa calendar method; hindi ito kapalit ng contraception o medical na payo.",
+            "import": {
+                "button": "I-import",
+                "title": "I-import ang kasaysayan ng regla",
+                "explainer": "CSV file o na-paste na teksto: isang linya bawat regla sa anyong „start_date,end_date” (opsyonal ang end date), mga petsa sa YYYY-MM-DD o DD.MM.YYYY, pinaghihiwalay ng kuwit o tuldok-kuwit.",
+                "fileLabel": "Pumili ng CSV file",
+                "pasteLabel": "O i-paste ang CSV text",
+                "submit": "I-import",
+                "resultToast": "{{imported}} na-import, {{skipped}} nilaktawan.",
+                "errorsTitle": "Hindi na-import ang mga linyang ito:",
+                "emptyError": "Pumili ng CSV file o mag-paste ng teksto.",
+                "error": "Nabigo ang pag-import."
+            },
+            "discoveryHint": "Tip: mag-subscribe sa hinulaang cycle bilang ICS feed sa <a href=\"/settings/personal/feeds\">Mga Setting → Personal → Mga Feed</a>, o ipakita ang cycle widget sa <a href=\"/\">Pangkalahatang-tanaw</a> gamit ang customize mode nito."
         },
         "duration": {
             "hm": "{{hours}} oras {{minutes}} min",

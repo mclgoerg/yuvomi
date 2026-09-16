@@ -22,6 +22,7 @@
 
 import express from 'express';
 import * as db from '../../db.js';
+import { FastingError, requireFastingCapability } from '../../services/fasting.js';
 import { log, VISIBILITIES, viewerId, badRequest } from './helpers.js';
 
 const router = express.Router();
@@ -32,6 +33,7 @@ const FLAT_SCOPES = Object.freeze({
   meds:       { table: 'medications',        column: 'user_id' },
   labs:       { table: 'health_lab_reports', column: 'user_id' },
   activities: { table: 'health_activities',  column: 'user_id' },
+  fasting:    { table: 'health_fasts',       column: 'user_id' },
 });
 
 // Vitalwerte tragen ihre Voreinstellung JE METRIK: wer den Blutdruck teilen
@@ -80,6 +82,18 @@ export function vitalScopeKey(type) {
   return `${VITAL_PREFIX}${String(type || '')}`;
 }
 
+function allowFastingMutation(database, viewer, res, scopes) {
+  if (!scopes.includes('fasting')) return true;
+  try {
+    requireFastingCapability(database, { id: viewer });
+    return true;
+  } catch (error) {
+    if (!(error instanceof FastingError)) throw error;
+    res.status(error.status).json({ error: error.message, code: error.status, reason: error.reason });
+    return false;
+  }
+}
+
 /**
  * GET /visibility-defaults
  * Response: { data: { defaults: { 'vital:bp': 'family', ... } } }
@@ -121,6 +135,7 @@ router.put('/visibility-defaults', (req, res) => {
       if (!VISIBILITIES.includes(visibility)) return badRequest(res, [`Invalid visibility: ${visibility}`]);
     }
     const database = db.get();
+    if (!allowFastingMutation(database, viewer, res, entries.map(([key]) => key))) return;
     const del = database.prepare('DELETE FROM health_visibility_defaults WHERE user_id = ? AND scope_key = ?');
     const set = database.prepare(`
       INSERT INTO health_visibility_defaults (user_id, scope_key, visibility)
@@ -170,11 +185,17 @@ router.patch('/visibility-defaults/apply', (req, res) => {
     if (!VISIBILITIES.includes(visibility)) return badRequest(res, ['visibility is required.']);
 
     const database = db.get();
+    if (!allowFastingMutation(database, viewer, res, [scope])) return;
     let updated = 0;
     if (scope.startsWith(VITAL_PREFIX)) {
       updated = database.prepare(
         'UPDATE health_vitals SET visibility = ? WHERE user_id = ? AND type = ?'
       ).run(visibility, viewer, scope.slice(VITAL_PREFIX.length)).changes;
+    } else if (scope === 'fasting') {
+      // Privacy changes must invalidate an already-open fasting editor too.
+      updated = database.prepare(
+        'UPDATE health_fasts SET visibility = ?, revision = revision + 1, updated_by = ?, updated_at = ? WHERE user_id = ?'
+      ).run(visibility, viewer, new Date().toISOString(), viewer).changes;
     } else {
       const target = FLAT_SCOPES[scope];
       updated = database.prepare(

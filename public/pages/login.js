@@ -151,9 +151,14 @@ export async function render(container) {
     // Anbieter hat alles funktioniert, hier fehlt nur das Konto. Die
     // Sammelmeldung schickt den Nutzer sonst zu seinem Passwort, statt zu dem,
     // der ihm ein Konto anlegen kann.
+    // Ebenso ein Konto, das sich nicht anmelden darf (#243): dieselbe Absage
+    // wie beim Passwort-Login. "Bitte erneut versuchen" liesse den Nutzer einen
+    // Weg wiederholen, der nie aufgeht.
     showError(errorEl, ssoError === 'oidc_signup_disabled'
       ? t('login.ssoNoAccount')
-      : t('login.ssoError'));
+      : ssoError === 'oidc_sign_in_blocked'
+        ? t('login.accountCannotSignIn')
+        : t('login.ssoError'));
   }
 
   // Mit SSO als Hauptweg tritt das Formular zurueck, verschwindet aber NICHT

@@ -86,7 +86,7 @@ Schalte an, was dein Haushalt braucht; der Rest bleibt aus dem Weg.
 | **Hauswirtschaft** | Haushaltshilfen: Dienstpläne, Ein- und Ausstempeln, Abrechnung, Aufgaben und Materialwünsche. |
 | **Entsorgung** | Abholtermine je Abfallart, auch „der letzte Freitag", oder ein abonnierter kommunaler ICS-Kalender. Standardmäßig aus. |
 | **Belohnungen** | Punkte aus Aufgaben, ein elterlich freigegebener Katalog und ein nachvollziehbares Konto. |
-| **Gesundheit** | Vitalwerte, Medikamente, Laborwerte, Aktivität und Zyklus je Mitglied, mit Verlaufsdiagrammen. |
+| **Gesundheit** | Vitalwerte, Medikamente, Laborwerte, Aktivität, Zyklus und ein Fastentagebuch je Mitglied, mit Verlaufsdiagrammen. |
 | **Schichtplan** | Rotierende Schichten und feste Wochenpläne, als Ebene im Kalender eingeblendet. Standardmäßig aus. |
 | **Notizen &amp; Kontakte** | Markdown-Haftnotizen mit antippbaren Checklisten, dazu Kontakte mit CardDAV-Sync und vCard-Import/-Export. |
 | **Geburtstage** | Geburtstage und optionale Namenstage, mit Kalendereinträgen, Alter und Erinnerungen. |

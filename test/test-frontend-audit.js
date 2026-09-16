@@ -2049,11 +2049,20 @@ test('admin-family leaf owns family member + role management lazily', () => {
   assert.match(source, /buildFamilyRoleOptions/);
   assert.match(source, /family_role/);
   assert.match(source, /birth_date/);
+  assert.match(source, /capabilityStateText\('health_use_fasting'/);
+  assert.match(source, /item\.default \?\? permissionCatalog\?\.defaults\?\.capability/);
 
   // Family leaf must not own API token, backup, or version concerns.
   assert.doesNotMatch(source, /\/auth\/api-tokens/);
   assert.doesNotMatch(source, /\/backup\//);
   assert.doesNotMatch(source, /\/version/);
+});
+
+test('permission summary compares capability access with each catalog default', () => {
+  const source = read('../public/settings/pages/admin-permissions.js');
+  assert.match(source, /isPermissionDeviation\(item, access\)/);
+  assert.match(source, /accessShort\(access\)/);
+  assert.doesNotMatch(source, /effectiveCapabilityAccess\(item\) === 'allow'/);
 });
 
 test('admin-api leaf owns API token lifecycle with one-time secret display', () => {
@@ -17410,6 +17419,81 @@ test('withoutCommentsKeepingLines laesst Regex-Literale und URLs heil', () => {
 
   assert.equal(withoutCommentsKeepingLines('renderAll(); // weg').trim(), 'renderAll();',
     'ein echter Zeilenkommentar muss weiter fallen');
+});
+
+/* EIN ZEILENKOMMENTAR OEFFNET KEINEN BLOCK (Review zu #1232).
+ *
+ * Der Schnitt nahm erst Blockkommentare heraus, dann Zeilenkommentare, und
+ * kannte keine Strings. `// Accept: *` gefolgt von `/*` las er als Blockanfang
+ * und blendete alles bis zum naechsten Blockende irgendwo spaeter in der Datei
+ * aus, echten Code eingeschlossen (gemessen an server/utils/http.js und
+ * server/index.js). Der Admin-Praedikat-Guard war in solchen Spannen blind.
+ */
+test('withoutCommentsKeepingLines liest Kommentare und Strings in einem Durchgang', () => {
+  const zeilen = (src) => withoutCommentsKeepingLines(src).split('\n');
+
+  const verschluckt = zeilen([
+    '// Accept: */*',
+    "const a = req.authRole === 'admin';",
+    '/* echter Kommentar */',
+    'renderAll();',
+  ].join('\n'));
+  assert.equal(verschluckt.length, 4, 'die Zeilenzahl muss gleich bleiben');
+  assert.equal(verschluckt[0].trim(), '', 'der Zeilenkommentar faellt');
+  assert.equal(verschluckt[1], "const a = req.authRole === 'admin';",
+    'ein Blockanfang in einem Zeilenkommentar darf den Code darunter nicht verschlucken');
+  assert.equal(verschluckt[2].trim(), '', 'der echte Blockkommentar faellt');
+  assert.equal(verschluckt[3], 'renderAll();');
+
+  const inStrings = "const s = '/* kein Kommentar */'; const d = \"// auch keiner\";";
+  assert.equal(withoutCommentsKeepingLines(inStrings), inStrings,
+    'Kommentarzeichen in einem String-Literal sind kein Kommentar');
+
+  const inTemplate = 'const t = `\n<a href="x">// kein</a> /* auch nicht */\n${x /* weg */}`;';
+  assert.equal(withoutCommentsKeepingLines(inTemplate),
+    'const t = `\n<a href="x">// kein</a> /* auch nicht */\n${x          }`;',
+    'im Template-Literal bleibt der Text stehen, in der Ersetzung faellt der Kommentar');
+
+  const mehrzeilig = zeilen('a();\n/* eins\n zwei */\nb(); // weg');
+  assert.equal(mehrzeilig.length, 4, 'ein mehrzeiliger Blockkommentar behaelt seine Zeilen');
+  assert.deepEqual(mehrzeilig.slice(0, 3).map((z) => z.trim()), ['a();', '', '']);
+  assert.equal(mehrzeilig[3].trimEnd(), 'b();', 'nach Code faellt nur der Kommentar');
+
+  const regex = zeilen(String.raw`const r = /[/*]/g; const q = /'/;` + '\nnext();\n/* c */\nconst h = a / b; // weg');
+  assert.equal(regex[0], String.raw`const r = /[/*]/g; const q = /'/;`,
+    'Kommentar- und Anfuehrungszeichen in einem Regex-Literal oeffnen nichts');
+  assert.equal(regex[1], 'next();');
+  assert.equal(regex[3].trimEnd(), 'const h = a / b;', 'eine Division ist kein Regex-Literal');
+});
+
+/* EIN `${` BEGINNT EINEN AUSDRUCK (Review zu #1232, Runde 2).
+ *
+ * Der Scanner merkte sich das Template-Literal als fertigen Wert, auch wenn er
+ * nur bis zum `${` gelesen hatte. Ein `/` direkt dahinter galt deshalb als
+ * Division, das `/*` in `/[/*]/` als Blockanfang, und alles bis zum naechsten
+ * Blockende weiter unten fiel weg - der Code dazwischen eingeschlossen.
+ * Dieselbe Klasse an den Nachbarstellen: `}${` springt direkt in die naechste
+ * Ersetzung, ein Template in einer Ersetzung oeffnet selbst eine. Nach dem
+ * schliessenden Backtick bleibt es dagegen ein Wert, der `/` dort teilt.
+ */
+test('withoutCommentsKeepingLines liest nach `${` einen Ausdruck', () => {
+  const zeilen = (src) => withoutCommentsKeepingLines(src).split('\n');
+  const gate = "const a = req.authRole === 'admin';";
+
+  for (const [name, template] of [
+    ['direkt nach dem Backtick', 'const t = `${/[/*]/.test(value)}`;'],
+    ['nach einer vorigen Ersetzung', 'const t = `x${a}${/[/*]/.test(value)}`;'],
+    ['im Template einer Ersetzung', 'const t = `${`${/[/*]/.source}`}`;'],
+  ]) {
+    const z = zeilen([template, gate, '/* spaeter */', 'renderAll();'].join('\n'));
+    assert.equal(z[0], template, `${name}: das Regex-Literal bleibt heil`);
+    assert.equal(z[1], gate, `${name}: der Code darunter darf nicht verschwinden`);
+    assert.equal(z[2].trim(), '', `${name}: der echte Blockkommentar faellt`);
+    assert.equal(z[3], 'renderAll();');
+  }
+
+  assert.equal(withoutCommentsKeepingLines('const n = `${a}` / 2 + "/" + b; // weg').trimEnd(),
+    'const n = `${a}` / 2 + "/" + b;', 'nach dem schliessenden Backtick teilt der `/`');
 });
 
 /* EIN IMPORT OHNE AUFRUF IST TOTER CODE.

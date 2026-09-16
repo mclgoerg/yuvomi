@@ -3884,13 +3884,90 @@
         "accountUsernameHint": "Adresse e-mail ou nom d'utilisateur. Ce n'est pas un champ de mot de passe - Yuvomi n'enregistre aucun mot de passe."
     },
     "health": {
+        "fasting": {
+            "title": "Jeûne",
+            "emptyTitle": "Jeûne",
+            "emptyDesc": "Lancez un minuteur de jeûne personnel et gardez votre historique à portée de vue.",
+            "permissionLabel": "Utiliser le jeûne",
+            "start": "Commencer le jeûne",
+            "finish": "Terminer le jeûne",
+            "history": "Historique",
+            "export": "Exporter en CSV",
+            "noHistory": "Aucun jeûne terminé pour le moment",
+            "ready": "Prêt pour votre prochain jeûne",
+            "startedAt": "Commencé le {{date}}",
+            "elapsedDays": "Jour {{days}}",
+            "goalReached": "Objectif atteint",
+            "goalTitle": "Votre objectif",
+            "goalHours": "Objectif en heures",
+            "earlier": "J’ai commencé plus tôt",
+            "backfill": "Ajouter un jeûne terminé",
+            "editStart": "Modifier le début",
+            "undoEnd": "Annuler la fin",
+            "deleted": "Jeûne supprimé",
+            "person": "Personne",
+            "readOnly": "Journal de jeûne en lecture seule",
+            "completedFrom": "Terminé à partir du",
+            "completedTo": "Terminé jusqu’au",
+            "applyFilter": "Appliquer les dates",
+            "targetAt": "Objectif : {{date}}",
+            "utcOffset": "Décalage UTC (heure locale répétée)",
+            "wallTimeError": "Cette heure locale n’existe pas dans le fuseau horaire enregistré. Choisissez une autre heure.",
+            "offline": "Reconnectez-vous avant de modifier un jeûne.",
+            "zoneMode": "Informations du cadran",
+            "zoneTimer": "Minuteur uniquement",
+            "zoneEducational": "Phases informatives",
+            "zoneDetails": "À propos de ces phases",
+            "zoneMeal": "Traitement du dernier repas",
+            "zoneStored": "Utilisation de l’énergie stockée",
+            "zoneKetones": "Utilisation croissante des graisses et des cétones",
+            "zoneLater": "24 heures et plus : les réponses individuelles varient",
+            "zoneVariability": "Ces grandes phases se chevauchent. La transition vers une utilisation accrue des graisses et des cétones varie, souvent sur 12 à 36 heures. Ce minuteur ne mesure pas l’état métabolique, et un jeûne plus long n’est pas nécessairement préférable.",
+            "extraDays": "+{{count}} jours",
+            "extraDays_one": "+{{count}} jour",
+            "extraDays_few": "+{{count}} jours",
+            "safetyDialog": "Yuvomi est un outil de suivi, pas un dispositif médical ni un conseil médical. Le jeûne ne convient pas à tout le monde. Demandez un avis professionnel, notamment pendant la grossesse ou l’allaitement, pour les enfants et les adolescents, en cas d’antécédents de troubles alimentaires, de diabète, de médicaments concernés ou de maladies chroniques. Vous pouvez terminer un jeûne à tout moment.",
+            "dateReadOnly": "Cette date ne peut pas être modifiée dans le sélecteur de date. L’horodatage d’origine est conservé ; vous pouvez modifier les autres champs.",
+            "saveError": "Impossible d'enregistrer le jeûne.",
+            "loadError": "Impossible de charger le jeûne.",
+            "zone": {
+                "early": "Phase initiale",
+                "fatBurning": "Phase neutre",
+                "ketosis": "Phase tardive"
+            },
+            "custom": "Personnalisé",
+            "startDate": "Date de début",
+            "endDate": "Date de fin",
+            "note": "Note",
+            "remaining": "Restant",
+            "noGoal": "Sans objectif",
+            "goalHint": "Heures entières, jusqu’à 336 (14 jours).",
+            "clockDefault": "Affichage par défaut du minuteur",
+            "clockAuto": "Automatique (selon l’objectif)",
+            "clockElapsed": "Écoulé",
+            "clockRemaining": "Restant",
+            "loadMore": "Charger 10 de plus",
+            "goalNextHint": "Modifier l’objectif met à jour le jeûne en cours et l’objectif par défaut des prochains jeûnes.",
+            "safetyTitle": "Avant de commencer",
+            "conflict": "Cette entrée a changé. Rechargez la page et réessayez.",
+            "finishedTitle": "Jeûne terminé",
+            "editTitle": "Modifier le jeûne",
+            "rating": "Comment vous sentez-vous ?",
+            "ratingValue": "{{value}} étoiles sur 5",
+            "clearRating": "Effacer la note",
+            "finishedHint": "La fin est enregistrée. Vous pouvez ajuster les heures et ajouter une évaluation ou une note.",
+            "rangeError": "La fin doit suivre le début et ne pas être dans le futur.",
+            "elapsed": "Durée du jeûne",
+            "sinceLast": "Depuis le dernier jeûne"
+        },
         "tabs": {
             "overview": "Aperçu",
             "vitals": "Constantes",
             "meds": "Médicaments",
             "labs": "Analyses",
             "activity": "Activité",
-            "cycle": "Cycle"
+            "cycle": "Cycle",
+            "fasting": "Jeûne"
         },
         "overview": {
             "title": "Aperçu",
@@ -4327,7 +4404,11 @@
                 "regular": "Régulier",
                 "irregular": "Irrégulier",
                 "notEnoughData": "Données insuffisantes",
-                "noPrediction": "Enregistrez des règles pour obtenir des prévisions."
+                "noPrediction": "Enregistrez des règles pour obtenir des prévisions.",
+                "fertilitySuppressedNote": "Fenêtre fertile suspendue : contraception hormonale.",
+                "nextPeriodRangeSub": "Moyenne : {{date}}",
+                "partnerNextPeriod": "Les règles de {{name}} devraient commencer le {{date}}.",
+                "partnerNextPeriodNeutral": "Rappel partenaire - règles"
             },
             "stats": {
                 "source": {
@@ -4335,11 +4416,14 @@
                     "history_one": "Basé sur votre dernier cycle",
                     "insufficientHistory": "Valeur par défaut pour l'instant - enregistrez {{count}} cycles de plus pour une prédiction personnalisée",
                     "insufficientHistory_one": "Valeur par défaut pour l'instant - enregistrez {{count}} cycle de plus pour une prédiction personnalisée",
-                    "default": "Hypothèse par défaut (aucun historique enregistré pour l'instant)"
+                    "default": "Hypothèse par défaut (aucun historique enregistré pour l'instant)",
+                    "historyOther": "Basé sur les {{count}} derniers cycles",
+                    "historyOther_one": "Basé sur le dernier cycle"
                 }
             },
             "unit": {
-                "days": "{{value}} jours"
+                "days": "{{value}} jours",
+                "days_one": "{{value}} jour"
             },
             "today": {
                 "title": "Aujourd'hui",
@@ -4353,7 +4437,9 @@
             "calendar": {
                 "title": "Calendrier",
                 "prevMonth": "Mois précédent",
-                "nextMonth": "Mois suivant"
+                "nextMonth": "Mois suivant",
+                "likelihoodTitle": "Schémas de symptômes",
+                "likelihoodCaption": "Choisissez un symptôme pour voir les jours où il survient souvent, d'après votre historique."
             },
             "weekday": {
                 "mon": "Lu",
@@ -4370,13 +4456,16 @@
                 "fertile": "Fécond",
                 "ovulation": "Ovulation",
                 "today": "Aujourd'hui",
-                "logged": "Entrée"
+                "logged": "Entrée",
+                "pms": "Fenêtre de SPM (schéma)"
             },
             "history": {
                 "title": "Évolution",
                 "ongoing": "en cours",
                 "empty": "Aucune période enregistrée pour l’instant.",
-                "cycleLength": "Cycle {{value}} jours"
+                "cycleLength": "Cycle {{value}} jours",
+                "cycleLength_one": "Cycle {{value}} jour",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Tendances",
@@ -4392,12 +4481,21 @@
                 "typical": "Typique",
                 "atypical": "Atypique",
                 "typicalRangeLabel": "Plage typique : {{min}}-{{max}} jours",
-                "likelihoodTitle": "Schémas de symptômes",
-                "likelihoodCaption": "Choisissez un symptôme pour voir les jours où il survient souvent, d'après votre historique.",
-                "likelyToday": "{{symptom}} survient souvent vers ce jour de votre cycle.",
                 "symptomTracked": "Enregistré",
                 "symptomPredicted": "Survient souvent ici",
-                "phaseOther": "Autre"
+                "phaseOther": "Autre",
+                "details": "Détails",
+                "feelingFrequency": "Fréquence des ressentis",
+                "flowLoad": "Intensité des règles par cycle",
+                "flowLoadCaption": "Basé sur tes entrées de flux - plus ton suivi est complet, plus c'est significatif.",
+                "flowLoadColumn": "Intensité cumulée",
+                "flowLoadValue": "{{load}} ({{days}} enregistrés)",
+                "heavyBleedingHintHeavy": "Tes dernières règles ont été plusieurs fois notées comme « abondantes » - cela vaut la peine d'en parler lors d'une consultation médicale.",
+                "heavyBleedingHintLong": "Au moins une de tes dernières règles a duré plus d'une semaine - cela vaut la peine d'en parler lors d'une consultation médicale.",
+                "painTitle": "Douleurs",
+                "painCurrentCycleLabel": "Jours de douleur ce cycle",
+                "painAvgPerCycleLabel": "Moy. jours de douleur par cycle",
+                "painAvgIntensityLabel": "Intensité moy."
             },
             "flow": {
                 "label": "Flux",
@@ -4466,7 +4564,9 @@
             },
             "period": {
                 "add": "Enregistrer les règles",
-                "edit": "Modifier les règles"
+                "edit": "Modifier les règles",
+                "warningFuture": "La date de début est dans le futur - les prévisions ne se basent que sur les cycles passés.",
+                "warningOverlap": "Chevauche un cycle déjà enregistré."
             },
             "dayLog": {
                 "title": "Enregistrer le jour",
@@ -4505,8 +4605,91 @@
                 "pregnancyMode": "Mode grossesse",
                 "dueDate": "Date prévue d'accouchement",
                 "pregnancyHint": "En mode grossesse, les prévisions de règles et d'ovulation sont en pause. Le suivi quotidien reste disponible.",
-                "saved": "Paramètres enregistrés."
-            }
+                "saved": "Paramètres enregistrés.",
+                "contraception": "Méthode de contraception",
+                "contraceptionHint": "Les méthodes hormonales suspendent automatiquement les prévisions de fenêtre fertile.",
+                "contraceptionUnset": "Non renseigné",
+                "contraceptionOptions": {
+                    "none": "Aucune",
+                    "pill": "Pilule",
+                    "hormonal_iud": "Stérilet hormonal",
+                    "copper_iud": "Stérilet en cuivre",
+                    "implant": "Implant",
+                    "injection": "Injection",
+                    "patch": "Patch",
+                    "ring": "Anneau vaginal",
+                    "condom": "Préservatif",
+                    "other": "Autre"
+                },
+                "perimenopauseMode": "Mode périménopause",
+                "perimenopauseModeHint": "Les prévisions s'affichent sous forme de plage plutôt que d'une seule date ; l'évaluation de la régularité est désactivée.",
+                "showPms": "Afficher la fenêtre prémenstruelle",
+                "notifyPartner": "Prévenir un·e partenaire",
+                "notifyPartnerHint": "La personne choisie ne reçoit que la date prévue, jamais les symptômes, notes ou autres entrées.",
+                "notifyPartnerNoEligible": "Aucun membre du foyer éligible - seuls les membres ayant accès au module Santé peuvent être notifiés.",
+                "notifyPartnerDaysBefore": "Rappel au/à la partenaire"
+            },
+            "mucus": {
+                "label": "Glaire cervicale",
+                "hint": "Facultatif. Les changements de texture peuvent aider à cerner la fenêtre de fertilité.",
+                "none": "Aucune",
+                "dry": "Sèche",
+                "sticky": "Collante",
+                "creamy": "Crémeuse",
+                "watery": "Aqueuse",
+                "eggwhite": "Blanc d'œuf"
+            },
+            "test": {
+                "label": "Tests",
+                "lhLabel": "Test LH",
+                "pregnancyLabel": "Test de grossesse",
+                "unset": "Non testé",
+                "negative": "Négatif",
+                "positive": "Positif"
+            },
+            "feelings": {
+                "label": "Émotions"
+            },
+            "intimacy": {
+                "label": "Intimité",
+                "hint": "Reste privé même si ce jour est partagé avec la famille.",
+                "none": "Non précisé",
+                "protected": "Protégé",
+                "unprotected": "Non protégé",
+                "solo": "Solo"
+            },
+            "quickLink": {
+                "painkiller": "Enregistrer un antalgique",
+                "weight": "Enregistrer le poids"
+            },
+            "bubble": {
+                "ariaLabel": "État du cycle aujourd'hui",
+                "line1": "Jour {{day}} du cycle · {{phase}}",
+                "periodToday": "Règles attendues aujourd'hui - les commencer maintenant ?",
+                "periodOverdue": "Règles en retard de {{count}} jours - les commencer maintenant ?",
+                "periodOverdue_one": "Règles en retard de {{count}} jour - les commencer maintenant ?",
+                "periodStillOpen": "Tes règles sont toujours enregistrées comme en cours - les terminer maintenant ?",
+                "peakPainDay": "D'après votre historique, aujourd'hui est souvent votre jour de douleur le plus intense ({{symptom}}).",
+                "likelySymptomsToday": "Probable aujourd'hui : {{symptoms}}",
+                "pmsWindow": "Fenêtre prémenstruelle probable à partir de {{weekday}}",
+                "upcomingSymptom": "Probable à partir de {{weekday}} : {{symptom}}",
+                "fertile": "Fenêtre fertile jusqu'au {{date}}",
+                "fertileConfirmed": "Fenêtre fertile (ovulation confirmée) jusqu'au {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "L'ovulation de ce cycle a été confirmée par une hausse de température. Les cycles à venir restent basés sur la méthode du calendrier ; cela ne remplace ni une contraception ni un avis médical.",
+            "import": {
+                "button": "Importer",
+                "title": "Importer l'historique des règles",
+                "explainer": "Fichier CSV ou texte collé : une ligne par cycle sous la forme « start_date,end_date » (date de fin facultative), dates au format AAAA-MM-JJ ou JJ.MM.AAAA, séparées par une virgule ou un point-virgule.",
+                "fileLabel": "Choisir un fichier CSV",
+                "pasteLabel": "Ou coller le texte CSV",
+                "submit": "Importer",
+                "resultToast": "{{imported}} importées, {{skipped}} ignorées.",
+                "errorsTitle": "Ces lignes n'ont pas pu être importées :",
+                "emptyError": "Choisissez un fichier CSV ou collez du texte.",
+                "error": "Échec de l'import."
+            },
+            "discoveryHint": "Astuce : abonnez-vous au cycle prévu via un flux ICS dans <a href=\"/settings/personal/feeds\">Paramètres → Personnel → Flux</a>, ou affichez le widget du cycle sur l'<a href=\"/\">Accueil</a> via son mode de personnalisation."
         },
         "duration": {
             "hm": "{{hours}} h {{minutes}} min",

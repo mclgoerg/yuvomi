@@ -3884,13 +3884,90 @@
         "accountUsernameHint": "E-mail-cím vagy felhasználónév. Ez nem jelszómező - a Yuvomi nem tárol jelszavakat."
     },
     "health": {
+        "fasting": {
+            "title": "Böjt",
+            "emptyTitle": "Böjt",
+            "emptyDesc": "Indítson személyes böjtidőzítőt, és kövesse nyomon az előzményeket.",
+            "permissionLabel": "Böjt használata",
+            "start": "Böjt indítása",
+            "finish": "Böjt befejezése",
+            "history": "Előzmények",
+            "export": "CSV exportálása",
+            "noHistory": "Még nincs befejezett böjt",
+            "ready": "Készen áll a következő böjtre",
+            "startedAt": "Kezdés: {{date}}",
+            "elapsedDays": "{{days}}. nap",
+            "goalReached": "Cél elérve",
+            "goalTitle": "Az Ön célja",
+            "goalHours": "Cél órában",
+            "earlier": "Korábban kezdtem",
+            "backfill": "Befejezett böjt hozzáadása",
+            "editStart": "Kezdés szerkesztése",
+            "undoEnd": "Befejezés visszavonása",
+            "deleted": "Böjt törölve",
+            "person": "Személy",
+            "readOnly": "Csak olvasható böjtnapló",
+            "completedFrom": "Befejezve ettől",
+            "completedTo": "Befejezve eddig",
+            "applyFilter": "Dátumok alkalmazása",
+            "targetAt": "Cél: {{date}}",
+            "utcOffset": "UTC-eltolás (ismétlődő helyi óra)",
+            "wallTimeError": "Ez a helyi idő nem létezik a rögzített időzónában. Válasszon másik időpontot.",
+            "offline": "A böjt módosítása előtt csatlakozzon újra.",
+            "zoneMode": "Számlap információi",
+            "zoneTimer": "Csak időmérő",
+            "zoneEducational": "Tájékoztató szakaszok",
+            "zoneDetails": "Ezekről a szakaszokról",
+            "zoneMeal": "Az utolsó étkezés feldolgozása",
+            "zoneStored": "Tárolt energia felhasználása",
+            "zoneKetones": "A zsír és a ketonok fokozódó felhasználása",
+            "zoneLater": "24 órán túl: az egyéni reakciók eltérnek",
+            "zoneVariability": "Ezek az általános szakaszok átfedik egymást. A zsír és a ketonok fokozott felhasználására való átállás változó, gyakran 12-36 óra alatt zajlik. Ez az időmérő nem méri az anyagcsere állapotát, és a hosszabb böjt nem feltétlenül jobb.",
+            "extraDays": "+{{count}} nap",
+            "extraDays_one": "+{{count}} nap",
+            "extraDays_few": "+{{count}} nap",
+            "safetyDialog": "A Yuvomi nyilvántartási eszköz, nem orvostechnikai eszköz vagy orvosi tanács. A böjt nem mindenkinek megfelelő. Kérjen szakmai útmutatást, különösen terhesség vagy szoptatás idején, gyermekek és serdülők esetében, korábbi étkezési zavarok, cukorbetegség, érintett gyógyszerek vagy krónikus betegségek esetén. A böjtöt bármikor befejezheti.",
+            "dateReadOnly": "Ez a dátum nem szerkeszthető a dátumválasztóval. Az eredeti időbélyeg megmarad; a többi mező módosítható.",
+            "saveError": "A böjt mentése nem sikerült.",
+            "loadError": "A böjt betöltése nem sikerült.",
+            "zone": {
+                "early": "Korai szakasz",
+                "fatBurning": "Semleges szakasz",
+                "ketosis": "Késői szakasz"
+            },
+            "custom": "Egyéni",
+            "startDate": "Kezdő dátum",
+            "endDate": "Befejező dátum",
+            "note": "Megjegyzés",
+            "remaining": "Fennmaradó",
+            "noGoal": "Cél nélkül",
+            "goalHint": "Egész órák, legfeljebb 336 (14 nap).",
+            "clockDefault": "Az időzítő alapértelmezett nézete",
+            "clockAuto": "Automatikus (a cél alapján)",
+            "clockElapsed": "Eltelt",
+            "clockRemaining": "Fennmaradó",
+            "loadMore": "További 10 betöltése",
+            "goalNextHint": "A cél módosítása frissíti az aktuális böjtöt és a jövőbeli böjtök alapértelmezett célját.",
+            "safetyTitle": "Mielőtt elkezded",
+            "conflict": "A bejegyzés megváltozott. Frissítsd az oldalt, és próbáld újra.",
+            "finishedTitle": "Böjt befejezve",
+            "editTitle": "Böjt szerkesztése",
+            "rating": "Hogy érzed magad?",
+            "ratingValue": "{{value}} az 5 csillagból",
+            "clearRating": "Értékelés törlése",
+            "finishedHint": "A befejezés mentve. Módosíthatod az időpontokat, és értékelést vagy megjegyzést adhatsz hozzá.",
+            "rangeError": "A végnek a kezdet után kell lennie, és nem lehet a jövőben.",
+            "elapsed": "Böjt időtartama",
+            "sinceLast": "Az utolsó böjt óta"
+        },
         "tabs": {
             "overview": "Áttekintés",
             "vitals": "Vitálértékek",
             "meds": "Gyógyszerek",
             "labs": "Laborértékek",
             "activity": "Tevékenység",
-            "cycle": "Ciklus"
+            "cycle": "Ciklus",
+            "fasting": "Böjt"
         },
         "overview": {
             "title": "Áttekintés",
@@ -4327,7 +4404,11 @@
                 "regular": "Szabályos",
                 "irregular": "Szabálytalan",
                 "notEnoughData": "Kevés adat",
-                "noPrediction": "Rögzíts egy menstruációt az előrejelzésekhez."
+                "noPrediction": "Rögzíts egy menstruációt az előrejelzésekhez.",
+                "fertilitySuppressedNote": "Termékeny időszak szüneteltetve: hormonális fogamzásgátlás.",
+                "nextPeriodRangeSub": "Átlag: {{date}}",
+                "partnerNextPeriod": "{{name}} menstruációja várhatóan {{date}}-én kezdődik.",
+                "partnerNextPeriodNeutral": "Partner-emlékeztető: menstruáció"
             },
             "stats": {
                 "source": {
@@ -4335,11 +4416,14 @@
                     "history_one": "Az utolsó ciklusod alapján",
                     "insufficientHistory": "Egyelőre alapértelmezett érték - rögzíts még {{count}} ciklust a személyre szabott előrejelzéshez",
                     "insufficientHistory_one": "Egyelőre alapértelmezett érték - rögzíts még {{count}} ciklust a személyre szabott előrejelzéshez",
-                    "default": "Alapértelmezett feltételezés (még nincs rögzített előzmény)"
+                    "default": "Alapértelmezett feltételezés (még nincs rögzített előzmény)",
+                    "historyOther": "Az utolsó {{count}} ciklus alapján",
+                    "historyOther_one": "Az utolsó ciklus alapján"
                 }
             },
             "unit": {
-                "days": "{{value}} nap"
+                "days": "{{value}} nap",
+                "days_one": "{{value}} nap"
             },
             "today": {
                 "title": "Ma",
@@ -4353,7 +4437,9 @@
             "calendar": {
                 "title": "Naptár",
                 "prevMonth": "Előző hónap",
-                "nextMonth": "Következő hónap"
+                "nextMonth": "Következő hónap",
+                "likelihoodTitle": "Tünetminták",
+                "likelihoodCaption": "Válassz egy tünetet, hogy lásd, mely napokon jelentkezik gyakran, az előzményeid alapján."
             },
             "weekday": {
                 "mon": "H",
@@ -4370,13 +4456,16 @@
                 "fertile": "Termékeny",
                 "ovulation": "Ovuláció",
                 "today": "Ma",
-                "logged": "Bejegyzés"
+                "logged": "Bejegyzés",
+                "pms": "PMS-időszak (minta)"
             },
             "history": {
                 "title": "Tendencia",
                 "ongoing": "folyamatban",
                 "empty": "Még nincs rögzített menstruáció.",
-                "cycleLength": "Ciklus {{value}} nap"
+                "cycleLength": "Ciklus {{value}} nap",
+                "cycleLength_one": "Ciklus {{value}} nap",
+                "flowHeaviest": "Max. {{value}}"
             },
             "trends": {
                 "title": "Trendek",
@@ -4392,12 +4481,21 @@
                 "typical": "Jellemző",
                 "atypical": "Nem jellemző",
                 "typicalRangeLabel": "Jellemző tartomány: {{min}}-{{max}} nap",
-                "likelihoodTitle": "Tünetminták",
-                "likelihoodCaption": "Válassz egy tünetet, hogy lásd, mely napokon jelentkezik gyakran, az előzményeid alapján.",
-                "likelyToday": "{{symptom}} gyakran ez körül a ciklusnap körül jelentkezik.",
                 "symptomTracked": "Rögzítve",
                 "symptomPredicted": "Gyakran itt jelentkezik",
-                "phaseOther": "Egyéb"
+                "phaseOther": "Egyéb",
+                "details": "Részletek",
+                "feelingFrequency": "Hangulat gyakorisága",
+                "flowLoad": "Vérzés intenzitása ciklusonként",
+                "flowLoadCaption": "A rögzített vérzésadatokon alapul - minél teljesebb a naplózás, annál informatívabb.",
+                "flowLoadColumn": "Vérzésterhelés",
+                "flowLoadValue": "{{load}} ({{days}} rögzítve)",
+                "heavyBleedingHintHeavy": "Az utóbbi ciklusaid ismétlődően „erős” vérzésként lettek rögzítve - érdemes ezt megemlíteni egy orvosi konzultáción.",
+                "heavyBleedingHintLong": "Legalább egy utóbbi ciklusod egy hétnél tovább tartott - érdemes ezt megemlíteni egy orvosi konzultáción.",
+                "painTitle": "Fájdalom",
+                "painCurrentCycleLabel": "Fájdalmas napok ebben a ciklusban",
+                "painAvgPerCycleLabel": "Átl. fájdalmas napok ciklusonként",
+                "painAvgIntensityLabel": "Átl. intenzitás"
             },
             "flow": {
                 "label": "Vérzés erőssége",
@@ -4466,7 +4564,9 @@
             },
             "period": {
                 "add": "Menstruáció rögzítése",
-                "edit": "Menstruáció szerkesztése"
+                "edit": "Menstruáció szerkesztése",
+                "warningFuture": "A kezdő dátum a jövőben van - az előrejelzések csak a korábbi ciklusokon alapulnak.",
+                "warningOverlap": "Átfedésben van egy már rögzített ciklussal."
             },
             "dayLog": {
                 "title": "Nap rögzítése",
@@ -4505,8 +4605,91 @@
                 "pregnancyMode": "Terhesség mód",
                 "dueDate": "Várható szülési időpont",
                 "pregnancyHint": "Terhesség módban a menstruáció- és ovulációs előrejelzések szünetelnek. A napi naplózás továbbra is elérhető.",
-                "saved": "Beállítások mentve."
-            }
+                "saved": "Beállítások mentve.",
+                "contraception": "Fogamzásgátlási módszer",
+                "contraceptionHint": "A hormonális módszerek automatikusan szüneteltetik a termékeny időszak előrejelzését.",
+                "contraceptionUnset": "Nincs megadva",
+                "contraceptionOptions": {
+                    "none": "Nincs",
+                    "pill": "Tabletta",
+                    "hormonal_iud": "Hormonspirál",
+                    "copper_iud": "Rézspirál",
+                    "implant": "Implantátum",
+                    "injection": "Injekció",
+                    "patch": "Tapasz",
+                    "ring": "Hüvelygyűrű",
+                    "condom": "Óvszer",
+                    "other": "Egyéb"
+                },
+                "perimenopauseMode": "Perimenopauza mód",
+                "perimenopauseModeHint": "Az előrejelzések tartományként jelennek meg egyetlen dátum helyett; a szabályosság-értékelés kikapcsol.",
+                "showPms": "PMS-időszak megjelenítése",
+                "notifyPartner": "Partner értesítése",
+                "notifyPartnerHint": "A kiválasztott személy csak az előre jelzett dátumot kapja meg, sosem tüneteket, jegyzeteket vagy más bejegyzéseket.",
+                "notifyPartnerNoEligible": "Nincs jogosult háztartástag - csak az Egészség modulhoz hozzáféréssel rendelkező tagok értesíthetők.",
+                "notifyPartnerDaysBefore": "Emlékeztető a partnernek"
+            },
+            "mucus": {
+                "label": "Méhnyaknyák",
+                "hint": "Nem kötelező. Az állag változásai segíthetnek szűkíteni a termékeny időszakot.",
+                "none": "Nincs",
+                "dry": "Száraz",
+                "sticky": "Ragadós",
+                "creamy": "Krémes",
+                "watery": "Vizes",
+                "eggwhite": "Tojásfehérje-szerű"
+            },
+            "test": {
+                "label": "Tesztek",
+                "lhLabel": "LH-teszt",
+                "pregnancyLabel": "Terhességi teszt",
+                "unset": "Nincs tesztelve",
+                "negative": "Negatív",
+                "positive": "Pozitív"
+            },
+            "feelings": {
+                "label": "Érzések"
+            },
+            "intimacy": {
+                "label": "Intimitás",
+                "hint": "Privát marad akkor is, ha ezt a napot megosztod a családdal.",
+                "none": "Nincs megadva",
+                "protected": "Védekezéssel",
+                "unprotected": "Védekezés nélkül",
+                "solo": "Egyedül"
+            },
+            "quickLink": {
+                "painkiller": "Fájdalomcsillapító rögzítése",
+                "weight": "Testsúly rögzítése"
+            },
+            "bubble": {
+                "ariaLabel": "Mai ciklusállapot",
+                "line1": "{{day}}. ciklusnap · {{phase}}",
+                "periodToday": "A menstruáció ma várható - elindítod most?",
+                "periodOverdue": "A menstruáció {{count}} napja késik - elindítod most?",
+                "periodOverdue_one": "A menstruáció {{count}} napja késik - elindítod most?",
+                "periodStillOpen": "A bejegyzés szerint a menstruációd még mindig tart - befejezed most?",
+                "peakPainDay": "A mintázatod szerint ma gyakran a legerősebb fájdalom napja van ({{symptom}}).",
+                "likelySymptomsToday": "Ma valószínű: {{symptoms}}",
+                "pmsWindow": "PMS-időszak valószínűleg {{weekday}}-tól",
+                "upcomingSymptom": "{{weekday}}-tól valószínű: {{symptom}}",
+                "fertile": "Termékeny időszak eddig: {{date}}",
+                "fertileConfirmed": "Termékeny időszak (megerősített ovuláció) eddig: {{date}}"
+            },
+            "fertilityDisclaimerConfirmed": "Ennek a ciklusnak az ovulációját hőmérséklet-emelkedés igazolta. A jövőbeli ciklusok továbbra is a naptári módszeren alapulnak; ez nem helyettesíti a fogamzásgátlást vagy az orvosi tanácsot.",
+            "import": {
+                "button": "Importálás",
+                "title": "Ciklustörténet importálása",
+                "explainer": "CSV-fájl vagy beillesztett szöveg: soronként egy időszak „start_date,end_date” formában (a végdátum opcionális), dátumok ÉÉÉÉ-HH-NN vagy NN.HH.ÉÉÉÉ formátumban, vesszővel vagy pontosvesszővel elválasztva.",
+                "fileLabel": "CSV-fájl kiválasztása",
+                "pasteLabel": "Vagy CSV-szöveg beillesztése",
+                "submit": "Importálás",
+                "resultToast": "{{imported}} importálva, {{skipped}} kihagyva.",
+                "errorsTitle": "Ezeket a sorokat nem sikerült importálni:",
+                "emptyError": "Válassz egy CSV-fájlt, vagy illessz be szöveget.",
+                "error": "Az importálás nem sikerült."
+            },
+            "discoveryHint": "Tipp: a becsült ciklusra ICS-hírcsatornaként iratkozhatsz fel a <a href=\"/settings/personal/feeds\">Beállítások → Személyes → Hírcsatornák</a> alatt, vagy megjelenítheted a ciklus-widgetet az <a href=\"/\">Áttekintésen</a> a testreszabás módban."
         },
         "duration": {
             "hm": "{{hours}} ó {{minutes}} p",
