@@ -281,7 +281,16 @@
    * "Heute" 65.7px) bleibt der reservierte Platz fuer den Reset in JEDER
    * Sprache gleich schmal (~44-48px, wie die beiden Pfeile), und das Label
    * bekommt den Rest der Zeile - real gemessen ausreichend fuer beide
-   * Wochenenden in de/fr/uk bei 320px und 375px, ohne Ellipsis-Kuerzung. */
+   * Wochenenden in de/fr/uk bei 320px und 375px, ohne Ellipsis-Kuerzung.
+   *
+   * PR #1200 Review Runde 6, Nice-to-have 2: die drei Deklarationen unten
+   * sind bewusst dieselben wie `.btn--icon` (layout.css) - der Knopf verhaelt
+   * sich hier ja wie ein Icon-Knopf, traegt die Klasse aber nicht (er bleibt
+   * `.btn--secondary` fuer die breite Ansicht, und `.btn--icon` faerbt ueber
+   * `.week-nav .btn--icon { color: var(--color-accent) }` zusaetzlich ein,
+   * was hier nicht gewollt ist). Die Wiederholung ist also absichtlich, nicht
+   * abgeschrieben - der Zeigefaehigkeits-Wert (--target-base) hat mit
+   * `.btn--icon` trotzdem EINE Quelle, nur zwei Stellen, die ihn eintragen. */
   .week-nav__today {
     padding: var(--space-2);
     min-width: var(--target-base);

@@ -84,7 +84,6 @@ function addDays(dateStr, n) {
  * Text - der reservierte Platz bleibt dadurch in jeder Sprache gleich schmal
  * (~44-48px wie ein Pfeil), statt mit dem uebersetzten Wort zu wachsen.
  *
-
  * Unter 640px faellt das Jahr an BEIDEN Enden weg (`formatDayMonth` statt
  * `formatDate`) - verwandt mit dem Muster, das der Kalender fuer sein eigenes
  * schmales Wochen-Label nutzt (`updateLabel()`, calendar.js:

@@ -17886,8 +17886,15 @@ test('.week-nav__label schneidet ueberlaufenden Text per overflow/text-overflow,
 
 // PR #1200 Review Runde 5, Should-fix: keine Suite pinnte den CSS-Teil des
 // Mechanismus fest, der `#week-today` unter 640px schmal wie einen Pfeil
-// haelt (die JS-Haelfte - Icon statt Text - haelt test-meals.js fest). Der
-// Reviewer hat gegengeprueft: den `@media (max-width: 639px)`-Block fuer
+// haelt. Dieser Test deckt NUR die CSS-Form ab (--target-base, kein
+// flex-basis:100%) - die JS-Haelfte (Icon statt Text) haelt ein eigener
+// Verhaltenstest in test-meals.js fest ("syncTodayButton() schaltet unter
+// 640px wirklich auf ein textloses Icon um und zurueck", PR #1200 Review
+// Runde 6), NICHT irgendein Stub in diesem Modul hier - die fruehere Fassung
+// dieses Kommentars behauptete das faelschlich, ohne dass je ein
+// `matchMedia`-Stub in test-meals.js den schmalen Zweig tatsaechlich betreten
+// haette (Runde 6, Blocking 1). Der Reviewer hat gegengeprueft: den
+// `@media (max-width: 639px)`-Block fuer
 // `.week-nav__today` entfernt (womit der Knopf wieder mit seinem vollen,
 // uebersetzten Text rechnet), und test:meals, test:frontend-audit und
 // test:mobile-scroll-layout blieben ALLE gruen - das waere die Rueckkehr der
@@ -17905,4 +17912,24 @@ test('.week-nav__today bleibt unter 640px pfeilbreit (icon-only), statt eine eig
     '.week-nav__today muss unter 640px auf --target-base begrenzt sein - ein Icon-Knopf, kein textbreiter Knopf');
   assert.doesNotMatch(narrowRule.body, /flex-basis:\s*100%/,
     '.week-nav__today darf unter 640px nicht mehr flex-basis:100% setzen - das war die eigene Zeile aus Runde 4, die Runde 5 ausdruecklich zurueckbaut');
+
+  // PR #1200 Review Runde 6, Nice-to-have 3: die obige Zusicherung pinnt nur
+  // die eine Haelfte von Runde 4s alter Form fest (die Abwesenheit von
+  // `flex-basis: 100%` am KIND). Die eigene Zeile brauchte aber ZWEI Regeln -
+  // zusaetzlich `.week-nav { flex-wrap: wrap; row-gap: ...; }` am ELTERN-
+  // Flex-Container, ohne die `flex-basis: 100%` allein gar keinen Umbruch
+  // erzwingen kann. Ohne diese zweite Zusicherung waere eine Rueckkehr NUR
+  // von `.week-nav { flex-wrap: wrap }` (ohne das Kind anzufassen) hier
+  // unsichtbar geblieben.
+  const weekNavRule = [...eachRule(meals)].find(({ selector, at }) =>
+    selector.trim() === '.week-nav' && at.some((query) => /max-width:\s*639px/.test(query)));
+  if (weekNavRule) {
+    assert.doesNotMatch(weekNavRule.body, /flex-wrap:\s*wrap/,
+      '.week-nav darf unter 640px kein flex-wrap:wrap zurueckbekommen - das war die zweite Haelfte der eigenen Zeile aus Runde 4, die Runde 5 ausdruecklich zurueckbaut');
+  }
+  const weekNavBaseRule = [...eachRule(meals)].find(({ selector, at }) =>
+    selector.trim() === '.week-nav' && at.length === 0);
+  assert.ok(weekNavBaseRule, '.week-nav-Basisregel (ausserhalb jeder @media) nicht gefunden');
+  assert.doesNotMatch(weekNavBaseRule.body, /flex-wrap:\s*wrap/,
+    '.week-nav darf auch in seiner Basisregel kein flex-wrap:wrap tragen - das waere derselbe Umbruch, nur ungeschuetzt durch die Breitenschwelle');
 });

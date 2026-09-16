@@ -12,6 +12,7 @@ import { datesForTemplateInRange, mealWeekday } from '../server/services/meal-re
 import { __test as mealsUi } from '../public/pages/meals.js';
 import { toDecimalString } from '../public/utils/money.js';
 import { todayKey } from '../public/utils/date.js';
+import { t } from '../public/i18n.js';
 import { setDisplayTimeZone, _resetDisplayTimeZoneCache } from '../public/utils/timezone.js';
 import { parseQuantity } from '../server/services/shopping-import.js';
 
@@ -840,13 +841,21 @@ function fakeResetButton() {
     textContent: '',
     title: '',
     dataset: {},
+    // PR #1200 Review Runde 6, Blocking 1: bis dahin wurde das eingefuegte
+    // Markup nirgends gehalten, nur dass ueberhaupt eingefuegt wird - der
+    // schmale Icon-Zweig in syncTodayButton() haette also genauso gut gar
+    // nichts einfuegen koennen, ohne dass ein Test das gesehen haette. Jetzt
+    // haelt insertedHTML das kumulierte Markup fest, damit ein Test unten
+    // wirklich pruefen kann, DASS ein `data-lucide="calendar-check"`-Icon
+    // eingefuegt wurde, statt nur zu vertrauen, dass es passiert.
+    insertedHTML: '',
     classList: {
       toggle(cls, force) { if (force) classes.add(cls); else classes.delete(cls); },
       contains(cls) { return classes.has(cls); },
     },
     setAttribute(name, value) { attrs[name] = String(value); },
     getAttribute(name) { return Object.prototype.hasOwnProperty.call(attrs, name) ? attrs[name] : null; },
-    insertAdjacentHTML() { /* Markup wird nicht geprueft - nur, dass gebaut wird */ },
+    insertAdjacentHTML(position, html) { this.insertedHTML += html; },
     // PR #1200 Review Runde 5, Nice-to-have 1: ein echtes `focus()`, das
     // `globalThis.document.activeElement` tatsaechlich umschreibt - vorher
     // war `document` ein nacktes Objekt ohne irgendeinen Weg, `activeElement`
@@ -921,6 +930,60 @@ test('syncTodayButton() rettet den Fokus vor dem eigenen inert-Werden', () => {
   } finally {
     mealsUi.state.currentWeek = zuvor;
     globalThis.document = zuvorDocument;
+  }
+});
+
+// PR #1200 Review Runde 6, Blocking 1: keine Suite betrat je den schmalen
+// Zweig von syncTodayButton() - jeder `matchMedia`-Stub in dieser Datei lieferte
+// unbedingt `{ matches: false }` (u. a. `fakeResetButton()`s eigene
+// `insertAdjacentHTML()`, die bislang gar nichts festhielt). Der Reviewer hat
+// gegengeprueft: `public/pages/meals.js:337-353` - die `aria-label`/`title`-
+// Zuweisung, das Icon-Einfuegen UND die Text-Wiederherstellung - vollstaendig
+// geloescht, und `test:meals`, `test:frontend-audit` sowie
+// `test:mobile-scroll-layout` blieben ALLE bei exit 0 stehen. CONTRIBUTING.md:
+// "Ein Guard, der nie rot gesehen wurde, ist kein Beweis." Dieser Test treibt
+// die ECHTE `syncTodayButton()` gegen einen `matchMedia`-Stub, der fuer
+// `NARROW_WEEK_LABEL_QUERY` tatsaechlich `{ matches: true }` liefert, und
+// prueft BEIDE Richtungen: schmal -> kein sichtbarer Text, ein
+// `data-lucide="calendar-check"`-Icon, das uebersetzte Wort auf
+// `aria-label`/`title`; zurueck ueber die Schwelle -> der sichtbare Text kommt
+// zurueck.
+test('syncTodayButton() schaltet unter 640px wirklich auf ein textloses Icon um und zurueck (PR #1200 Review Runde 6, Blocking 1)', () => {
+  const btn = fakeResetButton();
+  const root = { querySelector: (sel) => (sel === '#week-today' ? btn : null) };
+  const zuvorWeek = mealsUi.state.currentWeek;
+  const zuvorWindow = globalThis.window;
+  try {
+    // Eine Woche, die garantiert nicht die aktuelle ist - der Fokus-Rettungs-
+    // Zweig (siehe Test oben) ist hier nicht der Gegenstand der Pruefung.
+    mealsUi.state.currentWeek = '2000-01-03';
+    const label = t('meals.today');
+
+    // (a) schmal: matchMedia liefert fuer NARROW_WEEK_LABEL_QUERY matches:true.
+    globalThis.window = { lucide: undefined, matchMedia: () => ({ matches: true }) };
+    mealsUi.syncTodayButton(root);
+    assert(btn.textContent === '',
+      `unter 640px darf der Reset keinen sichtbaren Text tragen - textContent ist stattdessen "${btn.textContent}"`);
+    assert(btn.insertedHTML.includes('data-lucide="calendar-check"'),
+      `unter 640px muss der Reset ein data-lucide="calendar-check"-Icon einfuegen - eingefuegtes Markup: "${btn.insertedHTML}"`);
+    assert(btn.getAttribute('aria-label') === label,
+      `aria-label muss das uebersetzte Wort tragen, obwohl der sichtbare Text zum Icon wird - erhalten "${btn.getAttribute('aria-label')}"`);
+    assert(btn.title === label,
+      `title muss ebenfalls das uebersetzte Wort tragen - erhalten "${btn.title}"`);
+    assert(btn.dataset.iconOnly === 'true',
+      'dataset.iconOnly muss auf "true" stehen, sobald der Icon-Zweig genommen wurde');
+
+    // (b) zurueck ueber die Schwelle: matchMedia liefert wieder matches:false -
+    // der sichtbare Text muss zurueckkommen, nicht nur aria-label/title.
+    globalThis.window = { lucide: undefined, matchMedia: () => ({ matches: false }) };
+    mealsUi.syncTodayButton(root);
+    assert(btn.textContent === label,
+      `ab 640px muss der sichtbare Text wieder das uebersetzte Wort sein - stattdessen "${btn.textContent}"`);
+    assert(btn.dataset.iconOnly === 'false',
+      'dataset.iconOnly muss auf "false" zurueckfallen, sobald der Text-Zweig wieder genommen wird');
+  } finally {
+    mealsUi.state.currentWeek = zuvorWeek;
+    globalThis.window = zuvorWindow;
   }
 });
 
