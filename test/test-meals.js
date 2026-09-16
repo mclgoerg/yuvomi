@@ -833,12 +833,27 @@ test('Skalieren: eine mitten im Trenner abgeschnittene Zahl bleibt stehen', () =
 // echten Browser zu pruefen, ohne eine ganze DOM-Bibliothek zu laden.
 function fakeResetButton() {
   const classes = new Set();
+  const attrs = {};
   return {
     inert: false,
+    innerHTML: '',
+    textContent: '',
+    title: '',
+    dataset: {},
     classList: {
       toggle(cls, force) { if (force) classes.add(cls); else classes.delete(cls); },
       contains(cls) { return classes.has(cls); },
     },
+    setAttribute(name, value) { attrs[name] = String(value); },
+    getAttribute(name) { return Object.prototype.hasOwnProperty.call(attrs, name) ? attrs[name] : null; },
+    insertAdjacentHTML() { /* Markup wird nicht geprueft - nur, dass gebaut wird */ },
+    // PR #1200 Review Runde 5, Nice-to-have 1: ein echtes `focus()`, das
+    // `globalThis.document.activeElement` tatsaechlich umschreibt - vorher
+    // war `document` ein nacktes Objekt ohne irgendeinen Weg, `activeElement`
+    // zu veraendern, also blieb ein Test, der auf einen UNVERAENDERTEN Fokus
+    // pruefte, auch dann gruen, wenn der geprüfte Handler selbst einen Knopf
+    // fokussierte (die Pruefung konnte den Unterschied gar nicht sehen).
+    focus() { if (globalThis.document) globalThis.document.activeElement = this; },
   };
 }
 
@@ -1238,8 +1253,14 @@ test('meals.js registriert onNarrowWeekLabelQueryChange() wirklich per matchMedi
     `erwartet die Anmeldung auf "(max-width: 639px)", erhalten: "${call.query}"`);
   assert(call.type === 'change',
     `erwartet ein "change"-Ereignis, erhalten: "${call.type}"`);
-  assert(typeof call.handler === 'function',
-    'der registrierte Handler muss eine Funktion sein (onNarrowWeekLabelQueryChange)');
+  // PR #1200 Review Runde 5, Nice-to-have 2: `typeof call.handler ===
+  // 'function'` stand jeder Funktion offen, auch `renderWeekGrid` selbst -
+  // genau der Rueckfall aus Runde 4, den die Verdrahtung verhindern soll.
+  // Der Funktionsname pinnt fest, DASS es der schmale Handler ist, nicht nur
+  // irgendeine Funktion.
+  assert(call.handler.name === 'onNarrowWeekLabelQueryChange',
+    `erwartet den Handler "onNarrowWeekLabelQueryChange", erhalten: "${call.handler.name}". ` +
+    'Ein anderer registrierter Handler (z. B. renderWeekGrid direkt) waere hier ein Rueckfall auf Runde 4.');
 });
 
 // --------------------------------------------------------

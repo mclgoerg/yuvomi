@@ -17883,3 +17883,26 @@ test('.week-nav__label schneidet ueberlaufenden Text per overflow/text-overflow,
   assert.match(rule.body, /text-overflow:\s*ellipsis/,
     '.week-nav__label muss text-overflow:ellipsis setzen - sonst wird ueberlaufender Text kommentarlos abgeschnitten statt sichtbar gekuerzt');
 });
+
+// PR #1200 Review Runde 5, Should-fix: keine Suite pinnte den CSS-Teil des
+// Mechanismus fest, der `#week-today` unter 640px schmal wie einen Pfeil
+// haelt (die JS-Haelfte - Icon statt Text - haelt test-meals.js fest). Der
+// Reviewer hat gegengeprueft: den `@media (max-width: 639px)`-Block fuer
+// `.week-nav__today` entfernt (womit der Knopf wieder mit seinem vollen,
+// uebersetzten Text rechnet), und test:meals, test:frontend-audit und
+// test:mobile-scroll-layout blieben ALLE gruen - das waere die Rueckkehr der
+// Runde-3/4-Regression (der reservierte Slot skaliert wieder mit der
+// Uebersetzung, das Enddatum wird in fr/uk bei 320px wieder abgeschnitten),
+// von keiner Suite bemerkt. Dieser Test pinnt jetzt fest, dass der Knopf
+// unter 640px auf Pfeilbreite (--target-base) begrenzt bleibt, statt auf
+// `flex-basis: 100%` (Runde 4) zurueckzufallen.
+test('.week-nav__today bleibt unter 640px pfeilbreit (icon-only), statt eine eigene Zeile zu erzwingen (PR #1200 Review Runde 5)', () => {
+  const meals = read('../public/styles/meals.css');
+  const narrowRule = [...eachRule(meals)].find(({ selector, at }) =>
+    selector.trim() === '.week-nav__today' && at.some((query) => /max-width:\s*639px/.test(query)));
+  assert.ok(narrowRule, '.week-nav__today-Regel unter "@media (max-width: 639px)" nicht gefunden');
+  assert.match(narrowRule.body, /min-width:\s*var\(--target-base\)/,
+    '.week-nav__today muss unter 640px auf --target-base begrenzt sein - ein Icon-Knopf, kein textbreiter Knopf');
+  assert.doesNotMatch(narrowRule.body, /flex-basis:\s*100%/,
+    '.week-nav__today darf unter 640px nicht mehr flex-basis:100% setzen - das war die eigene Zeile aus Runde 4, die Runde 5 ausdruecklich zurueckbaut');
+});

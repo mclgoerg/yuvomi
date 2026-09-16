@@ -79,8 +79,12 @@ function addDays(dateStr, n) {
  * Enden - "14.09.2026 - 20.09.2026" - lief in de/fr/uk bei 320/375px 21-112px
  * ueber die Zeile. Seit #1164 lebt `#week-today` in derselben Zeile wie das
  * Label und macht sie um seine Breite enger; auf main war der schlechteste
- * Fall 9px bei 320px, hier gemessen bis 112px.
+ * Fall 9px bei 320px, hier gemessen bis 112px. Seit Runde 5 (unten,
+ * `syncTodayButton()`) ist `#week-today` unter 640px nur noch ein Icon ohne
+ * Text - der reservierte Platz bleibt dadurch in jeder Sprache gleich schmal
+ * (~44-48px wie ein Pfeil), statt mit dem uebersetzten Wort zu wachsen.
  *
+
  * Unter 640px faellt das Jahr an BEIDEN Enden weg (`formatDayMonth` statt
  * `formatDate`) - verwandt mit dem Muster, das der Kalender fuer sein eigenes
  * schmales Wochen-Label nutzt (`updateLabel()`, calendar.js:
@@ -305,6 +309,16 @@ function weekNavHtml() {
  * ihn gleich verbirgt), holt sich der Fokus vorher einen Stepper daneben -
  * sonst faellt er auf `<body>`, denn ein `inert`es Element blurred wie
  * `display: none` es taete.
+ *
+ * PR #1200 Review Runde 5, Should-fix: unter 640px wird der Knopf hier
+ * zusaetzlich auf ein reines Icon umgeschaltet (kein sichtbarer Text mehr) -
+ * dieselbe `NARROW_WEEK_LABEL_QUERY`-Schwelle wie `formatWeekLabel()`, damit
+ * beide zusammen kippen. Der uebersetzte Text von `meals.today` bleibt
+ * erhalten, wandert aber auf `aria-label`/`title` statt auf den sichtbaren
+ * Inhalt - Icons skalieren nicht mit der Wortlaenge der Uebersetzung, anders
+ * als der vorherige Text-Knopf (Runde 3/4). `dataset.iconOnly` haelt fest,
+ * welche Darstellung gerade steht, damit ein Aufruf ohne Wechsel (z. B. bei
+ * jedem Wochenwechsel) das Icon nicht unnoetig neu erzeugt.
  */
 function syncTodayButton(root = _container) {
   const btn = root?.querySelector('#week-today');
@@ -319,6 +333,24 @@ function syncTodayButton(root = _container) {
   }
   btn.classList.toggle('is-current', isCurrent);
   btn.inert = isCurrent;
+
+  const label = t('meals.today');
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
+  const narrow = typeof window !== 'undefined'
+    ? Boolean(window.matchMedia?.(NARROW_WEEK_LABEL_QUERY).matches)
+    : false;
+  if (narrow) {
+    if (btn.dataset.iconOnly !== 'true') {
+      btn.textContent = '';
+      btn.insertAdjacentHTML('beforeend', '<i data-lucide="calendar-check" aria-hidden="true"></i>');
+      btn.dataset.iconOnly = 'true';
+      if (window.lucide) lucide.createIcons({ el: btn });
+    }
+  } else if (btn.dataset.iconOnly === 'true') {
+    btn.textContent = label;
+    btn.dataset.iconOnly = 'false';
+  }
 }
 
 export async function render(container, { user }) {
