@@ -11,6 +11,7 @@ export const HEALTH_ROUTES = Object.freeze([
   '/health/cycle',
   '/health/fasting',
   '/health/meds',
+  '/health/prevention',
   '/health/labs',
   '/health/activity',
 ]);
@@ -24,6 +25,7 @@ export const HEALTH_TABS = ({ cycleEnabled = true, fastingEnabled = false } = {}
   ...(cycleEnabled ? [{ route: '/health/cycle', labelKey: 'health.tabs.cycle', icon: 'droplet' }] : []),
   ...(fastingEnabled ? [{ route: '/health/fasting', labelKey: 'health.tabs.fasting', icon: 'timer' }] : []),
   { route: '/health/meds',     labelKey: 'health.tabs.meds',     icon: 'pill'           },
+  { route: '/health/prevention', labelKey: 'health.tabs.prevention', icon: 'syringe'    },
   { route: '/health/labs',     labelKey: 'health.tabs.labs',     icon: 'flask-conical'  },
   { route: '/health/activity', labelKey: 'health.tabs.activity', icon: 'dumbbell'       },
 ];
