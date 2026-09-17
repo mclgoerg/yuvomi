@@ -5086,7 +5086,8 @@
         "historyLabel": "Historia",
         "historyTotalLabel": "Łączny koszt",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Przebieg w czasie"
     },
     "documentAttach": {
         "label": "Załączniki",

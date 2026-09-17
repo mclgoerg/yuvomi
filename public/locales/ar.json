@@ -5086,7 +5086,8 @@
         "historyLabel": "السجل",
         "historyTotalLabel": "إجمالي التكلفة",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "عداد المسافة عبر الزمن"
     },
     "documentAttach": {
         "label": "المرفقات",

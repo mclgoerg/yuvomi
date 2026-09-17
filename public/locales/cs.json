@@ -5086,7 +5086,8 @@
         "historyLabel": "Historie",
         "historyTotalLabel": "Celkové náklady",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Stav tachometru v čase"
     },
     "documentAttach": {
         "label": "Přílohy",

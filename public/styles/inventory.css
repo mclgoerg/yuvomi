@@ -553,6 +553,37 @@
  * Verlaufs-Ansicht (Service-Log + verknuepfte Buchungen/Dokumente, Paket C)
  * -------------------------------------------------------- */
 
+/* Kilometerstand-Trend, gleiche Geometrie wie die Health-Charts
+ * (utils/chart.js; .chart__grid/.chart__axis(--y) leben schon geteilt in
+ * panel.css). Was hierbleibt, ist modul-eigen: Kartenrahmen und Flaechenfuellung -
+ * dieselbe Aufteilung wie health.css bei .health-chart(-section)/__area. */
+.inventory-chart-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  margin-bottom: var(--space-3);
+}
+
+.inventory-chart-section__title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--color-text-primary);
+}
+
+.inventory-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.inventory-chart__area {
+  fill: color-mix(in oklab, var(--module-inventory) 14%, transparent);
+}
+
 .inventory-history-list {
   display: flex;
   flex-direction: column;

@@ -5086,7 +5086,8 @@
         "historyLabel": "Histórico",
         "historyTotalLabel": "Custo total",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Odômetro ao longo do tempo"
     },
     "documentAttach": {
         "label": "Anexos",

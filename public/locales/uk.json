@@ -5086,7 +5086,8 @@
         "historyLabel": "Історія",
         "historyTotalLabel": "Загальна вартість",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Пробіг у часі"
     },
     "documentAttach": {
         "label": "Вкладення",
