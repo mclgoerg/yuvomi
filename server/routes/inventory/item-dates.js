@@ -11,6 +11,15 @@
  * Erinnerungs-Ownership: die Zeile "gehoert" dem Gegenstand-Ersteller
  * (item.created_by), nicht der Person, die gerade speichert - identisches
  * Muster wie die Garantie-Erinnerung in items.js#syncReminder.
+ *
+ * interval_months (Vorrollen beim Abschluss, siehe service-log.js) ist KEINE
+ * zweite Wiederholungs-Engine neben server/services/recurrence.js. Die dort
+ * geparsten RRULEs beantworten "welcher Wochentag/welche Ordinalzahl im
+ * Monat", genau das braucht eine Frist wie "alle 24 Monate" nicht - sie ist
+ * dieselbe einfache Monats-Arithmetik wie server/services/subscriptions.js
+ * #addBillingCycle und inventory-deadlines.js#warrantyEndDate, deshalb ueber
+ * denselben geteilten Helfer (server/utils/interval-date.js#addMonthsClamped),
+ * nicht ueber recurrence.js.
  */
 import * as db from '../../db.js';
 import { str, date, num, collectErrors } from '../../middleware/validate.js';
