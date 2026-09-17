@@ -5328,7 +5328,8 @@
         "historyLabel": "Historique",
         "historyTotalLabel": "Coût total",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Compteur kilométrique dans le temps"
     },
     "documentAttach": {
         "label": "Pièces jointes",

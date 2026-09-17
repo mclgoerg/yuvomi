@@ -5328,7 +5328,8 @@
         "historyLabel": "Előzmények",
         "historyTotalLabel": "Összes költség",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Kilométeróra időbeli alakulása"
     },
     "documentAttach": {
         "label": "Mellékletek",

@@ -5328,7 +5328,8 @@
         "historyLabel": "Cronologia",
         "historyTotalLabel": "Costo totale",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Contachilometri nel tempo"
     },
     "documentAttach": {
         "label": "Allegati",

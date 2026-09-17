@@ -5328,7 +5328,8 @@
         "historyLabel": "इतिहास",
         "historyTotalLabel": "कुल लागत",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "समय के साथ ओडोमीटर"
     },
     "documentAttach": {
         "label": "अनुलग्नक",

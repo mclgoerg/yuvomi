@@ -9089,8 +9089,10 @@ const MIGRATIONS = [
         CHECK (interval_distance IS NULL OR interval_distance > 0);
 
       -- Manuelle Kilometerstand-Ablesung - nie eine Telematik-/Fahrzeug-API,
-      -- das ist die eigene harte Grenze des Vorschlags. "odometer" passt auch
-      -- fuer Betriebsstunden (Heizung), nicht nur fuer Fahrzeuge.
+      -- das ist die eigene harte Grenze des Vorschlags. Bewusst auf die
+      -- Kategorie "Fahrzeuge" begrenzt (Nutzer-Entscheidung 2026-09-17), die
+      -- Spalte selbst kennt diese Grenze aber nicht - sie liegt in der
+      -- Validierung (server/routes/inventory/items.js#validateItemFields).
       ALTER TABLE inventory_items ADD COLUMN odometer INTEGER CHECK (odometer IS NULL OR odometer >= 0);
       ALTER TABLE inventory_items ADD COLUMN odometer_unit TEXT
         CHECK (odometer_unit IS NULL OR odometer_unit IN ('km', 'mi'));

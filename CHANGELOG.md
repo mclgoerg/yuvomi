@@ -72,13 +72,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   category chips. Archiving a document (or deleting it) clears its reminder, so an archived scan
   never keeps nagging.
 
-- **Inventory tracked dates can now recur, keep a service history, and follow an odometer.** Give a
-  tracked date (TÜV, boiler service, chimney sweep, extinguisher check, ...) a recurring interval in
-  months, and pressing "Done" rolls it forward instead of just clearing it - the reminder moves with
-  it. Every completion (and any manually logged repair) is kept in a new service-history view on the
-  item, alongside its linked maintenance bookings and documents with a running cost total. Items can
-  also carry a manual odometer reading (km or mi) - a tracked date can add a distance interval as a
-  hint ("1,400 km to go") next to its date, though only the date itself ever produces a reminder.
+- **Inventory tracked dates can now recur, keep a service history, and vehicles have an odometer.**
+  Give a tracked date (TÜV, boiler service, chimney sweep, extinguisher check, ...) a recurring
+  interval in months, and pressing "Done" rolls it forward instead of just clearing it - the
+  reminder moves with it. Every completion (and any manually logged repair) is kept in a new
+  service-history view on the item, alongside its linked maintenance bookings and documents with a
+  running cost total, and a vehicle's history now plots its odometer readings as a small trend
+  chart. Vehicles can also carry a manual odometer reading (km or mi) - a tracked date can add a
+  distance interval as a hint ("1,400 km to go") next to its date, though only the date itself ever
+  produces a reminder.
 
 ### Changed
 

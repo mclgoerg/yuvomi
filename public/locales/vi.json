@@ -5328,7 +5328,8 @@
         "historyLabel": "Lịch sử",
         "historyTotalLabel": "Tổng chi phí",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Đồng hồ đo quãng đường theo thời gian"
     },
     "documentAttach": {
         "label": "Tệp đính kèm",

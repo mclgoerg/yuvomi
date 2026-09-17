@@ -5328,7 +5328,8 @@
         "historyLabel": "تاریخچه",
         "historyTotalLabel": "هزینه کل",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "کیلومتر شمار در طول زمان"
     },
     "documentAttach": {
         "label": "پیوست‌ها",

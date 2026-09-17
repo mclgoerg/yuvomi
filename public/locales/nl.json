@@ -5328,7 +5328,8 @@
         "historyLabel": "Geschiedenis",
         "historyTotalLabel": "Totale kosten",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Kilometerstand in de tijd"
     },
     "documentAttach": {
         "label": "Bijlagen",

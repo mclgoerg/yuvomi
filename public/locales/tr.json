@@ -5328,7 +5328,8 @@
         "historyLabel": "Geçmiş",
         "historyTotalLabel": "Toplam maliyet",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Zaman içinde kilometre sayacı"
     },
     "documentAttach": {
         "label": "Ekler",

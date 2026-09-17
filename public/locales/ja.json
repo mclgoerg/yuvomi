@@ -5328,7 +5328,8 @@
         "historyLabel": "履歴",
         "historyTotalLabel": "合計費用",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "走行距離の推移"
     },
     "documentAttach": {
         "label": "添付",

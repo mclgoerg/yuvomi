@@ -5328,7 +5328,8 @@
         "historyLabel": "История",
         "historyTotalLabel": "Общая стоимость",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Пробег с течением времени"
     },
     "documentAttach": {
         "label": "Вложения",

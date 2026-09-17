@@ -2817,11 +2817,15 @@ Visibility follows the existing rules unchanged — budget-entry visibility thro
 other document link uses. Inventory items have no per-item visibility model of their own (they are
 household-wide); service log rows are therefore visible to the whole household.
 
-**Odometer (`inventory_items.odometer`/`odometer_unit`/`odometer_on`, v211).** A manual reading —
-`odometer_unit` is `km` or `mi` (defaults to `km` when a reading is given without one),
-`odometer_on` is the date of that reading. Like every other item field, `PUT` is a full replace:
-omitting these fields clears the reading. Useful beyond vehicles — operating hours on a boiler are
-the same shape of number.
+**Odometer (`inventory_items.odometer`/`odometer_unit`/`odometer_on`, v211).** A manual reading,
+limited to the `vehicles` category — `odometer_unit` is `km` or `mi` (defaults to `km` when a
+reading is given without one), `odometer_on` is the date of that reading. A category other than
+`vehicles` silently clears all three fields rather than rejecting the write, on both create and
+update, so switching an item away from `vehicles` drops a previously set reading automatically. Like
+every other item field, `PUT` is a full replace: omitting these fields clears the reading. The item
+detail view plots every service-log entry that carries an `odometer` value (plus the item's own
+current reading, if it isn't already represented by one) as a small trend chart above the History
+timeline, using the shared chart geometry in `public/utils/chart.js`.
 
 ### Expense Groups
 Split expense groups (migration v39).
