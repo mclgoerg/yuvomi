@@ -240,29 +240,55 @@ test('POST /items: odometer wird mit Einheit und Ablesedatum gespeichert', async
 });
 
 test('POST /items: odometer ohne explizite Einheit faellt auf km zurueck', async () => {
-  const r = await call('POST', '/items', { name: 'Rasenmaeher', odometer: 120 });
+  const r = await call('POST', '/items', { name: 'Auto', category: 'vehicles', odometer: 120 });
   assert.equal(r.status, 201);
   assert.equal(r.body.data.odometer_unit, 'km');
 });
 
 test('POST /items: negativer odometer -> 400', async () => {
-  const r = await call('POST', '/items', { name: 'X', odometer: -1 });
+  const r = await call('POST', '/items', { name: 'X', category: 'vehicles', odometer: -1 });
   assert.equal(r.status, 400);
 });
 
 test('POST /items: ungueltige odometer_unit -> 400', async () => {
-  const r = await call('POST', '/items', { name: 'X', odometer: 10, odometer_unit: 'furlongs' });
+  const r = await call('POST', '/items', { name: 'X', category: 'vehicles', odometer: 10, odometer_unit: 'furlongs' });
   assert.equal(r.status, 400);
 });
 
 test('PUT /items/:id: odometer ist volles Replace - weglassen loescht es (deliberate, wie photo_data)', async () => {
-  const created = await call('POST', '/items', { name: 'Auto', odometer: 1000, odometer_unit: 'km', odometer_on: '2026-01-01' });
+  const created = await call('POST', '/items', { name: 'Auto', category: 'vehicles', odometer: 1000, odometer_unit: 'km', odometer_on: '2026-01-01' });
   const id = created.body.data.id;
-  const withoutOdometer = await call('PUT', `/items/${id}`, { name: 'Auto' });
+  const withoutOdometer = await call('PUT', `/items/${id}`, { name: 'Auto', category: 'vehicles' });
   assert.equal(withoutOdometer.status, 200);
   assert.equal(withoutOdometer.body.data.odometer, null);
   assert.equal(withoutOdometer.body.data.odometer_unit, null);
   assert.equal(withoutOdometer.body.data.odometer_on, null);
+});
+
+// --------------------------------------------------------
+// Kilometerstand ist auf Fahrzeuge begrenzt (Nutzer-Entscheidung 2026-09-17) -
+// keine Ausweitung auf andere Kategorien.
+// --------------------------------------------------------
+test('POST /items: odometer bei einer Nicht-Fahrzeug-Kategorie wird still auf NULL genullt, kein 400', async () => {
+  const r = await call('POST', '/items', {
+    name: 'Rasenmaeher', category: 'household', odometer: 500, odometer_unit: 'km', odometer_on: '2026-01-01',
+  });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.data.odometer, null);
+  assert.equal(r.body.data.odometer_unit, null);
+  assert.equal(r.body.data.odometer_on, null);
+});
+
+test('PUT /items/:id: ein Kategoriewechsel weg von Fahrzeugen raeumt einen gesetzten odometer automatisch ab', async () => {
+  const created = await call('POST', '/items', { name: 'Auto', category: 'vehicles', odometer: 42000, odometer_unit: 'km', odometer_on: '2026-01-01' });
+  const id = created.body.data.id;
+  const recategorized = await call('PUT', `/items/${id}`, {
+    name: 'Auto', category: 'other', odometer: 42000, odometer_unit: 'km', odometer_on: '2026-01-01',
+  });
+  assert.equal(recategorized.status, 200);
+  assert.equal(recategorized.body.data.odometer, null);
+  assert.equal(recategorized.body.data.odometer_unit, null);
+  assert.equal(recategorized.body.data.odometer_on, null);
 });
 
 test('PUT /items/:id: photo_data ist volles Replace - weglassen loescht es', async () => {

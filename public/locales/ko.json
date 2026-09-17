@@ -5333,7 +5333,8 @@
         "historyLabel": "이력",
         "historyTotalLabel": "총 비용",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "시간에 따른 주행거리"
     },
     "documentAttach": {
         "label": "첨부",

@@ -253,34 +253,43 @@ function validateItemFields(body) {
     values.warranty_months = vWarranty.value;
   }
 
-  // Manuelle Kilometerstand-Ablesung. Volles Replace wie jedes andere Feld
-  // hier: ein weggelassener Wert loescht ihn (siehe Modulkopf dieser
-  // Funktion), bewusst so - die Historie der Ablesung lebt im Service-Log,
-  // nicht in diesem Feld.
-  if (body.odometer === null || body.odometer === '' || body.odometer === undefined) {
+  // Manuelle Kilometerstand-Ablesung - bewusst auf die Kategorie "Fahrzeuge"
+  // begrenzt (Nutzer-Entscheidung 2026-09-17, keine Ausweitung auf andere
+  // Kategorien). Fuer jede andere Kategorie wird still auf NULL genullt statt
+  // mit 400 abgelehnt - dasselbe volle-Replace-Verhalten wie ein weggelassenes
+  // Feld (siehe Modulkopf dieser Funktion): ein Kategoriewechsel weg von
+  // Fahrzeugen raeumt einen vorher gesetzten Wert automatisch ab, statt ihn
+  // unsichtbar (das Formular blendet das Feld dann aus) stehen zu lassen.
+  if (values.category !== 'vehicles') {
     values.odometer = null;
+    values.odometer_unit = null;
+    values.odometer_on = null;
   } else {
-    const vOdometer = num(body.odometer, 'Kilometerstand');
-    results.push(vOdometer);
-    if (vOdometer.value !== null && (!Number.isInteger(vOdometer.value) || vOdometer.value < 0)) {
-      results.push({ error: 'Kilometerstand darf nicht negativ sein.' });
+    if (body.odometer === null || body.odometer === '' || body.odometer === undefined) {
+      values.odometer = null;
+    } else {
+      const vOdometer = num(body.odometer, 'Kilometerstand');
+      results.push(vOdometer);
+      if (vOdometer.value !== null && (!Number.isInteger(vOdometer.value) || vOdometer.value < 0)) {
+        results.push({ error: 'Kilometerstand darf nicht negativ sein.' });
+      }
+      values.odometer = vOdometer.value;
     }
-    values.odometer = vOdometer.value;
-  }
 
-  if (body.odometer_unit === null || body.odometer_unit === '' || body.odometer_unit === undefined) {
-    // Ohne explizite Einheit, aber mit Zahl: 'km' als Standard, damit kein
-    // Wert ohne Einheit dasteht - dasselbe Muster wie currency weiter oben.
-    values.odometer_unit = values.odometer != null ? 'km' : null;
-  } else {
-    const vUnit = oneOf(body.odometer_unit, ODOMETER_UNITS, 'Einheit');
-    results.push(vUnit);
-    values.odometer_unit = vUnit.value;
-  }
+    if (body.odometer_unit === null || body.odometer_unit === '' || body.odometer_unit === undefined) {
+      // Ohne explizite Einheit, aber mit Zahl: 'km' als Standard, damit kein
+      // Wert ohne Einheit dasteht - dasselbe Muster wie currency weiter oben.
+      values.odometer_unit = values.odometer != null ? 'km' : null;
+    } else {
+      const vUnit = oneOf(body.odometer_unit, ODOMETER_UNITS, 'Einheit');
+      results.push(vUnit);
+      values.odometer_unit = vUnit.value;
+    }
 
-  const vOdometerOn = date(body.odometer_on, 'Ablesedatum');
-  results.push(vOdometerOn);
-  values.odometer_on = vOdometerOn.value;
+    const vOdometerOn = date(body.odometer_on, 'Ablesedatum');
+    results.push(vOdometerOn);
+    values.odometer_on = vOdometerOn.value;
+  }
 
   const vCondition = oneOf(body.condition || 'good', CONDITIONS, 'Zustand');
   results.push(vCondition);

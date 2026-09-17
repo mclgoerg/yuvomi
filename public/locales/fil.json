@@ -5333,7 +5333,8 @@
         "historyLabel": "Kasaysayan",
         "historyTotalLabel": "Kabuuang gastos",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Odometer sa paglipas ng panahon"
     },
     "documentAttach": {
         "label": "Mga kalakip",

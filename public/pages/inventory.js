@@ -31,6 +31,7 @@ import { openDetailView, closeDetailView } from '/components/detail-view.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { attachOverlay } from '/utils/overlay-history.js';
 import { setNavBadge } from '/utils/nav-badges.js';
+import { CHART, chartScales, chartX, chartY, chartGridMarkup, chartXLabelsMarkup } from '/utils/chart.js';
 
 let _container = null;
 let _search = null;
@@ -812,22 +813,106 @@ function historyEntryLine(entry, odometerUnit) {
   return line;
 }
 
-/** Verlaufs-Knoten: Zeitleiste + Gesamtkosten - reine Anzeige, keine eigene
- *  Datenhaltung (server-seitig eine Zusammenfuehrung, kein neuer Speicher). */
-function historyDetailNode(history, odometerUnit) {
-  if (!history || !history.timeline.length) return null;
+/** Barrierefreie Tabelle unter dem Chart - lokales Gegenstueck zu
+ *  health.js#chartTableMarkup (dort ebenfalls nicht geteilt: die Geometrie in
+ *  utils/chart.js ist gemeinsam, das Vokabular je Modul eigen). */
+function chartTableMarkup(caption, headers, rows) {
+  const head = headers.map((h) => `<th scope="col">${esc(h)}</th>`).join('');
+  const body = rows.map((cells) =>
+    `<tr>${cells.map((c, i) => (i === 0
+      ? `<th scope="row">${esc(c)}</th>`
+      : `<td>${esc(c)}</td>`)).join('')}</tr>`).join('');
+  return `
+    <table class="sr-only">
+      <caption>${esc(caption)}</caption>
+      <thead><tr>${head}</tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+}
+
+/** Kilometerstand-Trend ueber die Zeit - dieselbe Geometrie wie die
+ *  Health-Charts (utils/chart.js#simpleLineChartMarkup-Muster), hier fuer die
+ *  eine Zeitreihe, die ein Gegenstand hat. Mindestens zwei Punkte, sonst ist
+ *  "ueber die Zeit" gar keine Aussage. */
+function odometerChartMarkup(points, unit) {
+  if (points.length < 2) return '';
+  const { W, H } = CHART;
+  const { top, bottom } = chartScales();
+
+  const values = points.map((p) => p.value);
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  if (min === max) { min -= 1; max += 1; }
+  const pad = (max - min) * 0.1;
+  min -= pad; max += pad;
+
+  const x = (i) => chartX(i, points.length);
+  const y = (v) => chartY(v, min, max);
+
+  const spine = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+  const area = `<polygon class="inventory-chart__area" points="${x(0).toFixed(1)},${bottom.toFixed(1)} ${spine} ${x(points.length - 1).toFixed(1)},${bottom.toFixed(1)}" />`;
+  const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-inventory)"><title>${esc(`${formatDate(p.date)}: ${p.value} ${unit}`)}</title></circle>`).join('');
+
+  const grid = chartGridMarkup(min, max, (val) => String(Math.round(val)));
+  const xLabels = chartXLabelsMarkup(points.map((p) => formatDate(p.date)));
+  const titleText = t('inventory.odometerChartTitle');
+  const table = chartTableMarkup(titleText, [t('inventory.completePerformedOnLabel'), t('inventory.odometerLabel')],
+    points.map((p) => [formatDate(p.date), `${p.value} ${unit}`]));
+
+  return `
+    <div class="inventory-chart-section">
+      <div class="inventory-chart-section__title">${esc(titleText)}</div>
+      <svg class="inventory-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titleText)}">
+        ${grid}
+        ${area}
+        <polyline fill="none" stroke="var(--module-inventory)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${spine}" />
+        ${dots}
+        ${xLabels}
+      </svg>
+      ${table}
+    </div>`;
+}
+
+/** Kilometerstand-Messpunkte: jede Service-Log-Zeile mit eigenem Wert, plus
+ *  die aktuelle Ablesung des Items selbst, falls sie zu keiner Log-Zeile
+ *  gehoert (z. B. direkt im Formular eingetragen, nie ueber "Erledigt"). */
+function odometerChartPoints(history, item) {
+  const points = (history?.timeline || [])
+    .filter((e) => e.type === 'service_log' && e.odometer != null)
+    .map((e) => ({ date: e.date, value: e.odometer }));
+  if (item.odometer != null && item.odometer_on && !points.some((p) => p.date === item.odometer_on)) {
+    points.push({ date: item.odometer_on, value: item.odometer });
+  }
+  return points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
+
+/** Verlaufs-Knoten: Kilometerstand-Trend (falls genug Messpunkte) + Zeitleiste
+ *  + Gesamtkosten - reine Anzeige, keine eigene Datenhaltung (server-seitig
+ *  eine Zusammenfuehrung, kein neuer Speicher). */
+function historyDetailNode(history, item) {
+  const odometerUnit = item.odometer_unit || 'km';
+  const chartHtml = odometerChartMarkup(odometerChartPoints(history, item), odometerUnit);
+  const hasTimeline = !!(history && history.timeline.length);
+  if (!chartHtml && !hasTimeline) return null;
+
   const wrap = document.createElement('div');
-  wrap.className = 'inventory-history-list';
-  history.timeline.forEach((entry) => wrap.appendChild(historyEntryLine(entry, odometerUnit)));
-  if (history.total) {
-    const total = document.createElement('div');
-    total.className = 'inventory-history-total';
-    const label = document.createElement('span');
-    label.textContent = t('inventory.historyTotalLabel');
-    const value = document.createElement('span');
-    value.textContent = formatMoney(history.total, _householdCurrency);
-    total.append(label, value);
-    wrap.appendChild(total);
+  if (chartHtml) wrap.insertAdjacentHTML('beforeend', chartHtml);
+
+  if (hasTimeline) {
+    const list = document.createElement('div');
+    list.className = 'inventory-history-list';
+    history.timeline.forEach((entry) => list.appendChild(historyEntryLine(entry, odometerUnit)));
+    wrap.appendChild(list);
+    if (history.total) {
+      const total = document.createElement('div');
+      total.className = 'inventory-history-total';
+      const label = document.createElement('span');
+      label.textContent = t('inventory.historyTotalLabel');
+      const value = document.createElement('span');
+      value.textContent = formatMoney(history.total, _householdCurrency);
+      total.append(label, value);
+      wrap.appendChild(total);
+    }
   }
   return wrap;
 }
@@ -885,7 +970,7 @@ function renderItemDetail(item, history, onDoneTrackedDate) {
     { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: trackedDatesDetailNode(item, onDoneTrackedDate) },
     { icon: 'receipt', label: t('inventory.linkedBookingsLabel'), node: inventoryDetailListNode(bookingEntries) },
     { icon: 'paperclip', label: t('inventory.attachmentsLabel'), node: inventoryDetailListNode(attachmentEntries) },
-    { icon: 'history', label: t('inventory.historyLabel'), node: historyDetailNode(history, item.odometer_unit || 'km') },
+    { icon: 'history', label: t('inventory.historyLabel'), node: historyDetailNode(history, item) },
   ];
 }
 
@@ -983,15 +1068,19 @@ function openCompletionSheet(item, trackedDate) {
     let settled = false;
     const settle = (result) => { if (!settled) { settled = true; resolve(result); } };
 
+    // Kilometerstand nur bei Fahrzeugen abfragen - dieselbe Einschraenkung wie
+    // im Item-Formular (Nutzer-Entscheidung 2026-09-17).
+    const isVehicle = item.category === 'vehicles';
     const content = `
       <div class="form-group">
         <label class="form-label" for="inv-complete-date">${esc(t('inventory.completePerformedOnLabel'))}</label>
         <yuvomi-datepicker id="inv-complete-date" type="date" value="${esc(todayKey())}"></yuvomi-datepicker>
       </div>
+      ${isVehicle ? `
       <div class="form-group">
         <label class="form-label" for="inv-complete-odometer">${esc(t('inventory.odometerLabel'))}</label>
         <input id="inv-complete-odometer" class="form-input" type="number" min="0" step="1" inputmode="numeric">
-      </div>
+      </div>` : ''}
       <div class="form-group">
         <label class="form-label" for="inv-complete-vendor">${esc(t('inventory.vendorLabel'))}</label>
         <input id="inv-complete-vendor" class="form-input" type="text">
@@ -1016,7 +1105,7 @@ function openCompletionSheet(item, trackedDate) {
           const saveBtn = panel.querySelector('#inv-complete-save');
           const performedOn = panel.querySelector('#inv-complete-date').value;
           if (!performedOn) return;
-          const odometerRaw = panel.querySelector('#inv-complete-odometer').value.trim();
+          const odometerRaw = isVehicle ? panel.querySelector('#inv-complete-odometer').value.trim() : '';
           const payload = {
             performed_on: performedOn,
             odometer: odometerRaw === '' ? null : Number(odometerRaw),
@@ -1545,7 +1634,7 @@ function buildItemForm({ mode, item = null }) {
             <select id="inv-condition" class="form-input">${conditionOptions}</select>
           </div>
         </div>
-        <div class="inventory-form-row">
+        <div class="inventory-form-row" id="inv-odometer-group" ${(isEdit ? item.category : 'other') === 'vehicles' ? '' : 'hidden'}>
           <div class="form-group">
             <label class="form-label" for="inv-odometer">${esc(t('inventory.odometerLabel'))}</label>
             <input id="inv-odometer" class="form-input" type="number" min="0" step="1" inputmode="numeric">
@@ -1615,6 +1704,15 @@ function buildItemForm({ mode, item = null }) {
     panel.querySelector('#inv-notes').value = isEdit && item.notes ? item.notes : '';
     panel.querySelector('#inv-odometer').value = isEdit && item.odometer != null ? String(item.odometer) : '';
     panel.querySelector('#inv-odometer-unit').value = isEdit && item.odometer_unit ? item.odometer_unit : 'km';
+
+    // Kilometerstand ist bewusst auf die Kategorie "Fahrzeuge" begrenzt (Nutzer-
+    // Entscheidung 2026-09-17) - andere Gegenstandsarten brauchen keinen
+    // Kilometerstand, und ein Kategoriewechsel weg von Fahrzeugen blendet die
+    // Gruppe wieder aus (saveItem() sendet dann ohnehin null, siehe dort).
+    const odometerGroup = panel.querySelector('#inv-odometer-group');
+    panel.querySelector('#inv-category').addEventListener('change', (e) => {
+      odometerGroup.hidden = e.target.value !== 'vehicles';
+    });
 
     updateWarrantyStatus(panel);
     panel.querySelector('#inv-purchase-date').addEventListener('input', () => updateWarrantyStatus(panel));
@@ -1759,11 +1857,15 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
 
   const priceRaw = panel.querySelector('#inv-purchase-price').value.trim();
   const warrantyRaw = panel.querySelector('#inv-warranty').value.trim();
-  const odometerRaw = panel.querySelector('#inv-odometer').value.trim();
+  const category = panel.querySelector('#inv-category').value;
+  // Kilometerstand ist auf Fahrzeuge begrenzt - unabhaengig vom (bei anderen
+  // Kategorien versteckten) Feldinhalt zaehlt hier nur die aktuelle Kategorie,
+  // sonst ueberlebte ein vor dem Kategoriewechsel eingetragener Wert unsichtbar.
+  const odometerRaw = category === 'vehicles' ? panel.querySelector('#inv-odometer').value.trim() : '';
 
   const payload = {
     name,
-    category: panel.querySelector('#inv-category').value,
+    category,
     location_id: panel.querySelector('#inv-location').value || null,
     purchase_date: panel.querySelector('#inv-purchase-date').value || null,
     purchase_price: priceRaw === '' ? null : Number(priceRaw),
@@ -1780,7 +1882,7 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     photo_data: photoData,
     odometer: odometerRaw === '' ? null : Number(odometerRaw),
     odometer_unit: odometerRaw === '' ? null : panel.querySelector('#inv-odometer-unit').value,
-    odometer_on: panel.querySelector('#inv-odometer-on').value || null,
+    odometer_on: category === 'vehicles' ? (panel.querySelector('#inv-odometer-on').value || null) : null,
   };
 
   saveBtn.disabled = true;

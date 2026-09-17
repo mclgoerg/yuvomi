@@ -5333,7 +5333,8 @@
         "historyLabel": "历史记录",
         "historyTotalLabel": "总费用",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "里程随时间变化"
     },
     "documentAttach": {
         "label": "附件",

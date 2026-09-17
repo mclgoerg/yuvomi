@@ -5333,7 +5333,8 @@
         "historyLabel": "Verlauf",
         "historyTotalLabel": "Gesamtkosten",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Kilometerstand über die Zeit"
     },
     "documentAttach": {
         "label": "Anhänge",

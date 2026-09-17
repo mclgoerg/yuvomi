@@ -5333,7 +5333,8 @@
         "historyLabel": "History",
         "historyTotalLabel": "Total cost",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Odometer over time"
     },
     "documentAttach": {
         "label": "Attachments",

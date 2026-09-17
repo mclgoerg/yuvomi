@@ -5333,7 +5333,8 @@
         "historyLabel": "Historik",
         "historyTotalLabel": "Total kostnad",
         "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}"
+        "historyOdometerValue": "{{count}} {{unit}}",
+        "odometerChartTitle": "Vägmätare över tid"
     },
     "documentAttach": {
         "label": "Bilagor",
