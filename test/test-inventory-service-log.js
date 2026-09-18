@@ -197,6 +197,30 @@ test('eine neue Erinnerung, deren Termin schon vergangen ist, wird nicht angeleg
   assert.equal(trackedDateReminders(dateId).length, 0, 'auch das vorgerollte Datum liegt in der Vergangenheit');
 });
 
+test('eine mehrere Intervalle ueberfaellige Frist rollt weit genug vor, nicht nur um ein Intervall', async () => {
+  // Faelligkeit 2000-01-15, monatliches Intervall, aber erst am 2000-04-20
+  // erledigt (mehr als drei Intervalle spaeter). Ein einzelnes Vorrollen
+  // (addMonthsClamped von der Faelligkeit statt vom Erledigungsdatum) laege
+  // bei 2000-02-15 und damit erneut in der Vergangenheit - die Zeile bliebe
+  // ueberfaellig, obwohl "Erledigt" gerade geklickt wurde.
+  const created = await call('POST', '/items', {
+    body: {
+      name: 'Lang ueberfaellig',
+      tracked_dates: [{ label: 'Wartung', date: '2000-01-15', reminder_offset_days: 0, interval_months: 1 }],
+    },
+  });
+  const dateId = created.body.data.tracked_dates[0].id;
+
+  const completed = await call('POST', `/items/${created.body.data.id}/dates/${dateId}/complete`, {
+    body: { performed_on: '2000-04-20' },
+  });
+  assert.equal(completed.status, 201);
+  const rolled = completed.body.data.tracked_dates.find((d) => d.id === dateId);
+  // 01-15 -> 02-15 -> 03-15 -> 04-15 -> 05-15: die erste Monatsmarke NACH
+  // dem Erledigungsdatum (04-20), nicht die naechste nach der Faelligkeit.
+  assert.equal(rolled.date, '2000-05-15', 'rollt so oft vor, bis das Ergebnis nach dem Erledigungsdatum liegt');
+});
+
 // --------------------------------------------------------
 // Die Historie uebersteht ein nachfolgendes Item-Speichern
 // --------------------------------------------------------
@@ -337,4 +361,67 @@ test('ein rueckdatierter Service-Log-Kilometerstand rollt inventory_items.odomet
   const afterNewer = await call('GET', `/items/${itemId}`);
   assert.equal(afterNewer.body.data.odometer, 51200);
   assert.equal(afterNewer.body.data.odometer_on, '2026-09-10');
+});
+
+test('ein NIEDRIGERER Kilometerstand an einem neueren Datum wird abgelehnt (Tippfehler-Schutz, Review #1257)', async () => {
+  // Nur das Datum zu pruefen reicht nicht: "5120" statt "51200" getippt an
+  // einem spaeteren Datum wuerde sonst den aktuellen Stand des Gegenstands
+  // stillschweigend zuruecksetzen (und odometerChartPoints() zeichnete den
+  // Rueckgang als echten Trend). Ein Fahrzeug faehrt nicht rueckwaerts.
+  const created = await call('POST', '/items', {
+    body: { name: 'Auto2', category: 'vehicles', odometer: 51200, odometer_unit: 'km', odometer_on: '2026-09-10' },
+  });
+  const itemId = created.body.data.id;
+
+  const typo = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Inspektion', performed_on: '2026-10-01', odometer: 5120 },
+  });
+  assert.equal(typo.status, 400, JSON.stringify(typo.body));
+
+  const afterTypo = await call('GET', `/items/${itemId}`);
+  assert.equal(afterTypo.body.data.odometer, 51200, 'der Tippfehler darf den Gegenstand nicht zuruecksetzen');
+
+  // Dieselbe Pruefung gilt fuer die "Erledigt"-Aktion einer getrackten Frist.
+  const withDate = await call('PUT', `/items/${itemId}`, {
+    body: {
+      name: 'Auto2', category: 'vehicles', odometer: 51200, odometer_unit: 'km', odometer_on: '2026-09-10',
+      tracked_dates: [{ label: 'TUEV', date: '2026-11-01', reminder_offset_days: 0 }],
+    },
+  });
+  const dateId = withDate.body.data.tracked_dates[0].id;
+  const completedTypo = await call('POST', `/items/${itemId}/dates/${dateId}/complete`, {
+    body: { performed_on: '2026-11-01', odometer: 5120 },
+  });
+  assert.equal(completedTypo.status, 400, JSON.stringify(completedTypo.body));
+});
+
+test('das Loeschen der Log-Zeile, die den aktuellen Kilometerstand gesetzt hat, rechnet ihn aus den verbleibenden Zeilen neu', async () => {
+  const created = await call('POST', '/items', {
+    body: { name: 'Auto3', category: 'vehicles' },
+  });
+  const itemId = created.body.data.id;
+
+  const first = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Erste Wartung', performed_on: '2026-01-01', odometer: 10000 },
+  });
+  const second = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Zweite Wartung', performed_on: '2026-06-01', odometer: 20000 },
+  });
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 20000);
+
+  // Die NEUESTE Log-Zeile loeschen: der Gegenstand muss auf die verbleibende
+  // (aeltere) Ablesung zurueckfallen, nicht auf dem geloeschten Stand stehen
+  // bleiben - das fehlende Gegenstueck zu maybeAdvanceItemOdometer.
+  const del = await call('DELETE', `/items/${itemId}/service-log/${second.body.data.id}`);
+  assert.equal(del.status, 204);
+  const afterDelete = await call('GET', `/items/${itemId}`);
+  assert.equal(afterDelete.body.data.odometer, 10000);
+  assert.equal(afterDelete.body.data.odometer_on, '2026-01-01');
+
+  // Auch die letzte verbleibende Zeile loeschen: kein Log-Eintrag mehr traegt
+  // eine Ablesung, der Gegenstand faellt auf NULL zurueck.
+  await call('DELETE', `/items/${itemId}/service-log/${first.body.data.id}`);
+  const afterAllDeleted = await call('GET', `/items/${itemId}`);
+  assert.equal(afterAllDeleted.body.data.odometer, null);
+  assert.equal(afterAllDeleted.body.data.odometer_on, null);
 });

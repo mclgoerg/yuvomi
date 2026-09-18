@@ -291,6 +291,38 @@ test('PUT /items/:id: ein Kategoriewechsel weg von Fahrzeugen raeumt einen geset
   assert.equal(recategorized.body.data.odometer_on, null);
 });
 
+test('POST /items: eine selbst angelegte Kategorie mit tracks_odometer traegt den Kilometerstand ebenso', () => {
+  // Der Mechanismus ist eine Eigenschaft der Kategorie-Zeile
+  // (inventory_categories.tracks_odometer), kein Vergleich gegen den festen
+  // String 'vehicles' - ein Haushalt, der z.B. "Wohnmobil" als eigene
+  // Kategorie anlegt, kann sie ebenso markieren (Review #1257).
+  db.prepare("INSERT INTO inventory_categories (key, name, tracks_odometer) VALUES ('camper', 'Wohnmobil', 1)").run();
+});
+
+test('POST /items: eine Kategorie mit tracks_odometer=1 nimmt den Kilometerstand', async () => {
+  const r = await call('POST', '/items', { name: 'Womo', category: 'camper', odometer: 8000 });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.data.odometer, 8000);
+});
+
+test('PUT /items/:id: das Loeschen der Fahrzeuge-Kategorie verhaelt sich wie jede andere Kategorieloeschung', async () => {
+  // Kein Sonderfall mehr, seit die Grenze an der Kategorie-Zeile haengt statt
+  // an einem hartcodierten Namen: Items fallen wie ueberall sonst auf 'other'
+  // zurueck, und der odometer raeumt sich wie jedes andere kategoriespezifische
+  // Feld beim naechsten Speichern ab (dieselbe Regel wie oben, "Kategoriewechsel
+  // raeumt ab") - keine stille Extra-Ueberraschung.
+  const created = await call('POST', '/items', { name: 'Zweitauto', category: 'vehicles', odometer: 15000 });
+  // Direkt wie server/routes/inventory/categories.js#DELETE /:key - dieser
+  // Test haengt nur den items-Router ein, nicht den categories-Router.
+  db.prepare("UPDATE inventory_items SET category = 'other' WHERE category = 'vehicles'").run();
+  db.prepare("DELETE FROM inventory_categories WHERE key = 'vehicles'").run();
+  const reloaded = await call('GET', `/items/${created.body.data.id}`);
+  assert.equal(reloaded.body.data.category, 'other', 'Fallback wie bei jeder geloeschten Kategorie');
+  assert.equal(reloaded.body.data.odometer, 15000, 'die Ablesung selbst bleibt bis zum naechsten Speichern stehen');
+  // seed die Kategorie fuer nachfolgende Tests wieder
+  db.prepare("INSERT INTO inventory_categories (key, name, icon, sort_order, tracks_odometer) VALUES ('vehicles', 'Fahrzeuge', 'car', 1, 1)").run();
+});
+
 test('PUT /items/:id: photo_data ist volles Replace - weglassen loescht es', async () => {
   const validPhoto = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
   const created = await call('POST', '/items', { name: 'Item To Update', photo_data: validPhoto });

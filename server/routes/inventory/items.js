@@ -95,6 +95,14 @@ function validCategoryKeys() {
   return db.get().prepare('SELECT key FROM inventory_categories').all().map((r) => r.key);
 }
 
+/** Traegt DIESE Kategorie den Kilometerstand (Review #1257: eine Eigenschaft
+ *  der Kategorie-Zeile, kein hartcodierter Vergleich gegen 'vehicles' - eine
+ *  geloeschte oder umbenannte Kategorie bricht die Funktion damit nicht mehr,
+ *  und ein selbst angelegtes Fahrzeug-Aequivalent kann sie ebenso tragen). */
+function categoryTracksOdometer(key) {
+  return db.get().prepare('SELECT tracks_odometer FROM inventory_categories WHERE key = ?').get(key)?.tracks_odometer === 1;
+}
+
 /**
  * Ortspfad fuer die Anzeige, z. B. "Keller · Regal 2" fuer einen Unterort,
  * "Garage" fuer einen Top-Ebene-Ort. NULL fuer ortlose Gegenstaende.
@@ -253,14 +261,15 @@ function validateItemFields(body) {
     values.warranty_months = vWarranty.value;
   }
 
-  // Manuelle Kilometerstand-Ablesung - bewusst auf die Kategorie "Fahrzeuge"
-  // begrenzt (Nutzer-Entscheidung 2026-09-17, keine Ausweitung auf andere
-  // Kategorien). Fuer jede andere Kategorie wird still auf NULL genullt statt
-  // mit 400 abgelehnt - dasselbe volle-Replace-Verhalten wie ein weggelassenes
-  // Feld (siehe Modulkopf dieser Funktion): ein Kategoriewechsel weg von
-  // Fahrzeugen raeumt einen vorher gesetzten Wert automatisch ab, statt ihn
-  // unsichtbar (das Formular blendet das Feld dann aus) stehen zu lassen.
-  if (values.category !== 'vehicles') {
+  // Manuelle Kilometerstand-Ablesung - bewusst auf Kategorien begrenzt, die
+  // tracks_odometer tragen (per Voreinstellung nur "Fahrzeuge", Nutzer-
+  // Entscheidung 2026-09-17). Fuer jede andere Kategorie wird still auf NULL
+  // genullt statt mit 400 abgelehnt - dasselbe volle-Replace-Verhalten wie ein
+  // weggelassenes Feld (siehe Modulkopf dieser Funktion): ein Kategoriewechsel
+  // weg von einer odometer-tragenden Kategorie raeumt einen vorher gesetzten
+  // Wert automatisch ab, statt ihn unsichtbar (das Formular blendet das Feld
+  // dann aus) stehen zu lassen.
+  if (!categoryTracksOdometer(values.category)) {
     values.odometer = null;
     values.odometer_unit = null;
     values.odometer_on = null;
@@ -584,10 +593,10 @@ router.post('/:id/dates/:dateId/complete', (req, res) => {
     const vDateId = idParam(req.params.dateId, 'Frist-ID');
     if (vDateId.error) return res.status(400).json({ error: vDateId.error, code: 400 });
 
-    const item = db.get().prepare('SELECT id, created_by FROM inventory_items WHERE id = ?').get(vId.value);
+    const item = db.get().prepare('SELECT id, created_by, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
     if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
 
-    const { value, errors } = validateCompletionInput(req.body);
+    const { value, errors } = validateCompletionInput(req.body, item);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const userId = req.authUserId || req.session.userId;
@@ -622,10 +631,10 @@ router.post('/:id/service-log', (req, res) => {
   try {
     const vId = idParam(req.params.id, 'Gegenstand-ID');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
-    const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
+    const item = db.get().prepare('SELECT id, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
     if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
 
-    const { value, errors } = validateServiceLogInput(req.body);
+    const { value, errors } = validateServiceLogInput(req.body, item);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const userId = req.authUserId || req.session.userId;
@@ -638,18 +647,22 @@ router.post('/:id/service-log', (req, res) => {
 });
 
 // --------------------------------------------------------
-// PATCH|DELETE /api/v1/inventory/items/:id/service-log/:logId
+// PUT|DELETE /api/v1/inventory/items/:id/service-log/:logId
+// PUT statt PATCH (Review #1257): validateServiceLogInput() verlangt label +
+// performed_on und loescht jedes weggelassene Feld - volles Replace, nicht
+// Teil-Update. Kein bestehender Aufrufer haengt daran: die App ruft bisher
+// nur /complete und /history auf, dieser Weg ist reine /api/v1-Oberflaeche.
 // --------------------------------------------------------
-router.patch('/:id/service-log/:logId', (req, res) => {
+router.put('/:id/service-log/:logId', (req, res) => {
   try {
     const vId = idParam(req.params.id, 'Gegenstand-ID');
     if (vId.error) return res.status(400).json({ error: vId.error, code: 400 });
     const vLogId = idParam(req.params.logId, 'Eintrag-ID');
     if (vLogId.error) return res.status(400).json({ error: vLogId.error, code: 400 });
-    const item = db.get().prepare('SELECT id FROM inventory_items WHERE id = ?').get(vId.value);
+    const item = db.get().prepare('SELECT id, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
     if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
 
-    const { value, errors } = validateServiceLogInput(req.body);
+    const { value, errors } = validateServiceLogInput(req.body, item);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const updated = updateServiceLogEntry({ itemId: item.id, logId: vLogId.value, values: value });

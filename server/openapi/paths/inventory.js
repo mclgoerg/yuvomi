@@ -94,7 +94,7 @@ export function inventoryPaths() {
       }),
     },
     '/api/v1/inventory/items/{id}/service-log/{logId}': {
-      patch: op({ summary: 'Update a service-log entry', tag: 'Inventory', params: [idParam('id', 'Item ID'), idParam('logId', 'Service-log entry ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      put: op({ summary: 'Replace a service-log entry', description: 'Full replace, not a partial update: label and performed_on are required, and any omitted optional field (odometer/vendor/note) is cleared.', tag: 'Inventory', params: [idParam('id', 'Item ID'), idParam('logId', 'Service-log entry ID')], stateChanging: true, requestBody: jsonBody(null) }),
       delete: op({ summary: 'Delete a service-log entry', tag: 'Inventory', params: [idParam('id', 'Item ID'), idParam('logId', 'Service-log entry ID')], stateChanging: true }),
     },
     '/api/v1/inventory/items/{id}/history': {

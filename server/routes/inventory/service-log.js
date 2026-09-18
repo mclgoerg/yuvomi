@@ -40,7 +40,33 @@ import { documentLinksFor } from '../../services/document-links.js';
 const HISTORY_ENTRY_ROLES = ['maintenance', 'accessory'];
 const DOCS = { table: 'inventory_item_documents', ownerColumn: 'item_id' };
 
-function validateServiceLogInput(body) {
+/**
+ * Ein Eintrag, der den AKTUELLEN Kilometerstand des Gegenstands stellen
+ * wuerde (sein Datum ist die neueste bekannte Ablesung, siehe
+ * maybeAdvanceItemOdometer), darf keinen niedrigeren Wert tragen als der
+ * bisherige aktuelle Stand - ein Fahrzeug faehrt nicht rueckwaerts. `5120`
+ * statt `51200` getippt wuerde sonst den aktuellen Stand des Gegenstands
+ * stillschweigend zuruecksetzen (maybeAdvanceItemOdometer war frueher nur
+ * eine Datums-, keine Wert-Pruefung). Eine RUECKDATIERTE Reparatur bleibt
+ * dagegen ausdruecklich erlaubt, auch mit einem niedrigeren Stand als der
+ * aktuelle: ihr Datum liegt vor der neuesten Ablesung, sie konkurriert also
+ * gar nicht um den aktuellen Wert (maybeAdvanceItemOdometer laesst sie
+ * unangetastet).
+ * @param {{odometer:number|null,odometer_on:string|null}|undefined} item
+ * @param {number|null} odometer
+ * @param {string|null} performedOn
+ * @returns {string|null} Fehlertext, oder null wenn unbedenklich
+ */
+function odometerRegressionError(item, odometer, performedOn) {
+  if (odometer == null || item?.odometer == null || item.odometer_on == null) return null;
+  if (performedOn == null || performedOn < item.odometer_on) return null;
+  if (odometer < item.odometer) {
+    return `Kilometerstand darf nicht unter den zuletzt erfassten Stand (${item.odometer}) fallen.`;
+  }
+  return null;
+}
+
+function validateServiceLogInput(body, item) {
   const results = [];
   const vLabel = str(body?.label, 'Bezeichnung', { max: 100 });
   results.push(vLabel);
@@ -57,6 +83,8 @@ function validateServiceLogInput(body) {
       odometer = vOdometer.value;
     }
   }
+  const regressionError = odometerRegressionError(item, odometer, vPerformedOn.value);
+  if (regressionError) results.push({ error: regressionError });
 
   const vVendor = str(body?.vendor, 'Haendler', { max: MAX_SHORT, required: false });
   results.push(vVendor);
@@ -77,7 +105,7 @@ function validateServiceLogInput(body) {
  * uebernimmt sie von der getrackten Frist selbst (completeTrackedDate), sie
  * kommt hier nie aus dem Body.
  */
-function validateCompletionInput(body) {
+function validateCompletionInput(body, item) {
   const results = [];
   const vPerformedOn = date(body?.performed_on, 'Datum', true);
   results.push(vPerformedOn);
@@ -92,6 +120,8 @@ function validateCompletionInput(body) {
       odometer = vOdometer.value;
     }
   }
+  const regressionError = odometerRegressionError(item, odometer, vPerformedOn.value);
+  if (regressionError) results.push({ error: regressionError });
 
   const vVendor = str(body?.vendor, 'Haendler', { max: MAX_SHORT, required: false });
   results.push(vVendor);
@@ -162,8 +192,30 @@ function updateServiceLogEntry({ itemId, logId, values }) {
   return loadServiceLogEntry(itemId, logId);
 }
 
+/**
+ * Fehlt bislang das Gegenstueck zu maybeAdvanceItemOdometer: das Loeschen der
+ * Log-Zeile, die den aktuellen Kilometerstand des Gegenstands zuletzt gesetzt
+ * hat, liesse den Gegenstand sonst auf einem Stand stehen, dessen Quelle es
+ * nicht mehr gibt. Setzt auf die neueste VERBLEIBENDE Ablesung zurueck, oder
+ * auf NULL, wenn keine Log-Zeile mehr eine traegt.
+ */
+function recomputeItemOdometer(itemId) {
+  const latest = db.get().prepare(`
+    SELECT performed_on, odometer FROM inventory_item_service_log
+    WHERE item_id = ? AND odometer IS NOT NULL
+    ORDER BY performed_on DESC, id DESC LIMIT 1
+  `).get(itemId);
+  db.get().prepare('UPDATE inventory_items SET odometer = ?, odometer_on = ? WHERE id = ?')
+    .run(latest?.odometer ?? null, latest?.performed_on ?? null, itemId);
+}
+
 function deleteServiceLogEntry({ itemId, logId }) {
-  return db.get().prepare('DELETE FROM inventory_item_service_log WHERE id = ? AND item_id = ?').run(logId, itemId);
+  const result = db.get().transaction(() => {
+    const changes = db.get().prepare('DELETE FROM inventory_item_service_log WHERE id = ? AND item_id = ?').run(logId, itemId);
+    if (changes.changes > 0) recomputeItemOdometer(itemId);
+    return changes;
+  })();
+  return result;
 }
 
 /**
@@ -171,7 +223,12 @@ function deleteServiceLogEntry({ itemId, logId }) {
  * vorrollen ODER abraeumen, Erinnerung neu synct). Die Erinnerung gehoert
  * item.created_by, nicht der Person, die gerade klickt - identisches Muster
  * wie item-dates.js selbst (Modulkopf) und items.js#syncReminder.
- * @returns {{trackedDate: object|null, logEntry: object}|{error:string, code:number}}
+ *
+ * Gibt nur {ok:true} oder {error, code} zurueck - der einzige Aufrufer
+ * (items.js) laedt den Gegenstand danach ohnehin per loadItem() neu, ein
+ * Ruecklauf der geschriebenen Zeilen waere zwei ungenutzte Extra-Abfragen je
+ * Aufruf gewesen (Review #1257).
+ * @returns {{ok:true}|{error:string, code:number}}
  */
 function completeTrackedDate({ item, dateId, values, userId }) {
   const trackedDate = loadTrackedDate(dateId);
@@ -179,7 +236,7 @@ function completeTrackedDate({ item, dateId, values, userId }) {
     return { error: 'Tracked date not found.', code: 404 };
   }
 
-  const result = db.get().transaction(() => {
+  db.get().transaction(() => {
     const inserted = db.get().prepare(`
       INSERT INTO inventory_item_service_log
         (item_id, item_date_id, label, performed_on, odometer, vendor, note, created_by)
@@ -192,7 +249,17 @@ function completeTrackedDate({ item, dateId, values, userId }) {
     maybeAdvanceItemOdometer(item.id, values.performed_on, values.odometer);
 
     if (trackedDate.interval_months != null) {
-      const nextDate = addMonthsClamped(trackedDate.date, trackedDate.interval_months);
+      // Vom FAELLIGKEITSDATUM aus vorrollen, nicht vom Erledigungsdatum - eine
+      // laengst ueberfaellige Frist (mehr als ein Intervall alt) rollte sonst
+      // nur EINMAL vor und landete erneut in der Vergangenheit: die Zeile
+      // bliebe ueberfaellig, keine Erinnerung entstuende (syncTrackedDateReminder
+      // verwirft einen bereits vergangenen remind_at), und ein zweiter Klick auf
+      // "Erledigt" schriebe eine zweite Log-Zeile mit demselben performed_on.
+      // Solange weiterrollen, bis das Ergebnis nach dem Erledigungsdatum liegt.
+      let nextDate = trackedDate.date;
+      do {
+        nextDate = addMonthsClamped(nextDate, trackedDate.interval_months);
+      } while (nextDate <= values.performed_on);
       rollTrackedDateForward(trackedDate, nextDate, item.created_by);
     } else {
       removeTrackedDate(trackedDate.id);
@@ -201,10 +268,7 @@ function completeTrackedDate({ item, dateId, values, userId }) {
     return inserted;
   })();
 
-  return {
-    logEntry: loadServiceLogEntry(item.id, result.lastInsertRowid),
-    trackedDate: trackedDate.interval_months != null ? loadTrackedDate(trackedDate.id) : null,
-  };
+  return { ok: true };
 }
 
 /**
@@ -239,7 +303,12 @@ function loadHistory(itemId, userId) {
   const documentRows = documentLinksFor(db.get(), { ...DOCS, ownerId: itemId, userId }).map((doc) => ({
     type: 'document',
     id: doc.document_id,
-    date: doc.created_at,
+    // doc.created_at ist ein UTC-Instant (%Y-%m-%dT%H:%M:%SZ) - der Link-
+    // Zeitpunkt, nicht das Dokument-Datum selbst -, gemischt in eine Zeitleiste
+    // aus reinen Tages-Schluesseln (performed_on/link.date). Auf den Tag
+    // gekuerzt, statt einen Abend-Link je nach Haushaltszone auf den
+    // Nachbartag fallen zu lassen.
+    date: String(doc.created_at).slice(0, 10),
     label: doc.name || doc.original_name || '',
   }));
 
