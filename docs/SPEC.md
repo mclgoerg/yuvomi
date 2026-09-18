@@ -3624,10 +3624,18 @@ anchor table, unlike the cycle's predicted-period anchors, because the record it
 already exists) is recomputed on every record write, after `PUT /caregivers/:subjectId`, and in the
 60-second `processDueNotifications()` pass.
 
-**The caregiver fan-out (D6) is the one genuinely new privacy rule in this feature.** Built against
-the only existing precedent for "more than one person gets a reminder off the same source",
-`server/services/event-reminder-fanout.js` (#921): one `reminders` row **per recipient** — the
-subject's own row carries `assigned_from = NULL`, a caregiver's row carries
+**The caregiver fan-out (D6) is the one genuinely new privacy rule in this feature — and it is
+opt-in.** A care grant (`health_care_grants`) governs read/write access to the data; it does not by
+itself decide whether a push naming the subject and the overdue item lands on someone else's
+device. That second question is `health_prevention_notify_caregivers` (`server/routes/preferences.js`,
+per owner, **default off** — the same shape as `cycle_settings.notify_partner_user_id`): without the
+owner's opt-in, a caregiver gets no inherited row at all, even with a standing care grant. Turning
+the opt-in off removes any already-inherited row **immediately**, the same "a change takes effect at
+once" guarantee described below for a revoked grant.
+
+Built against the only existing precedent for "more than one person gets a reminder off the same
+source", `server/services/event-reminder-fanout.js` (#921): one `reminders` row **per recipient** —
+the subject's own row carries `assigned_from = NULL`, a caregiver's row carries
 `created_by = <caregiver>, assigned_from = <subject>`, so each side's `pushed_at`/`dismissed` is
 independent. A caregiver's own self-set row (`assigned_from IS NULL`) is never overwritten by the
 sync. Revoking a caregiver grant removes their inherited row **immediately** — `PUT
@@ -3638,10 +3646,10 @@ at all, checked the same way the cycle sync gates on it. **The push body names t
 the inherited row** (`assigned_from IS NOT NULL`) — "Tetanus booster due - Mara": a caregiver caring
 for more than one person cannot tell whose reminder it is without the name, while the subject's own
 copy would just be noise about themselves. This exposes nothing a caregiver could not already read
-(`careAwareClause()` already shows them a subject's `private` rows), but it does put that fact on a
-second person's lock screen — a deliberate, accepted trade-off, not an oversight. Admin governs the
-type registry only; **it never gains read access to another person's records** (docs/DECISIONS.md
-#1 — privacy beats admin convenience).
+via a standing care grant (`careAwareClause()` already shows them a subject's `private` rows) — the
+opt-in above is what keeps that fact off a second person's lock screen unless the owner asks for it.
+Admin governs the type registry only; **it never gains read access to another person's records**
+(docs/DECISIONS.md #1 — privacy beats admin convenience).
 
 ### Schedule (migration 165, #786)
 

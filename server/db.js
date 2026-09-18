@@ -9031,8 +9031,11 @@ const MIGRATIONS = [
         default_interval_months INTEGER CHECK (default_interval_months IS NULL OR (default_interval_months BETWEEN 1 AND 600)),
         icon                    TEXT    NOT NULL DEFAULT 'syringe',
         sort_order              INTEGER NOT NULL DEFAULT 0,
-        created_at              TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        created_at              TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at              TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
       );
+      CREATE TRIGGER trg_health_prevention_types_updated_at AFTER UPDATE ON health_prevention_types FOR EACH ROW BEGIN
+        UPDATE health_prevention_types SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
 
       -- Das eine Modell fuer Impfung UND Vorsorgeuntersuchung (D1) - eine
       -- Tetanus-Auffrischung alle 10 Jahre und ein Zahnarzttermin alle 6 Monate

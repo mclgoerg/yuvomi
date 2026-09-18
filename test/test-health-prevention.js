@@ -232,6 +232,27 @@ test('das Löschen eines Typs lässt seine Datensätze mit der name-Momentaufnah
   assert.equal(survivor.name, 'Mumps', 'die name-Momentaufnahme traegt den zuletzt bekannten Typnamen');
 });
 
+test('das Löschen eines Typs überschreibt einen bereits eigenen Datensatz-Namen nicht', async () => {
+  asA();
+  const type = await call('POST', '/prevention/types', { name: 'Röteln', kind: 'vaccination', default_interval_months: 120 });
+  const typeId = type.body.data.id;
+
+  asB();
+  const record = await call('POST', '/prevention/records', {
+    type_id: typeId, name: 'Eigener Name', given_on: '2026-01-01',
+  });
+  const recordId = record.body.data.id;
+
+  asA();
+  const del = await call('DELETE', `/prevention/types/${typeId}`);
+  assert.equal(del.status, 204);
+
+  asB();
+  const after = await call('GET', `/prevention/records?user_id=${userB}`);
+  const survivor = after.body.data.find((r) => r.id === recordId);
+  assert.equal(survivor.name, 'Eigener Name', 'ein bereits gesetzter eigener Name bleibt unangetastet');
+});
+
 // ── GET /prevention/due ──────────────────────────────────────────────────────
 
 test('GET /prevention/due berechnet die Fälligkeit aus dem jüngsten Datensatz je Typ', async () => {
