@@ -24,7 +24,7 @@ import { emptyStateEl } from '/utils/empty-state.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { formatMoney } from '/utils/money.js';
 import { todayKey } from '/utils/date.js';
-import { formatDate, getLocale } from '/i18n.js';
+import { formatDate, getLocale, getNumberFormat } from '/i18n.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
 import { warrantyStatus, hasUpcomingDeadline, dateStatus, countUpcomingDeadlines } from '/utils/inventory-warranty.js';
 import { openDetailView, closeDetailView } from '/components/detail-view.js';
@@ -720,7 +720,7 @@ function trackedDateDetailEntries(item) {
       : status.days === 0 ? t('inventory.trackedDateDueToday')
       : t('inventory.trackedDateInDays', { count: status.days });
     const distanceHint = d.interval_distance
-      ? t('inventory.trackedDateDistanceHint', { count: d.interval_distance, unit: item.odometer_unit || 'km' })
+      ? t('inventory.trackedDateDistanceHint', { count: d.interval_distance, unit: odometerUnitLabel(item.odometer_unit) })
       : '';
     const sub = [countdown ? `${formatDate(d.date)} · ${countdown}` : formatDate(d.date), distanceHint]
       .filter(Boolean).join(' · ');
@@ -851,13 +851,13 @@ function odometerChartMarkup(points, unit) {
 
   const spine = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
   const area = `<polygon class="inventory-chart__area" points="${x(0).toFixed(1)},${bottom.toFixed(1)} ${spine} ${x(points.length - 1).toFixed(1)},${bottom.toFixed(1)}" />`;
-  const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-inventory)"><title>${esc(`${formatDate(p.date)}: ${p.value} ${unit}`)}</title></circle>`).join('');
+  const dots = points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3.5" fill="var(--module-inventory)"><title>${esc(`${formatDate(p.date)}: ${formatOdometer(p.value)} ${unit}`)}</title></circle>`).join('');
 
-  const grid = chartGridMarkup(min, max, (val) => String(Math.round(val)));
+  const grid = chartGridMarkup(min, max, (val) => formatOdometer(Math.round(val)));
   const xLabels = chartXLabelsMarkup(points.map((p) => formatDate(p.date)));
   const titleText = t('inventory.odometerChartTitle');
   const table = chartTableMarkup(titleText, [t('inventory.completePerformedOnLabel'), t('inventory.odometerLabel')],
-    points.map((p) => [formatDate(p.date), `${p.value} ${unit}`]));
+    points.map((p) => [formatDate(p.date), `${formatOdometer(p.value)} ${unit}`]));
 
   return `
     <div class="inventory-chart-section">
@@ -890,7 +890,7 @@ function odometerChartPoints(history, item) {
  *  + Gesamtkosten - reine Anzeige, keine eigene Datenhaltung (server-seitig
  *  eine Zusammenfuehrung, kein neuer Speicher). */
 function historyDetailNode(history, item) {
-  const odometerUnit = item.odometer_unit || 'km';
+  const odometerUnit = odometerUnitLabel(item.odometer_unit);
   const chartHtml = odometerChartMarkup(odometerChartPoints(history, item), odometerUnit);
   const hasTimeline = !!(history && history.timeline.length);
   if (!chartHtml && !hasTimeline) return null;
@@ -974,11 +974,23 @@ function renderItemDetail(item, history, onDoneTrackedDate) {
   ];
 }
 
+/** Uebersetzte Einheit statt des rohen DB-Codes ('km'/'mi') - jede Stelle, die
+ *  eine Kilometerstand-Zahl anzeigt, muss hierueber gehen (Review #1257: eine
+ *  Stelle blieb roh und zeigte "1400 km" auf Russisch statt "1400 км"). */
+function odometerUnitLabel(unit) {
+  return t(`inventory.odometerUnit${unit === 'mi' ? 'Mi' : 'Km'}`);
+}
+
+/** Tausendertrennzeichen der Locale statt einer rohen Ziffernfolge - dasselbe
+ *  Muster wie budget.js/dashboard.js/housekeeping.js (Review #1257). */
+function formatOdometer(value) {
+  return getNumberFormat().format(value);
+}
+
 /** Kilometerstand-Zeile: Wert + Einheit + Ablesedatum, oder leer ohne Wert. */
 function odometerDetailValue(item) {
   if (item.odometer == null) return '';
-  const unit = t(`inventory.odometerUnit${item.odometer_unit === 'mi' ? 'Mi' : 'Km'}`);
-  const value = `${item.odometer} ${unit}`;
+  const value = `${formatOdometer(item.odometer)} ${odometerUnitLabel(item.odometer_unit)}`;
   return item.odometer_on ? `${value} · ${formatDate(item.odometer_on)}` : value;
 }
 

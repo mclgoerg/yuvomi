@@ -9302,9 +9302,16 @@ const MIGRATIONS = [
 
       -- Manuelle Kilometerstand-Ablesung - nie eine Telematik-/Fahrzeug-API,
       -- das ist die eigene harte Grenze des Vorschlags. Bewusst auf die
-      -- Kategorie "Fahrzeuge" begrenzt (Nutzer-Entscheidung 2026-09-17), die
-      -- Spalte selbst kennt diese Grenze aber nicht - sie liegt in der
-      -- Validierung (server/routes/inventory/items.js#validateItemFields).
+      -- Kategorie "Fahrzeuge" begrenzt (Nutzer-Entscheidung 2026-09-17), aber
+      -- als EIGENSCHAFT der Kategorie-Zeile, nicht als Literal in der
+      -- Validierung (Review #1257): 'vehicles' ist eine ganz normale, vom
+      -- Haushalt loeschbare Zeile in inventory_categories (items.js:89
+      -- validCategoryKeys()) - ein hartcodierter Stringvergleich wuerde beim
+      -- Loeschen und bei jedem selbst angelegten Fahrzeug-Ersatz ("Motorrad",
+      -- "Wohnmobil") lautlos brechen. tracks_odometer traegt das stattdessen.
+      ALTER TABLE inventory_categories ADD COLUMN tracks_odometer INTEGER NOT NULL DEFAULT 0;
+      UPDATE inventory_categories SET tracks_odometer = 1 WHERE key = 'vehicles';
+
       ALTER TABLE inventory_items ADD COLUMN odometer INTEGER CHECK (odometer IS NULL OR odometer >= 0);
       ALTER TABLE inventory_items ADD COLUMN odometer_unit TEXT
         CHECK (odometer_unit IS NULL OR odometer_unit IN ('km', 'mi'));
