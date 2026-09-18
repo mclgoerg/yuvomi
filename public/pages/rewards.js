@@ -16,6 +16,7 @@ import { wireTablist } from '/utils/tablist.js';
 import { wireScrollFade } from '/utils/ux.js';
 import { renderSkeletonList } from '/utils/skeleton.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 
 const TABS = ['overview', 'catalog', 'ledger'];
 
@@ -29,6 +30,8 @@ let state = {
   participants: [],    // admin only
   ledgerFilter: null,  // user_id | null
   prevBalances: new Map(), // für Count-up: Salden vor dem letzten Neuladen
+  /** Fuer wen dieses Wandtablett einloesen darf (#1209) - leer fuer jeden Menschen. */
+  displayPeople: [],
 };
 
 function prefersReducedMotion() {
@@ -71,6 +74,62 @@ function runCountUps(scope) {
 
 function isAdmin() {
   return state.user?.role === 'admin';
+}
+
+/**
+ * Handelt gerade ein Wandtablett (#1209)?
+ *
+ * Die Einloese-Knoepfe dieser Seite haengen an einem IDENTITAETS-Gate: „bin ich
+ * das, oder bin ich Elternteil". Am Display trifft weder das eine noch das
+ * andere zu - das Konto ist kein Mitglied, nimmt an Belohnungen nicht teil und
+ * steht in keiner Liste. Ohne eine eigene Antwort verschwaende die Seite dort
+ * jeden Knopf, obwohl der Server die Handlung erlaubt.
+ */
+function actingAsDisplay() {
+  return state.user?.access_scope === 'display';
+}
+
+/**
+ * Darf an diesem Tablett fuer diese Person eingeloest werden?
+ *
+ * DIE ANTWORT KOMMT VOM SERVER, nicht aus einer zweiten Regel hier.
+ * `/displays/people` liefert `can_redeem` aus derselben Rechteaufloesung, die
+ * auch die Absage der Route stellt - eine eigene Bedingung an dieser Stelle
+ * waere die zweite Wahrheit, und sie liefe genau dann auseinander, wenn jemand
+ * die Rechte aendert.
+ */
+function displayMayRedeemFor(memberId) {
+  return (state.displayPeople ?? []).some((p) => p.id === memberId && p.can_redeem);
+}
+
+/**
+ * Darf dieser Nutzer in Belohnungen schreiben? (#467)
+ *
+ * Nicht dasselbe wie `isAdmin()`: das trennt Eltern von Kindern (wer darf
+ * freigeben, wer darf nur anfragen), dies trennt Schreiben von Lesen. Beide
+ * gelten nebeneinander - ein Elternteil mit `rewards: read` sieht die offenen
+ * Anfragen, entscheidet sie aber nicht.
+ *
+ * EIN DISPLAY FAELLT HIER EBENFALLS AUF `true`, und das ist richtig: seine
+ * Scope-Liste ist `rewards:read` (server/display-scopes.js), und alles auf
+ * dieser Seite ausser dem Einloesen ist ihm verwehrt. Die EINE Ausnahme traegt
+ * der Server als benannte Schreibroute (`DISPLAY_WRITE_ROUTES`), und in der
+ * Oberflaeche traegt sie `displayMayRedeemFor()` - deshalb fragt jede
+ * Einloese-Stelle ZUERST `actingAsDisplay()` und erst im anderen Zweig hier.
+ * Eine Ausnahme ohne diese Reihenfolge haette dem Tablett genau die zwei
+ * Handlungen genommen, fuer die es aufgehaengt wurde.
+ *
+ * DAS EINLOESEN DER EIGENEN PUNKTE FAELLT FUER EINEN MENSCHEN MIT. Es liegt
+ * nahe, es wie die eigene Erinnerungsvorlaufzeit im Schichtplan zu behandeln
+ * (S-12) und stehen zu lassen - aber dort senkt der Server das noetige Niveau
+ * ausdruecklich (sessionModuleAccessRequirement), und fuer
+ * `/rewards/redemptions` tut er das nur fuer ein gekoppeltes Geraet. Ein
+ * Knopf, der das nicht weiss, ist die teurere Auskunft.
+ *
+ * Selbes Muster wie readOnly() in public/pages/waste.js und schedule.js.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('rewards');
 }
 
 function fmtPoints(n) {
@@ -124,6 +183,15 @@ async function loadOverview() {
   const res = await api.get('/rewards/overview');
   state.overview = res.data;
   state.catalog = res.data.catalog || [];
+  // WER AN DIESEM TABLETT EINLOESEN DARF (#1209). Die Uebersicht selbst
+  // beantwortet das nicht: sie kennt Punktestaende, nicht Rechte, und `me` ist
+  // hier das Geraet. Der Fallback ist eine LEERE Liste - ohne Antwort weiss
+  // diese Seite nicht, fuer wen sie fragen darf, und kein Knopf ist die
+  // richtige Richtung fuer einen Irrtum.
+  if (actingAsDisplay()) {
+    const people = await api.get('/displays/people').catch(() => ({ data: [] }));
+    state.displayPeople = people.data ?? [];
+  }
   if (isAdmin()) {
     const r = await api.get('/rewards/redemptions?status=pending');
     state.redemptions = r.data || [];
@@ -173,6 +241,7 @@ let fab = null;
 // FAB-Aktion je Tab setzen (nur Admins erstellen; sonst ausgeblendet).
 function updateRewardsFab() {
   if (!fab) return;
+  if (readOnly()) { setPageFabAction(fab, { hidden: true }); return; }
   if (state.tab === 'catalog' && isAdmin()) {
     setPageFabAction(fab, { label: t('rewards.addReward'), onClick: () => openRewardModal(null) });
   } else if (state.tab === 'ledger' && isAdmin()) {
@@ -281,7 +350,9 @@ function canAffordAny(balance) {
 
 function renderStandingRow(member) {
   const hint = nextRewardHint(member.balance);
-  const canRedeem = isAdmin() || member.id === state.overview.me;
+  const canRedeem = actingAsDisplay()
+    ? displayMayRedeemFor(member.id)
+    : (!readOnly() && (isAdmin() || member.id === state.overview.me));
   /* DIE DECKUNG WAR NIE GEPRUEFT. `canRedeem` oben ist ein IDENTITAETS-Gate
    * (bin ich das, oder bin ich Elternteil), kein Kontostand. Emma sah mit 30
    * Punkten einen aktiven "Einloesen"-Knopf, waehrend die billigste Praemie 40
@@ -331,7 +402,9 @@ function renderStandingRow(member) {
 
 // Eltern-Ersteinrichtung: drei Schritte an einem Ort, bis alle erledigt sind.
 function renderSetupHints() {
-  if (!isAdmin()) return '';
+  // Drei Schritte, die alle etwas ANLEGEN. Eine Aufforderung einzurichten,
+  // ohne einrichten zu duerfen, ist die leere Zusage aus #700.
+  if (!isAdmin() || readOnly()) return '';
   const s = state.overview?.setup;
   if (!s) return '';
   const steps = [
@@ -363,6 +436,12 @@ function renderPendingPanel() {
         <p class="rw-pending__title">${esc(r.reward_icon ? `${r.reward_icon} ` : '')}${esc(r.reward_name)}</p>
         <p class="rw-pending__meta">${esc(isAdmin() ? r.user_name : '')}${isAdmin() ? ' · ' : ''}${esc(pointsLabel(r.cost))}${r.note ? ` · „${esc(r.note)}“` : ''}</p>
       </div>
+      ${/* DIE LISTE BLEIBT, DIE KNOEPFE GEHEN. Dass eine Anfrage offen ist, ist
+            eine Auskunft und gehoert auch dem, der sie nicht entscheiden darf -
+            "Genehmigen"/"Ablehnen"/"Abbrechen" sind reine Handlungen. Der
+            Behaelter geht MIT: `.rw-pending__actions` ist eine Flex-Box mit
+            `gap`, und eine leere waere eine Spalte fuer nichts. */ ''}
+      ${readOnly() ? '' : `
       <div class="rw-pending__actions">
         ${isAdmin() ? `
           <button class="btn btn--primary btn--sm" type="button" data-decide="fulfill" data-id="${r.id}">${esc(t('rewards.approve'))}</button>
@@ -370,7 +449,7 @@ function renderPendingPanel() {
         ` : `
           <button class="btn btn--ghost btn--sm" type="button" data-decide="cancel" data-id="${r.id}">${esc(t('common.cancel'))}</button>
         `}
-      </div>
+      </div>`}
     </li>`).join('');
   /* DER KOPF STEHT AUF DEM GRUND, NICHT IM TRAEGER (Zeilenlisten-Regel), und
    * die Dringlichkeit steht als ZAHL daneben statt als Farbfeld darunter.
@@ -389,7 +468,7 @@ function renderOverview(el) {
   el.replaceChildren();
   const list = balances();
   if (!list.length) {
-    const action = isAdmin()
+    const action = isAdmin() && !readOnly()
       ? { label: t('rewards.manageParticipants'), icon: 'user-plus', className: 'rw-manage-participants' }
       : null;
     el.insertAdjacentHTML('beforeend',
@@ -398,7 +477,7 @@ function renderOverview(el) {
     icons(el);
     return;
   }
-  const adminBar = isAdmin() ? `
+  const adminBar = isAdmin() && !readOnly() ? `
     <button class="btn btn--ghost btn--sm rw-manage-participants" type="button"><i data-lucide="users-round" aria-hidden="true"></i>${esc(t('rewards.manageParticipants'))}</button>` : '';
   el.insertAdjacentHTML('beforeend', `
     <div class="rewards-content__inner">
@@ -455,7 +534,17 @@ function affordabilityFor(cost) {
 function renderRewardCard(item) {
   const inactive = item.is_active === 0;
   const aff = affordabilityFor(item.cost);
-  const canRedeemBtn = !inactive && (isAdmin() || aff.canRedeem !== false) && (isAdmin() || balances().some((b) => b.id === state.overview?.me));
+  // AM TABLETT TRAEGT DER KATALOG KEINEN EINLOESE-KNOPF. Er ruft die Auswahl
+  // ohne Person auf - fuer einen Menschen ist das richtig, weil „ich" die
+  // Antwort ist. Am Display ist es niemand, und ein Knopf, der erst nach einer
+  // Person fragen muesste, waere ein zweiter Weg zu derselben Handlung. Der
+  // eine Weg steht in der Personenliste, wo die Person schon feststeht.
+  //
+  // `readOnly()` daneben schliesst denselben Knopf aus einem anderen Grund aus:
+  // ein MENSCH mit `rewards: read` darf gar nicht einloesen. Zwei Gruende, eine
+  // Wirkung - deshalb stehen sie als getrennte Bedingungen und nicht als eine.
+  const canRedeemBtn = !actingAsDisplay() && !readOnly()
+    && !inactive && (isAdmin() || aff.canRedeem !== false) && (isAdmin() || balances().some((b) => b.id === state.overview?.me));
   const shortHint = !isAdmin() && aff.short != null && aff.short > 0
     ? `<span class="rw-reward-card__short">${esc(t('rewards.pointsShort', { points: fmtPoints(aff.short) }))}</span>` : '';
   return `
@@ -468,7 +557,7 @@ function renderRewardCard(item) {
       <div class="rw-reward-card__foot">
         <span class="rw-cost"><i data-lucide="coins" aria-hidden="true"></i>${esc(pointsLabel(item.cost))}</span>
         <div class="rw-reward-card__actions">
-          ${isAdmin() ? `
+          ${isAdmin() && !readOnly() ? `
             <button class="btn btn--icon btn--sm" type="button" data-edit="${item.id}" aria-label="${esc(t('common.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>
           ` : ''}
           ${canRedeemBtn ? `<button class="btn btn--secondary btn--sm" type="button" data-redeem-item="${item.id}"><i data-lucide="gift" aria-hidden="true"></i>${esc(redeemVerb())}</button>` : shortHint}
@@ -485,7 +574,7 @@ function renderCatalog(el) {
       <h2 class="rw-section__title u-section-title"><i data-lucide="gift" aria-hidden="true"></i>${esc(t('rewards.tabCatalog'))}</h2>
     </div>` : '';
   if (!items.length) {
-    const action = isAdmin()
+    const action = isAdmin() && !readOnly()
       ? { label: t('rewards.addReward'), icon: 'plus', className: 'rw-add-reward' }
       : null;
     el.insertAdjacentHTML('beforeend',
@@ -575,6 +664,10 @@ function enrolledMembers() {
 }
 
 async function openRedeemModal(memberId, presetItemId = null) {
+  // AM TABLETT NICHT: dort ist dies der eine erlaubte Schreibweg, und ob er
+  // fuer DIESE Person offen steht, hat `displayMayRedeemFor()` am Knopf schon
+  // beantwortet - mit der Antwort des Servers, nicht mit einer zweiten Regel.
+  if (!actingAsDisplay() && readOnly()) return;
   const members = enrolledMembers();
   const me = state.overview?.me;
   const defaultMember = memberId ?? (members.some((m) => m.id === me) ? me : members[0]?.id) ?? null;
@@ -597,8 +690,16 @@ async function openRedeemModal(memberId, presetItemId = null) {
       </select>
     </div>`;
 
+  // AM TABLETT STEHT DIE PERSON IM TITEL (#1209). Fuer einen Menschen ist „ich"
+  // die Antwort und der Name waere Laerm; am Display sahen der Dialog fuer die
+  // eine und der fuer die andere Person identisch aus, und beide oeffnen sich
+  // aus derselben Liste heraus (im Browser gesehen). Kein neuer Locale-
+  // Schluessel: der Name traegt sich selbst, das Verb steht schon da.
+  const titelPerson = actingAsDisplay()
+    ? (state.displayPeople ?? []).find((p) => p.id === defaultMember)?.display_name
+    : null;
   openModal({
-    title: redeemVerb(),
+    title: titelPerson ? `${redeemVerb()} · ${titelPerson}` : redeemVerb(),
     content: `
       <form id="rw-redeem-form" novalidate>
         ${memberSelect}
@@ -662,6 +763,7 @@ async function openRedeemModal(memberId, presetItemId = null) {
 }
 
 async function decideRedemption(id, action, btn) {
+  if (readOnly()) return;
   const gefragt = action === 'reject' || action === 'cancel';
   if (gefragt) {
     // Kein `danger`: der Server bucht die reservierten Punkte per `reversal`
@@ -695,6 +797,7 @@ async function decideRedemption(id, action, btn) {
 }
 
 function openBonusModal() {
+  if (readOnly()) return;
   const members = enrolledMembers();
   if (!members.length) { confirmModal(t('rewards.emptyOverviewAdmin'), { confirmLabel: t('rewards.gotIt') }); return; }
   openModal({
@@ -750,6 +853,7 @@ function openBonusModal() {
 }
 
 function openRewardModal(item) {
+  if (readOnly()) return;
   const isEdit = !!item;
   openModal({
     title: isEdit ? t('rewards.editReward') : t('rewards.addReward'),
@@ -828,6 +932,7 @@ function openRewardModal(item) {
 }
 
 async function openParticipantsModal() {
+  if (readOnly()) return;
   let members = [];
   try {
     const res = await api.get('/rewards/participants');
@@ -896,7 +1001,9 @@ async function openMemberDetail(memberId) {
       <span class="rw-delta ${positive ? 'rw-delta--pos' : 'rw-delta--neg'}">${positive ? '+' : '−'}${fmtPoints(Math.abs(row.delta))}</span>
     </li>`;
   }).join('') : `<li class="rw-ledger-row rw-ledger-row--compact"><p class="rw-ledger-row__meta">${esc(t('rewards.emptyLedgerBody'))}</p></li>`;
-  const canRedeem = isAdmin() || member.id === state.overview?.me;
+  const canRedeem = actingAsDisplay()
+    ? displayMayRedeemFor(member.id)
+    : (!readOnly() && (isAdmin() || member.id === state.overview?.me));
   openModal({
     title: member.display_name,
     content: `
@@ -929,6 +1036,16 @@ async function refreshActiveTab() {
   const container = document.querySelector('.rewards-page')?.parentElement;
   await renderCurrentTab(container || document.body);
 }
+
+/**
+ * Reine Markup-Funktionen fuer die Tests. Sie brauchen `state`, also steht er
+ * mit darin: eine Punktestandzeile ohne Katalog und ohne `overview.me` liesse
+ * sich sonst nicht stellen.
+ */
+export const __test = {
+  renderStandingRow, renderRewardCard, renderPendingPanel, renderSetupHints,
+  readOnly, state,
+};
 
 export async function render(container, { user } = {}) {
   state.user = user || null;

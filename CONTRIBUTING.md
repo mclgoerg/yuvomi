@@ -286,8 +286,8 @@ GitHub API call), and only one specific failure is about the review staying sile
 
 That one is the step **"Die Review muss gesprochen haben"**. It exists because for five PRs
 the check was green over a review that never happened. Its message says what it saw - refused
-tools, a run that stopped at the plugin's own gate, agents it started but never waited for -
-and is a lead for the job log, not a proven cause: a run can hit a refusal on the way and still
+tools, a run that stopped at the plugin's own gate, agents it started but never waited for, a run
+that discarded its own task - and is a lead for the job log, not a proven cause: a run can hit a refusal on the way and still
 stop for another reason. The log shows every tool call because `show_full_output` stays on, and
 that setting is not only for reading: the step needs the same stream to find the comment the
 run posted. The exact rules - including every case in which the review is skipped or silence
@@ -309,9 +309,9 @@ branch: push to it, or merge `main` into the branch, or close and reopen it. A r
 when the refusal came from the path the review happened to take - reading earlier comments one
 way rather than another - because the next run may take a different one.
 
-**A later push is reviewed again.** The review does not stop because it already commented on
-an earlier push of the same PR: the workflow's prompt lifts that condition on purpose, since a
-green check over an unreviewed push is worse than a second review. A run that stops with
+**A later push is reviewed again.** This repository reviews per push, not per PR: a comment on
+an earlier push of the same PR does not cover a later one, and a green check over an unreviewed
+push is worse than a second review. A run that stops with
 "already reviewed this PR" has not reviewed the push it was started for, and the check turns red
 unless it finds that the push was reviewed some other way - also when that push only merged
 `main` into the branch.

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A wall tablet can now tick a task off and ask for a reward, for whoever is standing in front of
+  it.** Until now a display only showed things. Tapping a task on a tablet opens the list of people
+  and asks who did it, because on a wall "me" is nobody; picking someone ticks the task off and
+  records that person as having done it, so the points go where the work went. On the rewards page
+  each person keeps their own button for asking to redeem something, and the tablet is recorded as
+  having asked. Those two are everything a display can do: it still creates nothing, edits nothing,
+  deletes nothing, and changes no settings, and it cannot undo a tick either, because taking one back
+  gives points away again and that stays with the household. A person who is not allowed to tick
+  tasks off is not offered on the tablet, and a task that is not visible to the whole household does
+  not appear there and cannot be ticked off through it. Whether a redemption still needs approval is
+  unchanged: the display asks, it never approves.
+
 - **A wall tablet can get an account of its own that only a paired device can use.** Under Settings an
   administrator creates a display, gets a ten-character pairing code, and types it in once on the
   tablet; from then on the tablet shows the dashboard, calendar, tasks and rewards, and nothing else.
@@ -58,6 +70,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for one, on both this branch and main), and that is unchanged by this fix. Below 640px, Meals'
   reset additionally loses its visible word and becomes an icon-only button, the same width the two
   arrows already use; the word survives only on `aria-label`/`title`, not visually.
+
+### Fixed
+
+- **Restoring a backup from another installation now says that it is the encryption key, instead of
+  claiming the file is not a database.** A backup carries the encryption of the instance that wrote
+  it, so restoring one on an installation with a different key - or with no key at all, which is
+  what happens when the new host generates its own secrets - cannot work until that key is set. All
+  SQLite could say about it was "file is not a database", and that is what the restore dialog
+  showed: the same sentence it shows for a file that really is damaged. The message now names the
+  key, says whether this instance has one set at all, and tells you what to do before trying again -
+  and it still says "not a valid database" where the file genuinely is not one, so it cannot send
+  the next person looking in the wrong place. (#1267)
+
+- **On an instance without HTTPS, one cookie was issued in a way the browser throws away.** The
+  setting that decides whether cookies are marked HTTPS-only is off by default, which is right for a
+  self-hosted instance reached over plain HTTP. One place read that setting backwards, so on exactly
+  those instances the security token was handed out marked HTTPS-only and the browser dropped it.
+  It mostly hid behind a retry, surfacing as an occasional refused save rather than as anything
+  legible. Nobody has to change a setting; instances that had already turned HTTPS-only on were never
+  affected.
+
+- **Around the turn of the month, Budget could show the wrong month for a few hours.** When you open
+  Budget without picking a month, it picks one for you. That pick followed UTC instead of the
+  household's own time zone, so east of UTC the first hours of a new month still showed the old one,
+  and west of UTC the last evening of a month already showed the next. The summary and the list below
+  it each made the pick separately, so they could even disagree with each other. Both now follow the
+  household time zone, the same one the rest of the app uses for what counts as today.
+
+- **Tasks, Calendar and Rewards no longer offer buttons that a read-only member is not allowed to
+  press.** Someone whose access to a module is "read" still saw every control: edit, archive, delete,
+  add a subtask, the bulk action bar, dragging a card across the board, swiping a row. The server
+  refused each of them correctly, so nothing wrong was ever saved - but the refusal arrived as an
+  error message, and ticking a task off looked like it had worked for a moment before the checkbox
+  sprang back. What stays is everything that tells you something: the tick mark of a task and of a
+  subtask are still there, now as a plain mark that names the state instead of a greyed-out button
+  that promises a tap it cannot honour. What goes is everything that only acts, because it says
+  nothing the row next to it does not already say - where a task sits on the board is what its column
+  is for. Two consequences worth knowing about: a member with read-only access to Rewards can no
+  longer ask to redeem their own points, which they could before, because the server declines that
+  request too; and a wall tablet is unaffected - the two things it may do, ticking a task off for
+  a named person and asking for a reward, are granted to it as named routes rather than as module
+  access, and they stay exactly where they were.
+
+- **A reminder switch in the task dialog could only ever fail for some members.** This one crosses a module
+  boundary, so the read-only entry about buttons does not cover it: Reminders belong to
+  the Calendar, not to Tasks, so somebody allowed to edit tasks but only to read the calendar was
+  still offered the switch. Saving then stored the task and refused the reminder, and all they saw
+  was an error next to a task that had in fact been saved. A reminder that is already set now stays
+  visible but locked, so it can still be read off, and saving leaves it exactly as it was. Where
+  there is nothing set - a task being created, or one that never had a reminder - the section is
+  gone rather than shown as an empty switch that cannot be used, and the same goes for members with
+  no calendar access at all. One rule still holds for everyone: a task with a reminder needs a due
+  date, so clearing the date is refused while a reminder hangs on the task, and the message names
+  the date rather than the switch that cannot be operated. Changing the date to another one is
+  fine, and so is saving a task that already arrived without a date - reminders belong to whoever
+  set them, so another member may have cleared the date earlier, and being locked out of every
+  later edit would be nobody's fault but also nobody's to repair. With write access nothing
+  changes.
+
+- **A reminder for a task or an event you deleted no longer goes off afterwards.** Deleting an item
+  was meant to take its reminders with it, but the clean-up happened in the browser, as a second
+  request sent right behind the deletion - and that request was easy to lose. Closing the tab
+  straight after deleting dropped it. Deleting through the API or a connected assistant never sent
+  it at all. And a member who may change tasks but may only read the calendar had it refused,
+  without being told. What stayed behind was a reminder pointing at something that no longer exists:
+  it arrived later as a notification with a heading and no text, or sat in the app as an empty line
+  waiting to be dismissed. A reminder that somebody else in the household had set on the same task
+  outlived it every time, because the browser only ever cleaned up the reminders of whoever did the
+  deleting. Deleting now takes the reminders with it on the server, whichever way the item is
+  deleted, and reminders left over from before are cleared once when you update.
+
+- **A task reminder that had ended up after the due date was described as being on it.** A reminder
+  is stored as a point in time, while the dialog offers lead times - "1 day before" and the like. Pull
+  a due date forward past a reminder that was already set and there is no lead time left to name, and
+  the dialog fell back on "at the due time" for it. So a reminder that would not go off until six days
+  after the task was due looked as though it went off with it. Worse, saving the task again believed
+  that description and moved the reminder to match it, without being asked. The dialog now names the
+  situation instead: the list gets an entry that says the reminder is after the due date, a warning
+  beside it spells out when it actually goes off, and saving leaves it exactly where it is. Picking a
+  lead time moves it as it always did. Move the due date back past the reminder - the obvious way to
+  fix it - and the dialog notices while you are still in it: the entry and the warning give way to the
+  lead time that now applies, rather than going on claiming a situation that has passed.
 
 ### Security
 

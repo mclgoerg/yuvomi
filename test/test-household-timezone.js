@@ -245,6 +245,78 @@ function serverFiles(dir = SERVER_DIR) {
 
 const rel = (file) => path.relative(ROOT, file);
 
+/**
+ * Steht dieser Treffer in einem Kommentar?
+ *
+ * DIE FRAGE IST KLEINER ALS "entferne alle Kommentare", UND DAS IST DER PUNKT.
+ * Drei Anlaeufe gingen den anderen Weg, und jeder scheiterte an etwas anderem:
+ *
+ * 1. Zwei Regex-Durchgaenge, erst Block-, dann Zeilenkommentare. Ein Pfadmuster
+ *    mit Stern in einem Zeilenkommentar von `server/index.js` oeffnete einen
+ *    Blockkommentar bis 17 Zeilen weiter unten - 21 Zeilen weg, darunter zwei
+ *    Router-Mounts.
+ * 2. Ein Zeichen-Scan mit drei Zustaenden, ohne Strings. Ein Pfadmuster in
+ *    einem gewoehnlichen String von `server/openapi/schemas.js` oeffnete einen
+ *    Kommentar bis zum Dateiende - 523 Zeilen, ein Drittel der Datei.
+ * 3. Derselbe Scan mit String- und Regex-Zustaenden. Er fiel ueber
+ *    VERSCHACHTELTE Template-Literale in `server/services/shopping-mail.js`:
+ *    ein Backtick in der Interpolation eines anderen, und ab da stimmte keine
+ *    Zustandsgrenze mehr.
+ *
+ * Der naechste Schritt waere ein Stack fuer `${...}` gewesen, und damit ein
+ * JS-Tokenizer in einer Guard-Suite. Das ist die falsche Antwort auf die
+ * richtige Frage: gebraucht wird nicht der Quelltext ohne Kommentare, sondern
+ * ein Urteil ueber EINEN Fundort.
+ *
+ * DIE FEHLERRICHTUNG IST DABEI UMGEKEHRT - und das ist der eigentliche Gewinn.
+ * Ein Filter, der zu viel wegnimmt, macht den Guard BLIND: er meldet nichts und
+ * sieht gruen aus. Diese Fassung kann hoechstens zu VIEL melden, naemlich einen
+ * Treffer in einem ungewoehnlich formatierten Kommentar - und ein Fehlalarm
+ * kostet eine Minute, ein blinder Fleck eine Version. Die zweite Fassung stand
+ * hier mit der Begruendung, weniger zu durchsuchen sei "die geschlossene
+ * Richtung". Fuer einen Guard ist es die offene.
+ */
+function stehtImKommentar(quelle, index) {
+  const zeilenAnfang = quelle.lastIndexOf('\n', index - 1) + 1;
+  const vorDemTreffer = quelle.slice(zeilenAnfang, index);
+  // NUR DER ZEILENANFANG ENTSCHEIDET, und zwar fuer alle drei Formen: zwei
+  // Schraegstriche, ein Stern (Fortsetzung) oder ein Blockanfang.
+  //
+  // DER ERSTE ANLAUF FRAGTE `vorDemTreffer.includes('//')` - und traf damit
+  // jede Zeile mit einer URL darin: `const url = 'https://...'` gefolgt von
+  // echtem Code galt als Kommentar, und der Guard uebersprang die Datei
+  // stillschweigend. Genau der blinde Fleck, gegen den diese Fassung gebaut
+  // ist, nur eine Stelle weiter rechts.
+  //
+  // Der Preis ist ein Kommentar HINTER Code auf derselben Zeile: der gilt
+  // jetzt als Code und gaebe einen Fehlalarm. Nachgemessen ueber alle
+  // Serverdateien: **null** solche Stellen - und faende sich je eine, kostete
+  // sie eine Minute, waehrend der umgekehrte Irrtum eine Version kostet.
+  //
+  // EIN ZEILENKOMMENTAR ENDET NIE VOR DER ZEILE - dort genuegt der Anfang.
+  if (/^\s*\/\//.test(vorDemTreffer)) return true;
+  // EIN BLOCK SCHON, UND DAS WAR DER NAECHSTE BLINDE FLECK. Steht ein
+  // geschlossener Kommentar am Zeilenanfang und echter Code dahinter, begann
+  // die Zeile zwar mit seinem Anfang - der Treffer liegt aber ausserhalb. Die
+  // Fassung davor meldete ihn als Kommentar und widersprach damit genau der
+  // Zusage im Absatz oben. Ein Ende vor dem Treffer heisst: wieder Code.
+  if (/^\s*(\*|\/\*)/.test(vorDemTreffer)) return !vorDemTreffer.includes('*' + '/');
+  return false;
+}
+
+
+
+/**
+ * Der Sprung von JETZT auf einen Kalenderabschnitt - Tag ODER Monat.
+ *
+ * EINE Stelle, weil drei Guards darunter dieselbe Frage stellen und ein Muster,
+ * das an zwei Orten gepflegt wird, an einem davon veraltet. Die Alternative
+ * `\\d+` statt `(?:10|7)` waere weiter: 10 und 7 sind die beiden Laengen mit
+ * einer Bedeutung, ein `slice(0, 4)` waere das Jahr und kommt nicht vor - ein
+ * Guard soll melden, was es gibt, statt Faelle zu erfinden.
+ */
+const NOW_TO_PERIOD = /new Date\(\s*\)\s*\.toISOString\(\)\s*\.slice\(\s*0\s*,\s*(?:10|7)\s*\)/;
+
 test('Guard: nur timezone.js ruft serverTimeZone() direkt', () => {
   // `serverTimeZone()` ist der Rueckfall, nicht die Antwort - es liest `TZ` und
   // sieht die Einstellung nicht. Ein Aufruf woanders hiesse: diese eine Stelle
@@ -263,13 +335,122 @@ test('Guard: kein Server-Modul leitet "heute" aus toISOString() ab', () => {
   // (`new Date(Date.UTC(...))`); verboten ist der Sprung von JETZT auf einen
   // Kalendertag, denn der ist westlich von UTC abends und oestlich davon
   // morgens der falsche. Die Antwort heisst todayKey(<db>).
-  const NOW_TO_DAY = /new Date\(\s*\)\s*\.toISOString\(\)\s*\.slice\(\s*0\s*,\s*10\s*\)/;
+  //
+  // DER MONAT ZAEHLT MIT, UND DAS WAR EINE LUECKE. Die erste Fassung suchte
+  // `slice(0, 10)` - den Tag - und sah `slice(0, 7)` nicht, obwohl das
+  // derselbe Sprung von JETZT auf einen Kalenderabschnitt ist, nur ein
+  // groeberer. Gefunden wurden dadurch zwei Stellen in
+  // `server/routes/budget/entries.js`: der voreingestellte Monat der
+  // Uebersicht und der der Eintragsliste. Sie sprangen am Monatsrand fuer ein
+  // paar Stunden auf den Nachbarmonat, und beide Seiten derselben Ansicht
+  // konnten dabei verschiedene Zeitraeume zeigen. Die Datei importierte
+  // `todayKey` die ganze Zeit - fuer den Tag, nicht fuer den Monat.
+  //
+  // Der Ausschnitt ist als Alternative geschrieben und nicht als `\d+`: 10 und
+  // 7 sind die beiden Laengen mit einer Bedeutung. Ein `slice(0, 4)` waere das
+  // Jahr und faellt heute durch - es kommt nirgends vor, und ein Guard soll
+  // das melden, was es gibt, statt Faelle zu erfinden.
+  // JE FUNDORT URTEILEN, nicht die Datei erst saeubern: sonst meldet dieser
+  // Guard den Satz, der ERKLAERT, warum eine Stelle falsch war, als neuen
+  // Verstoss - er bestrafte damit das Richtigstellen. Warum das Urteil und
+  // nicht der Filter, steht ueber `stehtImKommentar`.
   const offenders = serverFiles()
     .filter((file) => !file.endsWith(path.join('utils', 'timezone.js')))
-    .filter((file) => NOW_TO_DAY.test(readFileSync(file, 'utf8')))
+    .filter((file) => {
+      const quelle = readFileSync(file, 'utf8');
+      const suche = new RegExp(NOW_TO_PERIOD.source, 'g');
+      for (let treffer = suche.exec(quelle); treffer; treffer = suche.exec(quelle)) {
+        if (!stehtImKommentar(quelle, treffer.index)) return true;
+      }
+      return false;
+    })
     .map(rel);
   assert.deepEqual(offenders, [],
-    `Diese Dateien bilden "heute" aus dem UTC-Tag: ${offenders.join(', ')}`);
+    `Diese Dateien bilden "heute" aus dem UTC-Kalender: ${offenders.join(', ')}`);
+});
+
+test('Guard: das Urteil ueber den Fundort trifft beide Kommentararten und nichts sonst', () => {
+  // DIE REGEL SELBST, klein und lesbar. Die drei Vorgaengerfassungen filterten
+  // die ganze Datei und scheiterten je an einer anderen Sprachkonstruktion;
+  // diese hier beantwortet nur, ob EIN Fundort in einem Kommentar liegt.
+  const code = 'const m = new Date().toISOString().slice(0, 7);';
+  assert.equal(stehtImKommentar(code, code.indexOf('new Date')), false, 'blanker Code');
+
+  const zeile = '// hier stand new Date().toISOString().slice(0, 7)';
+  assert.equal(stehtImKommentar(zeile, zeile.indexOf('new Date')), true, 'Zeilenkommentar');
+
+  // EIN KOMMENTAR HINTER CODE GILT ALS CODE, und das ist Absicht: die
+  // Gegenrichtung fragte, ob irgendwo davor auf der Zeile zwei Schraegstriche
+  // stehen, und traf damit jede Zeile mit einer URL im String. Im Bestand gibt
+  // es null solche Stellen, ein Fehlalarm bliebe also theoretisch - und er ist
+  // die guenstige Haelfte des Irrtums.
+  const nachCode = "foo(); // erledigt via new Date().toISOString().slice(0, 7)";
+  assert.equal(stehtImKommentar(nachCode, nachCode.indexOf('new Date')), false,
+    'ein Kommentar hinter Code gilt als Code - Fehlalarm statt blindem Fleck');
+
+  const urlImString = "const u = 'https://x'; const m = new Date().toISOString().slice(0, 7);";
+  assert.equal(stehtImKommentar(urlImString, urlImString.indexOf('new Date')), false,
+    'eine URL im String darf keinen Kommentar vortaeuschen');
+
+  // Ein am Zeilenanfang GESCHLOSSENER Block laesst den Rest der Zeile Code
+  // sein - die Fassung davor meldete ihn als Kommentar und war damit an genau
+  // der Stelle blind, an der ihre eigene Zusage das ausschliesst.
+  const geschlossen = '/' + '* alt *' + '/ const m = new Date().toISOString().slice(0, 7);';
+  assert.equal(stehtImKommentar(geschlossen, geschlossen.indexOf('new Date')), false,
+    'hinter einem auf derselben Zeile geschlossenen Block steht Code');
+
+  // Und die Gegenrichtung bleibt: ein OFFENER Block am Zeilenanfang deckt den
+  // Rest der Zeile weiterhin.
+  const offen = '/' + '* new Date().toISOString().slice(0, 7)';
+  assert.equal(stehtImKommentar(offen, offen.indexOf('new Date')), true,
+    'ein offener Block deckt den Treffer');
+
+  const block = '/' + '* new Date().toISOString().slice(0, 10) *' + '/';
+  assert.equal(stehtImKommentar(block, block.indexOf('new Date')), true, 'Blockkommentar');
+
+  const fortsetzung = '/' + '**\n * new Date().toISOString().slice(0, 7)\n *' + '/';
+  assert.equal(stehtImKommentar(fortsetzung, fortsetzung.indexOf('new Date')), true, 'Fortsetzungszeile');
+
+  // NACH einem geschlossenen Block ist wieder Code - das ist die Zusicherung,
+  // an der die zweite Fassung zerbrach, nur hier lokal statt global.
+  const danach = '/' + '* alt *' + '/\nconst m = new Date().toISOString().slice(0, 7);';
+  assert.equal(stehtImKommentar(danach, danach.indexOf('new Date')), false, 'hinter einem geschlossenen Block');
+});
+
+test('Guard: der Bestand ist sauber, und der Guard sieht ihn wirklich an', () => {
+  // DIE GEGENPROBE ZUM GUARD OBEN. Ein Guard, der nirgends etwas findet, kann
+  // richtig liegen - oder nicht hinsehen. Die zweite Fassung dieses Filters
+  // uebersah ein Drittel von `server/openapi/schemas.js`, ohne dass irgendetwas
+  // rot wurde. Deshalb wird hier gezaehlt, ob die gesuchten Stellen ueberhaupt
+  // gefunden WERDEN: in den Dateien, die das Muster als Kommentartext tragen,
+  // muss es Treffer geben - und alle muessen als Kommentar erkannt sein.
+  let kommentarTreffer = 0;
+  let codeTreffer = 0;
+  for (const file of serverFiles()) {
+    const quelle = readFileSync(file, 'utf8');
+    const suche = new RegExp(NOW_TO_PERIOD.source, 'g');
+    for (let t = suche.exec(quelle); t; t = suche.exec(quelle)) {
+      if (stehtImKommentar(quelle, t.index)) kommentarTreffer += 1;
+      else codeTreffer += 1;
+    }
+  }
+  assert.ok(kommentarTreffer > 0,
+    'das Muster kommt im Haus als Kommentartext vor - findet der Guard gar nichts, sieht er nicht hin');
+  assert.equal(codeTreffer, 0, 'und ausserhalb von Kommentaren steht es nirgends');
+});
+
+
+test('Guard: das Muster trifft Tag UND Monat, und der Kommentar-Filter haelt', () => {
+  // DER GUARD AUF DEN GUARD. Ein Muster, das niemand gegen einen bekannten
+  // Verstoss haelt, ist eine Behauptung - und die Monats-Erweiterung oben ist
+  // genau der Fall, den die alte Fassung durchliess.
+  assert.ok(NOW_TO_PERIOD.test('const t = new Date().toISOString().slice(0, 10);'), 'Tag');
+  assert.ok(NOW_TO_PERIOD.test('const m = new Date().toISOString().slice(0,7)'), 'Monat ohne Leerzeichen');
+  assert.ok(NOW_TO_PERIOD.test('x = new Date() .toISOString() .slice( 0 , 7 )'), 'Monat mit Leerzeichen');
+  // Arithmetik auf einem gebildeten Key bleibt erlaubt - sie fragt nicht die Uhr.
+  assert.ok(!NOW_TO_PERIOD.test('new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7)'), 'Date.UTC bleibt frei');
+  // Und der Kommentar-Filter: derselbe Text einmal als Code, einmal erklaert.
+  // Das Urteil ueber den Fundort hat seinen eigenen Fall weiter oben.
 });
 
 test('Guard: der null-Rueckfall steht nur als Default-Parameter', () => {

@@ -9,19 +9,21 @@ import { renderRRuleFields, bindRRuleEvents, getRRuleValues } from '/rrule-ui.js
 import { openModal as openSharedModal, closeModal, wireBlurValidation, validateAll, btnSuccess, btnError, btnLoading, promptModal, confirmModal, advancedSection, refocusAfterRender } from '/components/modal.js';
 import { stagger, vibrate, scheduleUndoableDelete, animationSettled } from '/utils/ux.js';
 import { wireSwipeRows, maybeShowSwipeHint } from '/utils/swipe-row.js';
-import { t, getLocale, formatDate, formatTime, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
+import { t, getLocale, formatDate, formatTime, timeSuffix, formatDateInput, parseDateInput, isDateInputValid, formatTimeInput, parseTimeInput } from '/i18n.js';
 import { esc } from '/utils/html.js';
 import { renderMarkdownToolbar, wireMarkdownToolbar } from '/utils/markdown-toolbar.js';
 import { refresh as refreshReminders } from '/reminders.js';
 import { renderUserMultiSelect, getSelectedUserIds, bindUserMultiSelect, renderAvatarStack } from '/components/user-multi-select.js';
 import { withChosenPeople } from '/utils/people-picker.js';
-import { resolveReminderPreset } from '/utils/reminder-offset.js';
+import { resolveReminderPreset, remindAtFromPreset, parseRemindAtAsUtc } from '/utils/reminder-offset.js';
+import { navModuleAccess } from '/permissions.js';
 import { renderPageSearch, wirePageSearch } from '/utils/page-search.js';
 import { renderDocumentAttachField, bindDocumentAttachField } from '/components/document-attach.js';
 import { emptyStateHTML, mountLoadError } from '/utils/empty-state.js';
 import '/components/category-manager.js';
 import '/components/tag-manager.js';
 import { findPageFab } from '/utils/fab.js';
+import { isNavModuleReadOnly } from '/permissions.js';
 import { isSoloHousehold, hidesPrivacyControls } from '/utils/household.js';
 import { popoverMenuHtml, installPopoverMenus } from '/utils/popover-menu.js';
 import { todayKey, parseLocalDateKey } from '/utils/date.js';
@@ -53,6 +55,49 @@ import {
 function viewer() {
   return { isAdmin: state.isAdmin, currentUserId: state.currentUserId };
 }
+
+/**
+ * Darf dieser Nutzer in Aufgaben ueberhaupt schreiben? (#467)
+ *
+ * Nicht dasselbe wie `canEditTaskDefinition()`: das fragt nach EINER Aufgabe
+ * (wem gehoert sie, ist sie gesperrt), dies nach dem Modul. Der Unterschied ist
+ * der Grund fuer beide Funktionen - die Sammelauswahl, die Kategorien- und
+ * Etikettenverwaltung und der Anlegeweg haengen an keiner einzelnen Aufgabe und
+ * kaemen sonst an der Rechtepruefung vorbei.
+ *
+ * Selbes Muster wie readOnly() in public/pages/waste.js und schedule.js.
+ */
+function readOnly() {
+  return isNavModuleReadOnly('tasks');
+}
+
+/**
+ * Jede `data-action` der Liste, die NICHT schreibt. Positivliste, damit eine
+ * spaeter ergaenzte Schreib-Aktion standardmaessig gesperrt ist statt
+ * standardmaessig offen (siehe READ_SAFE_ACTIONS in waste.js/schedule.js). Die
+ * Markup-Unterdrueckung in renderTaskCard() ist die erste Verteidigungslinie,
+ * der Wachposten in wireTaskList() die zweite.
+ *
+ * `toggle-status` und `toggle-subtask` stehen NICHT darin: bei `tasks: read`
+ * steht an ihrer Stelle ein `span`, der nur den Zustand nennt - taucht der
+ * Knopf trotzdem auf (Devtools, oder eine Liste, die von anderer Stelle neu
+ * gezeichnet wurde), findet er hier denselben Riegel.
+ *
+ * `pick-doer` steht ebenfalls nicht darin, OBWOHL ein Wandtablett genau ueber
+ * diese Aktion abhakt: sie SCHREIBT, und die Liste sagt, was nicht schreibt.
+ * Die Display-Ausnahme steht deshalb im Riegel selbst und nicht hier - sonst
+ * waere sie fuer einen Menschen mit `tasks: read` gleich mit geoeffnet.
+ */
+const READ_SAFE_ACTIONS = new Set(['open-task', 'toggle-subtasks']);
+
+/**
+ * Die eine Schreib-Aktion, die ein gekoppeltes Display erreichen darf (#1209):
+ * abhaken fuer eine am Geraet benannte Person. Der Server fuehrt sie als
+ * benannte Route (`DISPLAY_WRITE_ROUTES`, server/display-scopes.js), nicht als
+ * Modulrecht - das Tablett hat `tasks:read` wie jeder Nur-lesen-Nutzer, und
+ * ohne diese Ausnahme naehme der Riegel unten ihm seinen einzigen Zweck.
+ */
+const DISPLAY_WRITE_ACTIONS = new Set(['pick-doer']);
 
 function canEditTaskDefinition(task, parent = null) {
   return canEditTaskDefinitionFor(task, parent, viewer());
@@ -388,15 +433,52 @@ function renderTaskCard(task, opts = {}) {
     ? Math.round((task.subtask_done / task.subtask_total) * 100)
     : null;
 
+  // WER DARF HIER PER TIPP ABHAKEN? Zwei Gruende sagen nein, und beide fuehren
+  // zu DEMSELBEN Zeichen statt zu zwei Bauarten nebeneinander: ein Tablett hat
+  // keine Person, der die Erledigung gehoerte (#1209), ein Mensch mit
+  // `tasks: read` darf die Route gar nicht (#467).
+  //
+  // ZUSTAND BLEIBT, HANDLUNG FAELLT WEG - aber als `span`, nicht als
+  // `disabled`-Knopf. Die Begruendung steht seit #1209 an der Teilaufgabe und
+  // gilt hier Wort fuer Wort: ein gesperrter Knopf sieht aus wie ein
+  // Bedienelement, traegt Trefflaeche und Hover-Rahmen weiter, und sein
+  // `aria-label` verspricht „als erledigt markieren" fuer eine Beruehrung, die
+  // nichts tut. Die Beschriftung nennt deshalb den ZUSTAND.
+  //
+  // Die Knoepfe daneben (bearbeiten, ablegen, Unteraufgabe) sagen gar nichts -
+  // sie verschwinden ueber canEditTaskDefinition(), das bei `tasks: read` fuer
+  // jede Aufgabe `false` liefert.
+  const darfAbhaken = !actingAsDisplay() && !readOnly();
+
   const subtasksHtml = task.subtasks?.length
     ? task.subtasks.map((s) => `
         <div class="subtask-item ${s.status === 'done' ? 'subtask-item--done' : ''}"
              data-subtask-id="${s.id}">
+          ${/* AM TABLETT IST DIE TEILAUFGABE ZU LESEN, NICHT ZU TIPPEN (#1209).
+               Sie fuehrt auf dieselbe Route wie der Haken, aber ohne die
+               Personenauswahl - am Display gaebe es also niemanden, dem die
+               Erledigung gehoerte, und der Server antwortete mit 400.
+
+               DESHALB IST SIE DORT KEIN KNOPF, sondern ein Zustandszeichen.
+               Ein `disabled`-Knopf war der erste Anlauf und die halbe Loesung:
+               er sieht aus wie ein Bedienelement, traegt die Trefflaeche und
+               den Hover-Rahmen weiter, und sein `aria-label` versprach
+               „als erledigt markieren" fuer eine Beruehrung, die nichts tut -
+               genau das Angebot, das der Statusknopf daneben vermeidet, indem
+               er gar nicht erst erscheint. Jetzt nennt die Beschriftung den
+               ZUSTAND statt einer Handlung, und ein `span` verspricht nichts.
+               Dass eine Teilaufgabe am Display spaeter eine eigene
+               Personenauswahl bekommt, ist eine Folgeentscheidung. */''}
+          ${darfAbhaken ? `
           <button class="subtask-item__checkbox ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
                   data-action="toggle-subtask" data-id="${s.id}"
                   data-status="${s.status}" aria-label="${t('tasks.subtaskMarkDone', { title: esc(s.title) })}">
             ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
-          </button>
+          </button>` : `
+          <span class="subtask-item__checkbox subtask-item__checkbox--static ${s.status === 'done' ? 'subtask-item__checkbox--done' : ''}"
+                role="img" aria-label="${esc(`${s.title}: ${t(s.status === 'done' ? 'tasks.statusDone' : 'tasks.statusOpen')}`)}">
+            ${s.status === 'done' ? '<i data-lucide="check" class="subtask-item__checkbox-icon" aria-hidden="true"></i>' : ''}
+          </span>`}
           <span class="subtask-item__title">${esc(s.title)}</span>
           ${canEditTaskDefinition(s, task) ? `
           <div class="subtask-item__actions">
@@ -421,11 +503,32 @@ function renderTaskCard(task, opts = {}) {
         <input type="checkbox" class="task-bulk-checkbox" data-task-id="${task.id}"
                ${isChecked ? 'checked' : ''} aria-label="${t('tasks.selectTask')}">
         ` : ''}
+        ${darfAbhaken ? `
         <button class="task-status-btn task-status-btn--${task.status}"
                 data-action="toggle-status" data-id="${task.id}" data-status="${task.status}"
                 aria-label="${isDone ? t('tasks.markOpen', { title: esc(task.title) }) : t('tasks.markDone', { title: esc(task.title) })}">
           <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
         </button>
+        ` : actingAsDisplay() ? '' : `
+        ${/* NUR BEI `tasks: read`, NICHT AM DISPLAY. Dort tritt die
+             Personenauswahl an diese Stelle und traegt denselben Ring - ein
+             Zeichen davor waere ein zweiter Kreis in derselben Zeile. Ein
+             Mensch mit Leserecht bekommt keinen Picker, und ohne dieses
+             Zeichen verschwaende die Zeile die Auskunft, die der Haken traegt:
+             ob die Aufgabe erledigt ist. */''}
+        <span class="task-status-btn task-status-btn--${task.status} task-status-btn--static"
+              role="img" aria-label="${esc(`${task.title}: ${t(isDone ? 'tasks.statusDone' : 'tasks.statusOpen')}`)}">
+          <i data-lucide="check" class="task-status-btn__check" aria-hidden="true"></i>
+        </span>
+        `}
+        ${/* AM TABLETT GAR KEIN STATUSKNOPF, auch nicht bei einer erledigten
+             Aufgabe. Er zeigte dort auf das Zuruecknehmen, und genau das darf
+             ein Display nicht: es storniert Punkte und verwirft die
+             Folgeinstanz einer Serie. Stehen zu lassen hiesse, ein Angebot zu
+             zeichnen, das der Server mit 403 beantwortet - der Befund, der an
+             #1241 als eigener Faden offen steht. Eine erledigte Aufgabe traegt
+             am Display also gar keinen Knopf, und der Picker darunter zeichnet
+             sich fuer sie ohnehin nicht. */''}
         ${renderDoerPicker(task, isDone, archived)}
 
         <div class="task-card__body">
@@ -489,9 +592,10 @@ function renderTaskCard(task, opts = {}) {
         <div class="subtask-list ${expandedSubtasks ? 'subtask-list--visible' : ''}"
              id="subtasks-${task.id}">
           ${subtasksHtml}
+          ${canEdit ? `
           <button class="subtask-item__add" data-action="add-subtask" data-parent="${task.id}">
             ${t('tasks.subtaskAdd')}
-          </button>
+          </button>` : ''}
         </div>` : ''}
     </div>`;
 }
@@ -538,7 +642,10 @@ function renderTaskGroups(tasks, groupMode) {
         title: t('tasks.emptyTitle'),
         description: t('tasks.emptyDescription'),
         hint: t('emptyHint.tasks'),
-        action: { label: t('tasks.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-tasks' } },
+        // Der CTA klickt den FAB, und den gibt es bei `tasks: read` nicht mehr.
+        // Ohne diese Zeile blieb er als einziger Knopf einer leeren Seite
+        // stehen und tat beim Antippen nichts.
+        action: readOnly() ? undefined : { label: t('tasks.emptyAction'), icon: 'plus', attrs: { id: 'empty-cta-tasks' } },
       });
   }
 
@@ -1091,6 +1198,8 @@ let state = {
   defaultPoints:   0,        // Haushalt-Standard für neue Aufgaben (#578), 0 = aus
   currentUserId:   null,
   isAdmin:         false,    // darf fremde Kommentare entfernen (#734)
+  /** Wer an diesem Wandtablett abhaken darf (#1209) - leer fuer jeden Menschen. */
+  displayPeople:   [],
   // `tags` ist eine Liste, keine Auswahl: mehrere Tags engen UND-verknüpft ein,
   // wie jeder andere Filter in dieser Leiste auch (#586).
   // Status, Priorität und Person halten mehrere Werte (#671); innerhalb einer
@@ -1219,6 +1328,13 @@ async function loadTaskForEdit(id) {
 }
 
 async function loadReminderForTask(taskId) {
+  // Ohne JEDEN Kalenderzugriff antwortet `/reminders` mit 403, und das catch
+  // unten macht daraus dasselbe null - nur eine Anfrage spaeter. Der Dialog
+  // zeigt den Abschnitt in diesem Fall ohnehin nicht (siehe
+  // renderReminderSection), also wird hier gar nicht erst gefragt.
+  // `reminderAccess` steht weiter unten und ist als Funktionsdeklaration
+  // gehoistet.
+  if (reminderAccess() === 'none') return null;
   try {
     const data = await api.get(`/reminders?entity_type=task&entity_id=${taskId}`);
     return data.data;
@@ -1227,25 +1343,136 @@ async function loadReminderForTask(taskId) {
   }
 }
 
+/**
+ * Der Zeitpunkt einer Erinnerung als lesbarer Text in der Anzeigezone.
+ *
+ * `remind_at` ist naiv-UTC ohne Zonen-Suffix und darf deshalb NICHT als String
+ * weitergereicht werden - `zonedFields` laese ihn dann als Wanduhrzeit und
+ * zeigte in einer gesetzten Haushaltszone die falsche Stunde an. Der Umweg
+ * ueber `parseRemindAtAsUtc` macht daraus erst einen Zeitpunkt.
+ */
+function reminderWhenText(reminder) {
+  if (!reminder?.remind_at) return '';
+  const at = parseRemindAtAsUtc(reminder.remind_at);
+  if (Number.isNaN(at.getTime())) return '';
+  return `${formatDate(at)} ${formatTime(at)} ${timeSuffix()}`.trimEnd();
+}
+
+/**
+ * Wie weit darf dieser Dialog an der Erinnerung ruehren: 'write'|'read'|'none'.
+ *
+ * ERINNERUNGEN GEHOEREN DEM KALENDER, NICHT DEN AUFGABEN. `server/scopes.js`
+ * fuehrt die Praefixe `calendar`, `reminders` und `birthdays` unter EINEM
+ * Schluessel (`calendar`); der Aufgaben-Dialog schreibt aber ueber
+ * `/reminders`. Wer `tasks: write` und `calendar: read` traegt, sah hier
+ * deshalb einen Schalter, dessen Speichern serverseitig mit 403 endete - die
+ * Aufgabe war gespeichert, die Erinnerung nicht, und zu sehen bekam er nur
+ * eine Fehlermeldung.
+ *
+ * Drei Zustaende, nach der Faustregel „Zustand wird gesperrt, eine reine
+ * Handlung verschwindet":
+ *   write → unveraendert,
+ *   read  → gesperrt. Eine bestehende Erinnerung IST Zustand und bleibt
+ *           sichtbar; `GET /reminders` laesst `calendar: read` durch, der
+ *           Wert steht also wirklich da und ist nicht geraten.
+ *   none  → weg. Es gibt keinen Zustand zu zeigen: `GET /reminders` antwortet
+ *           mit 403, `loadReminderForTask()` liefert ohnehin null, und ein
+ *           leerer Schalter waere nur ein Versprechen auf einen 403.
+ *
+ * Gemessen wird am Nav-Modul `calendar` (dieselbe Karte wie im Router), nicht
+ * am Pfad - `navModuleAccess()` faellt ohne geladene Rechte auf 'write'
+ * zurueck, wie alles in permissions.js. Der Server bleibt das Gate.
+ */
+function reminderAccess() {
+  return navModuleAccess('calendar');
+}
+
+/**
+ * DER DIALOG NENNT AUCH DEN ZUSTAND, DEN SEINE PRESETS NICHT ABBILDEN.
+ *
+ * Die Auswahl kennt nur Vorlaeufe, `remind_at` ist aber ein absoluter
+ * Zeitpunkt. Wer die Faelligkeit VOR eine bestehende Erinnerung zieht, hat
+ * keinen Vorlauf mehr, sondern einen Nachlauf - und den gab es in der Liste
+ * nicht. Der Rueckfall lautete `offset_at_time`: der Dialog sagte „Zum
+ * Startzeitpunkt", waehrend die Erinnerung Tage spaeter feuerte, und das
+ * naechste Speichern rechnete aus dieser falschen Anzeige einen neuen
+ * Zeitpunkt - die Erinnerung wanderte, ohne dass jemand sie angefasst hatte.
+ *
+ * Der Zustand bekommt deshalb einen eigenen Eintrag mit Warnton statt einer
+ * Notluege. Er steht NUR in der Liste, wenn er gerade zutrifft (man waehlt ihn
+ * nicht aus, man ist darin), bleibt danach aber im DOM, damit die Wahl
+ * innerhalb des Dialogs umkehrbar ist: wer versehentlich einen Vorlauf
+ * anklickt, findet den alten Zustand noch vor.
+ *
+ * Der gespeicherte Zeitpunkt reist im versteckten Feld mit, weil das Speichern
+ * ihn braucht - es rechnet fuer diesen Eintrag NICHT, sondern reicht ihn durch.
+ */
 function renderReminderSection(task = null, reminder = null) {
+  const access = reminderAccess();
+  // GESPERRT WIRD NUR, WO ES ZUSTAND GIBT. `none` hat keinen (das Lesen
+  // antwortet mit 403), aber `read` ohne Erinnerung genauso wenig: ein
+  // gesperrter leerer Schalter ist keine Auskunft, sondern eine Tuer, die nie
+  // aufgeht - im Anlege-Dialog, wo es die Aufgabe noch gar nicht gibt, und
+  // ebenso an einer Aufgabe, an der nie eine Erinnerung hing. Beide Faelle
+  // messbar in test:module-readonly-ui, beide waren in der ersten Fassung
+  // dieses Riegels da (Review-Runde 1).
+  if (access === 'none' || (access === 'read' && !reminder)) return '';
+  // Ein gesperrter Abschnitt zeigt weiter, WAS eingestellt ist, und nimmt
+  // nichts an: `disabled` an jedem Bedienelement. Der Riegel im Formular
+  // (handleFormSubmit) haengt nicht daran - `checked` liesse sich auch an einem
+  // disabled-Kaestchen ablesen -, er fragt reminderAccess() selbst.
+  //
+  // `disabled` nimmt die Felder auch aus der TAB-ORDNUNG - der gespeicherte
+  // Wert ist dann sichtbar, aber per Tastatur nicht erreichbar. Fuer Knoepfe
+  // kennt das Haus dafuer `aria-disabled` (layout.css `.btn[aria-disabled]`);
+  // ein Kontrollkaestchen kann kein `readonly` tragen, ein `aria-disabled`-
+  // Kaestchen bliebe also bedienbar und muesste im Skript zurueckgesetzt
+  // werden. Das ist der Tausch, den diese Stelle bewusst macht.
+  //
+  // Die Hinweiszeile traegt `.task-field-hint` aus tasks.css und KEINE eigene
+  // Klasse: derselbe Satz in derselben Rolle darf nicht dreimal verschieden
+  // aussehen, und die Warnung davor steht schon an `.cal-field-hint` in
+  // calendar.css. Tragfaehig ist das, weil BEIDE Wege in dieses Markup
+  // tasks.css mitbringen - die Route /tasks laedt es als Seiten-Blatt, und
+  // `openTaskById()` (Dashboard, Kalender) awaitet vorher `ensureTaskStyles()`.
+  const locked = access === 'read';
+  const off = locked ? ' disabled' : '';
+  // `off` haengt auch am versteckten Transportfeld weiter unten, obwohl das
+  // nichts annimmt. Der Riegel aus #1253 prueft die REGEL („jedes Feld des
+  // Abschnitts"), nicht eine gepflegte Aufzaehlung - und genau deshalb hat er
+  // das neu dazugekommene Feld gefunden. Ihn dafuer aufzuweichen hiesse, ihn
+  // fuer das naechste Feld blind zu machen. Folgenlos ist es ohnehin: `.value`
+  // laesst sich auch gesperrt lesen, und ohne Schreibrecht wird die Erinnerung
+  // gar nicht erst gespeichert.
+  // Die Faelligkeit, MIT DER dieser Dialog geoeffnet wurde, fuers Speichern -
+  // dort entscheidet sie darueber, ob dieser Nutzer gerade ein Datum WEGRAEUMT
+  // oder ob die Aufgabe schon ohne eines kam (Review-Runde 3). Sie reist am
+  // Abschnitt mit, weil es ihn genau dann gibt, wenn eine gesperrte Erinnerung
+  // haengt - kein zusaetzlicher Modulzustand, der neben dem Dialog altern
+  // koennte.
+  const lockedDue = locked ? ` data-locked-due="${esc(task?.due_date ?? '')}"` : '';
   const hasReminder = !!reminder;
   const resolved = resolveReminderPreset(task, reminder);
   const showCustom = hasReminder && resolved.preset === 'offset_custom';
+  const afterDue = hasReminder && resolved.preset === 'offset_after_due';
+  const whenText = afterDue ? reminderWhenText(reminder) : '';
 
   return `
-    <div class="reminder-section">
+    <div class="reminder-section"${lockedDue}>
       <div class="reminder-section__header">
         <label class="toggle" style="margin:0">
-          <input type="checkbox" id="reminder-toggle" ${hasReminder ? 'checked' : ''}>
+          <input type="checkbox" id="reminder-toggle" ${hasReminder ? 'checked' : ''}${off}>
           <span class="toggle__track"></span>
           <span class="reminder-section__title">${t('reminders.enableLabel')}</span>
         </label>
       </div>
+      ${locked ? `<p class="task-field-hint">${t('reminders.readOnlyNotice')}</p>` : ''}
       <div id="reminder-fields" class="reminder-fields" ${hasReminder ? '' : 'style="display:none"'}>
         <div class="form-group" style="margin:0">
           <label class="label" for="reminder-offset">${t('reminders.offsetLabel')}</label>
-          <select class="input" id="reminder-offset">
+          <select class="input" id="reminder-offset"${off}>
             <option value="offset_none">${t('reminders.offsetNone')}</option>
+            ${afterDue ? `<option value="offset_after_due" selected>${t('reminders.offsetAfterDue')}</option>` : ''}
             <option value="offset_at_time" ${resolved.preset === 'offset_at_time' ? 'selected' : ''}>${t('reminders.offsetAtTime')}</option>
             <option value="offset_15m" ${resolved.preset === 'offset_15m' ? 'selected' : ''}>${t('reminders.offset15min')}</option>
             <option value="offset_1h" ${resolved.preset === 'offset_1h' ? 'selected' : ''}>${t('reminders.offset1hour')}</option>
@@ -1255,15 +1482,17 @@ function renderReminderSection(task = null, reminder = null) {
             <option value="offset_2w" ${resolved.preset === 'offset_2w' ? 'selected' : ''}>${t('reminders.offset2weeks')}</option>
             <option value="offset_custom" ${resolved.preset === 'offset_custom' ? 'selected' : ''}>${t('reminders.offsetCustom')}</option>
           </select>
+          <p class="task-field-hint field-hint--warn" id="reminder-after-due-warning" role="status" ${afterDue ? '' : 'hidden'}><i data-lucide="alert-triangle" aria-hidden="true"></i><span>${t('reminders.afterDueHint', { when: esc(whenText) })}</span></p>
+          <input type="hidden" id="reminder-stored-at" value="${esc(reminder?.remind_at ?? '')}"${off}>
         </div>
         <div class="modal-grid modal-grid--2" id="reminder-custom-fields" style="${showCustom ? '' : 'display:none'};margin-top:var(--space-3)">
           <div class="form-group" style="margin:0">
             <label class="label" for="reminder-custom-amount">${t('reminders.customAmountLabel')}</label>
-            <input class="input" type="number" min="1" step="1" id="reminder-custom-amount" value="${resolved.amount}">
+            <input class="input" type="number" min="1" step="1" id="reminder-custom-amount" value="${resolved.amount}"${off}>
           </div>
           <div class="form-group" style="margin:0">
             <label class="label" for="reminder-custom-unit">${t('reminders.customUnitLabel')}</label>
-            <select class="input" id="reminder-custom-unit">
+            <select class="input" id="reminder-custom-unit"${off}>
               <option value="minutes" ${resolved.unit === 'minutes' ? 'selected' : ''}>${t('reminders.customMinutes')}</option>
               <option value="hours" ${resolved.unit === 'hours' ? 'selected' : ''}>${t('reminders.customHours')}</option>
               <option value="days" ${resolved.unit === 'days' ? 'selected' : ''}>${t('reminders.customDays')}</option>
@@ -1273,6 +1502,72 @@ function renderReminderSection(task = null, reminder = null) {
         </div>
       </div>
     </div>`;
+}
+
+/**
+ * Das Preset, das die Auswahl nach einer Aenderung der Faelligkeit zeigen muss.
+ *
+ * DER ZUSTAND KANN SICH IM DIALOG HEILEN, und dann darf die Beschriftung nicht
+ * stehenbleiben. „Nach der Faelligkeit" ist keine Eigenschaft der Erinnerung,
+ * sondern das VERHAELTNIS zweier Zeitpunkte - schiebt jemand die Faelligkeit
+ * nach hinten (der naheliegende Weg, das Problem zu beheben), liegt die
+ * Erinnerung wieder davor, und der Dialog behauptete sonst weiter einen
+ * Nachlauf. Das waere derselbe Fehler, den dieser Abschnitt beseitigen soll,
+ * nur in die andere Richtung.
+ *
+ * Neu aufgeloest wird NUR, solange die Auswahl noch auf `offset_after_due`
+ * steht. Wer selbst einen Vorlauf gewaehlt hat, hat entschieden; ihm die Wahl
+ * beim naechsten Tastendruck im Datumsfeld umzustellen, waere Bevormundung.
+ *
+ * ES IST DIE GANZE AUFLOESUNG, NICHT NUR DAS PRESET. Ein geheilter Zustand
+ * landet fast immer auf `offset_custom` - ein Datum ohne Uhrzeit faellt auf
+ * 23:59:59, und der Abstand dorthin trifft selten einen runden Vorlauf. Nur die
+ * Auswahl umzustellen, hiesse die Felder darunter auf ihrem Render-Stand stehen
+ * zu lassen: die Auswahl saegte „Benutzerdefiniert", darunter staenden 1 Tag,
+ * und das Speichern verschoebe die Erinnerung doch - derselbe Schaden, in einem
+ * neuen Gewand. Das Heilen macht deshalb genau das, was das Oeffnen tut.
+ *
+ * @param {string} currentValue aktueller Wert der Auswahl
+ * @returns {{preset: string, amount: string, unit: string}|null} die neue
+ *          Auffuellung, oder null wenn nichts umzustellen ist
+ */
+function afterDueResolution(currentValue, { dueDate = '', dueTime = null, storedRemindAt = null } = {}) {
+  if (currentValue !== 'offset_after_due') return null;
+  if (!dueDate || !storedRemindAt) return null;
+  const resolved = resolveReminderPreset(
+    { due_date: dueDate, due_time: dueTime },
+    { remind_at: storedRemindAt },
+  );
+  return resolved.preset === 'offset_after_due' ? null : resolved;
+}
+
+/**
+ * Der Zeitpunkt, den der ausgefuellte Erinnerungs-Abschnitt ergibt.
+ *
+ * DIE NAHT ZWISCHEN MARKUP UND SPEICHERN, und sie steht bewusst als eigene
+ * Funktion da: welche Felder `renderReminderSection` schreibt und welche das
+ * Speichern liest, war vorher nur im Quelltext behauptet und an keiner Stelle
+ * messbar. Ein Test kann hier das ECHTE Markup vorne hineingeben und den
+ * Zeitpunkt hinten herausnehmen.
+ *
+ * Gerechnet wird in `remindAtFromPreset` - hier steht nur, was hineingeht. Der
+ * Zustand „liegt nach der Faelligkeit" hat keinen Vorlauf, aus dem sich etwas
+ * rechnen liesse; er reicht den gespeicherten Zeitpunkt durch und laesst die
+ * Erinnerung damit stehen, wo sie steht.
+ *
+ * @returns {string|null} naiv-UTC `remind_at`, oder null bei „keine" bzw. einer
+ *          unbrauchbaren Eingabe
+ */
+function reminderRemindAtFromForm(form, { dueDate, dueTime = null } = {}) {
+  const preset = form.querySelector('#reminder-offset')?.value || 'offset_none';
+  if (preset === 'offset_none') return null;
+  return remindAtFromPreset(preset, {
+    dueDate,
+    dueTime,
+    amount: form.querySelector('#reminder-custom-amount')?.value,
+    unit: form.querySelector('#reminder-custom-unit')?.value || 'days',
+    storedRemindAt: form.querySelector('#reminder-stored-at')?.value || null,
+  });
 }
 
 // --------------------------------------------------------
@@ -1329,7 +1624,69 @@ function wireCountdownGate(panel) {
   update();
 }
 
+/**
+ * Haelt Auswahl und Warnton am ZUSTAND, nicht am Ladezeitpunkt.
+ *
+ * Zwei Wege fuehren hierher: wer die Auswahl verlaesst, hat das Problem
+ * entschieden und soll den Warnton nicht mehr sehen (wer zurueckgeht, wieder);
+ * und wer die Faelligkeit verschiebt, aendert das Verhaeltnis, aus dem der
+ * Zustand ueberhaupt entsteht. Beide enden in derselben Regel, damit sie nicht
+ * auseinanderlaufen koennen.
+ */
+function syncReminderAfterDue(panel) {
+  const offset = panel.querySelector('#reminder-offset');
+  const warn   = panel.querySelector('#reminder-after-due-warning');
+  if (!offset) return;
+  // EIN GESPERRTER ABSCHNITT WIRD AUCH HIER NICHT ANGEFASST. Das
+  // Faelligkeitsdatum gehoert dem Aufgaben-Modul und ist mit `calendar: read`
+  // bedienbar, die Erinnerung daneben nicht - ein Feld, das sich unter der Hand
+  // aendert, obwohl es gesperrt ist, behauptete einen gespeicherten Zustand,
+  // den es nicht gibt (das Speichern fasst die Erinnerung ohne Schreibrecht
+  // gar nicht an). Gelesen wird der Riegel, den `renderReminderSection` schon
+  // gesetzt hat, statt die Rechtefrage ein zweites Mal zu stellen.
+  if (offset.disabled) return;
+  const next = afterDueResolution(offset.value, {
+    dueDate: parseDateInput(panel.querySelector('#task-due-date')?.value || ''),
+    dueTime: parseTimeInput(panel.querySelector('#task-due-time')?.value || '') || null,
+    storedRemindAt: panel.querySelector('#reminder-stored-at')?.value || null,
+  });
+  // Nur schreiben, wenn die Auswahl den Eintrag auch fuehrt - sonst faende der
+  // Browser ihn nicht und setzte die Auswahl stillschweigend auf den ersten:
+  // aus „1 Tag vorher" wuerde „Keine", und das Speichern loeschte die
+  // Erinnerung.
+  if (next && [...offset.options].some((o) => o.value === next.preset)) {
+    offset.value = next.preset;
+    const amount = panel.querySelector('#reminder-custom-amount');
+    const unit   = panel.querySelector('#reminder-custom-unit');
+    const custom = panel.querySelector('#reminder-custom-fields');
+    if (amount) amount.value = next.amount;
+    if (unit) unit.value = next.unit;
+    // Ein programmatisch gesetzter Wert loest KEIN `change` aus, der Listener
+    // daneben blendet die Felder also nicht ein. Hier steht es deshalb selbst.
+    if (custom) custom.style.display = next.preset === 'offset_custom' ? '' : 'none';
+  }
+  if (warn) warn.hidden = offset.value !== 'offset_after_due';
+}
+
+/**
+ * Die Faelligkeit aendert das Verhaeltnis, aus dem „nach der Faelligkeit"
+ * entsteht - beide Felder werden gehoert, `change` wie `input`, aus demselben
+ * Grund wie bei `wireCountdownGate`: sonst haengt die Anzeige je nach
+ * Bedienweg (Kalenderblatt vs. Tastatur) hinterher.
+ */
+function wireReminderAfterDue(panel) {
+  for (const sel of ['#task-due-date', '#task-due-time']) {
+    const field = panel.querySelector(sel);
+    if (!field) continue;
+    field.addEventListener('change', () => syncReminderAfterDue(panel));
+    field.addEventListener('input', () => syncReminderAfterDue(panel));
+  }
+}
+
 function openTaskModal({ task = null, users = [], reminder = null } = {}, container) {
+  // Der letzte Riegel vor dem Formular - hinter FAB, Kopfknopf und
+  // Leerzustands-CTA, die alle hierher fuehren.
+  if (readOnly()) return;
   const isEdit = !!task;
   // Working-Set VOR dem Rendern setzen: renderTagChips liest ihn direkt danach.
   modalTags = normalizeTagList(task?.tags);
@@ -1435,13 +1792,19 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
   const fields = panel.querySelector('#reminder-fields');
   const offset = panel.querySelector('#reminder-offset');
   const customFields = panel.querySelector('#reminder-custom-fields');
+  // `fields?.` statt `fields.`: die beiden Suchen sind unabhaengig, und seit
+  // der Abschnitt ganz fehlen kann (renderReminderSection gibt '' zurueck),
+  // haengt die Sicherheit dieser Zeile sonst allein daran, dass `toggle` im
+  // SELBEN Fall null ist und der Listener nie haengt. Das ist wahr, aber keine
+  // Zusicherung, die diese Stelle selbst traegt.
   toggle?.addEventListener('change', () => {
-    fields.style.display = toggle.checked ? '' : 'none';
+    if (fields) fields.style.display = toggle.checked ? '' : 'none';
   });
   offset?.addEventListener('change', () => {
-    if (!customFields) return;
-    customFields.style.display = offset.value === 'offset_custom' ? '' : 'none';
+    if (customFields) customFields.style.display = offset.value === 'offset_custom' ? '' : 'none';
+    syncReminderAfterDue(panel);
   });
+  wireReminderAfterDue(panel);
   // Form-Events
   panel.querySelector('#task-form')
     ?.addEventListener('submit', (e) => handleFormSubmit(e, { container, onChanged }));
@@ -1462,6 +1825,7 @@ function wireTaskForm(panel, { task = null, container = null, onChanged = () => 
  * Server liefert sie in derselben Antwort mit, ein Nachladen entfällt.
  */
 function openTagManager(container) {
+  if (readOnly()) return;
   let manager = null;
   const onChanged = async (e) => {
     state.allTags = e.detail?.tags ?? state.allTags;
@@ -1493,6 +1857,7 @@ function openTagManager(container) {
  * Aufgaben trägt, wäre eine Aktion, die garantiert nichts tut.
  */
 function openBulkTagDialog(taskIds, mode, container) {
+  if (readOnly()) return;
   const selected = state.tasks.filter((task) => taskIds.includes(task.id));
   const pool = mode === 'remove'
     ? [...new Map(selected.flatMap((task) => task.tags ?? [])
@@ -1558,6 +1923,7 @@ function openBulkTagDialog(taskIds, mode, container) {
 // --------------------------------------------------------
 
 function openTaskCategoryManager(container) {
+  if (readOnly()) return;
   // Die Auffrischung haengt am Ereignis, nicht am Schliessen: beim Loeschen
   // raeumt `confirmOverModal` das Modal darunter ab, bevor `api.delete` laeuft
   // (siehe `_notifyChanged` in components/category-manager.js).
@@ -1621,6 +1987,10 @@ function openTaskCategoryManager(container) {
 
 async function handleFormSubmit(e, { container = null, onChanged = () => loadTasks(container) } = {}) {
   e.preventDefault();
+  // Das Formular steht bei `tasks: read` gar nicht erst offen (openTaskModal
+  // riegelt ab, die Leseansicht bekommt keinen Mounter). Der Riegel hier faengt
+  // den Rest: ein Dialog, der noch offen war, als die Rechte sich aenderten.
+  if (readOnly()) return;
   const form      = e.target;
   const errorEl   = document.getElementById('task-form-error');
   const submitBtn = document.getElementById('task-submit-btn');
@@ -1690,28 +2060,58 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
   // Erinnerungs-Vorbedingungen VOR dem Speichern prüfen — verhindert den
   // widersprüchlichen Zustand "Aufgabe gespeichert (Erfolgs-Toast) + roter
   // Fehler", wenn Reminder ohne Fälligkeit/Offset gesetzt wird (Critique P2).
-  const wantsReminder = !!reminderToggle?.checked;
+  //
+  // OHNE SCHREIBRECHT AUF DEN KALENDER FAELLT DIESER TEIL GANZ WEG (siehe
+  // reminderAccess). Der Abschnitt steht dann gesperrt im Dialog, und was
+  // darin steht, ist der GESPEICHERTE Stand - ihn erneut zu schicken hiesse,
+  // einen unveraenderten Wert gegen einen 403 zu senden. Der Riegel sitzt VOR
+  // der Vorbedingungspruefung, nicht erst vor dem Schreiben: sonst blockierte
+  // ein geleertes Faelligkeitsdatum das Speichern mit einer Meldung ueber ein
+  // Feld, das dieser Nutzer gar nicht bedienen kann.
+  const canWriteReminder = reminderAccess() === 'write';
+  const wantsReminder = canWriteReminder && !!reminderToggle?.checked;
+  // DIE EINE VORBEDINGUNG, DIE AUCH OHNE SCHREIBRECHT GILT: eine Erinnerung
+  // braucht ein Faelligkeitsdatum. Die Regel ist nicht neu - mit Schreibrecht
+  // verweigert die Zeile darunter genau diese Kombination -, aber der Riegel
+  // oben machte sie fuer `calendar: read` brechbar: das Datum gehoert dem
+  // Aufgaben-Modul, ist also bedienbar, und wer es leerraeumt, liess bis
+  // Review-Runde 2 eine Erinnerung an einer Aufgabe OHNE Faelligkeit zurueck
+  // (`server/routes/tasks.js` fasst die Tabelle nicht an). Nachgemessen: die
+  // Aufgabe ging mit `due_date: null` durch, ohne Meldung.
+  //
+  // Der harte Block von vorher kommt damit NICHT zurueck. Er nannte den
+  // Erinnerungs-Schalter, den dieser Nutzer nicht bedienen kann; diese Meldung
+  // nennt das Faelligkeitsdatum, das er bedienen kann, und sagt dazu, warum es
+  // gebraucht wird. Ein Datums-WECHSEL bleibt erlaubt - er bricht die Regel
+  // nicht, sondern verschiebt nur den angezeigten Vorlauf. Der eigene Faden,
+  // auf den diese Zeile verwies, ist inzwischen eingeloest: ein negativer
+  // Versatz heisst jetzt `offset_after_due` und wird benannt statt verschwiegen
+  // (siehe renderReminderSection). Fuer diesen Nutzer aendert das nichts - der
+  // Abschnitt ist gesperrt, und gesperrt bleibt er auch beim Datumswechsel.
+  //
+  // GEMESSEN WIRD DER UEBERGANG, NICHT DER ZUSTAND (Review-Runde 3). Eine
+  // Aufgabe kann schon OHNE Faelligkeit ankommen, waehrend eine gesperrte
+  // Erinnerung an ihr haengt, und daran ist dieser Nutzer dann unschuldig:
+  // Erinnerungen sind pro `created_by` gefuehrt (`server/routes/reminders.js`
+  // filtert GET, Upsert und DELETE danach), niemand erzwingt die Regel
+  // tabellenuebergreifend, also raeumt ein ZWEITES Mitglied das Datum weg und
+  // loescht dabei nur seine eigene - nicht vorhandene - Zeile. Ein Riegel auf
+  // den Endzustand haette den Erstbesitzer danach aus der Aufgabe ausgesperrt,
+  // bei JEDER Aenderung, auch einer Titelkorrektur, und ohne Ausweg: den
+  // Schalter, der die Meldung verursacht, kann er nicht bedienen.
+  const lockedReminderPresent = !canWriteReminder && !!reminderToggle?.checked;
+  const dueDateWhenOpened = form.querySelector('.reminder-section[data-locked-due]')?.dataset.lockedDue || '';
+  if (lockedReminderPresent && dueDateWhenOpened && !dueDate) {
+    resetSubmit(t('tasks.reminderLockedNeedsDueDate'));
+    return;
+  }
   let remindAt = null;
   if (wantsReminder) {
     if (!dueDate) { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
     const offsetPreset = form.querySelector('#reminder-offset')?.value || 'offset_none';
     if (offsetPreset === 'offset_none') { resetSubmit(t('tasks.reminderNeedsDueDate')); return; }
-    let offsetMs = 0;
-    if (offsetPreset === 'offset_15m') offsetMs = 15 * 60 * 1000;
-    else if (offsetPreset === 'offset_1h') offsetMs = 60 * 60 * 1000;
-    else if (offsetPreset === 'offset_1d') offsetMs = 24 * 60 * 60 * 1000;
-    else if (offsetPreset === 'offset_2d') offsetMs = 2 * 24 * 60 * 60 * 1000;
-    else if (offsetPreset === 'offset_1w') offsetMs = 7 * 24 * 60 * 60 * 1000;
-    else if (offsetPreset === 'offset_2w') offsetMs = 14 * 24 * 60 * 60 * 1000;
-    else if (offsetPreset === 'offset_custom') {
-      const customAmount = Number(form.querySelector('#reminder-custom-amount')?.value || 0);
-      const customUnit = form.querySelector('#reminder-custom-unit')?.value || 'days';
-      if (!Number.isFinite(customAmount) || customAmount <= 0) { resetSubmit(t('common.invalidInput')); return; }
-      const unitFactor = customUnit === 'minutes' ? 60000 : customUnit === 'hours' ? 3600000 : customUnit === 'days' ? 86400000 : 604800000;
-      offsetMs = customAmount * unitFactor;
-    }
-    const dueDateTime = body.due_time ? new Date(`${dueDate}T${body.due_time}`) : new Date(`${dueDate}T23:59:59`);
-    remindAt = new Date(dueDateTime.getTime() - offsetMs).toISOString().slice(0, 19);
+    remindAt = reminderRemindAtFromForm(form, { dueDate, dueTime: body.due_time });
+    if (!remindAt) { resetSubmit(t('common.invalidInput')); return; }
   }
 
   // Wartende Uploads VOR dem Speichern der Aufgabe (#733): scheitert der
@@ -1740,16 +2140,22 @@ async function handleFormSubmit(e, { container = null, onChanged = () => loadTas
       window.yuvomi.showToast(t('tasks.createdToast'), 'success');
     }
 
-    // Erinnerung speichern oder löschen (Vorbedingungen bereits oben geprüft)
+    // Erinnerung speichern oder löschen (Vorbedingungen bereits oben geprüft).
+    // `canWriteReminder` gilt auch für den Löschzweig: das stumme catch dort
+    // fängt einen 403 zwar weg, aber der Aufruf wäre eine Löschanfrage für eine
+    // Erinnerung, die dieser Nutzer nicht anfassen darf - und an einer
+    // unveränderten Aufgabe hat er sie auch nicht abgewählt.
     if (savedTaskId) {
-      if (wantsReminder) {
-        await api.post('/reminders', { entity_type: 'task', entity_id: savedTaskId, remind_at: remindAt });
-        refreshReminders();
-      } else {
-        try {
-          await api.delete(`/reminders?entity_type=task&entity_id=${savedTaskId}`);
+      if (canWriteReminder) {
+        if (wantsReminder) {
+          await api.post('/reminders', { entity_type: 'task', entity_id: savedTaskId, remind_at: remindAt });
           refreshReminders();
-        } catch { /* kein Reminder vorhanden - ignorieren */ }
+        } else {
+          try {
+            await api.delete(`/reminders?entity_type=task&entity_id=${savedTaskId}`);
+            refreshReminders();
+          } catch { /* kein Reminder vorhanden - ignorieren */ }
+        }
       }
 
       // Dokument-Verknüpfungen als Replace-Set übernehmen (#503).
@@ -1883,6 +2289,10 @@ function applyColumnLocally(task, column) {
 
 /** Board-Bewegung mit optimistischem Vorgriff - der eine Weg für alle drei Gesten. */
 async function runColumnMove(task, column, container) {
+  // Der Schreibweg des Boards - Knopf UND Zug muenden hier. Vor dem
+  // OPTIMISTISCHEN `applyColumnLocally`: sonst spraenge die Karte erst in die
+  // neue Spalte und nach dem 403 zurueck, genau das Symptom aus dem Review.
+  if (readOnly()) return;
   const before = { id: task.id, status: task.status, archived_at: task.archived_at };
   applyColumnLocally(task, column);
   renderKanban(container);
@@ -1929,10 +2339,14 @@ function renderKanbanCard(task) {
       </div>
       <div class="kanban-card__footer">
         ${renderAvatarStack(task.assigned_users ?? [], { size: 22 }) || '<span></span>'}
+        ${/* Der Weiterschalt-Knopf ist reine Handlung: WO die Aufgabe steht,
+              sagt ihre Spalte, nicht dieser Knopf. Bei `tasks: read` faellt er
+              weg - zusammen mit dem Ziehen, das dieselbe Bewegung macht. */ ''}
+        ${readOnly() ? '' : `
         <button class="kanban-card__status-btn" type="button"
                 data-next-status="${next}" title="${nextLabel}" aria-label="${nextLabel}">
           <i data-lucide="${icon}" aria-hidden="true"></i>
-        </button>
+        </button>`}
       </div>
     </div>`;
 }
@@ -2050,6 +2464,10 @@ function destroyKanbanSortables() {
 function wireKanbanSortable(container) {
   const board = container.querySelector('.kanban-board');
   if (!board) return;
+  // Das Ziehen IST der Spaltenwechsel (runColumnMove -> PATCH /tasks/:id/status).
+  // Ohne diesen Riegel blieb die Geste als einziger Schreibweg der Seite offen,
+  // nachdem der Knopf daneben verschwunden war.
+  if (readOnly()) { destroyKanbanSortables(); return; }
   // renderKanban() baut die Spalten bei jedem Zug neu. Ohne das Abraeumen
   // haengen die alten Instanzen an Knoten, die es nicht mehr gibt.
   destroyKanbanSortables();
@@ -2098,7 +2516,10 @@ function wireKanbanClicks(container) {
 
   board.addEventListener('click', async (e) => {
     const statusBtn = e.target.closest('[data-next-status]');
-    if (statusBtn) {
+    // Bei `tasks: read` gibt es den Knopf nicht mehr; taucht er doch auf (per
+    // Devtools), faellt der Klick bewusst DURCH auf die Karte und oeffnet die
+    // Leseansicht - der Weg, den die Karte an dieser Stelle ohnehin anbietet.
+    if (statusBtn && !readOnly()) {
       e.stopPropagation();
       const card = statusBtn.closest('.kanban-card[data-task-id]');
       if (!card) return;
@@ -2206,6 +2627,19 @@ function groupHistoryByDay(entries) {
  */
 const DOER_PANEL_PREFIX = 'task-doer-';
 
+/**
+ * Handelt gerade ein Wandtablett (#1209)?
+ *
+ * DIE FRAGE IST NICHT „darf ich schreiben", SONDERN „bin ich jemand". An einem
+ * Display ist „ich" niemand: das Konto ist kein Haushaltsmitglied, verdient
+ * keine Punkte und hat nichts getan. Ein Haken, der ohne Nachfrage abhakt,
+ * schriebe also eine Erledigung auf ein Geraet - deshalb haengt hier eine
+ * andere Bedienung dran und nicht nur ein anderes Recht.
+ */
+function actingAsDisplay() {
+  return state.user?.access_scope === 'display';
+}
+
 function doerPanelTaskId(el) {
   const panel = el.closest?.('.popover-menu');
   if (!panel?.id?.startsWith(DOER_PANEL_PREFIX)) return null;
@@ -2215,13 +2649,38 @@ function doerPanelTaskId(el) {
 
 function renderDoerPicker(task, isDone, archived) {
   if (isDone || archived) return '';
-  const members = state.users ?? [];
-  if (members.length < 2) return '';
+  // AM TABLETT IST DIESE AUSWAHL DER EINE ERLAUBTE SCHREIBWEG (#1209), fuer
+  // einen MENSCHEN mit `tasks: read` ist sie eine reine Handlung und faellt weg
+  // - sie zeigt keinen Zustand, den der Haken daneben nicht schon traegt. Die
+  // Reihenfolge ist deshalb nicht beliebig: `actingAsDisplay()` zuerst, sonst
+  // naehme die Modulregel dem Geraet genau die Funktion, fuer die es haengt.
+  if (!actingAsDisplay() && readOnly()) return '';
+  const tablett = actingAsDisplay();
+  // AM TABLETT IST DIESE AUSWAHL DER EINZIGE WEG, und deshalb gilt die
+  // Zwei-Personen-Schwelle dort nicht. Fuer einen Menschen ist der Picker ein
+  // ZWEITES Ziel neben dem Haken: hakt er selbst ab, braucht er ihn nie, und in
+  // einem Haushalt mit einer Person gaebe es ohnehin nichts zu waehlen. Am
+  // Display gibt es kein „selbst" - auch die einzige Person des Haushalts muss
+  // benannt werden, sonst traegt der Verlauf ein Geraet als Erledigerin.
+  const members = tablett ? (state.displayPeople ?? []) : (state.users ?? []);
+  if (!tablett && members.length < 2) return '';
+  if (tablett && members.length === 0) return '';
   return popoverMenuHtml({
     id: `${DOER_PANEL_PREFIX}${task.id}`,
+    // DERSELBE SCHLUESSEL FUER BEIDE, und das ist kein Sparen am falschen Ende.
+    // „Wer hat X erledigt?" ist am Tablett genau die Frage, die der Knopf
+    // stellt - er hakt ab, indem er sie beantworten laesst. Ein zweiter
+    // Schluessel haette denselben Satz in 24 Sprachen ein zweites Mal gekostet,
+    // und zwei Schluessel mit einem Wortlaut laufen frueher oder spaeter
+    // auseinander.
     label: t('tasks.doneByPick', { title: task.title }),
-    icon: 'user-round-check',
-    triggerClass: 'btn btn--ghost btn--icon btn--icon-sm task-doer-btn',
+    // AM TABLETT TRAEGT DIESER KNOPF DEN HAKEN - er ERSETZT den Statusknopf,
+    // er steht nicht daneben. Zwei Knoepfe waeren zwei Angebote fuer dieselbe
+    // Handlung, und eines davon fuehrte in eine 403.
+    icon: tablett ? 'check' : 'user-round-check',
+    triggerClass: tablett
+      ? 'task-status-btn task-status-btn--open task-status-btn--pick'
+      : 'btn btn--ghost btn--icon btn--icon-sm task-doer-btn',
     items: members.map((u) => ({
       action: 'pick-doer', id: u.id, label: u.display_name, icon: 'user-round',
     })),
@@ -3029,7 +3488,13 @@ function wireSwipeGestures(container) {
   const listEl = container.querySelector('#task-list');
   if (!listEl) return;
 
-  wireSwipeRows(listEl, {
+  // DER RUECKGABEWERT IST FUER DIE MESSUNG DA, und er kostet nichts: kein
+  // Aufrufer liest ihn. Ob eine SEITE der Geste verdrahtet wird, ist sonst
+  // nirgends sichtbar - die Wischgeste hat kein Markup, an dem sich das pruefen
+  // liesse, und ein Zaehler auf dem Aufruf beantwortet nur, DASS verdrahtet
+  // wurde, nicht WELCHE Seite. Genau der Unterschied ist hier die Regel: am
+  // Display faellt die Schreib-Seite weg und die Lese-Seite bleibt.
+  const optionen = {
     card: '.task-card',
     // Vor 2.0.0 öffnete derselbe Wisch hier den Bearbeiten-Dialog: eine der
     // zwei Listen, in denen die Seiten wirklich getauscht haben.
@@ -3038,7 +3503,26 @@ function wireSwipeGestures(container) {
     // (§2: dieselbe Kante trägt sie in jeder Liste). Die Karte fliegt hinaus,
     // weil die Zeile danach in einer anderen Gruppe steht - ohne den Flug
     // spränge sie einfach weg.
-    leading: {
+    // AM WANDTABLETT UND BEI `tasks: read` FEHLT NUR DIE SCHREIB-SEITE.
+    //
+    // Der Wisch nach vorn ist der dritte Weg zu demselben Statuswechsel - neben
+    // Haken und Popover -, und der einzige, der die Person nicht erfragen kann:
+    // er hat keinen Ort, an dem eine Auswahl aufgehen koennte, und hakt sofort
+    // ab. Am Display liefe er ohne benannte Person in die 400 des Servers, mit
+    // englischem Text auf deutscher Oberflaeche.
+    //
+    // ABER NUR DIESE SEITE. Der erste Anlauf kehrte vor `wireSwipeRows` zurueck
+    // und nahm damit auch den Wisch nach hinten mit - der oeffnet die
+    // Detailansicht und ist reines LESEN, das ein Display ueberall sonst darf
+    // (der Titel derselben Karte oeffnet dieselbe Ansicht ohne jede Pruefung).
+    // `wireSwipeRows` laesst eine Seite ausdruecklich weg, wenn sie `null` ist,
+    // also kostet die Verengung nichts.
+    //
+    // DER ZWEITE GRUND IST DERSELBE SCHNITT (#467): ein Mensch mit
+    // `tasks: read` darf ueberhaupt nicht abhaken, und anders als am Tablett
+    // hilft ihm auch keine Personenauswahl darueber hinweg. Beide Gruende
+    // nehmen genau diese eine Kante.
+    leading: (actingAsDisplay() || readOnly()) ? null : {
       reveal: '.swipe-reveal--done',
       flyOut: true,
       run: async (row) => {
@@ -3084,7 +3568,9 @@ function wireSwipeGestures(container) {
         }
       },
     },
-  });
+  };
+  wireSwipeRows(listEl, optionen);
+  return optionen;
 }
 
 // --------------------------------------------------------
@@ -3273,6 +3759,11 @@ function wireGroupToggle(container) {
 
 function wireNewTaskBtn(container) {
   const handler = () => {
+    // Der FAB liegt in der Shell-Layer und wird ueber html[data-module-readonly]
+    // per CSS ausgeblendet (layout.css), der Kopfknopf traegt `.toolbar-new-btn`
+    // und faellt derselben Regel zu. Der Riegel bleibt trotzdem: eine
+    // CSS-Regel ist keine Sperre.
+    if (readOnly()) return;
     openTaskModal({ users: state.users }, container);
   };
   container.querySelector('#btn-new-task')?.addEventListener('click', handler);
@@ -3301,6 +3792,10 @@ function updateBulkActionsBar(container) {
 function wireBulkSelect(container) {
   const toggleBtn = container.querySelector('#btn-bulk-select');
   if (!toggleBtn) return;
+  // Die Mehrfachauswahl existiert nur fuer die Sammelaktionsleiste, und die
+  // schreibt in jeder ihrer sechs Spalten. Ohne sie waere sie eine Auswahl
+  // ohne Verb.
+  if (readOnly()) return;
 
   toggleBtn.addEventListener('click', () => {
     state.bulkSelectMode = !state.bulkSelectMode;
@@ -3334,6 +3829,7 @@ function wireBulkCheckboxes(container) {
 function wireBulkActions(container) {
   const bar = container.querySelector('#bulk-actions-bar');
   if (!bar) return;
+  if (readOnly()) return;
 
   bar.addEventListener('click', async (e) => {
     const btn = e.target.closest('button[id^="bulk-"]');
@@ -3393,8 +3889,9 @@ function handleBulkDelete(taskIds, container) {
   scheduleUndoableDelete({
     message: t('tasks.bulkDeleted'),
     commit: async ({ keepalive }) => {
+      // Erinnerungen gehen mit der Aufgabe - serverseitig, siehe
+      // deleteTaskWithUndo() in components/task-detail.js.
       await Promise.all(taskIds.map(id => api.delete(`/tasks/${id}`, { keepalive })));
-      taskIds.forEach(id => api.delete(`/reminders?entity_type=task&entity_id=${id}`, { keepalive }).catch(() => {}));
       if (keepalive) return; // Seite verschwindet — kein UI-Refresh mehr
       refreshReminders();
       await loadTasks(container);
@@ -3415,9 +3912,23 @@ function handleBulkDelete(taskIds, container) {
  * ist der Teil, der die Bedienung traegt: Neuladen und dieselbe Quittung mit
  * Rueckweg wie Tipp und Wisch - mit dem Namen darin, weil sonst nichts auf dem
  * Schirm verriete, wem die Erledigung gerade zugeschrieben wurde.
+ *
+ * AM WANDTABLETT OHNE RUECKWEG (#1209), und das ist die Fortsetzung derselben
+ * Regel, die den Statusknopf dort weglaesst: ein Display darf nicht
+ * zuruecknehmen. Der Toast bot den Weg trotzdem an - im Browser gemessen: ein
+ * Tipp auf „Rueckgaengig" lief in 403 und zeigte die rohe englische
+ * Serverantwort auf einer deutschen Oberflaeche. Den Knopf wegzulassen und den
+ * Rueckweg fuenf Sekunden lang daneben zu legen ist dasselbe falsche Angebot,
+ * nur fluechtiger.
  */
 async function completeTaskFor(container, taskId, userId) {
-  const person = (state.users ?? []).find((u) => u.id === userId);
+  // AM DISPLAY AUS `displayPeople`, SONST AUS `state.users`. Beide Listen
+  // tragen den Namen, aber nur die erste ist die, aus der die Wahl kam - und
+  // sie ist die einzige, die das Tablett sicher hat: `/tasks/meta/options`
+  // liegt heute in seinem Scope, und faellt das je weg, hiesse die Quittung
+  // „Erledigt von ." statt zu scheitern.
+  const quelle = actingAsDisplay() ? (state.displayPeople ?? []) : (state.users ?? []);
+  const person = quelle.find((u) => u.id === userId);
   try {
     await toggleTaskStatus(taskId, 'open', userId);
     await loadTasks(container);
@@ -3425,7 +3936,7 @@ async function completeTaskFor(container, taskId, userId) {
       t('tasks.doneByToast', { name: person?.display_name ?? '' }),
       'default',
       5000,
-      async () => {
+      actingAsDisplay() ? null : async () => {
         try {
           await toggleTaskStatus(taskId, 'done');
           await loadTasks(container);
@@ -3455,6 +3966,14 @@ function wireTaskList(container) {
     if (!target) return;
     const action = target.dataset.action;
     const id     = target.dataset.id;
+
+    // Der eine Riegel fuer alle Zeilen-Aktionen (siehe READ_SAFE_ACTIONS).
+    // Ausgeblendet ist nicht dasselbe wie unerreichbar: ein Knopf, den es im
+    // Markup nicht mehr gibt, kann trotzdem noch am Bildschirm stehen, wenn die
+    // Liste ihn vor einem Rechtewechsel gezeichnet hat.
+    const erlaubt = READ_SAFE_ACTIONS.has(action)
+      || (actingAsDisplay() && DISPLAY_WRITE_ACTIONS.has(action));
+    if (readOnly() && !erlaubt) return;
 
     if (action === 'toggle-status') {
       const status = target.dataset.status;
@@ -3521,6 +4040,13 @@ function wireTaskList(container) {
     }
 
     if (action === 'toggle-subtask') {
+      // DER RIEGEL NEBEN DEM WEGGELASSENEN ATTRIBUT. `disabled` im Markup
+      // verhindert den Klick, aber dieser Handler haengt delegiert an der
+      // Liste, und die Liste wird auch von anderen Stellen neu gezeichnet - ein
+      // Zustand, in dem beides auseinanderlaeuft, faellt sonst still in die 400
+      // des Servers. Zwei Zeilen fuer eine Zusicherung, die sonst an einem
+      // Attribut haengt.
+      if (actingAsDisplay()) return;
       try {
         await toggleSubtaskStatus(id, target.dataset.status);
         await loadTasks(container);
@@ -3588,7 +4114,12 @@ function openTaskView(task, reminder, container) {
     categories: state.categories,
     container,
     onChanged: () => loadTasks(container),
-    edit: {
+    // Ohne Mounter baut die geteilte Ansicht keinen Bearbeiten-Knopf (#918) -
+    // besser als einer, der ins Leere fuehrt. openTaskDetail zieht denselben
+    // Schluss ohnehin noch einmal ueber canEditTaskDefinition(); der Verzicht
+    // hier spart den Umweg und sagt es an der Stelle, an der das Formular
+    // eingehaengt wuerde.
+    edit: readOnly() ? null : {
       mount: (panel, pane) => {
         // Working-Set VOR dem Rendern setzen: renderTagChips in wireTaskForm
         // liest ihn direkt danach.
@@ -3821,6 +4352,13 @@ export async function render(container, { user }) {
               <span class="group-toggle__label">${t('tasks.historyView')}</span>
             </button>
           </div>
+          ${/* DREI WERKZEUGE, DIE ALLE SCHREIBEN (#467). Sammelauswahl fuehrt
+                zur Sammelaktionsleiste, die beiden Verwalter legen Kategorien
+                und Etiketten an, benennen um und loeschen. Keins davon zeigt
+                einen Zustand an, den ein Nur-lesen-Nutzer vermissen wuerde -
+                Kategorien und Etiketten stehen als Filter im Blatt und an den
+                Karten. */ ''}
+          ${readOnly() ? '' : `
           <button class="btn btn--ghost btn--icon" id="btn-bulk-select"
                   title="${t('tasks.bulkSelect')}" aria-label="${t('tasks.bulkSelect')}" aria-pressed="false">
             <i data-lucide="list-checks" class="icon-lg" aria-hidden="true"></i>
@@ -3828,10 +4366,11 @@ export async function render(container, { user }) {
           <button class="btn btn--icon btn--ghost" id="btn-manage-categories"
                   aria-label="${t('tasks.manageCategories')}" title="${t('tasks.manageCategories')}">
             <i data-lucide="folder-tree" class="icon-lg" aria-hidden="true"></i>
-          </button>
+          </button>`}
           <!-- Der Tag-Verwalter bekommt das Etiketten-Icon, die Kategorien den
                Ordnerbaum: die beiden Achsen sind bewusst getrennt, und dieselbe
                Bildsprache für beide hätte genau das wieder eingeebnet. -->
+          ${readOnly() ? '' : `
           <button class="btn btn--icon btn--ghost" id="btn-manage-tags"
                   aria-label="${t('tasks.manageTags')}" title="${t('tasks.manageTags')}">
             <i data-lucide="tags" class="icon-lg" aria-hidden="true"></i>
@@ -3839,7 +4378,7 @@ export async function render(container, { user }) {
           <button class="btn btn--primary toolbar-new-btn" id="btn-new-task" style="gap:var(--space-1)"
                   aria-label="${t('tasks.newTask')}">
             <i data-lucide="plus" class="icon-lg" aria-hidden="true"></i> <span class="toolbar-new-btn__label">${t('newLabel.tasks')}</span>
-          </button>
+          </button>`}
         </div>
       </div>
 
@@ -3869,6 +4408,7 @@ export async function render(container, { user }) {
           </div>
         </div>
         <div class="filter-panel" id="filter-panel" hidden></div>
+        ${readOnly() ? '' : `
         <div class="bulk-actions-bar" id="bulk-actions-bar" hidden>
           <span class="bulk-actions-bar__count" id="bulk-count"></span>
           <div class="bulk-actions-bar__actions">
@@ -3901,7 +4441,7 @@ export async function render(container, { user }) {
               ${t('tasks.bulkDelete')}
             </button>
           </div>
-        </div>
+        </div>`}
 
         <div id="task-list">
           ${[1,2,3].map(() => `
@@ -3911,9 +4451,10 @@ export async function render(container, { user }) {
               <div class="skeleton skeleton-line skeleton-line--short" style="height:12px"></div>
             </div>`).join('')}
         </div>
+        ${readOnly() ? '' : `
         <button class="page-fab" id="fab-new-task" aria-label="${t('tasks.newTask')}" data-dock-label="${t('newLabel.tasks')}">
           <i data-lucide="plus" class="icon-xl" aria-hidden="true"></i>
-        </button>
+        </button>`}
       </div>
     </div>
   `);
@@ -3922,12 +4463,25 @@ export async function render(container, { user }) {
 
   // Daten laden (Filter-State aus vorheriger Session berücksichtigen)
   try {
-    const [tasksData, metaData, preferencesData] = await Promise.all([
+    const [tasksData, metaData, preferencesData, displayPeople] = await Promise.all([
       api.get(`/tasks${taskQuery()}`),
       api.getWithSource('/tasks/meta/options'),
       // Reine Anzeigepräferenz: ein Fehler hier darf die Aufgabenliste nicht
       // mit in den Ladefehler ziehen, deshalb eigener Fallback.
       api.get('/preferences').catch(() => ({ data: {} })),
+      // WER AN DIESEM TABLETT ABHAKEN DARF (#1209) - und warum nicht die Liste
+      // aus `/tasks/meta/options`, die daneben schon geladen wird: die traegt
+      // jedes Haushaltsmitglied, auch eines ohne Schreibrecht auf Aufgaben.
+      // Der Picker bekaeme damit Namen, deren Wahl der Server mit 403
+      // beantwortet, und an einer Kuechenwand sieht das aus wie ein kaputtes
+      // Geraet. `/displays/people` beantwortet dieselbe Frage MIT der
+      // Rechtelage, aus derselben Aufloesung wie die Absage.
+      //
+      // Der Fallback ist eine LEERE Liste und kein Rueckfall auf `meta.users`:
+      // ohne Antwort weiss diese Seite nicht, wer abhaken darf, und eine
+      // geratene Liste waere die zweite Wahrheit. Ohne Liste zeichnet sich kein
+      // Picker - das ist die richtige Richtung fuer einen Irrtum.
+      actingAsDisplay() ? api.get('/displays/people').catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
     ]);
     state.loadError = null;
     // `metaData` traegt jetzt `{ data, fromCache }` - der Rumpf steht in `.data`.
@@ -3937,6 +4491,7 @@ export async function render(container, { user }) {
     state.metaStale = { users: alleStale, categories: alleStale, tags: alleStale };
     state.tasks = tasksData.data ?? [];
     state.users = meta.users ?? [];
+    state.displayPeople = (displayPeople.data ?? []).filter((p) => p.can_tick_off);
     state.categories = meta.categories ?? [];
     state.allTags = meta.tags ?? [];
     state.defaultPoints = Number(meta.default_points) || 0;
@@ -3953,6 +4508,7 @@ export async function render(container, { user }) {
     state.loadError = err;
     state.tasks = [];
     state.users = [];
+    state.displayPeople = [];
     state.categories = [];
     state.allTags = [];
     state.metaStale = { users: false, categories: false, tags: false };
@@ -4003,15 +4559,49 @@ export async function render(container, { user }) {
 // Testfläche: nur reine Funktionen, deren Vertrag außerhalb dieser Datei zählt.
 export const __test = {
   groupBy, groupKey, formatDueDate, normalizeFilterSet, taskQuery, state,
+  // Was ein Wandtablett zu sehen und zu fassen bekommt (#1209). Die Karte
+  // traegt drei Wege zum selben Statuswechsel - Haken, Wisch, Teilaufgabe -,
+  // und am Display darf nur der erste erscheinen, weil nur er nach der Person
+  // fragen kann. Beide Funktionen stehen hier, damit das messbar ist und nicht
+  // nur im Quelltext behauptet: die Karte fuer das Markup, das Einhaengen der
+  // Wischgeste fuer den Weg, der gar kein Markup hat.
+  renderTaskCard, wireSwipeGestures,
   // Der Aufgaben-Dialog als Markup: welche Felder er zeigt und wen er anbietet.
   renderModalContent,
+  // Der Erinnerungs-Abschnitt einzeln, weil er einen Zustand zu BENENNEN hat,
+  // den seine Auswahlliste nicht abbildet: eine Erinnerung nach der
+  // Faelligkeit. Was der Abschnitt dabei sagt, ist der halbe Fix - die andere
+  // Haelfte ist, dass das Speichern daraus nicht rechnet.
+  renderReminderSection, reminderRemindAtFromForm, afterDueResolution,
+  // Die Verdrahtung steht mit hier: die Regel allein zu messen hiesse, den
+  // haeufigsten Ausfall auszulassen - einen Listener, den niemand anhaengt.
+  syncReminderAfterDue, wireReminderAfterDue,
+  // Und der AUFRUFER dazu: eine Regel, die richtig ist und die niemand ruft,
+  // ist derselbe Ausfall wie eine falsche Regel.
+  wireTaskForm,
   // Die Personenauswahl beim Abhaken (#1205): WANN sie ueberhaupt erscheint,
   // ist die halbe Entscheidung - ein Solo-Haushalt bekommt sie nie zu sehen.
   renderDoerPicker,
+  // Welche Bedienelemente eine Boardkarte und eine leere Liste ueberhaupt
+  // anbieten. Die Nur-lesen-Regel (#467) ist eine Aussage ueber genau dieses
+  // Markup: was verschwindet, und was als Zeichen stehen bleibt, das den
+  // Zustand nennt. `renderTaskCard` steht schon oben - sie beantwortet beide
+  // Fragen, die des Tabletts und diese.
+  renderKanbanCard, renderTaskGroups, readOnly,
   // Gemerkte Filter: der Vertrag ist, dass Lesen und Schreiben AUSEINANDER
   // gehen - sonst schriebe das Bereinigen sich fest (siehe getRecentFilters).
   getRecentFilters, storedRecentFilters, saveRecentFilter,
   // Die Frische der Referenzlisten ist nur verhaltensgetrieben pruefbar: sie
   // haengt daran, WIE die Antwort kam, nicht daran, dass eine kam.
   refreshTags,
+  // Erinnerungen liegen im Kalender-Modul (siehe reminderAccess). Der Riegel
+  // steht an ZWEI Stellen - im Markup und im Speichern -, und nur der zweite
+  // entscheidet, ob eine Anfrage rausgeht. Ein Textguard kann das nicht sehen:
+  // er liest den Aufruf, nicht das Ausbleiben. Deshalb steht der Handler hier.
+  handleFormSubmit, reminderAccess,
+  // Der Lader steht hier, weil die PRAEMISSE des gesperrten Zweigs an ihm
+  // haengt: dass `calendar: read` die Erinnerung wirklich bekommt. War das nur
+  // Prosa, liess sich das `none` still zu `!== write` verengen und der ganze
+  // Abschnitt war toter Code, ohne dass ein Test rot wurde.
+  loadReminderForTask,
 };
