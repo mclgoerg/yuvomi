@@ -8963,9 +8963,61 @@ const MIGRATIONS = [
     `,
   },
   {
-    version: 218,
+    version: 219,
     description: 'Health: preventive care & vaccinations log (household type registry + per-person records)',
+    foreignKeysOff: true,
     up: `
+      -- reminders.entity_type erneut erweitern (Muster wie v137/v140/v141):
+      -- SQLite kann einen Spalten-CHECK nicht per ALTER erweitern, daher
+      -- Tabelle neu erstellen. foreignKeysOff bleibt Pflicht - gleicher Grund
+      -- wie dort: notification_deliveries.reminder_id ... ON DELETE CASCADE
+      -- wuerde sonst beim DROP TABLE auf jeder bestehenden Installation
+      -- mitgeloescht. 'health_prevention_due' ist der einzige neue Wert hier -
+      -- v218 (Dokumente) hat 'document_expiry' bereits eigenstaendig
+      -- nachgezogen, statt beide Werte in einem Schritt zu buendeln
+      -- (Review-Feedback #1255/#1256: ein Wert ohne Schreiber waere unter der
+      -- Anhaenge-Regel dauerhaft im CHECK fest gewesen, ohne Issue und ohne
+      -- SCOPE-/DECISIONS-Eintrag).
+      --
+      -- ERST DIE ZWEI TRIGGER AUS V217 ABRAEUMEN, aus demselben Grund wie
+      -- bereits in v218 dokumentiert: ihr Koerper nennt "reminders" beim
+      -- Namen, und SQLites ALTER TABLE ... RENAME TO reminders reparst dabei
+      -- die ganze Schema, was mitten in diesem Umbau auf ein momentan
+      -- fehlendes "reminders" trifft ("no such table: main.reminders").
+      -- Abraeumen vor dem Umbau und am Ende neu anlegen umgeht das.
+      DROP TRIGGER trg_reminders_tasks_ad;
+      DROP TRIGGER trg_reminders_events_ad;
+
+      CREATE TABLE reminders_new (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT    NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry', 'health_prevention_due')),
+        entity_id   INTEGER NOT NULL,
+        remind_at   TEXT    NOT NULL,
+        dismissed   INTEGER NOT NULL DEFAULT 0,
+        created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        pushed_at   TEXT,
+        assigned_from INTEGER REFERENCES users(id) ON DELETE SET NULL
+      );
+      INSERT INTO reminders_new (id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from)
+        SELECT id, entity_type, entity_id, remind_at, dismissed, created_by, created_at, pushed_at, assigned_from FROM reminders;
+      DROP TABLE reminders;
+      ALTER TABLE reminders_new RENAME TO reminders;
+      CREATE INDEX idx_reminders_entity ON reminders(entity_type, entity_id);
+      CREATE INDEX idx_reminders_remind ON reminders(remind_at);
+      CREATE INDEX idx_reminders_user ON reminders(created_by);
+      CREATE INDEX idx_reminders_assigned_from ON reminders(assigned_from);
+
+      CREATE TRIGGER trg_reminders_tasks_ad
+      AFTER DELETE ON tasks BEGIN
+        DELETE FROM reminders WHERE entity_type = 'task' AND entity_id = OLD.id;
+      END;
+
+      CREATE TRIGGER trg_reminders_events_ad
+      AFTER DELETE ON calendar_events BEGIN
+        DELETE FROM reminders WHERE entity_type = 'event' AND entity_id = OLD.id;
+      END;
+
       -- Haushalts-Register der Vorsorge-Arten (D2) - NICHTS VORBEFUELLT.
       -- docs/SCOPE.md schliesst mitgelieferte Kataloge aus, die veralten
       -- (deutsche U-Untersuchungen etc.); der Haushalt legt seine eigenen an.
