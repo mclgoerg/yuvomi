@@ -5319,8 +5319,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Tek seferlik",
         "trackedDateIntervalDistanceLabel": "Mesafe aralığı",
         "trackedDateIntervalDistancePlaceholder": "örn. 15000 km",
-        "trackedDateDistanceHint_one": "{{count}} {{unit}} kaldı",
-        "trackedDateDistanceHint": "{{count}} {{unit}} kaldı",
+        "trackedDateDistanceHint_one": "{{value}} {{unit}} kaldı",
+        "trackedDateDistanceHint": "{{value}} {{unit}} kaldı",
         "markDoneAction": "Tamamlandı",
         "completeSheetTitle": "\"{{label}}\" tamamlandı",
         "completePerformedOnLabel": "Tarih",
@@ -5331,9 +5331,10 @@
         "odometerUnitMi": "mi",
         "odometerOnLabel": "Okuma tarihi",
         "historyLabel": "Geçmiş",
+        "historyLoadError": "Geçmiş yüklenemedi",
         "historyTotalLabel": "Toplam maliyet",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Zaman içinde kilometre sayacı"
     },
     "documentAttach": {

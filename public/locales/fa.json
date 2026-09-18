@@ -5319,8 +5319,8 @@
         "trackedDateIntervalMonthsPlaceholder": "یک‌بار",
         "trackedDateIntervalDistanceLabel": "فاصله مسافت",
         "trackedDateIntervalDistancePlaceholder": "مثلاً ۱۵۰۰۰ کیلومتر",
-        "trackedDateDistanceHint_one": "{{count}} {{unit}} باقی‌مانده",
-        "trackedDateDistanceHint": "{{count}} {{unit}} باقی‌مانده",
+        "trackedDateDistanceHint_one": "{{value}} {{unit}} باقی‌مانده",
+        "trackedDateDistanceHint": "{{value}} {{unit}} باقی‌مانده",
         "markDoneAction": "انجام شد",
         "completeSheetTitle": "«{{label}}» انجام شد",
         "completePerformedOnLabel": "تاریخ",
@@ -5331,9 +5331,10 @@
         "odometerUnitMi": "مایل",
         "odometerOnLabel": "تاریخ قرائت",
         "historyLabel": "تاریخچه",
+        "historyLoadError": "بارگذاری تاریخچه ممکن نشد",
         "historyTotalLabel": "هزینه کل",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "کیلومتر شمار در طول زمان"
     },
     "documentAttach": {

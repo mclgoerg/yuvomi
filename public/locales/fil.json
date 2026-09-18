@@ -5319,8 +5319,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Minsanan",
         "trackedDateIntervalDistanceLabel": "Agwat ng distansya",
         "trackedDateIntervalDistancePlaceholder": "hal. 15000 km",
-        "trackedDateDistanceHint_one": "{{count}} {{unit}} na lang",
-        "trackedDateDistanceHint": "{{count}} {{unit}} na lang",
+        "trackedDateDistanceHint_one": "{{value}} {{unit}} na lang",
+        "trackedDateDistanceHint": "{{value}} {{unit}} na lang",
         "markDoneAction": "Tapos na",
         "completeSheetTitle": "Tapos na ang \"{{label}}\"",
         "completePerformedOnLabel": "Petsa",
@@ -5331,9 +5331,10 @@
         "odometerUnitMi": "mi",
         "odometerOnLabel": "Petsa ng pagbasa",
         "historyLabel": "Kasaysayan",
+        "historyLoadError": "Hindi ma-load ang kasaysayan",
         "historyTotalLabel": "Kabuuang gastos",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Odometer sa paglipas ng panahon"
     },
     "documentAttach": {

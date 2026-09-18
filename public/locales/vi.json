@@ -5319,8 +5319,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Một lần",
         "trackedDateIntervalDistanceLabel": "Khoảng cách định kỳ",
         "trackedDateIntervalDistancePlaceholder": "vd. 15000 km",
-        "trackedDateDistanceHint_one": "còn {{count}} {{unit}}",
-        "trackedDateDistanceHint": "còn {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "còn {{value}} {{unit}}",
+        "trackedDateDistanceHint": "còn {{value}} {{unit}}",
         "markDoneAction": "Xong",
         "completeSheetTitle": "Đã hoàn thành \"{{label}}\"",
         "completePerformedOnLabel": "Ngày",
@@ -5331,9 +5331,10 @@
         "odometerUnitMi": "dặm",
         "odometerOnLabel": "Ngày ghi số",
         "historyLabel": "Lịch sử",
+        "historyLoadError": "Không thể tải lịch sử",
         "historyTotalLabel": "Tổng chi phí",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Đồng hồ đo quãng đường theo thời gian"
     },
     "documentAttach": {

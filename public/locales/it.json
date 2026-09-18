@@ -5319,8 +5319,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Una tantum",
         "trackedDateIntervalDistanceLabel": "Intervallo di distanza",
         "trackedDateIntervalDistancePlaceholder": "es. 15000 km",
-        "trackedDateDistanceHint_one": "mancano {{count}} {{unit}}",
-        "trackedDateDistanceHint": "mancano {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "mancano {{value}} {{unit}}",
+        "trackedDateDistanceHint": "mancano {{value}} {{unit}}",
         "markDoneAction": "Fatto",
         "completeSheetTitle": "\"{{label}}\" completato",
         "completePerformedOnLabel": "Data",
@@ -5331,9 +5331,10 @@
         "odometerUnitMi": "mi",
         "odometerOnLabel": "Data di lettura",
         "historyLabel": "Cronologia",
+        "historyLoadError": "Impossibile caricare la cronologia",
         "historyTotalLabel": "Costo totale",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Contachilometri nel tempo"
     },
     "documentAttach": {

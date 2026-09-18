@@ -23,6 +23,7 @@ import {
 } from './entry-links.js';
 import { warrantyEndDate, reminderDateForWarranty } from '../../services/inventory-deadlines.js';
 import { dataUrlContentMatches } from '../../utils/file-signature.js';
+import { todayKey } from '../../utils/timezone.js';
 import {
   validateTrackedDatesInput, writeTrackedDates, removeTrackedDateReminders, loadTrackedDates, loadTrackedDatesForItems,
 } from './item-dates.js';
@@ -297,7 +298,13 @@ function validateItemFields(body) {
 
     const vOdometerOn = date(body.odometer_on, 'Ablesedatum');
     results.push(vOdometerOn);
-    values.odometer_on = vOdometerOn.value;
+    // Eine Ablesung ohne Datum bekommt "heute" (Haushalts-Zeitzone) - derselbe
+    // Ersatzwert wie 'km' fuer odometer_unit direkt darueber. Ohne ein Datum
+    // haelt odometerRegressionError() (service-log.js) jeden neuen Log-Eintrag
+    // fuer nicht-konkurrierend und laesst ihn den aktuellen Stand unbemerkt
+    // ueberschreiben - der Tippfehler-Schutz waere fuer dieses Item dauerhaft
+    // aus, sobald eine Ablesung ohne Datum stand (Review #1257).
+    values.odometer_on = vOdometerOn.value ?? (values.odometer != null ? todayKey(db.get(), new Date()) : null);
   }
 
   const vCondition = oneOf(body.condition || 'good', CONDITIONS, 'Zustand');
@@ -669,7 +676,7 @@ router.put('/:id/service-log/:logId', (req, res) => {
     if (!updated) return res.status(404).json({ error: 'Service log entry not found.', code: 404 });
     res.json({ data: updated });
   } catch (err) {
-    log.error('PATCH /:id/service-log/:logId error:', err);
+    log.error('PUT /:id/service-log/:logId error:', err);
     res.status(500).json({ error: 'Internal server error.', code: 500 });
   }
 });

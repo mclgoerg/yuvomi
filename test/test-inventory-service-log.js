@@ -425,3 +425,28 @@ test('das Loeschen der Log-Zeile, die den aktuellen Kilometerstand gesetzt hat, 
   assert.equal(afterAllDeleted.body.data.odometer, null);
   assert.equal(afterAllDeleted.body.data.odometer_on, null);
 });
+
+test('das Loeschen einer Log-Zeile, die NIE den aktuellen Kilometerstand gesetzt hat, laesst das Item unangetastet (Review #1257)', async () => {
+  // Ein im Formular gesetzter Stand ist durch keine Log-Zeile gedeckt - das
+  // Loeschen einer UNBETEILIGTEN (rueckdatierten) Log-Zeile darf ihn trotzdem
+  // nicht mitreissen, nur weil recomputeItemOdometer() bislang jede Loeschung
+  // pauschal neu berechnet hat.
+  const created = await call('POST', '/items', {
+    body: { name: 'Auto4', category: 'vehicles', odometer: 50000, odometer_unit: 'km', odometer_on: '2026-09-01' },
+  });
+  const itemId = created.body.data.id;
+
+  const backdated = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Oelwechsel', performed_on: '2026-08-01', odometer: 45000 },
+  });
+  assert.equal(backdated.status, 201);
+  // Die rueckdatierte Zeile hat den zwischengespeicherten Stand nie gesetzt.
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 50000);
+
+  const del = await call('DELETE', `/items/${itemId}/service-log/${backdated.body.data.id}`);
+  assert.equal(del.status, 204);
+
+  const after = await call('GET', `/items/${itemId}`);
+  assert.equal(after.body.data.odometer, 50000, 'der unabhaengig gesetzte Stand bleibt unangetastet');
+  assert.equal(after.body.data.odometer_on, '2026-09-01');
+});

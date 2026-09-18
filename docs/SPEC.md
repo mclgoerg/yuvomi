@@ -2825,11 +2825,20 @@ other document link uses. Inventory items have no per-item visibility model of t
 household-wide); service log rows are therefore visible to the whole household.
 
 **Odometer (`inventory_items.odometer`/`odometer_unit`/`odometer_on`, v220).** A manual reading,
-limited to the `vehicles` category - `odometer_unit` is `km` or `mi` (defaults to `km` when a
-reading is given without one), `odometer_on` is the date of that reading. A category other than
-`vehicles` silently clears all three fields rather than rejecting the write, on both create and
-update, so switching an item away from `vehicles` drops a previously set reading automatically. Like
-every other item field, `PUT` is a full replace: omitting these fields clears the reading. The item
+gated by `inventory_categories.tracks_odometer` (an additive boolean column, default off, seeded on
+for the built-in `vehicles` category only) rather than a hardcoded `category === 'vehicles'` string
+comparison - a household-renamed or deleted-and-recreated vehicle category, or a second one
+("Motorcycle", "RV"), keeps or gains the flag through the category itself, not through a literal that
+would silently stop matching. `odometer_unit` is `km` or `mi` (defaults to `km` when a reading is
+given without one), `odometer_on` is the date of that reading, defaulting to today's date
+(household zone) when a reading arrives without one - the odometer-regression guard on the service
+log needs a date to know whether a new entry competes with the current reading at all. A category
+without `tracks_odometer` silently clears all three fields rather than rejecting the write, on both
+create and update, so switching an item away from such a category drops a previously set reading
+automatically; there is currently no UI to flag a household's own category for tracking (only
+`vehicles` ships with it), and deleting a category that carried the flag has no way back once the
+category manager reassigns affected items to `other`. Like every other item field, `PUT` is a full
+replace: omitting these fields clears the reading. The item
 detail view plots every service-log entry that carries an `odometer` value (plus the item's own
 current reading, if it isn't already represented by one) as a small trend chart above the History
 timeline, using the shared chart geometry in `public/utils/chart.js`.

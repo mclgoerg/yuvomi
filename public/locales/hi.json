@@ -5319,8 +5319,8 @@
         "trackedDateIntervalMonthsPlaceholder": "एकबारगी",
         "trackedDateIntervalDistanceLabel": "दूरी अंतराल",
         "trackedDateIntervalDistancePlaceholder": "जैसे 15000 किमी",
-        "trackedDateDistanceHint_one": "{{count}} {{unit}} शेष",
-        "trackedDateDistanceHint": "{{count}} {{unit}} शेष",
+        "trackedDateDistanceHint_one": "{{value}} {{unit}} शेष",
+        "trackedDateDistanceHint": "{{value}} {{unit}} शेष",
         "markDoneAction": "हो गया",
         "completeSheetTitle": "\"{{label}}\" पूर्ण हुआ",
         "completePerformedOnLabel": "तारीख़",
@@ -5331,9 +5331,10 @@
         "odometerUnitMi": "मील",
         "odometerOnLabel": "रीडिंग की तारीख़",
         "historyLabel": "इतिहास",
+        "historyLoadError": "इतिहास लोड नहीं हो सका",
         "historyTotalLabel": "कुल लागत",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "समय के साथ ओडोमीटर"
     },
     "documentAttach": {

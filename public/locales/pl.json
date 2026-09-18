@@ -5319,8 +5319,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Jednorazowo",
         "trackedDateIntervalDistanceLabel": "Interwał dystansu",
         "trackedDateIntervalDistancePlaceholder": "np. 15000 km",
-        "trackedDateDistanceHint_one": "pozostało {{count}} {{unit}}",
-        "trackedDateDistanceHint": "pozostało {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "pozostało {{value}} {{unit}}",
+        "trackedDateDistanceHint": "pozostało {{value}} {{unit}}",
         "markDoneAction": "Gotowe",
         "completeSheetTitle": "„{{label}}” ukończone",
         "completePerformedOnLabel": "Data",
@@ -5331,9 +5331,10 @@
         "odometerUnitMi": "mi",
         "odometerOnLabel": "Data odczytu",
         "historyLabel": "Historia",
+        "historyLoadError": "Nie udało się wczytać historii",
         "historyTotalLabel": "Łączny koszt",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Przebieg w czasie"
     },
     "documentAttach": {

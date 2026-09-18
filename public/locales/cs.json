@@ -5319,8 +5319,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Jednorázově",
         "trackedDateIntervalDistanceLabel": "Interval vzdálenosti",
         "trackedDateIntervalDistancePlaceholder": "např. 15000 km",
-        "trackedDateDistanceHint_one": "zbývá {{count}} {{unit}}",
-        "trackedDateDistanceHint": "zbývá {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "zbývá {{value}} {{unit}}",
+        "trackedDateDistanceHint": "zbývá {{value}} {{unit}}",
         "markDoneAction": "Hotovo",
         "completeSheetTitle": "„{{label}}“ hotovo",
         "completePerformedOnLabel": "Datum",
@@ -5331,9 +5331,10 @@
         "odometerUnitMi": "mi",
         "odometerOnLabel": "Datum odečtu",
         "historyLabel": "Historie",
+        "historyLoadError": "Historii se nepodařilo načíst",
         "historyTotalLabel": "Celkové náklady",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Stav tachometru v čase"
     },
     "documentAttach": {
