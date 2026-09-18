@@ -212,7 +212,7 @@ export function healthPaths() {
     },
     '/api/v1/health/prevention/types': {
       get: op({ summary: 'List the household\'s preventive-care type registry', tag: 'Health', description: 'Open to every member. Nothing is seeded - the household names its own vaccination/checkup types.' }),
-      post: op({ summary: 'Add a preventive-care type', tag: 'Health', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { key, name, kind: "vaccination"|"checkup", default_interval_months?, icon?, sort_order? }. `default_interval_months` omitted/null means one-off (no recurrence).' }),
+      post: op({ summary: 'Add a preventive-care type', tag: 'Health', admin: true, stateChanging: true, requestBody: jsonBody(null), description: 'Body: { name, kind: "vaccination"|"checkup", default_interval_months?, icon?, sort_order? }. `default_interval_months` omitted/null means one-off (no recurrence).' }),
     },
     '/api/v1/health/prevention/types/{id}': {
       patch: op({ summary: 'Update a preventive-care type', tag: 'Health', admin: true, params: [idParam()], stateChanging: true, requestBody: jsonBody(null) }),

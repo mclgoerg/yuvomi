@@ -78,12 +78,12 @@ const asC = () => { session = { userId: userC, role: 'member' }; };
 
 test('nur Admins legen Typen an, alle Mitglieder lesen sie', async () => {
   asB();
-  const denied = await call('POST', '/prevention/types', { key: 'tetanus', name: 'Tetanus', kind: 'vaccination' });
+  const denied = await call('POST', '/prevention/types', { name: 'Tetanus', kind: 'vaccination' });
   assert.equal(denied.status, 403);
 
   asA();
   const created = await call('POST', '/prevention/types', {
-    key: 'tetanus', name: 'Tetanus', kind: 'vaccination', default_interval_months: 120,
+    name: 'Tetanus', kind: 'vaccination', default_interval_months: 120,
   });
   assert.equal(created.status, 201);
   assert.equal(created.body.data.icon, 'syringe');
@@ -91,20 +91,14 @@ test('nur Admins legen Typen an, alle Mitglieder lesen sie', async () => {
   asB();
   const list = await call('GET', '/prevention/types');
   assert.equal(list.status, 200);
-  assert.ok(list.body.data.some((t) => t.key === 'tetanus'));
-});
-
-test('ein doppelter key wird abgewiesen', async () => {
-  asA();
-  const dup = await call('POST', '/prevention/types', { key: 'tetanus', name: 'Tetanus erneut', kind: 'vaccination' });
-  assert.equal(dup.status, 409);
+  assert.ok(list.body.data.some((t) => t.name === 'Tetanus'));
 });
 
 test('ein Typ ohne Intervall ist einmalig (default_interval_months NULL)', async () => {
   asA();
-  const res = await call('POST', '/prevention/types', { key: 'flu', name: 'Grippeimpfung', kind: 'vaccination', default_interval_months: 12 });
+  const res = await call('POST', '/prevention/types', { name: 'Grippeimpfung', kind: 'vaccination', default_interval_months: 12 });
   assert.equal(res.status, 201);
-  const oneOff = await call('POST', '/prevention/types', { key: 'dentist', name: 'Zahnarzt', kind: 'checkup' });
+  const oneOff = await call('POST', '/prevention/types', { name: 'Zahnarzt', kind: 'checkup' });
   assert.equal(oneOff.status, 201);
   assert.equal(oneOff.body.data.default_interval_months, null);
 });
@@ -115,7 +109,7 @@ let tetanusTypeId;
 test('Vorbedingung: tetanus-Typ-ID einsammeln', async () => {
   asB();
   const list = await call('GET', '/prevention/types');
-  tetanusTypeId = list.body.data.find((t) => t.key === 'tetanus').id;
+  tetanusTypeId = list.body.data.find((t) => t.name === 'Tetanus').id;
   assert.ok(tetanusTypeId);
 });
 
@@ -219,7 +213,7 @@ test('ein Admin hat keinen Sonderzugriff auf fremde Datensätze (DECISIONS #1)',
 
 test('das Löschen eines Typs lässt seine Datensätze mit der name-Momentaufnahme bestehen', async () => {
   asA();
-  const type = await call('POST', '/prevention/types', { key: 'mumps', name: 'Mumps', kind: 'vaccination', default_interval_months: 60 });
+  const type = await call('POST', '/prevention/types', { name: 'Mumps', kind: 'vaccination', default_interval_months: 60 });
   const typeId = type.body.data.id;
 
   asB();
@@ -242,7 +236,7 @@ test('das Löschen eines Typs lässt seine Datensätze mit der name-Momentaufnah
 
 test('GET /prevention/due berechnet die Fälligkeit aus dem jüngsten Datensatz je Typ', async () => {
   asA();
-  const type = await call('POST', '/prevention/types', { key: 'checkup6m', name: 'Halbjahres-Check', kind: 'checkup', default_interval_months: 6 });
+  const type = await call('POST', '/prevention/types', { name: 'Halbjahres-Check', kind: 'checkup', default_interval_months: 6 });
   const typeId = type.body.data.id;
 
   asB();
@@ -256,7 +250,7 @@ test('GET /prevention/due berechnet die Fälligkeit aus dem jüngsten Datensatz 
 
 test('GET /prevention/due: ein unbeteiligtes Mitglied (weder Eigentuemer noch Betreuung) sieht nur, was der juengste Datensatz je Typ als familiensichtbar markiert', async () => {
   asA();
-  const type = await call('POST', '/prevention/types', { key: 'checkup_yearly', name: 'Jahres-Check', kind: 'checkup', default_interval_months: 12 });
+  const type = await call('POST', '/prevention/types', { name: 'Jahres-Check', kind: 'checkup', default_interval_months: 12 });
   const typeId = type.body.data.id;
 
   // Dave (userD) ist weder Eigentuemer noch Betreuung - dieselbe Person wie im
@@ -288,6 +282,49 @@ test('GET /prevention/due: ein unbeteiligtes Mitglied (weder Eigentuemer noch Be
   assert.equal(asStrangerFamily.status, 200);
   const item = asStrangerFamily.body.data.find((i) => i.type_id === typeId);
   assert.ok(item, 'ein familiensichtbarer juengster Datensatz muss einem unbeteiligten Mitglied ueber /due sichtbar sein');
+});
+
+test('PATCH next_due_on auf null faellt zurueck auf die intervall-abgeleitete Faelligkeit', async () => {
+  asA();
+  const type = await call('POST', '/prevention/types', { name: 'PATCH-Test-Typ', kind: 'checkup', default_interval_months: 6 });
+  const typeId = type.body.data.id;
+
+  asB();
+  const created = await call('POST', '/prevention/records', {
+    type_id: typeId, given_on: '2026-01-10', next_due_on: '2026-12-25', visibility: 'family',
+  });
+  const id = created.body.data.id;
+
+  const withOverride = await call('GET', `/prevention/due?user_id=${userB}`);
+  const beforePatch = withOverride.body.data.find((i) => i.type_id === typeId);
+  assert.equal(beforePatch.due_on, '2026-12-25', 'die explizite Vorgabe zaehlt, solange sie gesetzt ist');
+
+  const patched = await call('PATCH', `/prevention/records/${id}`, { next_due_on: null });
+  assert.equal(patched.status, 200);
+  assert.equal(patched.body.data.next_due_on, null);
+
+  const afterPatch = await call('GET', `/prevention/due?user_id=${userB}`);
+  const item = afterPatch.body.data.find((i) => i.type_id === typeId);
+  assert.equal(item.due_on, '2026-07-10', 'ohne Vorgabe zaehlt given_on + Intervall (6 Monate)');
+});
+
+test('GET /prevention/due: eine betreuende Person sieht auch ein privates Faelligkeits-Item der betreuten Person', async () => {
+  // Carol (userC) ist seit dem careAwareClause-Test oben Betreuerin von Bob (userB).
+  asA();
+  const type = await call('POST', '/prevention/types', { name: 'Betreuungs-Sichtbarkeits-Test', kind: 'checkup', default_interval_months: 3 });
+  const typeId = type.body.data.id;
+
+  asB();
+  const record = await call('POST', '/prevention/records', {
+    type_id: typeId, given_on: '2026-01-01', visibility: 'private',
+  });
+  assert.equal(record.status, 201);
+
+  asC();
+  const asCaregiver = await call('GET', `/prevention/due?user_id=${userB}`);
+  assert.equal(asCaregiver.status, 200);
+  const item = asCaregiver.body.data.find((i) => i.type_id === typeId);
+  assert.ok(item, 'eine echte Betreuung sieht ein privates Faelligkeits-Item, nicht nur familiensichtbare');
 });
 
 test('teardown: Server schliessen', async () => {

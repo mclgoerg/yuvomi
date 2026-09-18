@@ -4305,7 +4305,7 @@
             "dueTitle": "देय / अतिदेय",
             "overdueDays": "{{count}} दिन से अतिदेय",
             "overdueDays_one": "{{count}} दिन से अतिदेय",
-            "dueInDays": "{{count}} दिन में देय",
+            "dueInDays": "{{count}} दिनों में देय",
             "dueInDays_one": "{{count}} दिन में देय",
             "dueToday": "आज देय है",
             "personsLabel": "व्यक्ति",

@@ -41,17 +41,6 @@ async function loadTypes() {
   _types = res.data || [];
 }
 
-/** `key` ist intern (Sichtbarkeits-Scope, Eindeutigkeit) - der Haushalt tippt nur den Namen. */
-function slugifyKey(name) {
-  let slug = String(name || '')
-    .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  if (!slug || !/^[a-z]/.test(slug)) slug = `t_${slug}`;
-  return slug.slice(0, 40);
-}
-
 function typeIntervalLabel(type) {
   if (!type.default_interval_months) return t('settings.healthPreventionOneOff');
   // Ein Typ alle 10 Jahre eingetragen soll auch "alle 10 Jahre" lesen, nicht
@@ -228,15 +217,7 @@ function openTypeModal(type) {
           if (isEdit) {
             await api.patch(`/health/prevention/types/${type.id}`, body);
           } else {
-            // key ist rein intern (Eindeutigkeit + Sichtbarkeits-Scope) - der
-            // Haushalt sieht/tippt ihn nie. Ein seltener Namenszusammenstoss
-            // (409) bekommt einen zweiten, zufaellig erweiterten Versuch.
-            try {
-              await api.post('/health/prevention/types', { ...body, key: slugifyKey(name) });
-            } catch (err) {
-              if (err?.status !== 409) throw err;
-              await api.post('/health/prevention/types', { ...body, key: `${slugifyKey(name)}_${Math.random().toString(36).slice(2, 6)}` });
-            }
+            await api.post('/health/prevention/types', body);
           }
           closeModal({ force: true });
           window.yuvomi?.showToast(t('settings.healthPreventionTypeSaved'), 'success');

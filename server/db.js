@@ -8984,9 +8984,12 @@ const MIGRATIONS = [
       -- Namen, und SQLites ALTER TABLE ... RENAME TO reminders reparst dabei
       -- die ganze Schema, was mitten in diesem Umbau auf ein momentan
       -- fehlendes "reminders" trifft ("no such table: main.reminders").
-      -- Abraeumen vor dem Umbau und am Ende neu anlegen umgeht das.
-      DROP TRIGGER trg_reminders_tasks_ad;
-      DROP TRIGGER trg_reminders_events_ad;
+      -- Abraeumen vor dem Umbau und am Ende neu anlegen umgeht das. IF EXISTS
+      -- wie in v218 (Review #1255 nice-to-have): kostet hier nichts, haelt
+      -- aber eine Installation nicht auf 218 stecken, falls diese Annahme je
+      -- nicht mehr gilt.
+      DROP TRIGGER IF EXISTS trg_reminders_tasks_ad;
+      DROP TRIGGER IF EXISTS trg_reminders_events_ad;
 
       CREATE TABLE reminders_new (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -9023,7 +9026,6 @@ const MIGRATIONS = [
       -- (deutsche U-Untersuchungen etc.); der Haushalt legt seine eigenen an.
       CREATE TABLE health_prevention_types (
         id                      INTEGER PRIMARY KEY AUTOINCREMENT,
-        key                     TEXT    UNIQUE NOT NULL,
         name                    TEXT    NOT NULL,
         kind                    TEXT    NOT NULL CHECK (kind IN ('vaccination', 'checkup')),
         default_interval_months INTEGER CHECK (default_interval_months IS NULL OR (default_interval_months BETWEEN 1 AND 600)),

@@ -29,22 +29,12 @@ import {
 const router = express.Router();
 
 const KINDS = ['vaccination', 'checkup'];
-const KEY_PATTERN = /^[a-z][a-z0-9_]{0,49}$/;
 const MAX_MONTHS = 600;
 const MAX_OFFSET_DAYS = 365;
 
 // --------------------------------------------------------
 // Validierungs-Helfer
 // --------------------------------------------------------
-
-function vKey(value) {
-  if (value === undefined) return { value: undefined, error: null };
-  const s = String(value || '').trim();
-  if (!KEY_PATTERN.test(s)) {
-    return { value: null, error: 'key must be lowercase letters, digits or underscores, starting with a letter.' };
-  }
-  return { value: s, error: null };
-}
 
 /** 1-600, ganzzahlig; NULL = einmalig (kein Intervall). */
 function vIntervalMonths(value, field = 'default_interval_months') {
@@ -90,31 +80,27 @@ router.get('/prevention/types', (req, res) => {
 router.post('/prevention/types', requireAdmin, (req, res) => {
   try {
     const b = req.body || {};
-    const key = vKey(b.key);
     const name = v.str(b.name, 'name', { max: v.MAX_TITLE });
     const kind = v.oneOf(b.kind, KINDS, 'kind');
     const defaultIntervalMonths = vIntervalMonths(b.default_interval_months);
     const icon = v.str(b.icon, 'icon', { max: 50, required: false });
     const sortOrder = v.num(b.sort_order, 'sort_order');
 
-    const errors = v.collectErrors([key, name, defaultIntervalMonths, icon, sortOrder]);
+    const errors = v.collectErrors([name, defaultIntervalMonths, icon, sortOrder]);
     if (!kind.value) errors.push('kind is required.');
     if (errors.length) return badRequest(res, errors);
 
     const result = db.get().prepare(`
-      INSERT INTO health_prevention_types (key, name, kind, default_interval_months, icon, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO health_prevention_types (name, kind, default_interval_months, icon, sort_order)
+      VALUES (?, ?, ?, ?, ?)
     `).run(
-      key.value, name.value, kind.value, defaultIntervalMonths.value ?? null,
+      name.value, kind.value, defaultIntervalMonths.value ?? null,
       icon.value || 'syringe', sortOrder.value ?? 0,
     );
 
     const row = db.get().prepare('SELECT * FROM health_prevention_types WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ data: row });
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) {
-      return res.status(409).json({ error: 'A type with this key already exists.', code: 409 });
-    }
     log.error('Error creating prevention type:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
   }
@@ -132,7 +118,6 @@ router.patch('/prevention/types/:id', requireAdmin, (req, res) => {
     const fields = {};
     const checks = [];
 
-    if (b.key !== undefined)  { const r = vKey(b.key);  checks.push(r); if (!r.error) fields.key = r.value; }
     if (b.name !== undefined) { const r = v.str(b.name, 'name', { max: v.MAX_TITLE }); checks.push(r); if (!r.error) fields.name = r.value; }
     if (b.kind !== undefined) {
       const r = v.oneOf(b.kind, KINDS, 'kind');
@@ -151,9 +136,6 @@ router.patch('/prevention/types/:id', requireAdmin, (req, res) => {
     applyUpdate('health_prevention_types', id, fields);
     res.json({ data: db.get().prepare('SELECT * FROM health_prevention_types WHERE id = ?').get(id) });
   } catch (err) {
-    if (String(err.message).includes('UNIQUE')) {
-      return res.status(409).json({ error: 'A type with this key already exists.', code: 409 });
-    }
     log.error('Error updating prevention type:', err.message);
     res.status(500).json({ error: 'Internal error.', code: 500 });
   }
@@ -176,7 +158,7 @@ router.delete('/prevention/types/:id', requireAdmin, (req, res) => {
       // Momentaufnahme JETZT ziehen - danach ist der Typname weg, der
       // FK-ON-DELETE-SET-NULL nullt type_id automatisch, kennt aber keinen Namen.
       db.get().prepare(
-        'UPDATE health_prevention_records SET name = ? WHERE type_id = ?'
+        "UPDATE health_prevention_records SET name = ? WHERE type_id = ? AND (name IS NULL OR name = '')"
       ).run(type.name, id);
       db.get().prepare('DELETE FROM health_prevention_types WHERE id = ?').run(id);
     })();

@@ -162,7 +162,10 @@ test('jeder FLAT_SCOPES-Schluessel hat eine Zeile im Settings-Blatt', async () =
   const flatScopesBlock = serverSrc.match(/const FLAT_SCOPES = Object\.freeze\(\{([\s\S]*?)\}\);/)[1];
   const serverKeys = [...flatScopesBlock.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]).sort();
 
-  const clientKeys = [...clientSrc.matchAll(/key: '(\w+)'/g)].map((m) => m[1]).sort();
+  // Nur der visibilityScopes()-Block zaehlt - ein `key: '...'` anderswo im
+  // Modul (z.B. ein kuenftiges, unverwandtes Feature) soll kein falscher Fund werden.
+  const scopesBlock = clientSrc.match(/function visibilityScopes\(\) \{([\s\S]*?)\n\}/)[1];
+  const clientKeys = [...scopesBlock.matchAll(/key: '(\w+)'/g)].map((m) => m[1]).sort();
 
   const missing = serverKeys.filter((k) => !clientKeys.includes(k));
   assert.deepEqual(missing, [], `Settings-Blatt fehlen Zeilen fuer: ${missing.join(', ')}`);

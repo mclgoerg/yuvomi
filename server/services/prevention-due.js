@@ -58,7 +58,6 @@ export function computeDueForUser(database, userId, todayKeyValue) {
 
     items.push({
       type_id: type.id,
-      type_key: type.key,
       type_name: type.name,
       kind: type.kind,
       icon: type.icon,

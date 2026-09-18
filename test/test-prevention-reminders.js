@@ -35,12 +35,12 @@ function makeUser() {
 }
 
 function makeType(fields = {}) {
-  const key = `type${nextUserId++}`;
+  const name = fields.name ?? `type${nextUserId++}`;
   const intervalMonths = 'default_interval_months' in fields ? fields.default_interval_months : 12;
   return db.prepare(`
-    INSERT INTO health_prevention_types (key, name, kind, default_interval_months, icon)
-    VALUES (?, ?, ?, ?, 'syringe')
-  `).run(key, fields.name ?? key, fields.kind ?? 'vaccination', intervalMonths).lastInsertRowid;
+    INSERT INTO health_prevention_types (name, kind, default_interval_months, icon)
+    VALUES (?, ?, ?, 'syringe')
+  `).run(name, fields.kind ?? 'vaccination', intervalMonths).lastInsertRowid;
 }
 
 function makeRecord(userId, typeId, fields = {}) {

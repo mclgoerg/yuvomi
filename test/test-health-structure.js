@@ -2,8 +2,9 @@
  * Health structure guard.
  *
  * Sichert die modulare Aufteilung von server/routes/health.js: der Orchestrator
- * muss dieselbe {Methode, Pfad}-Routentabelle ergeben (74 Routen: 65 vorher,
- * dazu die neun Vorsorge-Routen aus prevention.js), und die
+ * muss dieselbe {Methode, Pfad}-Routentabelle ergeben (EXPECTED weiter unten,
+ * inklusive der neun Vorsorge-Routen aus prevention.js - keine feste Zahl
+ * hier, main waechst an anderer Stelle weiter), und die
  * Tab-Cluster-Router müssen zusammen exakt diese Routen ergeben
  * (keine verlorene/doppelte Route). Fängt ab, dass ein Cluster-Router still nicht
  * gemountet wird oder eine Route beim Umbau verloren geht/umbenannt wird.
@@ -152,10 +153,15 @@ const EXPECTED = [
   'GET /prevention/due',
 ];
 
-test('Orchestrator ergibt exakt die erwartete Routentabelle (74 Routen)', () => {
+test('Orchestrator ergibt exakt die erwartete Routentabelle', () => {
   const actual = collectRoutes(healthRouter).sort();
   assert.deepEqual(actual, [...EXPECTED].sort());
-  assert.equal(actual.length, 74);
+  // EXPECTED.length statt einer hartcodierten Zahl (Review-Runde 2 an #1256):
+  // main waechst an anderer Stelle weiter, ein fester Literal-Wert hier faellt
+  // dem zum Opfer, ohne dass diese Datei etwas damit zu tun haette. Das
+  // deepEqual oben pinnt die Tabelle ohnehin exakt - die abgeleitete Form
+  // ueberlebt main, das feste Literal nicht.
+  assert.equal(actual.length, EXPECTED.length);
 });
 
 test('die Cluster-Router zusammen ergeben genau die Orchestrator-Routen (keine verlorene/doppelte Route)', () => {
