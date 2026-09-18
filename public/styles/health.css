@@ -1209,6 +1209,83 @@ button.health-med-card:hover {
   flex: 0 0 auto;
 }
 
+/* Vorsorge-Zeilen (Review #1256): eigene Klassen statt geliehener
+ * health-activity-row*, damit eine Aenderung hier die Aktivitaeten-Zeilen
+ * nicht mehr stillschweigend mitzieht. Nur die Regeln, die die Vorsorge-Zeile
+ * tatsaechlich braucht (kein __icon/__type - sie hat kein Icon je Zeile). */
+.health-prevention-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border: none;
+  background: transparent;
+}
+
+.health-prevention-row + .health-prevention-row {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.health-prevention-row__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.health-prevention-row__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.health-prevention-row__when {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.health-prevention-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.health-prevention-row__chip {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  padding: var(--space-0h) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+}
+
+.health-prevention-row__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.health-prevention-row__edit {
+  flex: 0 0 auto;
+}
+
+/* Intervall-Eingabe (Wert + Einheit nebeneinander) - war inline style="",
+ * die Tokens waren richtig, nur nicht am richtigen Ort (Review #1256). */
+.health-prevention-interval-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.health-prevention-interval-row__value {
+  flex: 1;
+  min-width: 0;
+}
+
+.health-prevention-interval-row__unit {
+  flex: 0 0 auto;
+}
+
 @media (max-width: 639px) {
   /* .health-page bekommt hier BEWUSST keinen eigenen padding-inline mehr:
    * --space-3 (12px) schlug --page-inline-pad (16px) und setzte den Inhalt

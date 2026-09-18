@@ -63,6 +63,7 @@ export function computeDueForUser(database, userId, todayKeyValue) {
       kind: type.kind,
       icon: type.icon,
       record_id: record.id,
+      visibility: record.visibility,
       last_given_on: record.given_on,
       interval_months: intervalMonths,
       due_on: dueOn,

@@ -2709,6 +2709,9 @@
         "memberSsoOnlyLabel": "SSO 로그인만 허용",
         "memberSsoOnlyHint": "이 계정에는 비밀번호가 없습니다. 구성원은 SSO로만 로그인할 수 있습니다.",
         "memberSsoOnlyEditHint": "켜면 계정은 비밀번호를 잃고 SSO로만 들어옵니다. 끄려면 새 비밀번호를 설정해야 합니다.",
+        "healthPreventionNotifyCaregiversLabel": "돌봄 제공자에게 알리기",
+        "healthPreventionNotifyCaregiversHint": "돌봄 제공자는 앱을 열면 이미 기한이 된 항목을 볼 수 있습니다. 이 설정을 켜면 회원님의 이름이 포함된 푸시 알림도 함께 전송됩니다 - 돌봄 권한만으로는 알림이 발송되지 않으므로 기본값은 꺼짐입니다.",
+        "healthPreventionNotifyCaregiversSaved": "알림 설정이 저장되었습니다.",
         "healthVisibilityTitle": "기본 공개 범위",
         "healthVisibilityHint": "새 기록이 시작하는 값입니다. 기록마다 바꿀 수 있습니다.",
         "healthVisibilityOther": "기타 영역",
@@ -2763,6 +2766,8 @@
         "healthPreventionOneOff": "일회성",
         "healthPreventionIntervalMonths": "{{count}}개월마다",
         "healthPreventionIntervalMonths_one": "매월",
+        "healthPreventionIntervalYears": "{{count}}년마다",
+        "healthPreventionIntervalYears_one": "매년",
         "healthPreventionKind": {
             "vaccination": "예방접종",
             "checkup": "검진"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "{{count}}일 지연됨",
             "dueInDays": "{{count}}일 후 예정",
             "dueInDays_one": "{{count}}일 후 예정",
+            "dueToday": "오늘 마감",
             "personsLabel": "대상자",
             "loadError": "예방 데이터를 불러올 수 없습니다.",
             "loadErrorDesc": "나중에 다시 시도해 주세요.",

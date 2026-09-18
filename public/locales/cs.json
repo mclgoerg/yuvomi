@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "Pouze přihlášení přes SSO",
         "memberSsoOnlyHint": "Účet nedostane žádné heslo. Člen se může přihlásit pouze přes SSO.",
         "memberSsoOnlyEditHint": "Je-li přepínač zapnutý, účet ztratí své heslo a dostane se dovnitř jen přes SSO. K vypnutí je nutné nastavit nové heslo.",
+        "healthPreventionNotifyCaregiversLabel": "Upozornit pečovatele",
+        "healthPreventionNotifyCaregiversHint": "Pečovatel už při otevření aplikace vidí, co je splatné. Tímto mu navíc pošlete push upozornění s vaším jménem - ve výchozím stavu vypnuto, protože oprávnění k péči samo o sobě upozornění neznamená.",
+        "healthPreventionNotifyCaregiversSaved": "Nastavení upozornění uloženo.",
         "healthVisibilityTitle": "Výchozí viditelnost",
         "healthVisibilityHint": "S čím nové záznamy začínají. U každého záznamu to můžeš změnit.",
         "healthVisibilityOther": "Další oblasti",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "Jednorázově",
         "healthPreventionIntervalMonths": "Každých {{count}} měsíců",
         "healthPreventionIntervalMonths_one": "Každý měsíc",
+        "healthPreventionIntervalYears": "Každých {{count}} let",
+        "healthPreventionIntervalYears_one": "Každý rok",
         "healthPreventionKind": {
             "vaccination": "Očkování",
             "checkup": "Prohlídka"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "Po termínu {{count}} dnem",
             "dueInDays": "Termín za {{count}} dní",
             "dueInDays_one": "Termín za {{count}} den",
+            "dueToday": "Dnes vyprší",
             "personsLabel": "Osoba",
             "loadError": "Data prevence se nepodařilo načíst.",
             "loadErrorDesc": "Zkuste to prosím později znovu.",

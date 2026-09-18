@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "Alleen SSO-aanmelding",
         "memberSsoOnlyHint": "Het account krijgt geen wachtwoord. Het lid kan zich alleen via SSO aanmelden.",
         "memberSsoOnlyEditHint": "Staat de schakelaar aan, dan verliest het account zijn wachtwoord en komt het alleen nog via SSO binnen. Uitschakelen vereist een nieuw wachtwoord.",
+        "healthPreventionNotifyCaregiversLabel": "Verzorgers op de hoogte stellen",
+        "healthPreventionNotifyCaregiversHint": "Een verzorger ziet al wat er verschuldigd is zodra de app wordt geopend. Deze instelling stuurt daarnaast een pushmelding met jouw naam - standaard uit, want zorgtoegang alleen betekent nog geen melding.",
+        "healthPreventionNotifyCaregiversSaved": "Meldingsinstelling opgeslagen.",
         "healthVisibilityTitle": "Standaardzichtbaarheid",
         "healthVisibilityHint": "Waarmee nieuwe items beginnen. Je kunt het bij elk item nog wijzigen.",
         "healthVisibilityOther": "Andere onderdelen",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "Eenmalig",
         "healthPreventionIntervalMonths": "Elke {{count}} maanden",
         "healthPreventionIntervalMonths_one": "Elke maand",
+        "healthPreventionIntervalYears": "Elke {{count}} jaar",
+        "healthPreventionIntervalYears_one": "Elk jaar",
         "healthPreventionKind": {
             "vaccination": "Vaccinatie",
             "checkup": "Controle"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "{{count}} dag te laat",
             "dueInDays": "Over {{count}} dagen",
             "dueInDays_one": "Over {{count}} dag",
+            "dueToday": "Vandaag vervallen",
             "personsLabel": "Persoon",
             "loadError": "Preventiegegevens konden niet worden geladen.",
             "loadErrorDesc": "Probeer het later opnieuw.",

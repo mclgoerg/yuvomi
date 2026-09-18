@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "Chỉ đăng nhập bằng SSO",
         "memberSsoOnlyHint": "Tài khoản không nhận mật khẩu. Thành viên chỉ có thể đăng nhập qua SSO.",
         "memberSsoOnlyEditHint": "Khi bật, tài khoản mất mật khẩu và chỉ vào được qua SSO. Để tắt, cần đặt một mật khẩu mới.",
+        "healthPreventionNotifyCaregiversLabel": "Thông báo cho người chăm sóc",
+        "healthPreventionNotifyCaregiversHint": "Người chăm sóc đã có thể thấy mục nào đến hạn khi mở ứng dụng. Bật tùy chọn này sẽ gửi thêm thông báo đẩy có tên của bạn - mặc định tắt, vì quyền chăm sóc không tự động nghĩa là có thông báo.",
+        "healthPreventionNotifyCaregiversSaved": "Đã lưu cài đặt thông báo.",
         "healthVisibilityTitle": "Hiển thị mặc định",
         "healthVisibilityHint": "Giá trị khởi đầu của mục mới. Bạn vẫn có thể đổi ở từng mục.",
         "healthVisibilityOther": "Khu vực khác",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "Một lần",
         "healthPreventionIntervalMonths": "Mỗi {{count}} tháng",
         "healthPreventionIntervalMonths_one": "Mỗi tháng",
+        "healthPreventionIntervalYears": "Mỗi {{count}} năm",
+        "healthPreventionIntervalYears_one": "Mỗi năm",
         "healthPreventionKind": {
             "vaccination": "Tiêm chủng",
             "checkup": "Kiểm tra"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "Quá hạn {{count}} ngày",
             "dueInDays": "Đến hạn sau {{count}} ngày",
             "dueInDays_one": "Đến hạn sau {{count}} ngày",
+            "dueToday": "Đến hạn hôm nay",
             "personsLabel": "Người",
             "loadError": "Không thể tải dữ liệu phòng ngừa.",
             "loadErrorDesc": "Vui lòng thử lại sau.",

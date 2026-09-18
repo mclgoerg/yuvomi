@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "Μόνο σύνδεση με SSO",
         "memberSsoOnlyHint": "Ο λογαριασμός δεν αποκτά κωδικό. Το μέλος μπορεί να συνδεθεί μόνο μέσω SSO.",
         "memberSsoOnlyEditHint": "Με τον διακόπτη ενεργό, ο λογαριασμός χάνει τον κωδικό του και μπαίνει μόνο μέσω SSO. Για την απενεργοποίηση πρέπει να οριστεί νέος κωδικός.",
+        "healthPreventionNotifyCaregiversLabel": "Ειδοποίηση φροντιστών",
+        "healthPreventionNotifyCaregiversHint": "Ο φροντιστής βλέπει ήδη τι εκκρεμεί όταν ανοίγει την εφαρμογή. Αυτή η ρύθμιση στέλνει επιπλέον μια ειδοποίηση push με το όνομά σας - απενεργοποιημένη από προεπιλογή, αφού η άδεια φροντίδας από μόνη της δεν σημαίνει ειδοποίηση.",
+        "healthPreventionNotifyCaregiversSaved": "Η ρύθμιση ειδοποιήσεων αποθηκεύτηκε.",
         "healthVisibilityTitle": "Προεπιλεγμένη ορατότητα",
         "healthVisibilityHint": "Με τι ξεκινούν οι νέες καταχωρήσεις. Μπορείς να το αλλάξεις σε κάθε καταχώρηση.",
         "healthVisibilityOther": "Άλλες ενότητες",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "Εφάπαξ",
         "healthPreventionIntervalMonths": "Κάθε {{count}} μήνες",
         "healthPreventionIntervalMonths_one": "Κάθε μήνα",
+        "healthPreventionIntervalYears": "Κάθε {{count}} χρόνια",
+        "healthPreventionIntervalYears_one": "Κάθε χρόνο",
         "healthPreventionKind": {
             "vaccination": "Εμβόλιο",
             "checkup": "Εξέταση"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "Εκπρόθεσμο κατά {{count}} ημέρα",
             "dueInDays": "Λήγει σε {{count}} ημέρες",
             "dueInDays_one": "Λήγει σε {{count}} ημέρα",
+            "dueToday": "Λήγει σήμερα",
             "personsLabel": "Άτομο",
             "loadError": "Τα δεδομένα πρόληψης δεν ήταν δυνατό να φορτωθούν.",
             "loadErrorDesc": "Δοκίμασε ξανά αργότερα.",

@@ -23,7 +23,7 @@ import { syncPreventionRemindersForSubject } from '../../services/prevention-rem
 import {
   log, VISIBILITIES,
   viewerId, careAwareClause, applyUpdate, badRequest,
-  resolveOwner, writableClause,
+  resolveOwner, writableClause, canWriteFor,
 } from './helpers.js';
 
 const router = express.Router();
@@ -369,25 +369,17 @@ router.get('/prevention/due', (req, res) => {
     const viewer   = viewerId(req);
     const personId = req.query.user_id ? parseInt(req.query.user_id, 10) : viewer;
 
-    const isSelf = personId === viewer;
-    const isCaregiver = !isSelf && !!db.get().prepare(
-      'SELECT 1 FROM health_care_grants WHERE subject_id = ? AND caregiver_id = ?'
-    ).get(personId, viewer);
-
     const today = todayKey(db.get(), new Date());
     let items = computeDueForUser(db.get(), personId, today);
 
-    if (!isSelf && !isCaregiver) {
+    if (!canWriteFor(viewer, personId)) {
       // Ohne Betreuung nur, was der Eigentuemer als familiensichtbar markiert
       // hat - dieselbe Grenze wie careAwareClause() fuer die Datensaetze
       // selbst (helpers.js), hier auf den je Typ juengsten Datensatz
-      // angewandt statt sie ein zweites Mal zu formulieren.
-      items = items.filter((item) => {
-        const record = db.get().prepare(
-          'SELECT visibility FROM health_prevention_records WHERE id = ?'
-        ).get(item.record_id);
-        return record?.visibility === 'family';
-      });
+      // angewandt statt sie ein zweites Mal zu formulieren. computeDueForUser()
+      // liest die Sichtbarkeit ohnehin schon je Datensatz mit, kein zweiter
+      // Query pro Eintrag noetig.
+      items = items.filter((item) => item.visibility === 'family');
     }
 
     res.json({ data: items });

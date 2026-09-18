@@ -2709,6 +2709,9 @@
         "memberSsoOnlyLabel": "Pag-sign in sa SSO lamang",
         "memberSsoOnlyHint": "Walang password na makukuha ang account. Makakapag-sign in lang ang miyembro sa pamamagitan ng SSO.",
         "memberSsoOnlyEditHint": "Kapag naka-on ito, mawawala ang password ng account at sa SSO na lang ito papasok. Para i-off, kailangang magtakda ng bagong password.",
+        "healthPreventionNotifyCaregiversLabel": "Abisuhan ang mga tagapag-alaga",
+        "healthPreventionNotifyCaregiversHint": "Nakikita na ng tagapag-alaga kung ano ang due sa pagbukas ng app. Ang pagbukas nito ay magpapadala rin sa kanila ng push notification na may pangalan mo - naka-off bilang default, dahil ang access ng pag-aalaga lang ay hindi awtomatikong nangangahulugan ng notification.",
+        "healthPreventionNotifyCaregiversSaved": "Na-save ang setting ng notification.",
         "healthVisibilityTitle": "Default na visibility",
         "healthVisibilityHint": "Kung ano ang panimulang halaga ng bagong entry. Mababago mo pa ito sa bawat entry.",
         "healthVisibilityOther": "Iba pang bahagi",
@@ -2763,6 +2766,8 @@
         "healthPreventionOneOff": "Minsanan lang",
         "healthPreventionIntervalMonths": "Bawat {{count}} buwan",
         "healthPreventionIntervalMonths_one": "Bawat buwan",
+        "healthPreventionIntervalYears": "Bawat {{count}} taon",
+        "healthPreventionIntervalYears_one": "Bawat taon",
         "healthPreventionKind": {
             "vaccination": "Bakuna",
             "checkup": "Check-up"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "Lampas na ng {{count}} araw",
             "dueInDays": "Sa loob ng {{count}} araw",
             "dueInDays_one": "Sa loob ng {{count}} araw",
+            "dueToday": "Ngayon ang takdang araw",
             "personsLabel": "Tao",
             "loadError": "Hindi ma-load ang datos ng pag-iwas.",
             "loadErrorDesc": "Subukan ulit mamaya.",

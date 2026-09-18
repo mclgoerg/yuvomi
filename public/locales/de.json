@@ -2709,6 +2709,9 @@
         "memberSsoOnlyLabel": "Nur SSO-Anmeldung",
         "memberSsoOnlyHint": "Das Konto bekommt kein Passwort. Anmelden kann sich das Mitglied nur über SSO.",
         "memberSsoOnlyEditHint": "Ist der Schalter an, verliert das Konto sein Passwort und kommt nur noch über SSO herein. Zum Ausschalten muss ein neues Passwort gesetzt werden.",
+        "healthPreventionNotifyCaregiversLabel": "Betreuende Personen benachrichtigen",
+        "healthPreventionNotifyCaregiversHint": "Eine betreuende Person sieht bereits beim Öffnen der App, was fällig ist. Diese Einstellung schickt ihr zusätzlich eine Push-Benachrichtigung mit deinem Namen - standardmäßig aus, denn die Betreuungs-Zusage allein bedeutet noch keine Benachrichtigung.",
+        "healthPreventionNotifyCaregiversSaved": "Benachrichtigungs-Einstellung gespeichert.",
         "healthVisibilityTitle": "Standard-Sichtbarkeit",
         "healthVisibilityHint": "Womit neue Einträge vorbelegt werden. Beim Eintragen lässt sich das jedes Mal ändern.",
         "healthVisibilityOther": "Weitere Bereiche",
@@ -2763,6 +2766,8 @@
         "healthPreventionOneOff": "Einmalig",
         "healthPreventionIntervalMonths": "Alle {{count}} Monate",
         "healthPreventionIntervalMonths_one": "Jeden Monat",
+        "healthPreventionIntervalYears": "Alle {{count}} Jahre",
+        "healthPreventionIntervalYears_one": "Jedes Jahr",
         "healthPreventionKind": {
             "vaccination": "Impfung",
             "checkup": "Untersuchung"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "Seit {{count}} Tag überfällig",
             "dueInDays": "Fällig in {{count}} Tagen",
             "dueInDays_one": "Fällig in {{count}} Tag",
+            "dueToday": "Heute fällig",
             "personsLabel": "Person",
             "loadError": "Vorsorge-Daten konnten nicht geladen werden.",
             "loadErrorDesc": "Bitte versuche es später erneut.",

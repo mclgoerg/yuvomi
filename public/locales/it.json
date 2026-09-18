@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "Solo accesso con SSO",
         "memberSsoOnlyHint": "L'account non riceve alcuna password. Il membro può accedere solo tramite SSO.",
         "memberSsoOnlyEditHint": "Con l'interruttore attivo l'account perde la sua password ed entra solo tramite SSO. Per disattivarlo occorre impostare una nuova password.",
+        "healthPreventionNotifyCaregiversLabel": "Avvisa chi si prende cura di me",
+        "healthPreventionNotifyCaregiversHint": "Chi si prende cura di te vede già cosa è in scadenza aprendo l'app. Questa opzione gli invia anche una notifica push con il tuo nome - disattivata per impostazione predefinita, perché l'autorizzazione di assistenza da sola non implica una notifica.",
+        "healthPreventionNotifyCaregiversSaved": "Impostazione delle notifiche salvata.",
         "healthVisibilityTitle": "Visibilità predefinita",
         "healthVisibilityHint": "Come nascono le nuove voci. Puoi cambiarlo per ogni voce.",
         "healthVisibilityOther": "Altre aree",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "Una tantum",
         "healthPreventionIntervalMonths": "Ogni {{count}} mesi",
         "healthPreventionIntervalMonths_one": "Ogni mese",
+        "healthPreventionIntervalYears": "Ogni {{count}} anni",
+        "healthPreventionIntervalYears_one": "Ogni anno",
         "healthPreventionKind": {
             "vaccination": "Vaccinazione",
             "checkup": "Controllo"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "Scaduto da {{count}} giorno",
             "dueInDays": "In scadenza tra {{count}} giorni",
             "dueInDays_one": "In scadenza tra {{count}} giorno",
+            "dueToday": "Scade oggi",
             "personsLabel": "Persona",
             "loadError": "Impossibile caricare i dati di prevenzione.",
             "loadErrorDesc": "Riprova più tardi.",

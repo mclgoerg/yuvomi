@@ -53,9 +53,14 @@ function slugifyKey(name) {
 }
 
 function typeIntervalLabel(type) {
-  return type.default_interval_months
-    ? t('settings.healthPreventionIntervalMonths', { count: type.default_interval_months })
-    : t('settings.healthPreventionOneOff');
+  if (!type.default_interval_months) return t('settings.healthPreventionOneOff');
+  // Ein Typ alle 10 Jahre eingetragen soll auch "alle 10 Jahre" lesen, nicht
+  // "alle 120 Monate" - dieselbe Monate/Jahre-Umrechnung wie das Formular
+  // direkt darueber, das Monate ODER Jahre entgegennimmt (Review #1256).
+  const { value, unit } = intervalMonthsToInput(type.default_interval_months);
+  return unit === 'years'
+    ? t('settings.healthPreventionIntervalYears', { count: value })
+    : t('settings.healthPreventionIntervalMonths', { count: value });
 }
 
 function typesListMarkup() {
@@ -153,8 +158,7 @@ function openTypeModal(type) {
         <p class="form-hint">${esc(t('settings.healthPreventionTypeIntervalHint'))}</p>
         <div class="form-field">
           <label class="label" id="hpt-icon-label">${esc(t('settings.healthPreventionTypeIcon'))}</label>
-          <button type="button" class="btn btn--secondary" id="hpt-icon-trigger" aria-labelledby="hpt-icon-label"
-                  style="display:inline-flex;align-items:center;gap:var(--space-2);width:fit-content">
+          <button type="button" class="btn btn--secondary settings-icon-trigger" id="hpt-icon-trigger" aria-labelledby="hpt-icon-label">
             <i data-lucide="${esc(type?.icon || 'syringe')}" aria-hidden="true"></i>
             <span>${esc(t('iconPicker.title'))}</span>
           </button>

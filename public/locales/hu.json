@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "Csak SSO-bejelentkezés",
         "memberSsoOnlyHint": "A fiók nem kap jelszót. A tag csak SSO-val tud bejelentkezni.",
         "memberSsoOnlyEditHint": "Bekapcsolt kapcsolóval a fiók elveszíti a jelszavát, és csak SSO-val jut be. A kikapcsoláshoz új jelszót kell megadni.",
+        "healthPreventionNotifyCaregiversLabel": "Gondozók értesítése",
+        "healthPreventionNotifyCaregiversHint": "A gondozó már az alkalmazás megnyitásakor látja, mi esedékes. Ez a beállítás emellett push-értesítést is küld neki a nevével - alapértelmezetten kikapcsolva, mert a gondozási jogosultság önmagában nem jelent értesítést.",
+        "healthPreventionNotifyCaregiversSaved": "Az értesítési beállítás mentve.",
         "healthVisibilityTitle": "Alapértelmezett láthatóság",
         "healthVisibilityHint": "Milyen értékkel indulnak az új bejegyzések. Minden bejegyzésnél módosíthatod.",
         "healthVisibilityOther": "További területek",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "Egyszeri",
         "healthPreventionIntervalMonths": "{{count}} havonta",
         "healthPreventionIntervalMonths_one": "Havonta",
+        "healthPreventionIntervalYears": "{{count}} évente",
+        "healthPreventionIntervalYears_one": "Évente",
         "healthPreventionKind": {
             "vaccination": "Védőoltás",
             "checkup": "Szűrés"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "{{count}} napja lejárt",
             "dueInDays": "{{count}} nap múlva esedékes",
             "dueInDays_one": "{{count}} nap múlva esedékes",
+            "dueToday": "Ma esedékes",
             "personsLabel": "Személy",
             "loadError": "A megelőzési adatokat nem sikerült betölteni.",
             "loadErrorDesc": "Próbáld újra később.",

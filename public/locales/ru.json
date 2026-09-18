@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "Только вход через SSO",
         "memberSsoOnlyHint": "Учётная запись не получает пароль. Участник может войти только через SSO.",
         "memberSsoOnlyEditHint": "При включённом переключателе учётная запись теряет свой пароль и входит только через SSO. Чтобы выключить его, нужно задать новый пароль.",
+        "healthPreventionNotifyCaregiversLabel": "Уведомлять опекунов",
+        "healthPreventionNotifyCaregiversHint": "Опекун уже видит, что подошёл срок, открыв приложение. Эта настройка дополнительно отправляет ему push-уведомление с вашим именем - по умолчанию выключено, так как право опеки само по себе не означает уведомление.",
+        "healthPreventionNotifyCaregiversSaved": "Настройка уведомлений сохранена.",
         "healthVisibilityTitle": "Видимость по умолчанию",
         "healthVisibilityHint": "С чем создаются новые записи. Для каждой записи это можно изменить.",
         "healthVisibilityOther": "Другие разделы",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "Разово",
         "healthPreventionIntervalMonths": "Каждые {{count}} мес.",
         "healthPreventionIntervalMonths_one": "Каждый месяц",
+        "healthPreventionIntervalYears": "Каждые {{count}} лет",
+        "healthPreventionIntervalYears_one": "Каждый год",
         "healthPreventionKind": {
             "vaccination": "Прививка",
             "checkup": "Осмотр"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "Просрочено на {{count}} день",
             "dueInDays": "Через {{count}} дн.",
             "dueInDays_one": "Через {{count}} день",
+            "dueToday": "Сегодня",
             "personsLabel": "Человек",
             "loadError": "Не удалось загрузить данные о профилактике.",
             "loadErrorDesc": "Попробуйте позже.",

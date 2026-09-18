@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "Yalnızca SSO ile giriş",
         "memberSsoOnlyHint": "Hesap şifre almaz. Üye yalnızca SSO ile giriş yapabilir.",
         "memberSsoOnlyEditHint": "Anahtar açıkken hesap şifresini kaybeder ve yalnızca SSO ile girer. Kapatmak için yeni bir şifre belirlenmelidir.",
+        "healthPreventionNotifyCaregiversLabel": "Bakım verenleri bilgilendir",
+        "healthPreventionNotifyCaregiversHint": "Bakım veren kişi uygulamayı açtığında zaten neyin süresi geldiğini görür. Bu ayar ayrıca adınızı belirten bir push bildirimi de gönderir - bakım izni tek başına bildirim anlamına gelmediği için varsayılan olarak kapalıdır.",
+        "healthPreventionNotifyCaregiversSaved": "Bildirim ayarı kaydedildi.",
         "healthVisibilityTitle": "Varsayılan görünürlük",
         "healthVisibilityHint": "Yeni kayıtların hangi değerle başlayacağı. Her kayıtta değiştirebilirsin.",
         "healthVisibilityOther": "Diğer alanlar",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "Tek seferlik",
         "healthPreventionIntervalMonths": "Her {{count}} ayda bir",
         "healthPreventionIntervalMonths_one": "Her ay",
+        "healthPreventionIntervalYears": "Her {{count}} yılda bir",
+        "healthPreventionIntervalYears_one": "Her yıl",
         "healthPreventionKind": {
             "vaccination": "Aşı",
             "checkup": "Kontrol"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "{{count}} gün gecikti",
             "dueInDays": "{{count}} gün içinde",
             "dueInDays_one": "{{count}} gün içinde",
+            "dueToday": "Bugün bitiyor",
             "personsLabel": "Kişi",
             "loadError": "Önleyici bakım verileri yüklenemedi.",
             "loadErrorDesc": "Lütfen daha sonra tekrar deneyin.",

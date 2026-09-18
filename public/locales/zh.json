@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "仅通过 SSO 登录",
         "memberSsoOnlyHint": "该账户不会设置密码，成员只能通过 SSO 登录。",
         "memberSsoOnlyEditHint": "开关打开时，账户将失去密码，只能通过 SSO 进入。关闭时必须设置新密码。",
+        "healthPreventionNotifyCaregiversLabel": "通知我的照护者",
+        "healthPreventionNotifyCaregiversHint": "照护者打开应用后已经可以看到到期项目。开启此设置还会向其发送包含您姓名的推送通知 - 默认关闭,因为仅有照护权限并不意味着会收到通知。",
+        "healthPreventionNotifyCaregiversSaved": "通知设置已保存。",
         "healthVisibilityTitle": "默认可见范围",
         "healthVisibilityHint": "新记录的初始值。每次记录时仍可更改。",
         "healthVisibilityOther": "其他板块",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "一次性",
         "healthPreventionIntervalMonths": "每 {{count}} 个月",
         "healthPreventionIntervalMonths_one": "每月",
+        "healthPreventionIntervalYears": "每 {{count}} 年",
+        "healthPreventionIntervalYears_one": "每年",
         "healthPreventionKind": {
             "vaccination": "疫苗接种",
             "checkup": "体检"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "已逾期 {{count}} 天",
             "dueInDays": "{{count}} 天后到期",
             "dueInDays_one": "{{count}} 天后到期",
+            "dueToday": "今天到期",
             "personsLabel": "成员",
             "loadError": "无法加载预防保健数据。",
             "loadErrorDesc": "请稍后重试。",

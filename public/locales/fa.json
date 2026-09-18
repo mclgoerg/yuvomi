@@ -2709,6 +2709,9 @@
         "memberSsoOnlyLabel": "فقط ورود با SSO",
         "memberSsoOnlyHint": "این حساب رمز عبوری دریافت نمی‌کند. عضو تنها می‌تواند از طریق SSO وارد شود.",
         "memberSsoOnlyEditHint": "با روشن بودن این کلید، حساب رمز عبور خود را از دست می‌دهد و فقط از طریق SSO وارد می‌شود. برای خاموش کردن باید رمز عبور جدیدی تعیین شود.",
+        "healthPreventionNotifyCaregiversLabel": "اطلاع‌رسانی به مراقبان",
+        "healthPreventionNotifyCaregiversHint": "مراقب شما هنگام باز کردن برنامه از قبل می‌بیند چه چیزی سررسیده است. این گزینه علاوه بر آن یک اعلان فوری با نام شما ارسال می‌کند - به‌طور پیش‌فرض خاموش است، زیرا مجوز مراقبت به‌تنهایی به معنای اعلان نیست.",
+        "healthPreventionNotifyCaregiversSaved": "تنظیم اعلان ذخیره شد.",
         "healthVisibilityTitle": "نمایش پیش‌فرض",
         "healthVisibilityHint": "مقداری که ورودی‌های تازه با آن آغاز می‌شوند. در هر ورودی قابل تغییر است.",
         "healthVisibilityOther": "بخش‌های دیگر",
@@ -2763,6 +2766,8 @@
         "healthPreventionOneOff": "یک‌بار",
         "healthPreventionIntervalMonths": "هر {{count}} ماه",
         "healthPreventionIntervalMonths_one": "هر ماه",
+        "healthPreventionIntervalYears": "هر {{count}} سال",
+        "healthPreventionIntervalYears_one": "هر سال",
         "healthPreventionKind": {
             "vaccination": "واکسن",
             "checkup": "معاینه"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "{{count}} روز پیش معوق",
             "dueInDays": "{{count}} روز دیگر موعد",
             "dueInDays_one": "{{count}} روز دیگر موعد",
+            "dueToday": "موعد امروز",
             "personsLabel": "فرد",
             "loadError": "بارگذاری داده‌های پیشگیری ممکن نشد.",
             "loadErrorDesc": "لطفاً بعداً دوباره تلاش کنید.",

@@ -18,6 +18,7 @@ import { CHART, chartScales, chartGridMarkup, chartXLabelsMarkup, chartX, chartY
 import { scheduleUndoableDelete } from '/utils/ux.js';
 import { toLocalDateKey, parseLocalDateKey, addLocalDays, todayKey} from '/utils/date.js';
 import { zonedDateKey } from '/utils/timezone.js';
+import { DATE_STATUS_ALERT_DAYS } from '/utils/date-status.js';
 import { nowFields } from '/utils/timezone.js';
 import { trendMarkup } from '/utils/metric-card.js';
 import { openModal, closeModal, confirmModal, confirmOverModal, reportFieldError, advancedSection, refocusAfterRender } from '/components/modal.js';
@@ -3776,11 +3777,13 @@ function preventionDueSectionMarkup() {
 
 function preventionDueRowMarkup(item) {
   const overdue = item.days_left < 0;
-  const soon = !overdue && item.days_left <= 30;
+  const soon = !overdue && item.days_left <= DATE_STATUS_ALERT_DAYS;
   const tone = overdue ? 'overdue' : soon ? 'soon' : 'ok';
   const text = overdue
     ? t('health.prevention.overdueDays', { count: Math.abs(item.days_left) })
-    : t('health.prevention.dueInDays', { count: item.days_left });
+    : item.days_left === 0
+      ? t('health.prevention.dueToday')
+      : t('health.prevention.dueInDays', { count: item.days_left });
   return `
     <li class="health-prevention-due-row health-prevention-due-row--${tone}">
       <span class="health-prevention-due-row__icon" aria-hidden="true"><i data-lucide="${esc(item.icon || 'syringe')}"></i></span>
@@ -3811,19 +3814,22 @@ function preventionRowMarkup(row, own) {
   if (row.dose_number != null) meta.push(t('health.prevention.field.doseShort', { value: row.dose_number }));
   if (row.provider) meta.push(row.provider);
   if (row.batch) meta.push(row.batch);
+  // Eigene Klassen statt health-activity-row* (Review #1256): dieselben Regeln
+  // heute (siehe health.css), aber eine Aenderung an Aktivitaeten soll die
+  // Vorsorge-Zeilen nicht mehr stillschweigend mitziehen, und umgekehrt.
   const metaHtml = meta.length
-    ? `<span class="health-activity-row__meta">${meta.map((m) => `<span class="health-activity-row__chip">${esc(m)}</span>`).join('')}</span>`
+    ? `<span class="health-prevention-row__meta">${meta.map((m) => `<span class="health-prevention-row__chip">${esc(m)}</span>`).join('')}</span>`
     : '';
-  const noteHtml = row.note ? `<span class="health-activity-row__note">${esc(row.note)}</span>` : '';
+  const noteHtml = row.note ? `<span class="health-prevention-row__note">${esc(row.note)}</span>` : '';
   const editBtn = own
-    ? `<button type="button" class="btn btn--icon btn--sm health-activity-row__edit" data-prevention-edit="${esc(row.id)}"
+    ? `<button type="button" class="btn btn--icon btn--sm health-prevention-row__edit" data-prevention-edit="${esc(row.id)}"
          aria-label="${esc(t('health.prevention.edit'))}"><i data-lucide="pencil" aria-hidden="true"></i></button>`
     : '';
   return `
-    <li class="health-activity-row" data-record-id="${esc(row.id)}">
-      <span class="health-activity-row__body">
-        <span class="health-activity-row__head">
-          <span class="health-activity-row__when">${esc(formatDate(row.given_on))}</span>
+    <li class="health-prevention-row" data-record-id="${esc(row.id)}">
+      <span class="health-prevention-row__body">
+        <span class="health-prevention-row__head">
+          <span class="health-prevention-row__when">${esc(formatDate(row.given_on))}</span>
         </span>
         ${metaHtml}
         ${noteHtml}
@@ -3876,9 +3882,9 @@ function openPreventionModal(row) {
     <div class="modal-grid modal-grid--2">
       <div class="form-field">
         <label class="label" for="prevention-interval">${esc(t('health.prevention.field.intervalMonths'))}</label>
-        <div style="display:flex;gap:var(--space-2)">
-          <input class="input" id="prevention-interval" type="number" inputmode="numeric" min="1" step="1" value="${esc(val(interval.value))}" style="flex:1;min-width:0">
-          <select class="input" id="prevention-interval-unit" aria-label="${esc(t('common.unit'))}" style="flex:0 0 auto">${preventionIntervalUnitOptions(interval.unit)}</select>
+        <div class="health-prevention-interval-row">
+          <input class="input health-prevention-interval-row__value" id="prevention-interval" type="number" inputmode="numeric" min="1" step="1" value="${esc(val(interval.value))}">
+          <select class="input health-prevention-interval-row__unit" id="prevention-interval-unit" aria-label="${esc(t('common.unit'))}">${preventionIntervalUnitOptions(interval.unit)}</select>
         </div>
       </div>
       <div class="form-field">
@@ -4018,8 +4024,16 @@ function collectPreventionBody(panel) {
   if (dose !== undefined) body.dose_number = dose;
   if (interval !== undefined) body.interval_months = interval;
   if (offset !== undefined) body.reminder_offset_days = offset;
-  const nextDueOn = panel.querySelector('#prevention-next-due')?.value;
-  if (nextDueOn) body.next_due_on = nextDueOn;
+  // Der Input existiert nur, wenn die "Erweitert"-Sektion offen ist (siehe
+  // advancedOpen oben) - und die oeffnet sich ueberhaupt nur, wenn next_due_on
+  // (oder Intervall/Vorlauf) schon einen Wert traegt. Ist sie offen, ist das
+  // Feld also in Reichweite dieser Bearbeitung: ein geleertes Feld muss den
+  // Wert loeschen (`null`), nicht `undefined` senden und ihn dadurch fuer
+  // immer stehen lassen - anders als bei den anderen numField()-Werten oben,
+  // die absichtlich "nicht beruehrt" bedeuten, wenn das Formular sie nie
+  // gezeigt hat.
+  const nextDueInput = panel.querySelector('#prevention-next-due');
+  if (nextDueInput) body.next_due_on = nextDueInput.value || null;
   const provider = strField('#prevention-provider');
   if (provider) body.provider = provider;
   const batch = strField('#prevention-batch');

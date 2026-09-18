@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "Apenas início de sessão com SSO",
         "memberSsoOnlyHint": "A conta não recebe senha. O membro só pode iniciar sessão através de SSO.",
         "memberSsoOnlyEditHint": "Com o interruptor ligado, a conta perde a sua senha e só entra através de SSO. Para o desligar é preciso definir uma nova senha.",
+        "healthPreventionNotifyCaregiversLabel": "Avisar meus cuidadores",
+        "healthPreventionNotifyCaregiversHint": "Quem cuida de você já vê o que está pendente ao abrir o app. Esta opção também envia uma notificação push com seu nome - desativada por padrão, já que a permissão de cuidado sozinha não implica notificação.",
+        "healthPreventionNotifyCaregiversSaved": "Configuração de notificação salva.",
         "healthVisibilityTitle": "Visibilidade padrão",
         "healthVisibilityHint": "Como as novas entradas começam. Podes alterar isso em cada entrada.",
         "healthVisibilityOther": "Outras áreas",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "Único",
         "healthPreventionIntervalMonths": "A cada {{count}} meses",
         "healthPreventionIntervalMonths_one": "Todos os meses",
+        "healthPreventionIntervalYears": "A cada {{count}} anos",
+        "healthPreventionIntervalYears_one": "Todos os anos",
         "healthPreventionKind": {
             "vaccination": "Vacina",
             "checkup": "Check-up"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "Atrasado há {{count}} dia",
             "dueInDays": "Vence em {{count}} dias",
             "dueInDays_one": "Vence em {{count}} dia",
+            "dueToday": "Vence hoje",
             "personsLabel": "Pessoa",
             "loadError": "Não foi possível carregar os dados de prevenção.",
             "loadErrorDesc": "Tenta novamente mais tarde.",

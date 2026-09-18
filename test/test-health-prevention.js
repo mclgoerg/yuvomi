@@ -43,6 +43,8 @@ const userB = db.prepare(`INSERT INTO users (username, display_name, password_ha
   VALUES ('bob', 'Bob', '$2b$12$x', 'member')`).run().lastInsertRowid;
 const userC = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
   VALUES ('carol', 'Carol', '$2b$12$x', 'member')`).run().lastInsertRowid;
+const userD = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
+  VALUES ('dave', 'Dave', '$2b$12$x', 'member')`).run().lastInsertRowid;
 
 let session = { userId: userA, role: 'admin' };
 const app = express();
@@ -146,8 +148,6 @@ test('careAwareClause: eine betreuende Person sieht auch private Datensätze der
   assert.ok(asCaregiver.body.data.length > 0, 'die betreuende Person sieht die privaten Datensätze');
 
   // Ein viertes, unbeteiligtes Mitglied ohne Betreuungs-Zusage sieht nichts.
-  const userD = db.prepare(`INSERT INTO users (username, display_name, password_hash, role)
-    VALUES ('dave', 'Dave', '$2b$12$x', 'member')`).run().lastInsertRowid;
   session = { userId: userD, role: 'member' };
   const asStranger = await call('GET', `/prevention/records?user_id=${userB}`);
   assert.equal(asStranger.status, 200);
@@ -252,6 +252,42 @@ test('GET /prevention/due berechnet die Fälligkeit aus dem jüngsten Datensatz 
   const item = due.body.data.find((i) => i.type_id === typeId);
   assert.ok(item, 'der Typ erscheint in der Faelligkeitsliste');
   assert.equal(item.due_on, '2026-07-31', '31. Jan + 6 Monate, kein Schaltmonat-Problem hier');
+});
+
+test('GET /prevention/due: ein unbeteiligtes Mitglied (weder Eigentuemer noch Betreuung) sieht nur, was der juengste Datensatz je Typ als familiensichtbar markiert', async () => {
+  asA();
+  const type = await call('POST', '/prevention/types', { key: 'checkup_yearly', name: 'Jahres-Check', kind: 'checkup', default_interval_months: 12 });
+  const typeId = type.body.data.id;
+
+  // Dave (userD) ist weder Eigentuemer noch Betreuung - dieselbe Person wie im
+  // careAwareClause-Test oben ("ein unbetreutes Mitglied sieht keine privaten
+  // Datensätze"), hier gegen /prevention/due statt /prevention/records.
+  asB();
+  const privateRecord = await call('POST', '/prevention/records', {
+    type_id: typeId, given_on: '2026-01-15', visibility: 'private',
+  });
+  assert.equal(privateRecord.status, 201);
+
+  session = { userId: userD, role: 'member' };
+  const asStrangerPrivate = await call('GET', `/prevention/due?user_id=${userB}`);
+  assert.equal(asStrangerPrivate.status, 200);
+  assert.ok(!asStrangerPrivate.body.data.some((i) => i.type_id === typeId),
+    'ein privater Datensatz darf einem unbeteiligten Mitglied nicht ueber /due verraten werden');
+
+  // Derselbe Typ, aber der juengste Datensatz ist jetzt familiensichtbar -
+  // computeDueForUser() nimmt ohnehin den juengsten je Typ, die Sichtbarkeits-
+  // Pruefung in prevention.js muss also denselben Datensatz treffen.
+  asB();
+  const familyRecord = await call('POST', '/prevention/records', {
+    type_id: typeId, given_on: '2026-02-15', visibility: 'family',
+  });
+  assert.equal(familyRecord.status, 201);
+
+  session = { userId: userD, role: 'member' };
+  const asStrangerFamily = await call('GET', `/prevention/due?user_id=${userB}`);
+  assert.equal(asStrangerFamily.status, 200);
+  const item = asStrangerFamily.body.data.find((i) => i.type_id === typeId);
+  assert.ok(item, 'ein familiensichtbarer juengster Datensatz muss einem unbeteiligten Mitglied ueber /due sichtbar sein');
 });
 
 test('teardown: Server schliessen', async () => {

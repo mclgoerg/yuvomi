@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "केवल SSO साइन-इन",
         "memberSsoOnlyHint": "इस खाते को कोई पासवर्ड नहीं मिलेगा। सदस्य केवल SSO से ही साइन इन कर सकता है।",
         "memberSsoOnlyEditHint": "स्विच चालू होने पर खाता अपना पासवर्ड खो देता है और केवल SSO से ही अंदर आता है। बंद करने के लिए नया पासवर्ड सेट करना होगा।",
+        "healthPreventionNotifyCaregiversLabel": "देखभालकर्ताओं को सूचित करें",
+        "healthPreventionNotifyCaregiversHint": "देखभालकर्ता ऐप खोलते ही देख लेता है कि क्या देय है। इसे चालू करने पर उसे आपका नाम बताते हुए पुश सूचना भी भेजी जाएगी - डिफ़ॉल्ट रूप से बंद, क्योंकि देखभाल की अनुमति अपने आप में सूचना नहीं दर्शाती।",
+        "healthPreventionNotifyCaregiversSaved": "सूचना सेटिंग सहेजी गई।",
         "healthVisibilityTitle": "डिफ़ॉल्ट दृश्यता",
         "healthVisibilityHint": "नई प्रविष्टियाँ किस मान से शुरू होती हैं। हर प्रविष्टि पर इसे बदला जा सकता है।",
         "healthVisibilityOther": "अन्य क्षेत्र",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "एकबारगी",
         "healthPreventionIntervalMonths": "हर {{count}} महीने",
         "healthPreventionIntervalMonths_one": "हर महीने",
+        "healthPreventionIntervalYears": "हर {{count}} साल",
+        "healthPreventionIntervalYears_one": "हर साल",
         "healthPreventionKind": {
             "vaccination": "टीका",
             "checkup": "जांच"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "{{count}} दिन से अतिदेय",
             "dueInDays": "{{count}} दिन में देय",
             "dueInDays_one": "{{count}} दिन में देय",
+            "dueToday": "आज देय है",
             "personsLabel": "व्यक्ति",
             "loadError": "निवारण डेटा लोड नहीं हो सका।",
             "loadErrorDesc": "कृपया बाद में पुनः प्रयास करें।",

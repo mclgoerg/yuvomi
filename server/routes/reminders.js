@@ -286,6 +286,18 @@ router.get('/pending', (req, res) => {
       if (row.cycle_anchor_kind === 'partner_period') {
         row.cycle_owner_name = cycleOwnerName(row.entity_id);
       }
+      // Gleiche Lage wie oben, fuer D6: nur die geerbte Zeile (assigned_from
+      // gesetzt) nennt die betreute Person - server/services/notifications.js
+      // #preventionDueBody haelt denselben Riegel fuer die Push-Benachrichtigung,
+      // hier fuer den In-App-Toast (Review #1256: die eine Stelle folgte der
+      // anderen nicht).
+      if (row.entity_type === 'health_prevention_due' && row.assigned_from != null) {
+        row.prevention_subject_name = db.get().prepare(`
+          SELECT u.display_name FROM health_prevention_records pr
+          JOIN users u ON u.id = pr.user_id
+          WHERE pr.id = ?
+        `).get(row.entity_id)?.display_name;
+      }
     }
 
     res.json({ data: rows });

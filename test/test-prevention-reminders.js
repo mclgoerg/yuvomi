@@ -61,6 +61,16 @@ function revokeCare(subjectId, caregiverId) {
   db.prepare('DELETE FROM health_care_grants WHERE subject_id = ? AND caregiver_id = ?').run(subjectId, caregiverId);
 }
 
+// Opt-in wie cycle_settings.notify_partner_user_id - Standard aus (Review
+// #1256). Ohne diese Zeile bekaeme selbst eine bestehende Betreuungs-Zusage
+// keine geerbte Erinnerung.
+function enableNotifyCaregivers(subjectId) {
+  db.prepare(`
+    INSERT INTO sync_config (key, value) VALUES (?, '1')
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(`health_prevention_notify_caregivers:user:${subjectId}`);
+}
+
 function remindersFor(recordId) {
   return db.prepare(`
     SELECT * FROM reminders WHERE entity_type = 'health_prevention_due' AND entity_id = ?
@@ -136,10 +146,45 @@ test('der Voll-Sync raeumt eine Erinnerung ab, deren Datensatz geloescht wurde',
 
 // ── D6: Betreuungs-Fan-out ──────────────────────────────────────────────────
 
+test('D6: ohne Opt-in bekommt eine betreuende Person KEINE Zeile, trotz bestehender Betreuungs-Zusage', () => {
+  // Der Kern von Review #1256: health_care_grants regelt Lese-/Schreibrecht,
+  // nicht ob eine Push-Benachrichtigung mit Namen auf einem fremden Geraet
+  // landet. Ohne die ausdrueckliche Zustimmung des Eigentuemers bleibt es bei
+  // dessen eigener Zeile - dieselbe Grundhaltung wie cycle_settings.notify_partner_user_id.
+  const subject = makeUser();
+  const caregiver = makeUser();
+  grantCare(subject, caregiver);
+  const t = makeType({ default_interval_months: 12 });
+  const recordId = makeRecord(subject, t, { given_on: '2026-01-01' });
+
+  syncPreventionRemindersForSubject(db, subject, NOW);
+  const rows = remindersFor(recordId);
+  assert.ok(rows.some((r) => r.created_by === subject), 'die Eigentuemer-Zeile existiert weiterhin');
+  assert.ok(!rows.some((r) => r.created_by === caregiver), 'keine geerbte Zeile ohne Opt-in');
+});
+
+test('D6: das Opt-in auszuschalten raeumt eine bereits geerbte Zeile sofort ab', () => {
+  const subject = makeUser();
+  const caregiver = makeUser();
+  grantCare(subject, caregiver);
+  enableNotifyCaregivers(subject);
+  const t = makeType({ default_interval_months: 12 });
+  const recordId = makeRecord(subject, t, { given_on: '2026-01-01' });
+
+  syncPreventionRemindersForSubject(db, subject, NOW);
+  assert.ok(remindersFor(recordId).some((r) => r.created_by === caregiver), 'Vorbedingung: die Betreuer-Zeile existiert');
+
+  db.prepare("UPDATE sync_config SET value = '0' WHERE key = ?").run(`health_prevention_notify_caregivers:user:${subject}`);
+  syncPreventionRemindersForSubject(db, subject, NOW);
+  assert.ok(!remindersFor(recordId).some((r) => r.created_by === caregiver), 'die geerbte Zeile ist weg, sobald das Opt-in zurueckgenommen wird');
+  assert.ok(remindersFor(recordId).some((r) => r.created_by === subject), 'die Eigentuemer-Zeile bleibt bestehen');
+});
+
 test('D6: eine betreuende Person bekommt eine eigene Zeile (assigned_from = Subjekt)', () => {
   const subject = makeUser();
   const caregiver = makeUser();
   grantCare(subject, caregiver);
+  enableNotifyCaregivers(subject);
   const t = makeType({ default_interval_months: 12 });
   const recordId = makeRecord(subject, t, { given_on: '2026-01-01' });
 
@@ -158,6 +203,7 @@ test('D6: eine selbst gesetzte Zeile (assigned_from IS NULL) einer Betreuungsper
   const subject = makeUser();
   const caregiver = makeUser();
   grantCare(subject, caregiver);
+  enableNotifyCaregivers(subject);
   const t = makeType({ default_interval_months: 12 });
   const recordId = makeRecord(subject, t, { given_on: '2026-01-01' });
 
@@ -190,6 +236,7 @@ test('D6: ein Entzug der Betreuung raeumt die geerbte Zeile sofort ab', () => {
   const subject = makeUser();
   const caregiver = makeUser();
   grantCare(subject, caregiver);
+  enableNotifyCaregivers(subject);
   const t = makeType({ default_interval_months: 12 });
   const recordId = makeRecord(subject, t, { given_on: '2026-01-01' });
 
@@ -206,6 +253,7 @@ test('D6: eine betreuende Person ohne Health-Zugriff bekommt keine Zeile', () =>
   const subject = makeUser();
   const caregiver = makeUser();
   grantCare(subject, caregiver);
+  enableNotifyCaregivers(subject);
   db.prepare(`
     INSERT INTO access_permissions (subject_type, subject_id, resource_type, resource_key, access)
     VALUES ('user', ?, 'module', 'health', 'none')
@@ -225,6 +273,8 @@ test('D6: der Voll-Sync erreicht auch Betreuungspersonen ueber mehrere Subjekte'
   const caregiver = makeUser();
   grantCare(subjectOne, caregiver);
   grantCare(subjectTwo, caregiver);
+  enableNotifyCaregivers(subjectOne);
+  enableNotifyCaregivers(subjectTwo);
   const t = makeType({ default_interval_months: 12 });
   const recordOne = makeRecord(subjectOne, t, { given_on: '2026-01-01' });
   const recordTwo = makeRecord(subjectTwo, t, { given_on: '2026-02-01' });
@@ -244,6 +294,7 @@ test('D6: der Push-Text nennt die betreute Person nur auf der geerbten Zeile', a
   db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run('Mara', subject);
   const caregiver = makeUser();
   grantCare(subject, caregiver);
+  enableNotifyCaregivers(subject);
 
   const t = makeType({ name: 'Tetanus', default_interval_months: 1 });
   makeRecord(subject, t, { given_on: '2026-01-01', reminder_offset_days: 0 });

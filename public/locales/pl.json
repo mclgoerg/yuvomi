@@ -2709,6 +2709,9 @@
         "memberSsoOnlyLabel": "Tylko logowanie przez SSO",
         "memberSsoOnlyHint": "Konto nie otrzyma hasła. Członek może zalogować się wyłącznie przez SSO.",
         "memberSsoOnlyEditHint": "Przy włączonym przełączniku konto traci hasło i wchodzi już tylko przez SSO. Aby go wyłączyć, trzeba ustawić nowe hasło.",
+        "healthPreventionNotifyCaregiversLabel": "Powiadamiaj opiekunów",
+        "healthPreventionNotifyCaregiversHint": "Opiekun widzi już, co jest wymagane, otwierając aplikację. To ustawienie dodatkowo wysyła mu powiadomienie push z Twoim imieniem - domyślnie wyłączone, ponieważ samo uprawnienie opieki nie oznacza powiadomienia.",
+        "healthPreventionNotifyCaregiversSaved": "Zapisano ustawienie powiadomień.",
         "healthVisibilityTitle": "Domyślna widoczność",
         "healthVisibilityHint": "Z czym startują nowe wpisy. Przy każdym wpisie możesz to zmienić.",
         "healthVisibilityOther": "Pozostałe obszary",
@@ -2763,6 +2766,8 @@
         "healthPreventionOneOff": "Jednorazowo",
         "healthPreventionIntervalMonths": "Co {{count}} miesięcy",
         "healthPreventionIntervalMonths_one": "Co miesiąc",
+        "healthPreventionIntervalYears": "Co {{count}} lat",
+        "healthPreventionIntervalYears_one": "Co rok",
         "healthPreventionKind": {
             "vaccination": "Szczepienie",
             "checkup": "Badanie"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "Zaległe od {{count}} dnia",
             "dueInDays": "Termin za {{count}} dni",
             "dueInDays_one": "Termin za {{count}} dzień",
+            "dueToday": "Na dziś",
             "personsLabel": "Osoba",
             "loadError": "Nie udało się wczytać danych profilaktycznych.",
             "loadErrorDesc": "Spróbuj ponownie później.",

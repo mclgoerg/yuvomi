@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "SSO サインインのみ",
         "memberSsoOnlyHint": "このアカウントにはパスワードが設定されません。メンバーは SSO でのみサインインできます。",
         "memberSsoOnlyEditHint": "オンにするとアカウントはパスワードを失い、SSO でのみ入れるようになります。オフにするには新しいパスワードの設定が必要です。",
+        "healthPreventionNotifyCaregiversLabel": "介護者に通知する",
+        "healthPreventionNotifyCaregiversHint": "介護者はアプリを開けばすでに期限が来ている項目を確認できます。この設定をオンにすると、あなたの名前を含むプッシュ通知も送信されます - ケア権限があるだけでは通知は行われないため、デフォルトはオフです。",
+        "healthPreventionNotifyCaregiversSaved": "通知設定を保存しました。",
         "healthVisibilityTitle": "既定の公開範囲",
         "healthVisibilityHint": "新しい記録の初期値です。記録ごとに変更できます。",
         "healthVisibilityOther": "その他の領域",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "一回限り",
         "healthPreventionIntervalMonths": "{{count}}か月ごと",
         "healthPreventionIntervalMonths_one": "毎月",
+        "healthPreventionIntervalYears": "{{count}}年ごと",
+        "healthPreventionIntervalYears_one": "毎年",
         "healthPreventionKind": {
             "vaccination": "予防接種",
             "checkup": "健診"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "{{count}}日超過",
             "dueInDays": "あと{{count}}日で期限",
             "dueInDays_one": "あと{{count}}日で期限",
+            "dueToday": "今日が期限",
             "personsLabel": "対象者",
             "loadError": "予防データを読み込めませんでした。",
             "loadErrorDesc": "後でもう一度お試しください。",

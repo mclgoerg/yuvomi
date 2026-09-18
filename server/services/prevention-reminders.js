@@ -37,6 +37,14 @@
  *   - GEGATET JE EMPFÄNGER, NICHT NUR JE EIGENTÜMER: eine betreuende Person ohne
  *     Health-Zugriff (`resolvePermissions(...).modules.health === 'none'`)
  *     bekommt keine Zeile.
+ *   - OPT-IN DURCH DEN EIGENTÜMER (`health_prevention_notify_caregivers`,
+ *     server/routes/preferences.js), Standard AUS - dasselbe Muster wie
+ *     `cycle_settings.notify_partner_user_id`: eine Betreuungs-Zusage
+ *     (health_care_grants) regelt Lese-/Schreibrecht auf die Daten, nicht ob
+ *     eine Push-Benachrichtigung mit dem Namen der betreuten Person und der
+ *     Art des faelligen Eintrags auf einem fremden Geraet landet. Ohne
+ *     Opt-in bekommt niemand eine geerbte Zeile, auch bei bestehender
+ *     Betreuung nicht (Review #1256).
  *   - DER TEXT NENNT DIE BETREUTE PERSON NUR AUF DER GEERBTEN ZEILE
  *     (`assigned_from IS NOT NULL`) - server/services/notifications.js#preventionDueBody.
  */
@@ -145,9 +153,16 @@ export function syncPreventionRemindersForSubject(database, subjectId, now = new
     }
 
     const subjectHasHealth = !lacksHealth(database, subjectId);
-    const caregiverIds = database.prepare(
+    // Opt-in des Eigentuemers - siehe Modulkopf. Derselbe sync_config-
+    // Schluessel wie server/routes/preferences.js#cfgUserSet schreibt
+    // ('health_prevention_notify_caregivers:user:<id>'), hier direkt gelesen
+    // statt ueber die Route (gleiches Muster wie fasting.js#clockMode).
+    const notifyCaregivers = database.prepare(
+      'SELECT value FROM sync_config WHERE key = ?'
+    ).get(`health_prevention_notify_caregivers:user:${subjectId}`)?.value === '1';
+    const caregiverIds = notifyCaregivers ? database.prepare(
       'SELECT caregiver_id FROM health_care_grants WHERE subject_id = ?'
-    ).all(subjectId).map((r) => r.caregiver_id).filter((id) => !lacksHealth(database, id));
+    ).all(subjectId).map((r) => r.caregiver_id).filter((id) => !lacksHealth(database, id)) : [];
 
     for (const item of items) {
       syncRecordReminder(database, item, subjectId, subjectHasHealth, caregiverIds);

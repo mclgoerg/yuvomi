@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "تسجيل الدخول بـ SSO فقط",
         "memberSsoOnlyHint": "لن يحصل الحساب على كلمة مرور. لا يمكن للعضو تسجيل الدخول إلا عبر SSO.",
         "memberSsoOnlyEditHint": "عند تفعيل هذا الخيار يفقد الحساب كلمة مروره ولا يدخل إلا عبر SSO. لإيقافه يجب تعيين كلمة مرور جديدة.",
+        "healthPreventionNotifyCaregiversLabel": "إشعار مقدمي الرعاية",
+        "healthPreventionNotifyCaregiversHint": "يرى مقدم الرعاية بالفعل ما هو مستحق عند فتح التطبيق. يؤدي تفعيل هذا الخيار أيضًا إلى إرسال إشعار فوري يذكر اسمك - معطّل افتراضيًا، لأن إذن الرعاية وحده لا يعني إشعارًا.",
+        "healthPreventionNotifyCaregiversSaved": "تم حفظ إعداد الإشعارات.",
         "healthVisibilityTitle": "الظهور الافتراضي",
         "healthVisibilityHint": "القيمة التي تبدأ بها الإدخالات الجديدة. يمكنك تغييرها مع كل إدخال.",
         "healthVisibilityOther": "مجالات أخرى",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "لمرة واحدة",
         "healthPreventionIntervalMonths": "كل {{count}} أشهر",
         "healthPreventionIntervalMonths_one": "كل شهر",
+        "healthPreventionIntervalYears": "كل {{count}} سنوات",
+        "healthPreventionIntervalYears_one": "كل سنة",
         "healthPreventionKind": {
             "vaccination": "لقاح",
             "checkup": "فحص"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "متأخر يوم واحد",
             "dueInDays": "مستحق خلال {{count}} يومًا",
             "dueInDays_one": "مستحق خلال يوم واحد",
+            "dueToday": "يستحق اليوم",
             "personsLabel": "الشخص",
             "loadError": "تعذر تحميل بيانات الوقاية.",
             "loadErrorDesc": "يرجى المحاولة لاحقًا.",

@@ -2697,6 +2697,9 @@
         "memberSsoOnlyLabel": "Endast SSO-inloggning",
         "memberSsoOnlyHint": "Kontot får inget lösenord. Medlemmen kan bara logga in via SSO.",
         "memberSsoOnlyEditHint": "Med reglaget på förlorar kontot sitt lösenord och kommer bara in via SSO. För att stänga av det måste ett nytt lösenord anges.",
+        "healthPreventionNotifyCaregiversLabel": "Meddela mina vårdgivare",
+        "healthPreventionNotifyCaregiversHint": "Den som hjälper dig ser redan vad som är dags för när appen öppnas. Den här inställningen skickar dessutom en push-notis med ditt namn - avstängd som standard, eftersom omsorgsbehörighet i sig inte innebär en avisering.",
+        "healthPreventionNotifyCaregiversSaved": "Aviseringsinställning sparad.",
         "healthVisibilityTitle": "Standardsynlighet",
         "healthVisibilityHint": "Vad nya poster börjar som. Du kan ändra det för varje post.",
         "healthVisibilityOther": "Andra områden",
@@ -2751,6 +2754,8 @@
         "healthPreventionOneOff": "Engångs",
         "healthPreventionIntervalMonths": "Var {{count}}:e månad",
         "healthPreventionIntervalMonths_one": "Varje månad",
+        "healthPreventionIntervalYears": "Vart {{count}}:e år",
+        "healthPreventionIntervalYears_one": "Varje år",
         "healthPreventionKind": {
             "vaccination": "Vaccination",
             "checkup": "Kontroll"
@@ -4302,6 +4307,7 @@
             "overdueDays_one": "Försenat med {{count}} dag",
             "dueInDays": "Dags om {{count}} dagar",
             "dueInDays_one": "Dags om {{count}} dag",
+            "dueToday": "Förfaller idag",
             "personsLabel": "Person",
             "loadError": "Data för förebyggande vård kunde inte läsas in.",
             "loadErrorDesc": "Försök igen senare.",
