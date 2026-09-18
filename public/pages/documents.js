@@ -855,12 +855,18 @@ function renderCategoryChips() {
 }
 
 // Ein einzelner Umschalt-Chip, gleiches Muster wie renderCategoryChips - nur ein
-// Zustand statt einer Auswahlliste, weil es nur "an" oder "aus" gibt.
+// Zustand statt einer Auswahlliste, weil es nur "an" oder "aus" gibt. Und
+// dieselbe Regel: nur zeigen, wenn er irgendwohin fuehrt - direkt nach dem
+// Anlegen des Features hat noch kein Dokument ein Ablaufdatum, und ein
+// dauerhaft sichtbarer Filter, der ins Leere fuehrt, waere Rauschen wie bei
+// den Kategorien oben. Der aktive Filter bleibt auch bei 0 stehen, aus
+// demselben Grund wie dort - er soll waehrend der Benutzung nicht wegspringen.
 function renderExpiringChip() {
   const host = _container?.querySelector('#documents-expiring-filter');
   if (!host) return;
   const count = expiringCount();
   host.replaceChildren();
+  if (!count && !state.expiringSoon) return;
   host.insertAdjacentHTML('beforeend', `
     <button type="button" class="filter-chip filter-chip--sm${state.expiringSoon ? ' filter-chip--active' : ''}" data-expiring-toggle aria-pressed="${state.expiringSoon}">
       <i data-lucide="calendar-clock" class="icon-md" aria-hidden="true"></i>${t('documents.expiringFilterLabel')}<span class="filter-chip__count">${count}</span>
@@ -1813,7 +1819,7 @@ function openDocumentModal(doc = null, { initialUpload = 'files' } = {}) {
           <div class="form-group">
             <label class="label" for="document-expiry-reminder-days">${t('documents.expiryReminderLabel')}</label>
             <input class="input" id="document-expiry-reminder-days" type="number" min="0" max="365" step="1"
-                   value="${doc?.expiry_reminder_days ?? ''}" placeholder="${esc(t('documents.expiryReminderPlaceholder'))}">
+                   value="${esc(doc?.expiry_reminder_days ?? '')}" placeholder="${esc(t('documents.expiryReminderPlaceholder'))}">
             <p class="document-form__hint">${t('documents.expiryReminderHint')}</p>
           </div>
         </div>`;
