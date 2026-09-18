@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Одноразово",
         "trackedDateIntervalDistanceLabel": "Інтервал за пробігом",
         "trackedDateIntervalDistancePlaceholder": "напр. 15000 км",
-        "trackedDateDistanceHint_one": "залишилось {{count}} {{unit}}",
-        "trackedDateDistanceHint": "залишилось {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "залишилось {{value}} {{unit}}",
+        "trackedDateDistanceHint": "залишилось {{value}} {{unit}}",
         "markDoneAction": "Готово",
         "completeSheetTitle": "«{{label}}» виконано",
         "completePerformedOnLabel": "Дата",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "милі",
         "odometerOnLabel": "Дата показника",
         "historyLabel": "Історія",
+        "historyLoadError": "Не вдалося завантажити історію",
         "historyTotalLabel": "Загальна вартість",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Пробіг у часі"
     },
     "documentAttach": {

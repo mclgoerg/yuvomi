@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Egyszeri",
         "trackedDateIntervalDistanceLabel": "Távolság-intervallum",
         "trackedDateIntervalDistancePlaceholder": "pl. 15000 km",
-        "trackedDateDistanceHint_one": "még {{count}} {{unit}}",
-        "trackedDateDistanceHint": "még {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "még {{value}} {{unit}}",
+        "trackedDateDistanceHint": "még {{value}} {{unit}}",
         "markDoneAction": "Kész",
         "completeSheetTitle": "„{{label}}” kész",
         "completePerformedOnLabel": "Dátum",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "mérföld",
         "odometerOnLabel": "Leolvasás dátuma",
         "historyLabel": "Előzmények",
+        "historyLoadError": "Az előzményeket nem sikerült betölteni",
         "historyTotalLabel": "Összes költség",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Kilométeróra időbeli alakulása"
     },
     "documentAttach": {

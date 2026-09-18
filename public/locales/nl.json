@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Eenmalig",
         "trackedDateIntervalDistanceLabel": "Afstandsinterval",
         "trackedDateIntervalDistancePlaceholder": "bijv. 15000 km",
-        "trackedDateDistanceHint_one": "nog {{count}} {{unit}}",
-        "trackedDateDistanceHint": "nog {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "nog {{value}} {{unit}}",
+        "trackedDateDistanceHint": "nog {{value}} {{unit}}",
         "markDoneAction": "Klaar",
         "completeSheetTitle": "\"{{label}}\" voltooid",
         "completePerformedOnLabel": "Datum",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "mi",
         "odometerOnLabel": "Aflezingsdatum",
         "historyLabel": "Geschiedenis",
+        "historyLoadError": "Geschiedenis kon niet worden geladen",
         "historyTotalLabel": "Totale kosten",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Kilometerstand in de tijd"
     },
     "documentAttach": {

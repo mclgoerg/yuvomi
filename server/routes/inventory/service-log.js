@@ -211,8 +211,21 @@ function recomputeItemOdometer(itemId) {
 
 function deleteServiceLogEntry({ itemId, logId }) {
   const result = db.get().transaction(() => {
+    // Vor dem Loeschen pruefen, ob DIESE Zeile ueberhaupt den aktuell
+    // zwischengespeicherten Kilometerstand gesetzt hat - eine rueckdatierte
+    // oder sonst nicht fuehrende Zeile darf einen unabhaengig (z. B. im
+    // Formular) gesetzten Stand nicht mitreissen, nur weil sie geloescht wird
+    // (Review #1257).
+    const logRow = db.get().prepare(
+      'SELECT performed_on, odometer FROM inventory_item_service_log WHERE id = ? AND item_id = ?'
+    ).get(logId, itemId);
     const changes = db.get().prepare('DELETE FROM inventory_item_service_log WHERE id = ? AND item_id = ?').run(logId, itemId);
-    if (changes.changes > 0) recomputeItemOdometer(itemId);
+    if (changes.changes > 0 && logRow?.odometer != null) {
+      const item = db.get().prepare('SELECT odometer, odometer_on FROM inventory_items WHERE id = ?').get(itemId);
+      if (item && item.odometer === logRow.odometer && item.odometer_on === logRow.performed_on) {
+        recomputeItemOdometer(itemId);
+      }
+    }
     return changes;
   })();
   return result;

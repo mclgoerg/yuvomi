@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Engångs",
         "trackedDateIntervalDistanceLabel": "Distansintervall",
         "trackedDateIntervalDistancePlaceholder": "t.ex. 15000 km",
-        "trackedDateDistanceHint_one": "{{count}} {{unit}} kvar",
-        "trackedDateDistanceHint": "{{count}} {{unit}} kvar",
+        "trackedDateDistanceHint_one": "{{value}} {{unit}} kvar",
+        "trackedDateDistanceHint": "{{value}} {{unit}} kvar",
         "markDoneAction": "Klar",
         "completeSheetTitle": "\"{{label}}\" klar",
         "completePerformedOnLabel": "Datum",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "mi",
         "odometerOnLabel": "Avläsningsdatum",
         "historyLabel": "Historik",
+        "historyLoadError": "Historiken kunde inte laddas",
         "historyTotalLabel": "Total kostnad",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Vägmätare över tid"
     },
     "documentAttach": {

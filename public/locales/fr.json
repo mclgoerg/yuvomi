@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Ponctuel",
         "trackedDateIntervalDistanceLabel": "Intervalle de distance",
         "trackedDateIntervalDistancePlaceholder": "p. ex. 15000 km",
-        "trackedDateDistanceHint_one": "encore {{count}} {{unit}}",
-        "trackedDateDistanceHint": "encore {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "encore {{value}} {{unit}}",
+        "trackedDateDistanceHint": "encore {{value}} {{unit}}",
         "markDoneAction": "Terminé",
         "completeSheetTitle": "« {{label}} » terminé",
         "completePerformedOnLabel": "Date",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "mi",
         "odometerOnLabel": "Date du relevé",
         "historyLabel": "Historique",
+        "historyLoadError": "Impossible de charger l’historique",
         "historyTotalLabel": "Coût total",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Compteur kilométrique dans le temps"
     },
     "documentAttach": {

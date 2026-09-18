@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Sekali saja",
         "trackedDateIntervalDistanceLabel": "Interval jarak",
         "trackedDateIntervalDistancePlaceholder": "mis. 15000 km",
-        "trackedDateDistanceHint_one": "tersisa {{count}} {{unit}}",
-        "trackedDateDistanceHint": "tersisa {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "tersisa {{value}} {{unit}}",
+        "trackedDateDistanceHint": "tersisa {{value}} {{unit}}",
         "markDoneAction": "Selesai",
         "completeSheetTitle": "\"{{label}}\" selesai",
         "completePerformedOnLabel": "Tanggal",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "mi",
         "odometerOnLabel": "Tanggal pembacaan",
         "historyLabel": "Riwayat",
+        "historyLoadError": "Riwayat tidak dapat dimuat",
         "historyTotalLabel": "Total biaya",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Odometer dari waktu ke waktu"
     },
     "documentAttach": {

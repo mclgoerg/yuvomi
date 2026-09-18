@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "単発",
         "trackedDateIntervalDistanceLabel": "距離間隔",
         "trackedDateIntervalDistancePlaceholder": "例: 15000 km",
-        "trackedDateDistanceHint_one": "あと{{count}} {{unit}}",
-        "trackedDateDistanceHint": "あと{{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "あと{{value}} {{unit}}",
+        "trackedDateDistanceHint": "あと{{value}} {{unit}}",
         "markDoneAction": "完了",
         "completeSheetTitle": "「{{label}}」を完了しました",
         "completePerformedOnLabel": "日付",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "マイル",
         "odometerOnLabel": "記録日",
         "historyLabel": "履歴",
+        "historyLoadError": "履歴を読み込めませんでした",
         "historyTotalLabel": "合計費用",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "走行距離の推移"
     },
     "documentAttach": {

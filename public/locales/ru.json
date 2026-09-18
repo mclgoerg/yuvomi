@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Разовое",
         "trackedDateIntervalDistanceLabel": "Интервал по пробегу",
         "trackedDateIntervalDistancePlaceholder": "напр. 15000 км",
-        "trackedDateDistanceHint_one": "осталось {{count}} {{unit}}",
-        "trackedDateDistanceHint": "осталось {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "осталось {{value}} {{unit}}",
+        "trackedDateDistanceHint": "осталось {{value}} {{unit}}",
         "markDoneAction": "Готово",
         "completeSheetTitle": "«{{label}}» выполнено",
         "completePerformedOnLabel": "Дата",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "мили",
         "odometerOnLabel": "Дата показания",
         "historyLabel": "История",
+        "historyLoadError": "Не удалось загрузить историю",
         "historyTotalLabel": "Общая стоимость",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Пробег с течением времени"
     },
     "documentAttach": {

@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "仅一次",
         "trackedDateIntervalDistanceLabel": "里程间隔",
         "trackedDateIntervalDistancePlaceholder": "例如 15000 公里",
-        "trackedDateDistanceHint_one": "还剩 {{count}} {{unit}}",
-        "trackedDateDistanceHint": "还剩 {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "还剩 {{value}} {{unit}}",
+        "trackedDateDistanceHint": "还剩 {{value}} {{unit}}",
         "markDoneAction": "完成",
         "completeSheetTitle": "“{{label}}”已完成",
         "completePerformedOnLabel": "日期",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "英里",
         "odometerOnLabel": "读数日期",
         "historyLabel": "历史记录",
+        "historyLoadError": "无法加载历史记录",
         "historyTotalLabel": "总费用",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "里程随时间变化"
     },
     "documentAttach": {

@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "일회성",
         "trackedDateIntervalDistanceLabel": "거리 간격",
         "trackedDateIntervalDistancePlaceholder": "예: 15000km",
-        "trackedDateDistanceHint_one": "{{count}} {{unit}} 남음",
-        "trackedDateDistanceHint": "{{count}} {{unit}} 남음",
+        "trackedDateDistanceHint_one": "{{value}} {{unit}} 남음",
+        "trackedDateDistanceHint": "{{value}} {{unit}} 남음",
         "markDoneAction": "완료",
         "completeSheetTitle": "\"{{label}}\" 완료됨",
         "completePerformedOnLabel": "날짜",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "마일",
         "odometerOnLabel": "측정일",
         "historyLabel": "이력",
+        "historyLoadError": "기록을 불러오지 못했습니다",
         "historyTotalLabel": "총 비용",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "시간에 따른 주행거리"
     },
     "documentAttach": {

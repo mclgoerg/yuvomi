@@ -5314,8 +5314,8 @@
         "trackedDateIntervalMonthsPlaceholder": "Εφάπαξ",
         "trackedDateIntervalDistanceLabel": "Διάστημα απόστασης",
         "trackedDateIntervalDistancePlaceholder": "π.χ. 15000 χλμ",
-        "trackedDateDistanceHint_one": "απομένουν {{count}} {{unit}}",
-        "trackedDateDistanceHint": "απομένουν {{count}} {{unit}}",
+        "trackedDateDistanceHint_one": "απομένουν {{value}} {{unit}}",
+        "trackedDateDistanceHint": "απομένουν {{value}} {{unit}}",
         "markDoneAction": "Έγινε",
         "completeSheetTitle": "Το «{{label}}» ολοκληρώθηκε",
         "completePerformedOnLabel": "Ημερομηνία",
@@ -5326,9 +5326,10 @@
         "odometerUnitMi": "μίλια",
         "odometerOnLabel": "Ημερομηνία μέτρησης",
         "historyLabel": "Ιστορικό",
+        "historyLoadError": "Δεν ήταν δυνατή η φόρτωση του ιστορικού",
         "historyTotalLabel": "Συνολικό κόστος",
-        "historyOdometerValue_one": "{{count}} {{unit}}",
-        "historyOdometerValue": "{{count}} {{unit}}",
+        "historyOdometerValue_one": "{{value}} {{unit}}",
+        "historyOdometerValue": "{{value}} {{unit}}",
         "odometerChartTitle": "Χιλιόμετρα με την πάροδο του χρόνου"
     },
     "documentAttach": {

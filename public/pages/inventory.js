@@ -57,6 +57,12 @@ async function loadCategories() {
   state.categories = res.data;
 }
 
+/** Client-Spiegel von items.js#categoryTracksOdometer - dieselbe Flagge (state.categories),
+ *  kein hartcodierter 'vehicles'-Vergleich mehr (Review #1257). */
+function categoryTracksOdometer(categoryKey) {
+  return state.categories.find((c) => c.key === categoryKey)?.tracks_odometer === 1;
+}
+
 // --------------------------------------------------------
 // Ort-Verwaltung (zwei Ebenen ueber dieselbe Komponente wie Budget-Kategorien)
 // --------------------------------------------------------
@@ -720,7 +726,7 @@ function trackedDateDetailEntries(item) {
       : status.days === 0 ? t('inventory.trackedDateDueToday')
       : t('inventory.trackedDateInDays', { count: status.days });
     const distanceHint = d.interval_distance
-      ? t('inventory.trackedDateDistanceHint', { count: d.interval_distance, unit: odometerUnitLabel(item.odometer_unit) })
+      ? t('inventory.trackedDateDistanceHint', { value: formatOdometer(d.interval_distance), count: d.interval_distance, unit: odometerUnitLabel(item.odometer_unit) })
       : '';
     const sub = [countdown ? `${formatDate(d.date)} · ${countdown}` : formatDate(d.date), distanceHint]
       .filter(Boolean).join(' · ');
@@ -792,7 +798,7 @@ function historyEntryLine(entry, odometerUnit) {
   if (entry.type === 'service_log') {
     if (entry.vendor) subParts.push(entry.vendor);
     if (entry.odometer != null) {
-      subParts.push(t('inventory.historyOdometerValue', { count: entry.odometer, unit: odometerUnit }));
+      subParts.push(t('inventory.historyOdometerValue', { value: formatOdometer(entry.odometer), count: entry.odometer, unit: odometerUnit }));
     }
     if (entry.note) subParts.push(entry.note);
   } else if (entry.type === 'budget_entry') {
@@ -889,7 +895,17 @@ function odometerChartPoints(history, item) {
 /** Verlaufs-Knoten: Kilometerstand-Trend (falls genug Messpunkte) + Zeitleiste
  *  + Gesamtkosten - reine Anzeige, keine eigene Datenhaltung (server-seitig
  *  eine Zusammenfuehrung, kein neuer Speicher). */
-function historyDetailNode(history, item) {
+function historyDetailNode(history, item, historyLoadFailed) {
+  // Ein Ladefehler sieht sonst genauso aus wie "nichts protokolliert" - beides
+  // liefert history === null (Review #1257).
+  if (historyLoadFailed) {
+    const error = document.createElement('p');
+    error.className = 'form-error';
+    error.setAttribute('role', 'alert');
+    error.textContent = t('inventory.historyLoadError');
+    return error;
+  }
+
   const odometerUnit = odometerUnitLabel(item.odometer_unit);
   const chartHtml = odometerChartMarkup(odometerChartPoints(history, item), odometerUnit);
   const hasTimeline = !!(history && history.timeline.length);
@@ -937,7 +953,7 @@ function photoDetailNode(photoData) {
  * (detailRowEl), also keine Fallunterscheidung hier noetig.
  * @returns {Array} Sections fuer openDetailView
  */
-function renderItemDetail(item, history, onDoneTrackedDate) {
+function renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed) {
   const bookingEntries = (item.linked_entries || []).map((link) => ({
     text: `${link.title} · ${formatMoney(link.amount, _householdCurrency)}`,
     sub: `${roleLabel(link.role)} · ${formatDate(link.date)}`,
@@ -964,13 +980,13 @@ function renderItemDetail(item, history, onDoneTrackedDate) {
     { icon: 'at-sign', label: t('inventory.accountUsernameLabel'), value: item.account_username || '' },
     { icon: 'shield', label: t('inventory.warrantyMonthsLabel'), value: warrantyDetailValue(item) },
     { icon: 'gauge', label: t('inventory.odometerLabel'), value: odometerDetailValue(item) },
-    { icon: 'gauge', label: t('inventory.conditionLabel'), value: t(`inventory.condition${item.condition.charAt(0).toUpperCase()}${item.condition.slice(1)}`) },
+    { icon: 'sparkles', label: t('inventory.conditionLabel'), value: t(`inventory.condition${item.condition.charAt(0).toUpperCase()}${item.condition.slice(1)}`) },
     { icon: 'info', label: t('inventory.statusLabel'), value: statusLabel(item.status) },
     { icon: 'align-left', label: t('inventory.notesLabel'), value: item.notes || '', multiline: true },
     { icon: 'calendar-clock', label: t('inventory.trackedDatesLabel'), node: trackedDatesDetailNode(item, onDoneTrackedDate) },
     { icon: 'receipt', label: t('inventory.linkedBookingsLabel'), node: inventoryDetailListNode(bookingEntries) },
     { icon: 'paperclip', label: t('inventory.attachmentsLabel'), node: inventoryDetailListNode(attachmentEntries) },
-    { icon: 'history', label: t('inventory.historyLabel'), node: historyDetailNode(history, item) },
+    { icon: 'history', label: t('inventory.historyLabel'), node: historyDetailNode(history, item, historyLoadFailed) },
   ];
 }
 
@@ -1009,11 +1025,13 @@ function odometerDetailValue(item) {
  */
 async function openItemDetail(item) {
   let history = null;
+  let historyLoadFailed = false;
   try {
     const res = await api.get(`/inventory/items/${item.id}/history`);
     history = res.data;
   } catch (err) {
     console.error('[Inventory] Verlauf konnte nicht geladen werden:', err);
+    historyLoadFailed = true;
   }
 
   const onDoneTrackedDate = async (trackedDate) => {
@@ -1044,7 +1062,7 @@ async function openItemDetail(item) {
     title: item.name,
     accentColor: 'var(--module-inventory)',
     size: 'md',
-    sections: renderItemDetail(item, history, onDoneTrackedDate),
+    sections: renderItemDetail(item, history, onDoneTrackedDate, historyLoadFailed),
     actions: [{
       id: 'inventory-detail-delete',
       label: t('common.delete'),
@@ -1080,9 +1098,9 @@ function openCompletionSheet(item, trackedDate) {
     let settled = false;
     const settle = (result) => { if (!settled) { settled = true; resolve(result); } };
 
-    // Kilometerstand nur bei Fahrzeugen abfragen - dieselbe Einschraenkung wie
-    // im Item-Formular (Nutzer-Entscheidung 2026-09-17).
-    const isVehicle = item.category === 'vehicles';
+    // Kilometerstand nur bei odometer-tragenden Kategorien abfragen - dieselbe
+    // Einschraenkung wie im Item-Formular.
+    const isVehicle = categoryTracksOdometer(item.category);
     const content = `
       <div class="form-group">
         <label class="form-label" for="inv-complete-date">${esc(t('inventory.completePerformedOnLabel'))}</label>
@@ -1646,7 +1664,7 @@ function buildItemForm({ mode, item = null }) {
             <select id="inv-condition" class="form-input">${conditionOptions}</select>
           </div>
         </div>
-        <div class="inventory-form-row" id="inv-odometer-group" ${(isEdit ? item.category : 'other') === 'vehicles' ? '' : 'hidden'}>
+        <div class="inventory-form-row" id="inv-odometer-group" ${categoryTracksOdometer(isEdit ? item.category : 'other') ? '' : 'hidden'}>
           <div class="form-group">
             <label class="form-label" for="inv-odometer">${esc(t('inventory.odometerLabel'))}</label>
             <input id="inv-odometer" class="form-input" type="number" min="0" step="1" inputmode="numeric">
@@ -1692,7 +1710,7 @@ function buildItemForm({ mode, item = null }) {
           || !!item.photo_data || (item.attachments?.length ?? 0) > 0
           // Kilometerstand auf einen Blick zeigen: entweder schon gesetzt,
           // oder die Kategorie, fuer die er am haeufigsten gebraucht wird.
-          || item.odometer != null || item.category === 'vehicles'),
+          || item.odometer != null || categoryTracksOdometer(item.category)),
       })}
       <div class="modal-panel__footer modal-panel__footer--plain">
         ${isEdit ? `<button type="button" class="btn btn--danger-ghost" id="inv-delete">${esc(t('common.delete'))}</button>` : ''}
@@ -1717,13 +1735,14 @@ function buildItemForm({ mode, item = null }) {
     panel.querySelector('#inv-odometer').value = isEdit && item.odometer != null ? String(item.odometer) : '';
     panel.querySelector('#inv-odometer-unit').value = isEdit && item.odometer_unit ? item.odometer_unit : 'km';
 
-    // Kilometerstand ist bewusst auf die Kategorie "Fahrzeuge" begrenzt (Nutzer-
-    // Entscheidung 2026-09-17) - andere Gegenstandsarten brauchen keinen
-    // Kilometerstand, und ein Kategoriewechsel weg von Fahrzeugen blendet die
-    // Gruppe wieder aus (saveItem() sendet dann ohnehin null, siehe dort).
+    // Kilometerstand ist auf odometer-tragende Kategorien begrenzt (per
+    // Voreinstellung nur "Fahrzeuge", Nutzer-Entscheidung 2026-09-17) - andere
+    // Gegenstandsarten brauchen keinen Kilometerstand, und ein Kategoriewechsel
+    // weg davon blendet die Gruppe wieder aus (saveItem() sendet dann ohnehin
+    // null, siehe dort).
     const odometerGroup = panel.querySelector('#inv-odometer-group');
     panel.querySelector('#inv-category').addEventListener('change', (e) => {
-      odometerGroup.hidden = e.target.value !== 'vehicles';
+      odometerGroup.hidden = !categoryTracksOdometer(e.target.value);
     });
 
     updateWarrantyStatus(panel);
@@ -1870,10 +1889,11 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
   const priceRaw = panel.querySelector('#inv-purchase-price').value.trim();
   const warrantyRaw = panel.querySelector('#inv-warranty').value.trim();
   const category = panel.querySelector('#inv-category').value;
-  // Kilometerstand ist auf Fahrzeuge begrenzt - unabhaengig vom (bei anderen
-  // Kategorien versteckten) Feldinhalt zaehlt hier nur die aktuelle Kategorie,
-  // sonst ueberlebte ein vor dem Kategoriewechsel eingetragener Wert unsichtbar.
-  const odometerRaw = category === 'vehicles' ? panel.querySelector('#inv-odometer').value.trim() : '';
+  // Kilometerstand ist auf odometer-tragende Kategorien begrenzt - unabhaengig
+  // vom (bei anderen Kategorien versteckten) Feldinhalt zaehlt hier nur die
+  // aktuelle Kategorie, sonst ueberlebte ein vor dem Kategoriewechsel
+  // eingetragener Wert unsichtbar.
+  const odometerRaw = categoryTracksOdometer(category) ? panel.querySelector('#inv-odometer').value.trim() : '';
 
   const payload = {
     name,
@@ -1894,7 +1914,7 @@ async function saveItem(panel, mode, item, attachments, pickedBooking, photoData
     photo_data: photoData,
     odometer: odometerRaw === '' ? null : Number(odometerRaw),
     odometer_unit: odometerRaw === '' ? null : panel.querySelector('#inv-odometer-unit').value,
-    odometer_on: category === 'vehicles' ? (panel.querySelector('#inv-odometer-on').value || null) : null,
+    odometer_on: categoryTracksOdometer(category) ? (panel.querySelector('#inv-odometer-on').value || null) : null,
   };
 
   saveBtn.disabled = true;
