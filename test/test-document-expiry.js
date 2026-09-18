@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import http from 'node:http';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import Database from 'better-sqlite3-multiple-ciphers';
 import express from 'express';
 
@@ -19,6 +19,7 @@ process.env.SESSION_SECRET = 'document-expiry-test-secret';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
+const { default: remindersRouter } = await import('../server/routes/reminders.js');
 
 const moduleDatabase = get();
 const suiteDatabase = buildMigratedDatabase(MIGRATIONS);
@@ -59,16 +60,23 @@ function seedUser(role = 'member') {
 const OWNER = seedUser('member');
 const ADMIN = seedUser('admin');
 
-function createHarness({ userId = OWNER, role = 'member' } = {}) {
+// `authScopes`/`sessionModuleAccess` sind pro Aufruf setzbar (Default: null =
+// unbeschraenkt), damit die Rechte-/Sichtbarkeitsachse in den Tests unten
+// geprueft werden kann - derselbe echte `deniedModules()`/`tokenAllows()`-Pfad
+// wie in server/index.js, nicht ein Stub, der ihn umgeht.
+function createHarness({ userId = OWNER, role = 'member', authScopes = null, sessionModuleAccess = null } = {}) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.authUserId = userId;
     req.authRole = role;
     req.session = { userId, role };
+    req.authScopes = authScopes;
+    req.sessionModuleAccess = sessionModuleAccess;
     next();
   });
   app.use('/api/v1/documents', documentsRouter);
+  app.use('/api/v1/reminders', remindersRouter);
   const server = http.createServer(app);
   return {
     async call(method, pathname, body) {
@@ -76,6 +84,19 @@ function createHarness({ userId = OWNER, role = 'member' } = {}) {
         await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
       }
       const base = `http://127.0.0.1:${server.address().port}/api/v1/documents`;
+      const res = await fetch(`${base}${pathname}`, {
+        method,
+        headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const text = await res.text();
+      return { status: res.status, body: text ? JSON.parse(text) : null };
+    },
+    async callReminders(method, pathname, body) {
+      if (!server.listening) {
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+      }
+      const base = `http://127.0.0.1:${server.address().port}/api/v1/reminders`;
       const res = await fetch(`${base}${pathname}`, {
         method,
         headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
@@ -401,5 +422,113 @@ test('GET /documents?expiring=<days> zeigt nur bald ablaufende/ueberfaellige Dok
     assert.ok(!ids.includes(none.body.data.id));
   } finally {
     await h.close();
+  }
+});
+
+/** Dieselbe Stelle, die die Einstellungsseite schreibt. */
+function setHouseholdTimeZone(zone) {
+  get().prepare(`
+    INSERT INTO sync_config (key, value) VALUES ('household_timezone', ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(zone);
+}
+
+// DIE UHR WIRD AUF DEN RAND GESTELLT (Muster wie test-budget-month-zone.js):
+// ein Test zur Tagesmitte waere in jeder Zone gruen und wuerde nichts messen.
+// `expires_at` ist ein lokal eingegebener Kalendertag - der Filter muss den
+// Haushalts-Tag als Grenze nehmen, nicht den UTC-Tag von `date('now')`.
+test('GET /documents?expiring=<days> nimmt den Haushaltstag als Grenze, nicht den UTC-Tag', async () => {
+  const h = createHarness();
+  try {
+    setHouseholdTimeZone('Pacific/Kiritimati'); // UTC+14
+    // 2026-08-31 20:00 UTC ist in Kiritimati bereits der 2026-09-01.
+    mock.timers.enable({ apis: ['Date'], now: new Date('2026-08-31T20:00:00Z') });
+    try {
+      assert.equal(new Date().toISOString().slice(0, 10), '2026-08-31', 'UTC steht auf den 31.08.');
+      // Haushaltstag (01.09.) + 5 Tage = 06.09. Ein rein UTC-basierter Filter
+      // rechnete vom 31.08. + 5 Tage = 05.09. und liesse dieses Dokument aussen
+      // vor - genau der Unterschied, den dieser Test misst.
+      const doc = await h.call('POST', '', uploadPayload({ name: 'Haushaltsrand', expires_at: '2026-09-06' }));
+      const res = await h.call('GET', '?expiring=5');
+      const ids = res.body.data.map((d) => d.id);
+      assert.ok(ids.includes(doc.body.data.id),
+        'der 06.09. liegt innerhalb von "Haushaltstag + 5", auch wenn UTC noch auf dem 31.08. steht');
+    } finally {
+      mock.timers.reset();
+    }
+  } finally {
+    await h.close();
+  }
+});
+
+// --------------------------------------------------------
+// document_expiry ist abgeleitet - kein Schreibweg darf es von Hand setzen
+// --------------------------------------------------------
+
+test('POST /reminders lehnt document_expiry ab - die Erinnerung leitet sich aus dem Dokument ab', async () => {
+  const h = createHarness();
+  try {
+    const doc = await h.call('POST', '', uploadPayload({ name: 'Privat', visibility: 'private' }));
+    // Vor der Review-Korrektur war document_expiry hier setzbar: ein Mitglied
+    // konnte per {entity_type: 'document_expiry', entity_id: <fremde id>} eine
+    // eigene Erinnerung anlegen und deren entity_title (der Dokumentname) ueber
+    // die eigene /pending-Liste zurücklesen - ganz ohne Sichtbarkeitspruefung
+    // auf das einzelne Dokument.
+    const res = await h.callReminders('POST', '', {
+      entity_type: 'document_expiry', entity_id: doc.body.data.id, remind_at: '2099-01-01T09:00',
+    });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /derived from the item itself/);
+  } finally {
+    await h.close();
+  }
+});
+
+test('/pending kennt document_expiry weiterhin - der Toast muss die faellige Erinnerung zeigen und wegwischen koennen', async () => {
+  const h = createHarness();
+  try {
+    const doc = await h.call('POST', '', uploadPayload({
+      name: 'Reisepass faellig', expires_at: daysFromToday(30), expiry_reminder_days: 5,
+    }));
+    get().prepare("UPDATE reminders SET remind_at = '2000-01-01T09:00' WHERE entity_type = 'document_expiry' AND entity_id = ?")
+      .run(doc.body.data.id);
+
+    const pending = await h.callReminders('GET', '/pending');
+    assert.equal(pending.status, 200);
+    const match = pending.body.data.find((r) => r.entity_type === 'document_expiry' && r.entity_id === doc.body.data.id);
+    assert.ok(match, 'die faellige Erinnerung fehlt in /pending');
+    assert.equal(match.entity_title, 'Reisepass faellig');
+  } finally {
+    await h.close();
+  }
+});
+
+// --------------------------------------------------------
+// Rechteachse: ein Zugriff ohne `documents`-Scope sieht/loescht nichts
+// --------------------------------------------------------
+
+test('/pending mit einem Token ohne documents-Scope zeigt keine document_expiry-Erinnerung', async () => {
+  const h = createHarness({ authScopes: null });
+  try {
+    const doc = await h.call('POST', '', uploadPayload({
+      name: 'Faellig, aber ausser Reichweite', expires_at: daysFromToday(30), expiry_reminder_days: 5,
+    }));
+    get().prepare("UPDATE reminders SET remind_at = '2000-01-01T09:00' WHERE entity_type = 'document_expiry' AND entity_id = ?")
+      .run(doc.body.data.id);
+  } finally {
+    await h.close();
+  }
+
+  // Zweiter Harness, echtes gescoptes Credential: nur calendar:read, kein
+  // documents-Scope - derselbe echte mayTouchOrigin()-Pfad wie in
+  // server/index.js, nicht ein Stub, der ihn umgeht.
+  const scoped = createHarness({ authScopes: ['calendar:read'] });
+  try {
+    const pending = await scoped.callReminders('GET', '/pending');
+    assert.equal(pending.status, 200);
+    assert.ok(!pending.body.data.some((r) => r.entity_type === 'document_expiry'),
+      'ein Credential ohne documents-Scope darf keine Dokumentnamen ueber den Erinnerungs-Toast sehen');
+  } finally {
+    await scoped.close();
   }
 });

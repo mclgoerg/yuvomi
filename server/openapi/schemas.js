@@ -297,6 +297,8 @@ export const schemas = {
             creator_name: { type: ['string', 'null'] },
             creator_color: { type: ['string', 'null'] },
             allowed_member_ids: { type: 'array', items: { type: 'integer' } },
+            expires_at: { type: ['string', 'null'], format: 'date', description: 'YYYY-MM-DD, e.g. a passport or permit expiry.' },
+            expiry_reminder_days: { type: ['integer', 'null'], description: 'Days before expires_at to remind, 0-365.' },
             created_at: { type: 'string', format: 'date-time' },
             updated_at: { type: 'string', format: 'date-time' },
           },

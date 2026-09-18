@@ -11,9 +11,12 @@
 import { parseLocalDateKey, todayKey as householdToday } from '/utils/date.js';
 // dateStatus() und ihr Schwellenwert leben jetzt in einer neutralen Datei, weil
 // Dokumente (und spaeter Health) denselben Chip brauchen. Re-exportiert, damit
-// jeder bestehende Inventar-Import unveraendert bleibt.
-import { WARRANTY_ALERT_DAYS, dateStatus } from './date-status.js';
+// jeder bestehende Inventar-Import unveraendert bleibt - der alte Name
+// WARRANTY_ALERT_DAYS bleibt hier als Alias, "Garantie" waere unter dem neuen,
+// neutralen Namen in date-status.js selbst irrefuehrend.
+import { DATE_STATUS_ALERT_DAYS, dateStatus } from './date-status.js';
 
+const WARRANTY_ALERT_DAYS = DATE_STATUS_ALERT_DAYS;
 export { WARRANTY_ALERT_DAYS, dateStatus };
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -45,7 +48,7 @@ export function warrantyStatus(item, todayKey = householdToday()) {
   const endDateKey = warrantyEndDateKey(item);
   if (!endDateKey) return null;
   const days = Math.round((parseLocalDateKey(endDateKey) - parseLocalDateKey(todayKey)) / 86_400_000);
-  const state = days < 0 ? 'expired' : days <= WARRANTY_ALERT_DAYS ? 'expiring' : 'valid';
+  const state = days < 0 ? 'expired' : days <= DATE_STATUS_ALERT_DAYS ? 'expiring' : 'valid';
   return { state, endDateKey, days };
 }
 

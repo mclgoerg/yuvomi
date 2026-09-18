@@ -249,6 +249,13 @@ export function documentsPaths() {
               enum: ['medical', 'school', 'identity', 'insurance', 'finance', 'home', 'vehicle', 'legal', 'travel', 'pets', 'warranty', 'taxes', 'work', 'other'],
             },
           },
+          {
+            name: 'expiring',
+            in: 'query',
+            required: false,
+            description: 'Only documents whose expires_at is within the next N days or already past. An invalid value is silently skipped (no filter applied), same as an invalid status/category.',
+            schema: { type: 'integer', minimum: 0 },
+          },
         ],
         responses: {
           200: {

@@ -8715,6 +8715,25 @@ const MIGRATIONS = [
       -- zuerst beschreibt (Review-Feedback #1256: ein CHECK laesst sich unter
       -- der Anhaenge-Regel nie wieder verengen, ein Wert ohne Schreiber waere
       -- also dauerhaft fest, ohne Issue und ohne SCOPE-/DECISIONS-Eintrag).
+      --
+      -- ERST DIE ZWEI TRIGGER AUS V217 ABRAEUMEN. Sie haengen an tasks/
+      -- calendar_events, nicht an reminders, ueberleben also strukturell -
+      -- aber ihr KOERPER nennt 'reminders' beim Namen, und genau das bringt
+      -- SQLites CREATE-TABLE-RENAME-Ablauf hier zum Absturz: waehrend ALTER
+      -- TABLE reminders_new RENAME TO reminders laeuft, parst SQLite jeden
+      -- Trigger/View der Datenbank neu durch, und trifft dabei fuer einen
+      -- kurzen Moment auf einen Trigger, dessen Textkoerper eine Tabelle
+      -- nennt, die gerade nicht existiert (das alte reminders ist schon weg,
+      -- das neue noch nicht umbenannt) - "no such table: main.reminders",
+      -- mitten in dieser Migration, auf jeder Installation, reproduziert
+      -- ausserhalb dieser Datei mit einem Fuenfzeiler gegen better-sqlite3.
+      -- Abraeumen vor dem Umbau und am Ende neu anlegen umgeht das - derselbe
+      -- Kniff wie bei trg_search_tasks_ad in v114/v117/v166/v194, nur in der
+      -- umgekehrten Richtung (dort verlor die umgebaute Tabelle ihre EIGENEN
+      -- Trigger, hier verliert ein FREMDER Trigger kurzzeitig sein Ziel).
+      DROP TRIGGER trg_reminders_tasks_ad;
+      DROP TRIGGER trg_reminders_events_ad;
+
       CREATE TABLE reminders_new (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         entity_type TEXT    NOT NULL CHECK(entity_type IN ('task', 'event', 'subscription', 'inventory_item', 'inventory_tracked_date', 'pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry')),
@@ -8734,6 +8753,16 @@ const MIGRATIONS = [
       CREATE INDEX idx_reminders_remind ON reminders(remind_at);
       CREATE INDEX idx_reminders_user ON reminders(created_by);
       CREATE INDEX idx_reminders_assigned_from ON reminders(assigned_from);
+
+      CREATE TRIGGER trg_reminders_tasks_ad
+      AFTER DELETE ON tasks BEGIN
+        DELETE FROM reminders WHERE entity_type = 'task' AND entity_id = OLD.id;
+      END;
+
+      CREATE TRIGGER trg_reminders_events_ad
+      AFTER DELETE ON calendar_events BEGIN
+        DELETE FROM reminders WHERE entity_type = 'event' AND entity_id = OLD.id;
+      END;
     `,
   },
 ];

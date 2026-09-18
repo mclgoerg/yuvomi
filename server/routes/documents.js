@@ -46,6 +46,7 @@ import {
 } from '../services/document-storage.js';
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from '../utils/upload-limit.js';
 import { contentMatchesMime } from '../utils/file-signature.js';
+import { todayKey } from '../utils/timezone.js';
 
 let dmsAdapterFactory = defaultGetDmsAdapter;
 export function _setDmsAdapterFactory(fn) { dmsAdapterFactory = fn || defaultGetDmsAdapter; }
@@ -1053,7 +1054,9 @@ router.get('/', (req, res) => {
     // `?expiring=<days>` - Dokumente, deren Ablauf innerhalb der naechsten N Tage
     // liegt oder bereits vergangen ist (dieselbe "faellig ODER ueberfaellig"-
     // Lesart wie der Chip von public/utils/date-status.js). Ein ungueltiger Wert
-    // wird verworfen statt den Filter stillschweigend ueberzuspringen.
+    // wird still uebersprungen (Filter bleibt aus, volle Liste) statt mit 400
+    // abgelehnt - derselbe Umgang wie beim Rest dieser Route (`status`/`category`
+    // fallen ebenso auf "kein Filter" zurueck statt einen Request abzulehnen).
     const expiringDays = req.query.expiring !== undefined && req.query.expiring !== ''
       ? Number(req.query.expiring)
       : null;
@@ -1086,10 +1089,17 @@ router.get('/', (req, res) => {
       ? `AND d.folder_id IN (${subtree.map((_v, i) => `@f${i}`).join(',')})`
       : '';
     const params = {
-      userId: userId(req), status, category, expiringWithinDays, ...folderParams,
+      userId: userId(req), status, category, expiringWithinDays,
+      // `expires_at` ist ein lokal eingegebener Kalendertag, kein Instant -
+      // `date('now')` waere der UTC-Tag und oestlich von UTC am fruehen Abend,
+      // westlich davon am fruehen Morgen der falsche (server/services/
+      // task-scope.js hat dieselbe Falle). `todayKey()` bindet stattdessen den
+      // Haushalts-Tagesschluessel als Parameter.
+      today: todayKey(db.get()),
+      ...folderParams,
     };
     const expiringClause = expiringWithinDays !== null
-      ? "AND d.expires_at IS NOT NULL AND date(d.expires_at) <= date('now', '+' || @expiringWithinDays || ' days')"
+      ? "AND d.expires_at IS NOT NULL AND date(d.expires_at) <= date(@today, '+' || @expiringWithinDays || ' days')"
       : '';
     const rows = db.get().prepare(`
       ${documentSelect()}

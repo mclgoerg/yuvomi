@@ -80,10 +80,21 @@ function syncEventFanout(entityType, entityId, userId) {
  * sind beide keine gespeicherte Zeile, an die man von Hand eine Erinnerung
  * hängen könnte.
  *
+ * `document_expiry` gehört dazu, obwohl `subscription`/`inventory_item`/
+ * `inventory_tracked_date` es nicht tun: dort haelt ein handgesetzter Termin
+ * bis zur naechsten Aenderung des Objekts, hier nicht.
+ * documents.js#syncDocumentExpiryReminder loescht bei JEDEM Speichern ALLE
+ * Zeilen der Entitaet, nicht nur die eigenen - ein Schreibweg, der das
+ * respektiert, haette also nie eine Halbwertszeit, mit der man arbeiten kann.
+ * Zusaetzlich haette ein settable `document_expiry` keine Sichtbarkeitspruefung
+ * auf das einzelne Dokument (nur `mayTouchOrigin()` auf das Modul): ein
+ * Mitglied koennte `entity_id`s fremder, privater Dokumente erraten und ihre
+ * Namen ueber `GET /reminders/pending` zurücklesen.
+ *
  * Die LESEWEGE (GET) kennen alle Typen weiter: der Erinnerungs-Toast muss eine
  * abgeleitete Meldung anzeigen und wegwischen können.
  */
-const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup'];
+const DERIVED_ENTITY_TYPES = ['pantry_item', 'cycle_period', 'cycle_log_nudge', 'schedule_entry', 'schedule_extra_entry', 'waste_pickup', 'document_expiry'];
 
 /* DIESER ROUTER IST EINE MISCHSTELLE, UND SEIN PFAD SAGT DAS NICHT.
  *

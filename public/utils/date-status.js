@@ -9,7 +9,7 @@
 import { parseLocalDateKey, todayKey as householdToday } from '/utils/date.js';
 
 /** Vorlauf in Tagen, ab dem ein Datum als "läuft bald ab" gilt. */
-export const WARRANTY_ALERT_DAYS = 30;
+export const DATE_STATUS_ALERT_DAYS = 30;
 
 /**
  * @param {string|null} dateKey - YYYY-MM-DD, oder null/leer
@@ -19,6 +19,6 @@ export const WARRANTY_ALERT_DAYS = 30;
 export function dateStatus(dateKey, todayKey = householdToday()) {
   if (!dateKey) return null;
   const days = Math.round((parseLocalDateKey(dateKey) - parseLocalDateKey(todayKey)) / 86_400_000);
-  const state = days < 0 ? 'expired' : days <= WARRANTY_ALERT_DAYS ? 'expiring' : 'valid';
+  const state = days < 0 ? 'expired' : days <= DATE_STATUS_ALERT_DAYS ? 'expiring' : 'valid';
   return { state, endDateKey: dateKey, days };
 }

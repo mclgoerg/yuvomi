@@ -383,15 +383,18 @@ function matchesFolder(doc) {
 }
 
 /** Laeuft der Ablauf bald ab oder ist er schon vorbei? Kein Ablaufdatum heisst nein. */
-function matchesExpiringSoon(doc) {
-  if (!state.expiringSoon) return true;
+function isExpiringOrOverdue(doc) {
   const status = dateStatus(doc.expires_at);
   return !!status && status.state !== 'valid';
 }
 
+function matchesExpiringSoon(doc) {
+  return !state.expiringSoon || isExpiringOrOverdue(doc);
+}
+
 function expiringCount() {
   return state.allDocuments.filter((doc) => matchesCategory(doc) && matchesFolder(doc)
-    && !!dateStatus(doc.expires_at) && dateStatus(doc.expires_at).state !== 'valid').length;
+    && isExpiringOrOverdue(doc)).length;
 }
 
 function sortDocuments(docs) {
