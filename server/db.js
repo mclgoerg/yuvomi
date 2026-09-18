@@ -8731,8 +8731,8 @@ const MIGRATIONS = [
       -- Kniff wie bei trg_search_tasks_ad in v114/v117/v166/v194, nur in der
       -- umgekehrten Richtung (dort verlor die umgebaute Tabelle ihre EIGENEN
       -- Trigger, hier verliert ein FREMDER Trigger kurzzeitig sein Ziel).
-      DROP TRIGGER trg_reminders_tasks_ad;
-      DROP TRIGGER trg_reminders_events_ad;
+      DROP TRIGGER IF EXISTS trg_reminders_tasks_ad;
+      DROP TRIGGER IF EXISTS trg_reminders_events_ad;
 
       CREATE TABLE reminders_new (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,

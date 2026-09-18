@@ -16,6 +16,13 @@ import express from 'express';
 
 process.env.DB_PATH = ':memory:';
 process.env.SESSION_SECRET = 'document-expiry-test-secret';
+// Explizit, nicht dem Zufall der Umgebung ueberlassen (Review-Runde 2): jeder
+// Test ausser dem Haushaltszonen-Test unten setzt kein eigenes
+// household_timezone, faellt also auf serverTimeZone() zurueck, die ohne
+// diese Zeile die TZ des CI-Containers erbt. dateKey()/daysFromToday() weiter
+// unten rechnen bewusst in UTC - ohne einen Pin liefe der Rest der Datei nur
+// zufaellig auf derselben Uhr wie die Serverseite.
+process.env.TZ = 'UTC';
 
 const { MIGRATIONS, get, _setTestDatabase } = await import('../server/db.js');
 const { default: documentsRouter } = await import('../server/routes/documents.js');
@@ -59,6 +66,7 @@ function seedUser(role = 'member') {
 
 const OWNER = seedUser('member');
 const ADMIN = seedUser('admin');
+const OTHER_MEMBER = seedUser('member');
 
 // `authScopes`/`sessionModuleAccess` sind pro Aufruf setzbar (Default: null =
 // unbeschraenkt), damit die Rechte-/Sichtbarkeitsachse in den Tests unten
@@ -433,6 +441,13 @@ function setHouseholdTimeZone(zone) {
   `).run(zone);
 }
 
+/** Nachtraeglich gesetzte Zeile wieder entfernen - ohne das faellt jeder nach
+ *  dieser Stelle deklarierte Test in dieser Datei auf UTC+14 zurueck, statt
+ *  auf den Pin oben (Review-Runde 2, nice to have). */
+function clearHouseholdTimeZone() {
+  get().prepare("DELETE FROM sync_config WHERE key = 'household_timezone'").run();
+}
+
 // DIE UHR WIRD AUF DEN RAND GESTELLT (Muster wie test-budget-month-zone.js):
 // ein Test zur Tagesmitte waere in jeder Zone gruen und wuerde nichts messen.
 // `expires_at` ist ein lokal eingegebener Kalendertag - der Filter muss den
@@ -455,6 +470,7 @@ test('GET /documents?expiring=<days> nimmt den Haushaltstag als Grenze, nicht de
         'der 06.09. liegt innerhalb von "Haushaltstag + 5", auch wenn UTC noch auf dem 31.08. steht');
     } finally {
       mock.timers.reset();
+      clearHouseholdTimeZone();
     }
   } finally {
     await h.close();
@@ -500,6 +516,37 @@ test('/pending kennt document_expiry weiterhin - der Toast muss die faellige Eri
     assert.equal(match.entity_title, 'Reisepass faellig');
   } finally {
     await h.close();
+  }
+});
+
+test('/pending: ein zweites Haushaltsmitglied sieht die faellige Erinnerung eines privaten Dokuments nicht', async () => {
+  // Die Achse, die Runde 1 offen liess: bisher liefen alle Tests als OWNER
+  // oder ADMIN, keiner als ein ECHTES zweites Mitglied gegen ein 'private'
+  // Dokument. Die Erinnerung gehoert created_by (dem Ersteller), und /pending
+  // filtert WHERE r.created_by = ? - dieser Test misst genau das, nicht nur
+  // den Modul-Scope von oben.
+  const owner = createHarness({ userId: OWNER });
+  try {
+    const doc = await owner.call('POST', '', uploadPayload({
+      name: 'Privater Reisepass', visibility: 'private', expires_at: daysFromToday(30), expiry_reminder_days: 5,
+    }));
+    get().prepare("UPDATE reminders SET remind_at = '2000-01-01T09:00' WHERE entity_type = 'document_expiry' AND entity_id = ?")
+      .run(doc.body.data.id);
+
+    const ownPending = await owner.callReminders('GET', '/pending');
+    assert.ok(ownPending.body.data.some((r) => r.entity_type === 'document_expiry' && r.entity_id === doc.body.data.id),
+      'Vorbedingung: der Eigentuemer selbst sieht seine eigene faellige Erinnerung');
+  } finally {
+    await owner.close();
+  }
+
+  const other = createHarness({ userId: OTHER_MEMBER });
+  try {
+    const pending = await other.callReminders('GET', '/pending');
+    assert.equal(pending.status, 200);
+    assert.deepEqual(pending.body.data, [], 'ein anderes Mitglied sieht keine fremde Dokument-Erinnerung, privat oder nicht');
+  } finally {
+    await other.close();
   }
 });
 
