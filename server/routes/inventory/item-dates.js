@@ -77,7 +77,7 @@ function validateTrackedDateRow(row) {
 
   // NULL bleibt das heutige Einmal-Verhalten (keine Wiederholung) - genau wie
   // beim Vorlauf oben wird ein leeres/fehlendes Feld NICHT auf einen Default
-  // umgeschrieben, sondern bleibt NULL (server/db.js Migration 211).
+  // umgeschrieben, sondern bleibt NULL (server/db.js Migration 219).
   let intervalMonths = null;
   if (row?.interval_months !== undefined && row.interval_months !== null && row.interval_months !== '') {
     const vInterval = num(row.interval_months, 'Wiederholung (Monate)');
