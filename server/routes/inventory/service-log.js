@@ -151,6 +151,18 @@ function loadServiceLogEntry(itemId, logId) {
   `).get(logId, itemId);
 }
 
+/** Spiegelt items.js#categoryTracksOdometer, hier ueber item_id statt Kategorie-Key -
+ *  ein Log-Eintrag mit odometer auf einem Gegenstand ausserhalb einer odometer-
+ *  tragenden Kategorie darf inventory_items.odometer nicht setzen, auch wenn
+ *  das Formular das Feld fuer diese Kategorie gar nicht mehr zeigt (Review #1257). */
+function itemCategoryTracksOdometer(itemId) {
+  return db.get().prepare(`
+    SELECT ic.tracks_odometer FROM inventory_items ii
+    JOIN inventory_categories ic ON ic.key = ii.category
+    WHERE ii.id = ?
+  `).get(itemId)?.tracks_odometer === 1;
+}
+
 /**
  * Ein Kilometerstand auf einer Log-Zeile schreibt inventory_items.odometer nur
  * fort, wenn er die neueste Ablesung ist - ein rueckdatierter Reparatur-
@@ -158,6 +170,7 @@ function loadServiceLogEntry(itemId, logId) {
  */
 function maybeAdvanceItemOdometer(itemId, performedOn, odometer) {
   if (odometer == null) return;
+  if (!itemCategoryTracksOdometer(itemId)) return;
   const item = db.get().prepare('SELECT odometer_on FROM inventory_items WHERE id = ?').get(itemId);
   if (!item) return;
   if (item.odometer_on == null || performedOn >= item.odometer_on) {
@@ -207,6 +220,30 @@ function recomputeItemOdometer(itemId) {
   `).get(itemId);
   db.get().prepare('UPDATE inventory_items SET odometer = ?, odometer_on = ? WHERE id = ?')
     .run(latest?.odometer ?? null, latest?.performed_on ?? null, itemId);
+}
+
+/**
+ * PUT auf eine Log-Zeile darf den Tippfehler-Schutz nicht gegen den EIGENEN
+ * alten Wert der Zeile pruefen, die gerade bearbeitet wird - sonst blockiert
+ * jede Korrektur dieser einen Zeile sich selbst (z. B. 520000 auf 52000
+ * richtigstellen scheitert daran, dass 520000 noch der zwischengespeicherte
+ * Stand ist). War diese Zeile die Quelle des aktuellen Stands, zaehlt
+ * stattdessen der Stand, der ohne sie gelten wuerde (dieselbe Ableitung wie
+ * recomputeItemOdometer(), nur ohne sie zu schreiben - Review #1257).
+ */
+function odometerBaselineExcluding(item, itemId, excludeLogId) {
+  const excluded = db.get().prepare(
+    'SELECT performed_on, odometer FROM inventory_item_service_log WHERE id = ? AND item_id = ?'
+  ).get(excludeLogId, itemId);
+  if (!excluded || excluded.odometer == null) return item;
+  if (item?.odometer !== excluded.odometer || item?.odometer_on !== excluded.performed_on) return item;
+
+  const latest = db.get().prepare(`
+    SELECT performed_on, odometer FROM inventory_item_service_log
+    WHERE item_id = ? AND id != ? AND odometer IS NOT NULL
+    ORDER BY performed_on DESC, id DESC LIMIT 1
+  `).get(itemId, excludeLogId);
+  return { odometer: latest?.odometer ?? null, odometer_on: latest?.performed_on ?? null };
 }
 
 function deleteServiceLogEntry({ itemId, logId }) {
@@ -335,6 +372,7 @@ export {
   HISTORY_ENTRY_ROLES,
   validateServiceLogInput,
   validateCompletionInput,
+  odometerBaselineExcluding,
   loadServiceLog,
   loadServiceLogEntry,
   createServiceLogEntry,

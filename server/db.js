@@ -9122,9 +9122,12 @@ const MIGRATIONS = [
         vendor       TEXT,
         note         TEXT,
         created_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
-        created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
       );
       CREATE INDEX idx_inventory_item_service_log_item ON inventory_item_service_log(item_id, performed_on DESC);
+      CREATE TRIGGER trg_inventory_item_service_log_updated_at AFTER UPDATE ON inventory_item_service_log FOR EACH ROW BEGIN
+        UPDATE inventory_item_service_log SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = OLD.id; END;
     `,
   },
 ];
