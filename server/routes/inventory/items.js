@@ -28,7 +28,7 @@ import {
   validateTrackedDatesInput, writeTrackedDates, removeTrackedDateReminders, loadTrackedDates, loadTrackedDatesForItems,
 } from './item-dates.js';
 import {
-  validateServiceLogInput, validateCompletionInput, loadServiceLog, createServiceLogEntry,
+  validateServiceLogInput, validateCompletionInput, odometerBaselineExcluding, loadServiceLog, createServiceLogEntry,
   updateServiceLogEntry, deleteServiceLogEntry, completeTrackedDate, loadHistory,
 } from './service-log.js';
 
@@ -669,7 +669,10 @@ router.put('/:id/service-log/:logId', (req, res) => {
     const item = db.get().prepare('SELECT id, odometer, odometer_on FROM inventory_items WHERE id = ?').get(vId.value);
     if (!item) return res.status(404).json({ error: 'Item not found.', code: 404 });
 
-    const { value, errors } = validateServiceLogInput(req.body, item);
+    // Die bearbeitete Zeile darf den Tippfehler-Schutz nicht gegen ihren
+    // eigenen alten Wert pruefen (Review #1257).
+    const baseline = odometerBaselineExcluding(item, item.id, vLogId.value);
+    const { value, errors } = validateServiceLogInput(req.body, baseline);
     if (errors.length) return res.status(400).json({ error: errors.join(' '), code: 400 });
 
     const updated = updateServiceLogEntry({ itemId: item.id, logId: vLogId.value, values: value });

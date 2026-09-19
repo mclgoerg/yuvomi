@@ -450,3 +450,43 @@ test('das Loeschen einer Log-Zeile, die NIE den aktuellen Kilometerstand gesetzt
   assert.equal(after.body.data.odometer, 50000, 'der unabhaengig gesetzte Stand bleibt unangetastet');
   assert.equal(after.body.data.odometer_on, '2026-09-01');
 });
+
+test('a reading without a date still arms the typo guard (Review #1257)', async () => {
+  const created = await call('POST', '/items', { body: { name: 'Auto5', category: 'vehicles', odometer: 51200 } });
+  const { id, odometer_on: readOn } = created.body.data;
+  assert.ok(readOn, 'a reading without a date gets one');
+  const typo = await call('POST', `/items/${id}/service-log`, { body: { label: 'Inspektion', performed_on: readOn, odometer: 5120 } });
+  assert.equal(typo.status, 400);
+  assert.equal((await call('GET', `/items/${id}`)).body.data.odometer, 51200);
+});
+
+test('PUT einer Log-Zeile prueft den Tippfehler-Schutz nicht gegen ihren eigenen alten Wert (Review #1257)', async () => {
+  const created = await call('POST', '/items', { body: { name: 'Auto6', category: 'vehicles' } });
+  const itemId = created.body.data.id;
+
+  const logged = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 520000 },
+  });
+  assert.equal(logged.status, 201);
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 520000);
+
+  // Denselben Tippfehler an der Zeile selbst richtigstellen - die Zeile
+  // konkurriert nicht gegen ihren eigenen alten (falschen) Wert.
+  const fixed = await call('PUT', `/items/${itemId}/service-log/${logged.body.data.id}`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 52000 },
+  });
+  assert.equal(fixed.status, 200, JSON.stringify(fixed.body));
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 52000);
+});
+
+test('ein Kilometerstand auf einer Log-Zeile setzt inventory_items.odometer nur bei odometer-tragender Kategorie (Review #1257)', async () => {
+  const created = await call('POST', '/items', { body: { name: 'Sonstiges Ding', category: 'other' } });
+  const itemId = created.body.data.id;
+
+  const logged = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Reparatur', performed_on: '2026-09-10', odometer: 777 },
+  });
+  assert.equal(logged.status, 201);
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, null,
+    'eine Kategorie ohne tracks_odometer darf inventory_items.odometer nicht setzen');
+});
