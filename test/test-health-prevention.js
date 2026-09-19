@@ -348,6 +348,16 @@ test('GET /prevention/due: eine betreuende Person sieht auch ein privates Faelli
   assert.ok(item, 'eine echte Betreuung sieht ein privates Faelligkeits-Item, nicht nur familiensichtbare');
 });
 
+test('PATCH on a type moves updated_at, not created_at', async () => {
+  const id = db.prepare(`INSERT INTO health_prevention_types (name, kind, created_at, updated_at)
+    VALUES ('Masern', 'vaccination', '2000-01-01T00:00:00Z', '2000-01-01T00:00:00Z')`).run().lastInsertRowid;
+  asA();
+  const res = await call('PATCH', `/prevention/types/${id}`, { name: 'MMR' });
+  assert.equal(res.status, 200);
+  assert.notEqual(res.body.data.updated_at, '2000-01-01T00:00:00Z');
+  assert.equal(res.body.data.created_at, '2000-01-01T00:00:00Z');
+});
+
 test('teardown: Server schliessen', async () => {
   await new Promise((r) => server.close(r));
 });
