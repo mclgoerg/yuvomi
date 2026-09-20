@@ -490,3 +490,55 @@ test('ein Kilometerstand auf einer Log-Zeile setzt inventory_items.odometer nur 
   assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, null,
     'eine Kategorie ohne tracks_odometer darf inventory_items.odometer nicht setzen');
 });
+
+test('PUT raeumt inventory_items.odometer ab, wenn die einzige Log-Zeile ihren Kilometerstand verliert (Review #1257)', async () => {
+  const created = await call('POST', '/items', { body: { name: 'Auto7', category: 'vehicles' } });
+  const itemId = created.body.data.id;
+
+  const logged = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 520000 },
+  });
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 520000);
+
+  const cleared = await call('PUT', `/items/${itemId}/service-log/${logged.body.data.id}`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10' },
+  });
+  assert.equal(cleared.status, 200, JSON.stringify(cleared.body));
+
+  const after = await call('GET', `/items/${itemId}`);
+  assert.equal(after.body.data.odometer, null, 'ohne verbleibende Ablesung faellt der Gegenstand auf NULL zurueck');
+  assert.equal(after.body.data.odometer_on, null);
+});
+
+test('PUT rechnet inventory_items.odometer neu, wenn die bearbeitete Zeile die Quelle war (Review #1257)', async () => {
+  const created = await call('POST', '/items', { body: { name: 'Auto8', category: 'vehicles' } });
+  const itemId = created.body.data.id;
+
+  const leading = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 520000 },
+  });
+  // Rueckdatierte zweite Zeile - konkurriert (noch) nicht um den aktuellen Stand.
+  await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Reifenwechsel', performed_on: '2026-09-01', odometer: 50000 },
+  });
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 520000);
+
+  // Die fuehrende Zeile war ein Tippfehler im DATUM (sollte 2026-08-01 sein) -
+  // danach ist die zweite Zeile (50000 am 2026-09-01) die juengste Ablesung.
+  const backdated = await call('PUT', `/items/${itemId}/service-log/${leading.body.data.id}`, {
+    body: { label: 'Inspektion', performed_on: '2026-08-01', odometer: 520000 },
+  });
+  assert.equal(backdated.status, 200, JSON.stringify(backdated.body));
+
+  const afterBackdate = await call('GET', `/items/${itemId}`);
+  assert.equal(afterBackdate.body.data.odometer, 50000, 'die neu juengste Ablesung zaehlt jetzt');
+  assert.equal(afterBackdate.body.data.odometer_on, '2026-09-01');
+
+  // Eine echte, spaetere und hoehere Ablesung darf jetzt nicht mehr an einem
+  // veralteten Cache-Stand (520000) scheitern.
+  const legit = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Reifenwechsel 2', performed_on: '2026-09-20', odometer: 60000 },
+  });
+  assert.equal(legit.status, 201, JSON.stringify(legit.body));
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 60000);
+});

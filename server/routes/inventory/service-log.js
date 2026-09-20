@@ -136,7 +136,7 @@ function validateCompletionInput(body, item) {
 
 function loadServiceLog(itemId) {
   return db.get().prepare(`
-    SELECT id, item_id, item_date_id, label, performed_on, odometer, vendor, note, created_by, created_at
+    SELECT id, item_id, item_date_id, label, performed_on, odometer, vendor, note, created_by, created_at, updated_at
     FROM inventory_item_service_log
     WHERE item_id = ?
     ORDER BY performed_on DESC, id DESC
@@ -145,7 +145,7 @@ function loadServiceLog(itemId) {
 
 function loadServiceLogEntry(itemId, logId) {
   return db.get().prepare(`
-    SELECT id, item_id, item_date_id, label, performed_on, odometer, vendor, note, created_by, created_at
+    SELECT id, item_id, item_date_id, label, performed_on, odometer, vendor, note, created_by, created_at, updated_at
     FROM inventory_item_service_log
     WHERE id = ? AND item_id = ?
   `).get(logId, itemId);
@@ -195,12 +195,29 @@ function updateServiceLogEntry({ itemId, logId, values }) {
   const existing = loadServiceLogEntry(itemId, logId);
   if (!existing) return null;
   db.get().transaction(() => {
+    // Vor dem Schreiben pruefen, ob DIESE Zeile (mit ihrem ALTEN Wert) die
+    // Quelle des zwischengespeicherten Stands war - derselbe Guard wie
+    // deleteServiceLogEntry(), nur fuer UPDATE statt DELETE (Review #1257).
+    // War sie es, kann ein blosses maybeAdvanceItemOdometer() mit den NEUEN
+    // Werten den Stand nicht mehr korrekt herleiten (die alte, jetzt
+    // ueberschriebene Ablesung bleibt im Cache stehen, obwohl ihre Quelle
+    // gerade einen anderen Wert bekommen hat) - stattdessen zaehlt neu, was
+    // ALLE verbleibenden Zeilen (inklusive der geaenderten) jetzt hergeben.
+    const item = db.get().prepare('SELECT odometer, odometer_on FROM inventory_items WHERE id = ?').get(itemId);
+    const wasSource = item && existing.odometer != null
+      && item.odometer === existing.odometer && item.odometer_on === existing.performed_on;
+
     db.get().prepare(`
       UPDATE inventory_item_service_log
       SET label = ?, performed_on = ?, odometer = ?, vendor = ?, note = ?
       WHERE id = ?
     `).run(values.label, values.performed_on, values.odometer, values.vendor, values.note, logId);
-    maybeAdvanceItemOdometer(itemId, values.performed_on, values.odometer);
+
+    if (wasSource) {
+      recomputeItemOdometer(itemId);
+    } else {
+      maybeAdvanceItemOdometer(itemId, values.performed_on, values.odometer);
+    }
   })();
   return loadServiceLogEntry(itemId, logId);
 }

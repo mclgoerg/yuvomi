@@ -1100,13 +1100,13 @@ function openCompletionSheet(item, trackedDate) {
 
     // Kilometerstand nur bei odometer-tragenden Kategorien abfragen - dieselbe
     // Einschraenkung wie im Item-Formular.
-    const isVehicle = categoryTracksOdometer(item.category);
+    const tracksOdometer = categoryTracksOdometer(item.category);
     const content = `
       <div class="form-group">
         <label class="form-label" for="inv-complete-date">${esc(t('inventory.completePerformedOnLabel'))}</label>
         <yuvomi-datepicker id="inv-complete-date" type="date" value="${esc(todayKey())}"></yuvomi-datepicker>
       </div>
-      ${isVehicle ? `
+      ${tracksOdometer ? `
       <div class="form-group">
         <label class="form-label" for="inv-complete-odometer">${esc(t('inventory.odometerLabel'))}</label>
         <input id="inv-complete-odometer" class="form-input" type="number" min="0" step="1" inputmode="numeric">
@@ -1135,7 +1135,7 @@ function openCompletionSheet(item, trackedDate) {
           const saveBtn = panel.querySelector('#inv-complete-save');
           const performedOn = panel.querySelector('#inv-complete-date').value;
           if (!performedOn) return;
-          const odometerRaw = isVehicle ? panel.querySelector('#inv-complete-odometer').value.trim() : '';
+          const odometerRaw = tracksOdometer ? panel.querySelector('#inv-complete-odometer').value.trim() : '';
           const payload = {
             performed_on: performedOn,
             odometer: odometerRaw === '' ? null : Number(odometerRaw),

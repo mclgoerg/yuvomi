@@ -2827,10 +2827,9 @@ household-wide); service log rows are therefore visible to the whole household.
 **Odometer (`inventory_items.odometer`/`odometer_unit`/`odometer_on`, v220).** A manual reading,
 gated by `inventory_categories.tracks_odometer` (an additive boolean column, default off, seeded on
 for the built-in `vehicles` category only) rather than a hardcoded `category === 'vehicles'` string
-comparison - a household-renamed or deleted-and-recreated vehicle category, or a second one
-("Motorcycle", "RV"), keeps or gains the flag through the category itself, not through a literal that
-would silently stop matching. `odometer_unit` is `km` or `mi` (defaults to `km` when a reading is
-given without one), `odometer_on` is the date of that reading, defaulting to today's date
+comparison - a household-renamed `vehicles` category keeps the flag through its stable `key`, not
+through a literal that would silently stop matching a new name. `odometer_unit` is `km` or `mi`
+(defaults to `km` when a reading is given without one), `odometer_on` is the date of that reading, defaulting to today's date
 (household zone) when a reading arrives without one - the odometer-regression guard on the service
 log needs a date to know whether a new entry competes with the current reading at all. A category
 without `tracks_odometer` silently clears all three fields rather than rejecting the write, on both
