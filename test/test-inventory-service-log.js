@@ -569,13 +569,49 @@ test('recomputeItemOdometer() waescht keine Ablesung ein, wenn die Kategorie odo
   assert.equal(afterNewLog.body.data.odometer_on, '2026-09-10');
 
   // Die fuehrende (Quell-)Zeile bearbeiten darf die eben abgewiesene 105000
-  // nicht ueber recomputeItemOdometer() nachtraeglich einwaschen.
+  // nicht ueber recomputeItemOdometer() nachtraeglich einwaschen - und muss
+  // die verwaiste 100000 abraeumen (NULL), nicht stehen lassen: ein blosses
+  // Abbrechen des Gates wuerde denselben Stand auf ewig einfrieren, dessen
+  // Quelle es nicht mehr gibt (Review #1257, Runde 2 an dieser Sperre).
   const edited = await call('PUT', `/items/${itemId}/service-log/${leading.body.data.id}`, {
     body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 110000 },
   });
   assert.equal(edited.status, 200, JSON.stringify(edited.body));
 
   const afterEdit = await call('GET', `/items/${itemId}`);
-  assert.equal(afterEdit.body.data.odometer, 100000, 'recomputeItemOdometer() braucht dasselbe Gate');
-  assert.equal(afterEdit.body.data.odometer_on, '2026-09-10');
+  assert.equal(afterEdit.body.data.odometer, null, 'ohne tracking-Kategorie raeumt recomputeItemOdometer() ab, statt stehenzubleiben');
+  assert.equal(afterEdit.body.data.odometer_on, null);
+});
+
+test('DELETE der einzigen Ablesung heilt den verwaisten Stand ab, auch wenn die Kategorie nicht mehr trackt (Review #1257)', async () => {
+  const created = await call('POST', '/items', { body: { name: 'Auto10', category: 'vehicles' } });
+  const itemId = created.body.data.id;
+
+  const only = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 100000 },
+  });
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 100000);
+
+  // Kategorie geloescht - Item faellt auf 'other', der Stand bleibt zunaechst
+  // stehen (categories.js raeumt odometer/odometer_unit/odometer_on nicht ab).
+  db.prepare("UPDATE inventory_items SET category = 'other' WHERE id = ?").run(itemId);
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 100000);
+
+  // Die einzige Zeile loeschen muss den verwaisten Stand abraeumen (NULL),
+  // nicht bei 100000 einfrieren - sonst validiert eine spaetere echte Ablesung
+  // gegen einen Stand, dessen Quelle laengst geloescht ist.
+  const del = await call('DELETE', `/items/${itemId}/service-log/${only.body.data.id}`);
+  assert.equal(del.status, 204);
+  const afterDelete = await call('GET', `/items/${itemId}`);
+  assert.equal(afterDelete.body.data.odometer, null, 'die verwaiste Ablesung wird abgeraeumt, nicht eingefroren');
+  assert.equal(afterDelete.body.data.odometer_on, null);
+
+  // Kategorie zurueck auf 'vehicles': eine neue, echte Ablesung darf nicht an
+  // einem Stand scheitern, den es laengst nicht mehr geben sollte.
+  db.prepare("UPDATE inventory_items SET category = 'vehicles' WHERE id = ?").run(itemId);
+  const fresh = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Reifenwechsel', performed_on: '2026-10-01', odometer: 60000 },
+  });
+  assert.equal(fresh.status, 201, JSON.stringify(fresh.body));
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 60000);
 });

@@ -229,15 +229,21 @@ function updateServiceLogEntry({ itemId, logId, values }) {
  * nicht mehr gibt. Setzt auf die neueste VERBLEIBENDE Ablesung zurueck, oder
  * auf NULL, wenn keine Log-Zeile mehr eine traegt.
  *
- * Braucht dieselbe tracks_odometer-Sperre wie maybeAdvanceItemOdometer -
- * sonst waescht ein PUT/DELETE auf der Quell-Zeile eine Ablesung wieder ein,
- * die der Gegenstand laengst verloren hat (Kategorie ohne tracks_odometer,
- * z. B. nach dem Loeschen der urspruenglichen Kategorie - categories.js
- * raeumt odometer/odometer_unit/odometer_on beim Neuzuordnen nicht ab,
- * das Gate hier ist die zweite Verteidigungslinie, Review #1257).
+ * Braucht dieselbe tracks_odometer-Sperre wie maybeAdvanceItemOdometer - aber
+ * hier RAEUMT das Gate ab, statt nur abzubrechen (Review #1257, Runde 2 an
+ * dieser Sperre): diese Funktion ist die Aufraeum-Funktion selbst, ein
+ * blosses return liesse den Gegenstand auf einer verwaisten Ablesung stehen,
+ * deren Quelle es nicht mehr gibt - genau die Sperre wuerde dann verhindern,
+ * dass sie je wieder abgeraeumt wird. Dieselbe Regel wie
+ * items.js#validateItemFields() beim Kategoriewechsel: keine tracking-
+ * Kategorie heisst odometer/odometer_unit/odometer_on werden NULL, nicht
+ * "bleiben stehen, wie sie sind".
  */
 function recomputeItemOdometer(itemId) {
-  if (!itemCategoryTracksOdometer(itemId)) return;
+  if (!itemCategoryTracksOdometer(itemId)) {
+    db.get().prepare('UPDATE inventory_items SET odometer = NULL, odometer_unit = NULL, odometer_on = NULL WHERE id = ?').run(itemId);
+    return;
+  }
   const latest = db.get().prepare(`
     SELECT performed_on, odometer FROM inventory_item_service_log
     WHERE item_id = ? AND odometer IS NOT NULL
