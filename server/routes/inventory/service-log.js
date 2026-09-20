@@ -228,8 +228,16 @@ function updateServiceLogEntry({ itemId, logId, values }) {
  * hat, liesse den Gegenstand sonst auf einem Stand stehen, dessen Quelle es
  * nicht mehr gibt. Setzt auf die neueste VERBLEIBENDE Ablesung zurueck, oder
  * auf NULL, wenn keine Log-Zeile mehr eine traegt.
+ *
+ * Braucht dieselbe tracks_odometer-Sperre wie maybeAdvanceItemOdometer -
+ * sonst waescht ein PUT/DELETE auf der Quell-Zeile eine Ablesung wieder ein,
+ * die der Gegenstand laengst verloren hat (Kategorie ohne tracks_odometer,
+ * z. B. nach dem Loeschen der urspruenglichen Kategorie - categories.js
+ * raeumt odometer/odometer_unit/odometer_on beim Neuzuordnen nicht ab,
+ * das Gate hier ist die zweite Verteidigungslinie, Review #1257).
  */
 function recomputeItemOdometer(itemId) {
+  if (!itemCategoryTracksOdometer(itemId)) return;
   const latest = db.get().prepare(`
     SELECT performed_on, odometer FROM inventory_item_service_log
     WHERE item_id = ? AND odometer IS NOT NULL

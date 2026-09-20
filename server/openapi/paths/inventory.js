@@ -94,8 +94,8 @@ export function inventoryPaths() {
       }),
     },
     '/api/v1/inventory/items/{id}/service-log/{logId}': {
-      put: op({ summary: 'Replace a service-log entry', description: 'Full replace, not a partial update: label and performed_on are required, and any omitted optional field (odometer/vendor/note) is cleared.', tag: 'Inventory', params: [idParam('id', 'Item ID'), idParam('logId', 'Service-log entry ID')], stateChanging: true, requestBody: jsonBody(null) }),
-      delete: op({ summary: 'Delete a service-log entry', tag: 'Inventory', params: [idParam('id', 'Item ID'), idParam('logId', 'Service-log entry ID')], stateChanging: true }),
+      put: op({ summary: 'Replace a service-log entry', description: 'Full replace, not a partial update: label and performed_on are required, and any omitted optional field (odometer/vendor/note) is cleared. If this entry currently supplies `inventory_items.odometer`/`odometer_on`, they are recomputed from whatever remains after the write - the cached reading can move down or clear to `null` here, not just advance.', tag: 'Inventory', params: [idParam('id', 'Item ID'), idParam('logId', 'Service-log entry ID')], stateChanging: true, requestBody: jsonBody(null) }),
+      delete: op({ summary: 'Delete a service-log entry', description: 'If this entry currently supplies `inventory_items.odometer`/`odometer_on`, they are recomputed from whatever remains - deleting the source entry can move the cached reading down or clear it to `null`, not just leave it standing.', tag: 'Inventory', params: [idParam('id', 'Item ID'), idParam('logId', 'Service-log entry ID')], stateChanging: true }),
     },
     '/api/v1/inventory/items/{id}/history': {
       get: op({

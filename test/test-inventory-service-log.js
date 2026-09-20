@@ -542,3 +542,40 @@ test('PUT rechnet inventory_items.odometer neu, wenn die bearbeitete Zeile die Q
   assert.equal(legit.status, 201, JSON.stringify(legit.body));
   assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 60000);
 });
+
+test('recomputeItemOdometer() waescht keine Ablesung ein, wenn die Kategorie odometer nicht mehr trackt (Review #1257)', async () => {
+  const created = await call('POST', '/items', { body: { name: 'Auto9', category: 'vehicles' } });
+  const itemId = created.body.data.id;
+
+  const leading = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 100000 },
+  });
+  assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 100000);
+
+  // Die Kategorie wurde geloescht - categories.js#DELETE /:key haengt betroffene
+  // Items pauschal auf 'other' um, ohne odometer/odometer_unit/odometer_on
+  // abzuraeumen (dieselbe Situation, nur direkt simuliert statt ueber die Route,
+  // um die anderen Tests dieser Datei nicht durch ein echtes Loeschen von
+  // 'vehicles' zu stoeren).
+  db.prepare("UPDATE inventory_items SET category = 'other' WHERE id = ?").run(itemId);
+
+  // Ein neuer Log-Eintrag darf inventory_items.odometer nicht mehr setzen -
+  // die Kategorie trackt es nicht mehr (maybeAdvanceItemOdometer-Gate).
+  await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Reparatur', performed_on: '2026-09-15', odometer: 105000 },
+  });
+  const afterNewLog = await call('GET', `/items/${itemId}`);
+  assert.equal(afterNewLog.body.data.odometer, 100000, 'das Gate haelt den Stand fest');
+  assert.equal(afterNewLog.body.data.odometer_on, '2026-09-10');
+
+  // Die fuehrende (Quell-)Zeile bearbeiten darf die eben abgewiesene 105000
+  // nicht ueber recomputeItemOdometer() nachtraeglich einwaschen.
+  const edited = await call('PUT', `/items/${itemId}/service-log/${leading.body.data.id}`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 110000 },
+  });
+  assert.equal(edited.status, 200, JSON.stringify(edited.body));
+
+  const afterEdit = await call('GET', `/items/${itemId}`);
+  assert.equal(afterEdit.body.data.odometer, 100000, 'recomputeItemOdometer() braucht dasselbe Gate');
+  assert.equal(afterEdit.body.data.odometer_on, '2026-09-10');
+});
