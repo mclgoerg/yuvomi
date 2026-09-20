@@ -12,6 +12,7 @@
  *   closeModal({ force }) → Promise<void>
  *   confirmModal(message, opts) → Promise<boolean>       (ersetzt ein offenes Modal)
  *   confirmOverModal(message, opts) → Promise<boolean>   (parkt es und gibt es zurück)
+ *   askOverModal(ask) → Promise<Antwort>                 (dasselbe für einen eigenen Dialog)
  *
  * Nachträglich gemountete Panes (Detailansicht → Formular, detail-view.js)
  *   mountFooter(panel)             → hebt eine neu gerenderte Fußzeile ans Panel
@@ -640,12 +641,21 @@ function _resumeSuspendedModal({ overlay, id, title, titleId, snapshot, dirtyGua
  * lässt sich sein Overlay direkt nach dem Aufruf greifen.
  */
 async function _confirmOverSuspended(message, opts, suspended) {
-  const pending = confirmModal(message, opts);
+  return _askOverSuspended(() => confirmModal(message, opts), suspended);
+}
+
+/**
+ * Derselbe Ablauf für einen Dialog, den der Aufrufer selbst baut (#1284): `ask`
+ * öffnet ihn über openModal und liefert ein Promise auf die Antwort. Auch hier
+ * entsteht der Dialog synchron, also greift der Overlay-Zugriff direkt danach.
+ */
+async function _askOverSuspended(ask, suspended) {
+  const pending = ask();
   const dialogOverlay = document.getElementById('shared-modal-overlay');
   try {
-    const confirmed = await pending;
+    const answer = await pending;
     await _awaitOverlayRemoval(dialogOverlay);
-    return confirmed;
+    return answer;
   } catch (err) {
     // Ein geparktes Modal ist inert und damit unbedienbar. Scheitert der Dialog,
     // muss es zurückkommen - sonst steht die App bis zum Reload.
@@ -1167,6 +1177,100 @@ export function updateHeaderAction(panel, { label, onClick, hidden = false } = {
 }
 
 // --------------------------------------------------------
+// Totzeit gegen den Doppeltipp (#1284)
+// --------------------------------------------------------
+
+/**
+ * Wie lange eine frisch geöffnete RÜCKFRAGE keine Zeiger-Betätigung annimmt.
+ *
+ * DER DIALOG FÄHRT IN DIE HAND, DIE GERADE GETIPPT HAT. Auf Handybreite ist
+ * das Modal ein Sheet, und `modal-sheet-in` (layout.css) schiebt es 280 ms
+ * lang von unten nach oben - quer durch die Stelle, an der eben noch
+ * „Speichern" stand. Gemessen in headless Chrome: ein zweiter Tipp 40-70 ms
+ * nach dem Öffnen der Serien-Rückfrage wählte eine Reichweite aus, ohne dass
+ * die Frage je gelesen wurde; auf dem Desktop legte das Löschen aus dem
+ * Popover „Nur diesen Termin" unter den zweiten Klick eines Doppelklicks.
+ * Beides trifft jede Rückfrage des geteilten Systems, nicht nur den neuen
+ * Dialog: die Löschfrage geht denselben Weg durch `confirmModal` → `openModal`.
+ *
+ * NUR RÜCKFRAGEN, und das ist der Unterschied, der zählt. Die Sperre hing
+ * zuerst an `openModal` selbst und traf damit jedes Overlay - 62 Aufrufe in
+ * 20 Dateien, Formulare und Ansichtsblätter darunter. Dort ist der erste
+ * Zeigerklick Absicht: jemand hat das Blatt aufgemacht und tippt hinein. Im
+ * Notizblatt fiel so der Moduswechsel weg, und eine Sonde wartete 42 s auf
+ * eine Vorschlagsliste, die nie kam. Scharf gestellt wird deshalb einzeln,
+ * über `pointerDeadTime: true` - siehe openModal.
+ *
+ * 350 ms deckt die Einfahrt (280 ms) samt Rest ab und liegt unter der
+ * Schwelle, ab der ein GEWOLLTER zweiter Klick sich verschluckt anfühlt.
+ */
+const POINTER_DEAD_TIME_MS = 350;
+
+/**
+ * Genau die Ereignisse, mit denen ein Zeiger etwas auslöst.
+ *
+ * Die Touch-Ereignisse stehen bewusst NICHT dabei: `touchstart`/`touchmove`
+ * tragen das Scrollen des Inhalts und die Wischgeste des Sheets
+ * (`_wireSheetSwipe`), und sie abzufangen hieße, eine Geste mittendrin
+ * abzuschneiden. Der Tipp selbst kommt ohnehin hier vorbei - als `click` mit
+ * `pointerType: 'touch'`.
+ */
+const POINTER_ACTIVATION_EVENTS = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
+
+/**
+ * Kommt dieses Ereignis von einem Zeiger - oder von Tastatur bzw. Screenreader?
+ *
+ * DIE TOTZEIT UNTERSCHEIDET DIE EREIGNISART, NICHT NUR DIE ZEIT. Eine Sperre,
+ * die auch `Enter`/`Space` schluckt, wäre kein Schutz, sondern ein Rückschritt
+ * in der Bedienbarkeit: wer mit Tastatur bedient, tabbt in den Dialog und
+ * drückt - dazwischen liegen keine 350 ms Nachdenkzeit, die man ihm abziehen
+ * dürfte, und er hat auch nie „danebengetippt", weil kein Sheet unter seinen
+ * Finger gefahren ist.
+ *
+ * Zwei Merkmale, und EINES genügt, weil keines für sich vollständig ist:
+ * Chrome liefert einen per Tastatur ausgelösten Klick als PointerEvent mit
+ * leerem `pointerType` und `detail === 0` - dasselbe gilt für `element.click()`
+ * und für die Betätigung durch einen Screenreader. Ein Tipp trägt
+ * `pointerType: 'touch'`, ein älterer MouseEvent ohne `pointerType` immerhin
+ * `detail >= 1`. Nur auf `pointerType` zu hören ließe den Tipp durch, sobald
+ * ein Browser den Kompatibilitätsklick ohne Zeigerart schickt; nur auf
+ * `detail` zu hören ließe `pointerdown` durch, das kein `detail` führt.
+ */
+function _isPointerActivation(event) {
+  if (typeof event?.pointerType === 'string' && event.pointerType !== '') return true;
+  return typeof event?.detail === 'number' && event.detail > 0;
+}
+
+/**
+ * Hängt die Totzeit an ein frisch geöffnetes Overlay.
+ *
+ * CAPTURE AUF DER WURZEL UND ALS ERSTER LISTENER. Capture, damit das Ereignis
+ * fällt, bevor irgendein Handler im Dialog es sieht; als erster, weil ein
+ * Klick auf das Overlay SELBST (der Schließweg über den Hintergrund) im
+ * AT_TARGET-Fall landet - dort laufen Capture- und Bubble-Listener desselben
+ * Knotens in Registrierungsreihenfolge, und `stopImmediatePropagation` wirkt
+ * nur auf das, was noch kommt.
+ *
+ * `now` und `duration` sind für die Sonden da: eine Totzeit belegt man, indem
+ * man die Zeit vorstellt, nicht indem man die Konstante im Quelltext sucht.
+ *
+ * @param {EventTarget} root
+ * @param {{now?: () => number, duration?: number}} [opts]
+ * @returns {(event: Event) => void} der angehängte Handler (für Sonden)
+ */
+export function armPointerDeadTime(root, { now = () => performance.now(), duration = POINTER_DEAD_TIME_MS } = {}) {
+  const openedAt = now();
+  const swallow = (event) => {
+    if (now() - openedAt >= duration) return;
+    if (!_isPointerActivation(event)) return;
+    event.preventDefault?.();
+    event.stopImmediatePropagation?.();
+  };
+  for (const type of POINTER_ACTIVATION_EVENTS) root.addEventListener(type, swallow, true);
+  return swallow;
+}
+
+// --------------------------------------------------------
 // openModal
 // --------------------------------------------------------
 
@@ -1185,10 +1289,16 @@ export function updateHeaderAction(panel, { label, onClick, hidden = false } = {
  * @param {boolean} [opts.dirtyGuard=true] - `false` für Ansichtsblätter, deren
  *   Felder sofort wirken und nichts zu speichern haben (siehe _dirtyGuardEnabled).
  *   Für alles mit einem Speichern-Knopf bleibt es an.
+ * @param {boolean} [opts.pointerDeadTime=false] - `true` NUR für Rückfragen, also
+ *   Dialoge, deren Knöpfe eine Frage beantworten. Sie nehmen dann 350 ms lang
+ *   keinen Zeigerklick an, damit ein Tipp, der noch zum Öffnen gehörte, nicht
+ *   ungelesen antwortet (siehe POINTER_DEAD_TIME_MS). Ein Formular, das jemand
+ *   selbst aufgemacht hat, bekommt das NICHT: dort ist der erste Klick Absicht.
  */
 export function openModal({
   title, content, onSave, onDelete, onClose, size = 'md',
   initialFocus = 'first-field', headerAction = null, dirtyGuard = true,
+  pointerDeadTime = false,
 } = {}) {
   // Vorheriges Modal schließen (kein Stacking).
   if (activeOverlay) {
@@ -1237,6 +1347,18 @@ export function openModal({
   document.body.insertAdjacentHTML('beforeend', html);
   activeOverlay = document.getElementById('shared-modal-overlay');
   activeOverlay._onCloseCallback = onClose;
+
+  // VOR JEDEM ANDEREN LISTENER AUF DIESEM KNOTEN: die Totzeit schluckt einen
+  // Zeigerklick, der noch zum Öffnen gehört, und ihre Reihenfolge entscheidet
+  // mit - siehe armPointerDeadTime.
+  //
+  // NUR FÜR RÜCKFRAGEN. Sie schluckt jeden Zeigerklick auf dem Overlay, also
+  // auch den auf ein Feld oder einen Umschalter. In einer Rückfrage ist der
+  // verfrühte Klick eine ANTWORT auf eine ungelesene Frage; in einem Formular,
+  // das jemand selbst aufgemacht hat, ist er Absicht, und ihn zu schlucken ist
+  // der Fehler. Gemessen: der Moduswechsel im Notizblatt fiel weg, und die
+  // Sonde wartete 42 s auf eine Vorschlagsliste, die nie kam.
+  if (pointerDeadTime) armPointerDeadTime(activeOverlay);
 
   // Lucide-Icons rendern
   if (window.lucide) window.lucide.createIcons({ el: activeOverlay });
@@ -1441,6 +1563,7 @@ export function promptModal(label, defaultValue = '') {
     }
 
     openModal({
+      pointerDeadTime: true,
       title: label,
       size: 'sm',
       content: `
@@ -1497,6 +1620,7 @@ export function selectModal(label, options) {
       .join('');
 
     openModal({
+      pointerDeadTime: true,
       title: label,
       size: 'sm',
       content: `
@@ -1555,6 +1679,7 @@ export function confirmModal(message, { confirmLabel, cancelLabel, danger = fals
     }
 
     openModal({
+      pointerDeadTime: true,
       title: message,
       size: 'sm',
       content: `
@@ -1640,10 +1765,49 @@ function createConfirmOverModal({
 
 export const confirmOverModal = createConfirmOverModal();
 
+/**
+ * Eine Rückfrage ÜBER einem offenen Modal, deren Dialog der Aufrufer selbst
+ * baut - für Fragen, die mehr als zwei Ausgänge haben (#1284: „Nur diesen
+ * Termin" / „Diesen und folgende" / „Ganze Serie" / Abbrechen beim Speichern
+ * eines Serientermins).
+ *
+ * Dieselbe Mechanik wie `confirmOverModal` mit `closeOnConfirm: false`: das
+ * Formular wird geparkt, `ask()` öffnet den Dialog über `openModal` und liefert
+ * ein Promise auf die Antwort, danach kommt das Formular in JEDEM Fall zurück -
+ * samt Dirty-Snapshot, Escape-Handler und Fokus auf dem auslösenden Knopf. Was
+ * mit der Antwort geschieht (speichern, eine Meldung an einem Feld zeigen,
+ * abbrechen), entscheidet der Aufrufer am wiederhergestellten Formular.
+ *
+ * Ohne offenes Modal ruft es `ask()` einfach auf.
+ *
+ * @param {() => Promise<*>} ask - öffnet den Dialog, löst zur Antwort auf
+ * @returns {Promise<*>} die Antwort von `ask`
+ */
+function createAskOverModal({
+  getActiveOverlay = () => activeOverlay,
+  getModalState = () => modalState,
+  suspend = _suspendActiveModal,
+  askSuspended = _askOverSuspended,
+  resume = _resumeSuspendedModal,
+} = {}) {
+  return async function askOverModal(ask) {
+    // Dieselbe Bedingung wie bei confirmOverModal: nur ein regulär offenes
+    // Modal lässt sich parken.
+    if (!getActiveOverlay() || getModalState() !== 'open') return ask();
+    const suspended = suspend();
+    const answer = await askSuspended(ask, suspended);
+    resume(suspended);
+    return answer;
+  };
+}
+
+export const askOverModal = createAskOverModal();
+
 /** Nur fuer Tests: Gesten und Bestaetigungen ohne echtes Panel treiben. */
 export const __test = {
   wireSheetSwipe: _wireSheetSwipe,
   createConfirmOverModal,
+  createAskOverModal,
   finishSuspendedConfirmation,
   applyInitialFocus,
 };

@@ -168,6 +168,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   time zone and which lead time it was written from, and moving somebody's reminder on a guess is
   worse than leaving it. The edit dialog names such a time honestly instead of hiding it (#1260), and
   saving the reminder again writes it correctly. (#1291)
+- **Saving a change to one event of a repeating series now asks which events it is for.** Editing an
+  event of a series - adding a person, for example - used to change that one event only, unless you
+  had spotted the "Applies to" field below the repeat settings, which started on "Only this event".
+  The person then showed on that single event, and every other event of the series stayed without
+  them: a grey dot, no avatar. The field is gone. Saving now asks "Only this event", "This and
+  following" or "Whole series", with none of them picked in advance, and cancelling takes you back to
+  the form without saving anything. If nothing was changed, saving simply closes the form. A single
+  event, and a series that belongs to a synced or subscribed calendar, save as before, without the
+  question. Deleting an event of a series asks the same question with the same three buttons,
+  instead of a drop-down. A series that already has a person on one event only can be put right by
+  opening one of the events without them, picking the person and choosing "Whole series". Both
+  dialogs say which event they are about, above the three buttons: its title and the date of the
+  occurrence you opened, on the household's clock. That line is what tells you where "This and
+  following" would cut the series, and it matters most when deleting - by then the list or the form
+  has already closed, and the question is the only thing on screen. A question
+  that has just opened ignores taps and clicks for a third of a second, so a quick second tap
+  on Save - or the second click of a double-click on Delete - can no longer answer a question that
+  nobody has read yet; on a phone the dialog slides up into that very spot. Forms and sheets you
+  opened yourself are unaffected and take your first tap as they always did. The keyboard and screen
+  readers are not affected: Enter, Space, Tab and Escape work from the first moment. (#1284)
 
 - **An empty database file no longer starts Yuvomi as an empty instance.** If the database file
   existed but had a size of zero, Yuvomi took it for a new database, set it up from scratch and came
