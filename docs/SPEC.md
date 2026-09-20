@@ -861,6 +861,8 @@ Display metadata (name, color) for synced Google/CalDAV calendars. Populated aut
 
 **Applying a default assignee to events already imported (#1154):** the sync stays new-only, but an admin can run a one-off backfill from Settings → Sync (section "Fill in assignments"). `GET /api/v1/calendar/external-calendars/default-assignee-backfill` returns `{ count, token }` for the confirmation, `POST` on the same path applies it and returns `{ assigned }`. It covers every `external_calendars` row of every account that carries a default assignee and fills only events still mirrored from that calendar (`external_source` equals the calendar's source, so a locally detached occurrence that kept its `calendar_ref_id` is left alone), that arrived inbound rather than being created locally and pushed out (outbound leaves a trace no import carries: Google and CalDAV keep their `target_*` column, Apple and CalDAV upload under the UID `oikos-<id>@oikos.local`; an imported event someone moved to another calendar in Yuvomi carries a target too and is skipped as well; Google events created before migration 47 are skipped entirely, because the Google outbound of that time uploaded every local event without a target), with **no assignment at all** (`assigned_to IS NULL` and no `event_assignments` row), so a manual assignment always wins. It writes through `setEventAssignments()`, the same path as the event editor: the author's reminders fan out to the new assignee and a restricted attachment opens to them. That path runs only for events with a future author reminder or an attachment, and inherited reminders whose time has already passed are marked dismissed, so backfilling old events sends no stale notifications. `POST` requires `expected_count`, the number the confirmation showed, and takes the `token` from the count back as `expected_token` (#1171): a SHA-256 over the candidate list, each event with the person it would get. When the candidate set changed in between, it answers 409 with the current `{ count, token }` and changes nothing. The count alone only catches a change in size; the token also catches a swap of the same size (an event assigned by hand while a new import takes its place, or a calendar switched to another person). `expected_token` is optional so an API client written before it keeps working, but without it only the count is compared. The count and the candidate list are taken in the same synchronous step, and only that list is processed: each row is re-checked when written, so an event assigned by hand in the meantime stays as it is and a candidate that appeared later is not touched. It works in batches of 50 with a yield between them: 5000 events in one transaction measured over twelve seconds of blocked event loop. It cannot tell a never-assigned event from one whose assignment was removed by hand; the confirmation says so. An orphaned default assignee is skipped, and ICS subscriptions are not included: they belong to their creator and are configured in personal settings, not on the admin page the action lives on.
 
+**Moving an event between two calendars of the same account (#1270):** the second exception to new-only. An event moved from calendar A to calendar B comes back with an unchanged identity - CalDAV and Apple over the iCal UID, Google over the event ID - so the inbound finds the existing row and updates it; `calendar_ref_id` travels with it, but the assignment stayed with A's default assignee, and with it the display colour, which an event without a colour of its own takes from its primary assignee (#891). The assignment now follows, in all three providers, through `reassignDefaultOnCalendarMove()` in `server/services/sync-assignment.js`. It moves only an assignment nobody touched: exactly A's default assignee and nobody else (one `event_assignments` row, and `assigned_to` either empty or that same person). Several assignees, a different person, or no assignee at all are all statements a human made and stay as they are - an assignment removed by hand is indistinguishable from one never made, and new-only resolves that case the same way it always has. A calendar B without a default assignee takes nothing away, because a calendar that assigns nothing may not unassign either. A legacy row without a `calendar_ref_id` is left alone: without the "before" there is no "untouched". Written through `setEventAssignments()`, so the old assignee's inherited reminders are withdrawn and the new one's are laid out (#921) and a restricted attachment changes hands; an inherited reminder whose time has already passed is marked dismissed, for the same reason as in the backfill above. Outlook has no inbound and ICS subscriptions are identified per feed (`subscription_id`), so neither is affected. Events already moved before this shipped do not heal on the next sync: `calendar_ref_id` no longer changes for them.
+
 ### Holiday Cache
 Cached public holidays and school holidays from the free [OpenHolidays API](https://openholidaysapi.org)
 (no API key). Populated by an admin-configured country/subdivision in Settings → Modules → Calendar and refreshed
@@ -1710,18 +1712,18 @@ deleted through `POST`/`PUT`/`DELETE /api/v1/reminders` (`SETTABLE_ENTITY_TYPES`
 `server/routes/reminders.js`). Three of those are **derived** - their module recreates the reminder
 whenever the underlying object is written (renewal date, warranty end, inventory deadline) - but a
 hand-set date survives until the next change to their object, which is a half-life you can work with,
-and closing them would break a published `/api/v1` surface for no reason. The other nine
+and closing them would break a published `/api/v1` surface for no reason. The other ten
 (`DERIVED_ENTITY_TYPES`: `pantry_item`, `cycle_period`, `cycle_log_nudge`, `schedule_entry`,
-`schedule_extra_entry`, `waste_pickup`, `document_expiry`, `fasting_goal`,
+`schedule_extra_entry`, `waste_pickup`, `document_expiry`, `health_prevention_due`, `fasting_goal`,
 `fasting_next_start`) are maintained by their owning modules. Pantry, cycle, schedule,
-Waste and fasting also receive periodic repair
+Waste, prevention and fasting also receive periodic repair
 (`syncAllPantryExpiryReminders()`, `syncAllCycleReminders()`, `syncAllScheduleReminders()`,
-`syncAllWasteReminders()`, `syncAllFastingReminders()`, all called from
+`syncAllWasteReminders()`, `syncAllPreventionReminders()`, `syncAllFastingReminders()`, all called from
 `server/services/notifications.js`); document reminders reconcile on document writes, archive and
 delete. A hand-set reminder of any derived type is therefore replaced by the owner, so all four write paths
 (`POST`, `PUT`, `DELETE /:id`, `DELETE` by filter) answer 400 for them.
 
-Four of the nine additionally have no user-supplyable `entity_id`: a pattern-derived shift, a predicted
+Four of the ten additionally have no user-supplyable `entity_id`: a pattern-derived shift, a predicted
 period, "not logged today" and a Waste occurrence are computed on read and have no stored row of their
 own, so `entity_id` points at an anchor row the sync maintains - `schedule_reminder_entries`
 (migration v184, UNIQUE on `(user_id, date_key, COALESCE(pattern_day_id, 0))`, so one anchor per
@@ -1731,11 +1733,28 @@ None of them is something a caller could construct even if the type were settabl
 `schedule_extra_entry` points directly at its `schedule_extra_shifts` row, and `pantry_item` at its
 pantry item.
 
-`document_expiry` points directly at its `family_documents` row. `fasting_goal` and
+`document_expiry` points directly at its `family_documents` row, and `health_prevention_due` at the
+`health_prevention_records` row the due date was computed from (migration v219): a caregiver's
+copy carries `assigned_from`, so revoking that access withdraws it without touching the owner's own.
+`fasting_goal` and
 `fasting_next_start` point directly at the owner's `health_fasts` row; only that owner receives or
 dismisses them, and deleting the fast removes all of its reminder delivery states atomically.
 
-Reading and **dismissing** (`PATCH /:id/dismiss`) stay open for all fourteen types - the reminder toast
+**A deleted task or event takes its reminders with it (migration v217, #1258).** `entity_type`/`entity_id`
+is a *soft* reference - `created_by` is the table's only foreign key - so nothing in the schema removed a
+reminder whose task or event was gone. The clean-up lived in the browser instead, as a second request sent
+behind the delete, and three routes lost it: a tab closed straight after deleting dropped the `keepalive`
+call, the `/api/v1` and MCP delete paths never sent it at all, and a member allowed to edit tasks but only
+to read the calendar had it refused without being told. A reminder set by *another* member on the same task
+outlived it every time, because the browser only ever cleaned up its own. What stayed behind pointed at
+nothing: a notification with a heading and no body, or an empty row in the in-app list. Two `AFTER DELETE`
+triggers now do it in the database - `trg_reminders_tasks_ad` on `tasks` and `trg_reminders_events_ad` on
+`calendar_events` - so every delete path is covered, including a cascade, and every member's row goes, not
+just the deleting user's. The same migration deletes the rows already orphaned, once. The thirteen derived
+and settable types keep the soft reference and are reconciled by their owning module, which is why only
+these two needed a trigger.
+
+Reading and **dismissing** (`PATCH /:id/dismiss`) stay open for all fifteen types - the reminder toast
 has to show a derived notification and let the user wave it away, and dismissing holds precisely
 because the row stays.
 
@@ -3115,7 +3134,7 @@ default private, with the existing own-record bulk visibility action.
 
 The page supports immediate/earlier start, completed backfill, active-start
 correction, and completed-record edits. First creation requires explicit safety
-acknowledgement on the page: Yuvomi records fasting and is not a
+acknowledgement, shared by page and widget: Yuvomi records fasting and is not a
 medical device or medical advice. Finish persists before the optional summary;
 closing it keeps the fast completed. Undo end PATCHes end_at:null with the returned
 revision. Deletion uses the shared undoable-delete window. Offline display keeps
@@ -3168,6 +3187,10 @@ also filters fasting reminders while Health is globally disabled. Periodic repai
 unchanged delivery state and only considers the latest fast plus pending rows.
 Polling renders text in the device locale; push and external channels use the household
 locale. Both use the `/health/fasting` deep link.
+
+The optional dashboard fasting widget is self-only, requires Health/capability/
+widget permission, and reuses the page's safety, start/finish and clock controls.
+It fits all supported widget sizes and is a web/PWA widget, not a native OS widget.
 
 **`health_vitals`** — one row per measurement.
 

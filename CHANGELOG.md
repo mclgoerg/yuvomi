@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A fasting timer can now be added to the dashboard.** It shows only your own fast and lets you
+  start or finish it there, using the same safety confirmation and timer controls as the journal.
+  Existing dashboards keep it hidden until you add it from the dashboard editor. (#1180)
+
+- **Inventory tracked dates can now recur, keep a service history, and vehicles have an odometer.**
+  Give a tracked date (TÜV, boiler service, chimney sweep, extinguisher check, ...) a recurring
+  interval in months, and pressing "Done" rolls it forward instead of just clearing it - the
+  reminder moves with it. Every completion is kept in a new service-history view on the item,
+  alongside its linked maintenance bookings and documents with a running cost total, and a
+  vehicle's history now plots its odometer readings as a small trend chart. Vehicles can also
+  carry a manual odometer reading (km or mi) - a tracked date can add a distance interval as a
+  hint ("1,400 km to go") next to its date, though only the date itself ever produces a reminder.
+
+### Fixed
+
+- **Filipino was offered as the language for stored entries and then refused when you saved it.**
+  The setting listed all 24 languages, but the server built its own list from the locale file names
+  with a pattern that required exactly two letters - and Filipino's file is `fil.json`, with three.
+  Picking it came back as "invalid language". Every other language was unaffected, which is why this
+  went unnoticed.
+
+## [2.68.0] - 2026-09-20
+
+### Added
+
 - **A wall tablet can now tick a task off and ask for a reward, for whoever is standing in front of
   it.** Until now a display only showed things. Tapping a task on a tablet opens the list of people
   and asks who did it, because on a wall "me" is nobody; picking someone ticks the task off and
@@ -75,16 +100,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fasting can now remind you when you reach your goal and when it is time to start again.**
   Each reminder can be enabled independently. Changing a fast, its goal or its permissions removes
   notifications that no longer apply without erasing the saved preference. (#1179)
-
-- **Inventory tracked dates can now recur, keep a service history, and vehicles have an odometer.**
-  Give a tracked date (TÜV, boiler service, chimney sweep, extinguisher check, ...) a recurring
-  interval in months, and pressing "Done" rolls it forward instead of just clearing it - the
-  reminder moves with it. Every completion is kept in a new service-history view on the item,
-  alongside its linked maintenance bookings and documents with a
-  running cost total, and a vehicle's history now plots its odometer readings as a small trend
-  chart. Vehicles can also carry a manual odometer reading (km or mi) - a tracked date can add a
-  distance interval as a hint ("1,400 km to go") next to its date, though only the date itself ever
-  produces a reminder.
 
 ### Changed
 
@@ -204,6 +219,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Restoring a backup onto an empty file with the command-line helper (`scripts/restore-backup.js`)
   keeps working, and a write-ahead log next to that file is no longer deleted but kept next to the
   pre-restore copy, where the helper tells you. (#1282)
+
+- **Notes, Contacts and Birthdays no longer offer buttons that a read-only member is not allowed to
+  press.** Where your access to a module is "read", these three pages still carried every writing
+  control, and each of them ended in an error message once the form was filled in: on the pinboard
+  the pin, the delete button, the tappable checklist and the editor inside the note dialog; in
+  Contacts the category manager, the selection mode, the vCard import, the delete entry in each row,
+  the delete and edit actions of the detail view and the "n" shortcut; on Birthdays the two buttons
+  in each row, the swipe gesture behind them and the import from Contacts. The rule is the one Tasks,
+  Calendar and Rewards already follow: something that shows a state stays, as a sign that names the
+  state rather than as a greyed-out button that promises a touch doing nothing, and something that
+  only acts disappears. A pinned note therefore keeps its pin as a sign, a checklist keeps its ticks
+  as readable state, and a note still opens - in a reading view, without an editor. What you can read
+  stays complete: phone numbers, mail addresses, the map link and the vCard export in Contacts, and
+  name, date, age, countdown, name day and note on a birthday. Birthdays follow your access to the
+  Calendar, which is the module they belong to. The import button on that page now asks about both
+  modules it touches, because it reads contacts and writes birthdays: it needs you to see Contacts,
+  as before, and now also to be allowed to edit the Calendar. (#1265)
 
 - **The "n" shortcut no longer opens a create dialog on a page you may only read.** Where your
   access to a module is "read", the create button is hidden, but the keyboard shortcut still pressed
@@ -425,6 +457,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   left untouched as long as you do not change the reminders; if you do, the dialog asks you to pick a
   lead time for it or remove it instead of moving it for you. The event details now also give the
   time of a reminder that has no preset lead time, not just the day. (#1260)
+- **An appointment moved to another calendar now belongs to that calendar's person.** A calendar you
+  subscribe to can have a household member set as its default, and everything arriving from it is
+  assigned to that person. Moving an appointment from one such calendar to another sent it back with
+  the same identity, so Yuvomi recognised it and updated the row it already had: the detail view then
+  named the new calendar, but the assignment stayed with the person of the old one - and with it the
+  colour the appointment is drawn in, which comes from whoever it is assigned to. The assignment now
+  moves along, for Google, iCloud and CalDAV alike. Only an untouched one does: if you had assigned
+  the appointment to somebody else by hand, added a second person, or taken the assignment away, it
+  stays exactly as you left it, and a calendar without a default person takes nothing away. Reminders
+  follow the assignment as they always have, except that one whose time has already passed is not
+  delivered again to the new person. An appointment that carries a colour of its own still shows that
+  colour. (#1270)
+- **An appointment you wrote yourself and assigned by hand keeps that assignment when it moves
+  between calendars.** The entry above moves an untouched default assignment along with an
+  appointment, and it read "untouched" off the assignment naming exactly the default person of the
+  calendar the appointment came from. An appointment you wrote in Yuvomi and sent out to a calendar
+  looks the same from the inside, because sending it out records which calendar it now lies in: an
+  appointment assigned to Anna by hand and sent into Anna's own calendar was in exactly that state,
+  and the next move replaced your assignment with the other calendar's person. An appointment Yuvomi
+  sent out is now left alone, by the same rule the one-off filling in of default assignees already
+  followed - it carries a trace no import has, either the target calendar you picked or the
+  identifier Yuvomi uploads it under. Appointments that really did arrive from a calendar are
+  unaffected and still take their assignment with them. (#1270)
 
 ### Security
 

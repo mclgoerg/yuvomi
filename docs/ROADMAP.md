@@ -118,6 +118,21 @@ this list.
 - OIDC identity looked up by `(provider, sub)` rather than `sub` alone, on its own merits and
   independent of multi-provider configuration (#848).
 - Loan payoff across several loans, in instalments rather than in principle (#935).
+- Quick-add from free text, deterministic: a date out of "dentist thursday 3pm", a quantity out of
+  "2kg potatoes", with no model and no provider layer, and nothing leaving the device (#656).
+- Show the time during the photo screensaver, following the wall mode's own clock settings rather
+  than gaining a switch of its own (#885).
+- Full-bleed screensaver photos as an opt-in, with `contain` staying the default, because `cover`
+  crops a portrait photo hard on a landscape panel (#885).
+- Start the screensaver from the interface; `preview()` already exists, the open question is only
+  where the button belongs (#885).
+- An optional target level on a stock item, used for the handover to the shopping list when it is
+  set and falling back to the minimum when it is not: restocking to the minimum leaves the household
+  low again after one tap (#1077).
+- A picture on a reward, kept with the redemption the way its name and symbol already are, so old
+  redemptions do not start showing the wrong thing (#1118).
+- A chosen goal per child in the rewards progress, rather than the bar always aiming at the cheapest
+  reward they cannot yet afford (#1118).
 - Themes: the font half, after the colour half has shipped (#972).
 - A module index for third-party modules, the one open request in #746.
 

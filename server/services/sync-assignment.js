@@ -54,7 +54,17 @@ export function assignDefaultToEvent(d, eventId, userId) {
 // external_source auf 'local') behält seine calendar_ref_id, gehört aber nicht
 // mehr dem Kalender.
 //
-// Und kein HINAUSGEPUSHTER Termin: der Outbound-Sync stempelt dieselben Spalten
+// Und kein HINAUSGEPUSHTER Termin - die Bedingung steht als NOT_PUSHED_OUTBOUND
+// unter diesem Block, weil der Umzug (#1270) dieselbe Frage stellt.
+//
+// Geschrieben wird über setEventAssignments(), die eine Schreibstelle der
+// Zuweisung: sie verteilt die Erinnerungen des Anlegers an die neue Person
+// (#921) und gleicht die Dokumentrechte eines Anhangs an. Ein direktes INSERT
+// zeigte der Person den Termin, aber weder Erinnerung noch Anhang.
+// --------------------------------------------------------
+
+// --------------------------------------------------------
+// Kein HINAUSGEPUSHTER Termin: der Outbound-Sync stempelt dieselben Spalten
 // (external_source, calendar_ref_id) auf einen lokal angelegten Termin, sobald er
 // im Kalender liegt. Er hinterlässt aber eine Spur, die kein Import trägt -
 // Google und CalDAV behalten ihr gewähltes Ziel (target_*), Apple und CalDAV
@@ -70,22 +80,37 @@ export function assignDefaultToEvent(d, eventId, userId) {
 // mitgenommen, aber uebersprungen ist die sichere Richtung. Die Tabellen-
 // Umbauten danach tragen created_at unveraendert mit.
 //
-// Geschrieben wird über setEventAssignments(), die eine Schreibstelle der
-// Zuweisung: sie verteilt die Erinnerungen des Anlegers an die neue Person
-// (#921) und gleicht die Dokumentrechte eines Anhangs an. Ein direktes INSERT
-// zeigte der Person den Termin, aber weder Erinnerung noch Anhang.
+// EINE Bedingung, ZWEI Fragesteller: das Nachtragen (#1154) und der Umzug
+// (#1270) wollen beide wissen, ob an dieser Zeile schon eine Hand war, und
+// kennen dieselben Spuren. Als zweite Schreibweise driftete die Regel - der
+// Umzug hatte sie erst gar nicht und stellte damit eine von Hand gesetzte
+// Zuweisung um, sobald sie zufaellig die Standard-Person des Quellkalenders
+// nannte (der eigene Kalender der zugewiesenen Person ist genau dieser Fall).
+//
+// Der Alias `e` steht im Fragment: jede einsetzende Abfrage muss
+// calendar_events als `e` fuehren.
+//
+// Nicht dabei: Outlook. Der Push dorthin ist einseitig, es gibt keinen Inbound,
+// und die Zeile bleibt dauerhaft external_source='local' ohne calendar_ref_id
+// (outlook-calendar.js, Kopfkommentar) - sie kommt an keiner der beiden Stellen
+// vorbei. Geht derselbe Termin ausserdem zu Google, CalDAV oder Apple, traegt
+// er deren Spur und ist damit schon draussen.
 // --------------------------------------------------------
+
+const NOT_PUSHED_OUTBOUND = `
+  e.target_google_calendar_id IS NULL
+    AND e.target_caldav_calendar_url IS NULL
+    AND COALESCE(e.external_calendar_id, '') <> ('oikos-' || e.id || '@oikos.local')
+    AND NOT (e.external_source = 'google' AND e.created_at < COALESCE(
+      (SELECT applied_at FROM schema_migrations WHERE version = 47), ''))
+`;
 
 const UNASSIGNED_MAPPED_EVENTS = `
   FROM calendar_events e
   JOIN external_calendars ec ON ec.id = e.calendar_ref_id
   JOIN users u ON u.id = ec.default_assignee_user_id
   WHERE e.external_source = ec.source
-    AND e.target_google_calendar_id IS NULL
-    AND e.target_caldav_calendar_url IS NULL
-    AND COALESCE(e.external_calendar_id, '') <> ('oikos-' || e.id || '@oikos.local')
-    AND NOT (e.external_source = 'google' AND e.created_at < COALESCE(
-      (SELECT applied_at FROM schema_migrations WHERE version = 47), ''))
+    AND ${NOT_PUSHED_OUTBOUND}
     AND e.assigned_to IS NULL
     AND NOT EXISTS (SELECT 1 FROM event_assignments ea WHERE ea.event_id = e.id)
 `;
@@ -212,4 +237,125 @@ export async function applyDefaultAssigneesToExisting(
     if (start + batchSize < candidates.length) await new Promise((resolve) => setImmediate(resolve));
   }
   return assigned;
+}
+
+// --------------------------------------------------------
+// Umzug zwischen zwei Kalendern desselben Kontos (#1270).
+//
+// Verschiebt jemand einen Termin im fremden Kalender von A nach B, kommt er mit
+// UNVERAENDERTER Identitaet zurueck - CalDAV und Apple ueber die iCal-UID,
+// Google ueber die Event-ID. Der Inbound findet die Zeile also wieder und
+// aktualisiert sie, `calendar_ref_id` wandert mit. Die Zuweisung nicht: sie
+// wurde beim Import einmal gesetzt und blieb seither bei der Standard-Person von
+// A. Weil die Anzeigefarbe eines Termins ohne eigene Farbe der PRIMAEREN
+// zugewiesenen Person gehoert (`resolveEventColor`, #891), stand der Termin
+// danach im neuen Kalender und trug die Farbe des alten.
+//
+// UMGESTELLT WIRD NUR EINE ZUWEISUNG, DIE NIEMAND ANGEFASST HAT. Das ist die
+// ganze Bedingung: die Zuweisung muss GENAU die Standard-Person von A sein -
+// eine Menge mit einem Element, denn ein Termin kann mehrere Personen tragen
+// (`event_assignments`), und `assigned_to` nennt darunter die primaere. Alles
+// andere ist eine Aussage eines Menschen und bleibt stehen:
+//   - mehrere Personen, oder eine andere als die Standard-Person von A: von Hand
+//     gesetzt.
+//   - keine Person: von Hand ENTFERNT oder nie zugewiesen. Beides sieht gleich
+//     aus, und der Kopfkommentar dieses Moduls entscheidet das seit #459 in
+//     dieselbe Richtung - der Sync traegt nicht nach.
+//   - A hatte gar keine Standard-Person: dann kann die vorhandene Zuweisung
+//     nicht von ihr stammen.
+//
+// UND NUR, WENN B EINE STANDARD-PERSON HAT. Ein Kalender ohne Standard-Person
+// weist nichts zu (`assignDefaultToEvent` ist dann ein No-op); er darf dann auch
+// nichts WEGnehmen. Sonst waere der Umzug in einen Kalender ohne Standard-Person
+// eine Loeschung der Zuweisung - eine Handlung, die niemand angeordnet hat, und
+// mit ihr fielen die geerbten Erinnerungen der Person weg.
+//
+// UND KEIN HINAUSGEPUSHTER TERMIN. Die Bedingung oben - "GENAU die
+// Standard-Person von A" - kann eine vom Sync gesetzte Zuweisung nicht von einer
+// HANDGESETZTEN unterscheiden, wenn beide dieselbe Person nennen. Genau das ist
+// der eigene Termin, den jemand Anna zuweist und in Annas eigenen Kalender
+// pusht: der Push stempelt `calendar_ref_id` darauf (caldav-outbound.js,
+// caldav-sync.js, apple-calendar.js, google-calendar.js), und beim naechsten
+// Umzug sah der Helfer "Zuweisung == Standard-Person von A" und stellte die
+// Handarbeit auf die Person von B um. Gefragt wird deshalb dasselbe wie beim
+// Nachtragen (#1154), aus DERSELBEN Quelle: NOT_PUSHED_OUTBOUND.
+//
+// Eine Altzeile ohne `calendar_ref_id` bleibt aussen vor: woher sie kam, ist
+// nicht bekannt, und ohne das Vorher gibt es kein "unangetastet".
+//
+// GESCHRIEBEN WIRD UEBER setEventAssignments() - die eine Schreibstelle der
+// Zuweisung. Sie nimmt der alten Person ihre geerbten Erinnerungen ab, legt sie
+// der neuen hin (#921) und gleicht die Dokumentrechte eines Anhangs an. Ein
+// eigenes UPDATE auf `event_assignments` zeigte der neuen Person den Termin,
+// aber weder Erinnerung noch Anhang - und liesse der alten ihre Erinnerungen.
+//
+// KEINE VERGANGENEN ERINNERUNGEN, aus demselben Grund wie beim Nachtragen
+// (#1154): der Scheduler verschickt jede nicht verworfene Erinnerung mit
+// remind_at <= jetzt. Ein Termin von 2024, den jemand heute in einen anderen
+// Kalender schiebt, haette der neuen Person sofort die alte Meldung geschickt.
+// Geerbte Erinnerungen, deren Zeit vorbei ist, gelten deshalb als verworfen;
+// kuenftige kommen wie gewohnt.
+// --------------------------------------------------------
+
+/**
+ * Stellt die Standard-Zuweisung eines umgezogenen Sync-Termins auf die
+ * Standard-Person des neuen Kalenders um. No-op, wenn die Zuweisung nicht
+ * genau die unangetastete Standard-Person des alten Kalenders ist oder der
+ * Termin hinausgepusht wurde (NOT_PUSHED_OUTBOUND).
+ *
+ * @param {object} d better-sqlite3 Datenbank-Handle
+ * @param {number} eventId ID des umgezogenen Termins
+ * @param {object} move
+ * @param {number|null} move.fromCalRefId external_calendars.id VOR dem Umzug
+ * @param {number|null} move.toCalRefId   external_calendars.id NACH dem Umzug
+ * @param {number|null} move.toDefaultUserId Standard-Person des neuen Kalenders
+ *        (die Aufrufer loesen sie einmal je Kalender auf, nicht je Termin)
+ * @returns {boolean} true, wenn die Zuweisung umgestellt wurde
+ */
+export function reassignDefaultOnCalendarMove(
+  d,
+  eventId,
+  { fromCalRefId = null, toCalRefId = null, toDefaultUserId = null } = {},
+) {
+  if (!eventId || fromCalRefId == null || toCalRefId == null) return false;
+  if (Number(fromCalRefId) === Number(toCalRefId)) return false;
+  if (!toDefaultUserId) return false;
+
+  // An einem hinausgepushten Termin war schon eine Hand: seine Zuweisung ist
+  // eine Aussage eines Menschen, auch wenn sie dieselbe Person nennt wie der
+  // Kalender, in dem er liegt.
+  const notPushedOut = d.prepare(
+    `SELECT 1 FROM calendar_events e WHERE e.id = ? AND ${NOT_PUSHED_OUTBOUND}`
+  ).get(eventId);
+  if (!notPushedOut) return false;
+
+  const fromDefault = d.prepare(
+    'SELECT default_assignee_user_id FROM external_calendars WHERE id = ?'
+  ).get(fromCalRefId)?.default_assignee_user_id ?? null;
+  if (!fromDefault) return false;
+  if (Number(fromDefault) === Number(toDefaultUserId)) return false;
+
+  // GENAU die Standard-Person von A - in beiden Spalten, die eine Zuweisung
+  // fuehren. `assigned_to` darf leer sein: so sah eine Zeile aus, deren Spalte
+  // beim Import schon belegt war (assignDefaultToEvent schreibt sie nur, wenn
+  // sie NULL ist).
+  const assigned = d.prepare('SELECT user_id FROM event_assignments WHERE event_id = ?')
+    .all(eventId).map((r) => Number(r.user_id));
+  if (assigned.length !== 1 || assigned[0] !== Number(fromDefault)) return false;
+  const primary = d.prepare('SELECT assigned_to FROM calendar_events WHERE id = ?')
+    .get(eventId)?.assigned_to ?? null;
+  if (primary != null && Number(primary) !== Number(fromDefault)) return false;
+
+  // Verwaiste Referenz (Nutzer gelöscht) still ignorieren, wie in
+  // assignDefaultToEvent.
+  if (!d.prepare('SELECT 1 FROM users WHERE id = ?').get(toDefaultUserId)) return false;
+
+  d.prepare('UPDATE calendar_events SET assigned_to = ? WHERE id = ?').run(toDefaultUserId, eventId);
+  setEventAssignments(d, eventId, [toDefaultUserId]);
+  d.prepare(`
+    UPDATE reminders SET dismissed = 1
+    WHERE entity_type = 'event' AND entity_id = ? AND created_by = ?
+      AND assigned_from IS NOT NULL AND remind_at <= ?
+  `).run(eventId, toDefaultUserId, new Date().toISOString());
+  return true;
 }
