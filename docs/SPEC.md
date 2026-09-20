@@ -374,7 +374,26 @@ Points-and-rewards system. A member earns a task's `points` when the task is mar
 | description | TEXT | |
 | is_active | INTEGER | 0/1, default 1 |
 | sort_order | INTEGER | NOT NULL DEFAULT 0 |
+| quantity | INTEGER | nullable, migration v221 - how many units the **household** has; `NULL` = unlimited |
 | created_by | INTEGER | FK → Users (SET NULL) |
+
+**How many there are (#1310, migration v221).** The catalog is household-wide and has no mapping from
+a reward to a child, so a physical object used to be open to every child at once and redeemable again
+and again. `quantity` limits it for the whole household - a target per child is a different question
+and deliberately not this one. `NULL` means unlimited and is the state of every reward created before
+v221: existing rows must keep the behaviour they had, and a number, even a large one, would be an
+invented limit that strikes one day. A unit counts as used when a redemption is **fulfilled**, not
+when it is requested: a request reserves the points, not a unit, otherwise the first request would
+already be the decision and there would be nothing left for a parent to decide. `remaining` is
+therefore derived on read (`quantity` minus the fulfilled redemptions, clamped at 0) and stored
+nowhere, like the balance - a cancelled or rejected redemption frees its unit again by itself.
+Requesting a reward whose units are all fulfilled is refused with 409 and `reason: "out_of_stock"`
+before anything is booked; a request that is already open when the last unit goes is **rejected with
+a reason** at decision time rather than blocked in advance, because its points are reserved already
+and the existing `reversal` gives them back. Checking and writing sit in one synchronous transaction
+in both write paths, so two requests for the last unit cannot both pass - the driver is synchronous,
+and an `await` in front of a database call would be exactly the yield point that lets the second one
+in between counting and writing.
 
 **Reward Redemptions** — approval flow. Requesting reserves the points via a `redeem` ledger entry; rejecting or cancelling books them back with a `reversal`. Name/icon/cost are snapshotted so later catalog edits don't rewrite history.
 
@@ -385,6 +404,7 @@ Points-and-rewards system. A member earns a task's `points` when the task is mar
 | reward_name / reward_icon / cost | TEXT / TEXT / INTEGER | snapshot at request time |
 | status | TEXT | pending / fulfilled / rejected / cancelled |
 | note | TEXT | optional member note |
+| decision_reason | TEXT | nullable, migration v221 - machine-readable reason for an automatic decision (`out_of_stock`); `NULL` = decided by hand |
 | requested_by / decided_by | INTEGER | FK → Users (SET NULL) |
 | decided_at | TEXT | ISO timestamp, nullable |
 
@@ -2785,7 +2805,7 @@ series' materialized instance or an `is_pending` (expected) entry is rejected. C
 linked to it, so a collective receipt split across several items does not silently copy its total
 onto each one.
 
-### Inventory Item Dates (migration v140, recurrence/service log/odometer in v221)
+### Inventory Item Dates (migration v140, recurrence/service log/odometer in v222)
 Custom, per-item tracked dates beyond the built-in warranty deadline — TÜV, service, insurance
 renewal, or anything else with a date and its own reminder lead time.
 
@@ -2807,7 +2827,7 @@ rejects the whole write with no partial insert. **Because this is a full replace
 new id on every item save** - free-text rows have no natural key to diff on. Each row drives its own
 [reminder](#reminders), recreated whenever the item is saved.
 
-**Completion (`POST /api/v1/inventory/items/:id/dates/:dateId/complete`, v221).** Marking a tracked
+**Completion (`POST /api/v1/inventory/items/:id/dates/:dateId/complete`, v222).** Marking a tracked
 date done writes one `inventory_item_service_log` row (a label/date snapshot, plus optional
 odometer/vendor/note) and either:
 
@@ -2825,7 +2845,7 @@ a distance threshold, so it renders beside the date (e.g. "1,400 km to go, last 
 never produces a `reminders` row or an ICS `VEVENT` of its own - odometer readings are manual only,
 there is no telematics/vehicle-API integration.
 
-**Service log (`inventory_item_service_log`, v221).** One row per completed or manually logged
+**Service log (`inventory_item_service_log`, v222).** One row per completed or manually logged
 service event: `item_id` (CASCADE delete), `item_date_id` (nullable, **SET NULL** - not CASCADE - so
 "the TÜV was done on 2026-03-11" stays true after the tracked-date row it came from is replaced or
 deleted on the next item save), `label`/`performed_on` (a snapshot, **never rendered by joining
@@ -2840,7 +2860,7 @@ lower it to an earlier row's value or clear it to `NULL` if no row carries a rea
 same "was this row the source" check gates both, so an edit or deletion of any *other* row never
 touches the cached value.
 
-**History view (`GET /api/v1/inventory/items/:id/history`, v221).** A read-only aggregation, no new
+**History view (`GET /api/v1/inventory/items/:id/history`, v222).** A read-only aggregation, no new
 store: service-log rows, linked budget entries with the `maintenance`/`accessory` roles (via the
 existing item↔booking links), and linked documents, merged into one dated timeline with a cost total.
 Visibility follows the existing rules unchanged - budget-entry visibility through the household's
@@ -2848,7 +2868,7 @@ Visibility follows the existing rules unchanged - budget-entry visibility throug
 other document link uses. Inventory items have no per-item visibility model of their own (they are
 household-wide); service log rows are therefore visible to the whole household.
 
-**Odometer (`inventory_items.odometer`/`odometer_unit`/`odometer_on`, v221).** A manual reading,
+**Odometer (`inventory_items.odometer`/`odometer_unit`/`odometer_on`, v222).** A manual reading,
 gated by `inventory_categories.tracks_odometer` (an additive boolean column, default off, seeded on
 for the built-in `vehicles` category only) rather than a hardcoded `category === 'vehicles'` string
 comparison - a household-renamed `vehicles` category keeps the flag through its stable `key`, not
@@ -4882,6 +4902,13 @@ gone. The data model, including why the balance is always derived from the ledge
   immediately as a `redeem` ledger row, so a second request cannot spend the same balance; rejecting
   or cancelling books them back as a `reversal`. `rewards_require_approval = false` (Settings →
   Modules → Rewards) drops the approval step household-wide.
+- **Quantity (#1310):** a reward can carry a number of units for the household; the field is empty by
+  default and empty means unlimited. A card shows "N left" while units remain and a "Sold out" tag
+  once none do; a sold-out reward keeps its place in the catalog - the household should see that it
+  exists - but it carries no redeem button, is not offered in the redeem dialog and is not the target
+  of anybody's progress bar. If the last unit goes while a request is still open, approving it
+  rejects it instead, with the reason recorded on the row and the points returned; the page says so in
+  the reader's language, because the server sends the reason as a code and not as a sentence.
 - **Context FAB:** creates a reward on the Catalog tab and grants a bonus on the Ledger tab, both
   admin-only; on the Overview tab, and for members, it is hidden — the module's create actions are
   parent actions.
