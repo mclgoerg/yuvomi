@@ -28,12 +28,13 @@ import * as db from '../../db.js';
 import {
   str, date, num, collectErrors, MAX_SHORT, MAX_TEXT,
 } from '../../middleware/validate.js';
-import { addMonthsClamped } from '../../utils/interval-date.js';
+import { addMonthsClamped, parseDateKey } from '../../utils/interval-date.js';
 import {
   loadTrackedDate, rollTrackedDateForward, removeTrackedDate,
 } from './item-dates.js';
 import { loadLinkedEntries, computeTotal } from './entry-links.js';
 import { documentLinksFor } from '../../services/document-links.js';
+import { householdTimeZone, utcToWall } from '../../utils/timezone.js';
 
 /** Rollen, die im Service-Verlauf zaehlen - dieselben, die das Formular unter
  *  "Reparatur/Wartung" bzw. "Zubehoer" anbietet (entry-links.js#ROLES). */
@@ -167,6 +168,14 @@ function itemCategoryTracksOdometer(itemId) {
  * Ein Kilometerstand auf einer Log-Zeile schreibt inventory_items.odometer nur
  * fort, wenn er die neueste Ablesung ist - ein rueckdatierter Reparatur-
  * Eintrag darf den aktuellen Kilometerstand des Fahrzeugs nicht zuruecksetzen.
+ *
+ * odometer_unit gehoert dem GEGENSTAND, nicht der Log-Zeile (die Tabelle hat
+ * keine eigene Einheiten-Spalte - jede Ablesung eines Gegenstands gilt in
+ * derselben Einheit). Ein bereits gewaehlter Wert (z. B. 'mi') bleibt stehen;
+ * ohne einen wird 'km' Standard, dieselbe Regel wie
+ * items.js#validateItemFields() fuer eine im Formular eingetragene erste
+ * Ablesung (Review #1257: vorher blieb odometer_unit hier immer NULL, und
+ * 'km' erschien fuer ein Meilen-Fahrzeug an jeder Anzeigestelle).
  */
 function maybeAdvanceItemOdometer(itemId, performedOn, odometer) {
   if (odometer == null) return;
@@ -174,8 +183,11 @@ function maybeAdvanceItemOdometer(itemId, performedOn, odometer) {
   const item = db.get().prepare('SELECT odometer_on FROM inventory_items WHERE id = ?').get(itemId);
   if (!item) return;
   if (item.odometer_on == null || performedOn >= item.odometer_on) {
-    db.get().prepare('UPDATE inventory_items SET odometer = ?, odometer_on = ? WHERE id = ?')
-      .run(odometer, performedOn, itemId);
+    db.get().prepare(`
+      UPDATE inventory_items
+      SET odometer = ?, odometer_on = ?, odometer_unit = COALESCE(odometer_unit, 'km')
+      WHERE id = ?
+    `).run(odometer, performedOn, itemId);
   }
 }
 
@@ -249,8 +261,12 @@ function recomputeItemOdometer(itemId) {
     WHERE item_id = ? AND odometer IS NOT NULL
     ORDER BY performed_on DESC, id DESC LIMIT 1
   `).get(itemId);
-  db.get().prepare('UPDATE inventory_items SET odometer = ?, odometer_on = ? WHERE id = ?')
-    .run(latest?.odometer ?? null, latest?.performed_on ?? null, itemId);
+  db.get().prepare(`
+    UPDATE inventory_items
+    SET odometer = ?, odometer_on = ?,
+        odometer_unit = CASE WHEN ? IS NULL THEN NULL ELSE COALESCE(odometer_unit, 'km') END
+    WHERE id = ?
+  `).run(latest?.odometer ?? null, latest?.performed_on ?? null, latest?.odometer ?? null, itemId);
 }
 
 /**
@@ -299,6 +315,35 @@ function deleteServiceLogEntry({ itemId, logId }) {
   return result;
 }
 
+/** Ganze Kalendermonate zwischen zwei YYYY-MM-DD-Werten (Tag ignoriert) -
+ *  ein erster, geschlossen berechneter Sprung fuer rollForwardPast(), statt
+ *  sich monatsweise ans Ziel heranzutasten. */
+function monthsBetween(fromKey, toKey) {
+  const from = parseDateKey(fromKey);
+  const to = parseDateKey(toKey);
+  return (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + (to.getUTCMonth() - from.getUTCMonth());
+}
+
+/**
+ * Rollt `fromDate` in interval_months-Schritten vor, bis das Ergebnis nach
+ * `afterDate` liegt - ohne dabei einen Schritt je verstrichenem Intervall zu
+ * gehen. `performed_on` ist Nutzereingabe; ein Datum Jahrzehnte in der Zukunft
+ * liesse eine Schleife, die einen Monat je Durchlauf vorankommt, hunderttausend
+ * Mal drehen (Review #1257). monthsBetween() liefert die noetige Anzahl
+ * Intervalle in einer Rechnung; die verbleibende Schleife korrigiert nur noch
+ * die Tages-Klemmung (31. Jan + 1 Monat -> 28. Feb kann den Vergleich um ein
+ * Intervall verschieben) und dreht sich deshalb hoechstens ein-, zweimal.
+ */
+function rollForwardPast(fromDate, intervalMonths, afterDate) {
+  const elapsed = monthsBetween(fromDate, afterDate);
+  const steps = Math.max(1, Math.ceil((elapsed + 1) / intervalMonths));
+  let nextDate = addMonthsClamped(fromDate, steps * intervalMonths);
+  while (nextDate <= afterDate) {
+    nextDate = addMonthsClamped(nextDate, intervalMonths);
+  }
+  return nextDate;
+}
+
 /**
  * Die "Erledigt"-Aktion: EINE Transaktion (Log-Zeile schreiben, Frist
  * vorrollen ODER abraeumen, Erinnerung neu synct). Die Erinnerung gehoert
@@ -337,10 +382,7 @@ function completeTrackedDate({ item, dateId, values, userId }) {
       // verwirft einen bereits vergangenen remind_at), und ein zweiter Klick auf
       // "Erledigt" schriebe eine zweite Log-Zeile mit demselben performed_on.
       // Solange weiterrollen, bis das Ergebnis nach dem Erledigungsdatum liegt.
-      let nextDate = trackedDate.date;
-      do {
-        nextDate = addMonthsClamped(nextDate, trackedDate.interval_months);
-      } while (nextDate <= values.performed_on);
+      const nextDate = rollForwardPast(trackedDate.date, trackedDate.interval_months, values.performed_on);
       rollTrackedDateForward(trackedDate, nextDate, item.created_by);
     } else {
       removeTrackedDate(trackedDate.id);
@@ -381,15 +423,17 @@ function loadHistory(itemId, userId) {
     amount: link.amount,
   }));
 
+  const householdTz = householdTimeZone(db.get());
   const documentRows = documentLinksFor(db.get(), { ...DOCS, ownerId: itemId, userId }).map((doc) => ({
     type: 'document',
     id: doc.document_id,
     // doc.created_at ist ein UTC-Instant (%Y-%m-%dT%H:%M:%SZ) - der Link-
     // Zeitpunkt, nicht das Dokument-Datum selbst -, gemischt in eine Zeitleiste
-    // aus reinen Tages-Schluesseln (performed_on/link.date). Auf den Tag
-    // gekuerzt, statt einen Abend-Link je nach Haushaltszone auf den
-    // Nachbartag fallen zu lassen.
-    date: String(doc.created_at).slice(0, 10),
+    // aus reinen Tages-Schluesseln (performed_on/link.date). In die
+    // Haushaltszone gewandelt (utcToWall, dieselbe Funktion wie todayKey())
+    // statt auf den UTC-Tag gekuerzt - ein Abend-Link faellt sonst genau auf
+    // den Nachbartag, den dieser Kommentar vermeiden wollte (Review #1257).
+    date: utcToWall(doc.created_at, householdTz)?.date ?? String(doc.created_at).slice(0, 10),
     label: doc.name || doc.original_name || '',
   }));
 

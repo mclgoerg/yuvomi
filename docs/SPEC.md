@@ -2894,9 +2894,9 @@ As with every reminder in this app, a completion whose new reminder moment alrea
 does not write one - no retroactive nagging.
 
 **`interval_distance` is a hint, never a reminder.** The app cannot know when an odometer will pass
-a distance threshold, so it renders beside the date (e.g. "1,400 km to go, last reading 12 Sep") and
-never produces a `reminders` row or an ICS `VEVENT` of its own - odometer readings are manual only,
-there is no telematics/vehicle-API integration.
+a distance threshold, so it renders beside the date (e.g. "1,400 km to go") and never produces a
+`reminders` row or an ICS `VEVENT` of its own - odometer readings are manual only, there is no
+telematics/vehicle-API integration.
 
 **Service log (`inventory_item_service_log`, v224).** One row per completed or manually logged
 service event: `item_id` (CASCADE delete), `item_date_id` (nullable, **SET NULL** - not CASCADE - so

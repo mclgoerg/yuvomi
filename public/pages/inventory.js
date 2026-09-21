@@ -1054,7 +1054,13 @@ async function openItemDetail(item) {
     // geändert (Frist, Erinnerung, ggf. Kilometerstand, Verlauf). Ohne
     // Abschluss (abgebrochen) geht dieselbe, unveränderte Ansicht wieder auf.
     const refreshed = (completed && state.items.find((i) => i.id === item.id)) || item;
-    await openItemDetail(refreshed);
+    // Bewusst nicht awaited: openItemDetail() laedt selbst erst die Historie
+    // nach, bevor es die Ansicht oeffnet, und ohne diesen await haengt sich
+    // ein erneutes "Erledigt" in der neu geoeffneten Ansicht nicht mehr eine
+    // Ebene tiefer in eine wachsende Kette wartender Aufrufe (Review #1257).
+    // refocusAfterRender() braucht dieses Warten ohnehin nicht - siehe deren
+    // eigener Kommentar in modal.js.
+    openItemDetail(refreshed);
     refocusAfterRender();
   };
 

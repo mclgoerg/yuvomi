@@ -221,6 +221,28 @@ test('eine mehrere Intervalle ueberfaellige Frist rollt weit genug vor, nicht nu
   assert.equal(rolled.date, '2000-05-15', 'rollt so oft vor, bis das Ergebnis nach dem Erledigungsdatum liegt');
 });
 
+test('eine extrem weit in der Zukunft erledigte Frist rollt ohne eine Schleife je verstrichenem Monat vor (Review #1257)', async () => {
+  // performed_on ist Nutzereingabe - eine Faelligkeit von 2000-01-15 mit
+  // monatlichem Intervall gegen ein Erledigungsdatum 100 Jahre spaeter waeren
+  // 1200 Durchlaeufe, wenn vorrollen einen Schritt je Durchlauf ginge.
+  const created = await call('POST', '/items', {
+    body: {
+      name: 'Weit in der Zukunft erledigt',
+      tracked_dates: [{ label: 'Wartung', date: '2000-01-15', reminder_offset_days: 0, interval_months: 1 }],
+    },
+  });
+  const dateId = created.body.data.tracked_dates[0].id;
+
+  const start = Date.now();
+  const completed = await call('POST', `/items/${created.body.data.id}/dates/${dateId}/complete`, {
+    body: { performed_on: '2100-01-01' },
+  });
+  assert.ok(Date.now() - start < 1000, 'ein geschlossen berechneter Sprung, keine Monat-fuer-Monat-Schleife');
+  assert.equal(completed.status, 201);
+  const rolled = completed.body.data.tracked_dates.find((d) => d.id === dateId);
+  assert.equal(rolled.date, '2100-02-15', 'die erste Monatsmarke nach dem Erledigungsdatum');
+});
+
 // --------------------------------------------------------
 // Die Historie uebersteht ein nachfolgendes Item-Speichern
 // --------------------------------------------------------
@@ -302,6 +324,26 @@ test('die Verlaufs-Ansicht versteckt ein privates Dokument, das die betrachtende
 
   const asB = await call('GET', `/items/${item.id}/history`, { as: { id: B } });
   assert.equal(asB.body.data.timeline.filter((e) => e.type === 'document').length, 1);
+});
+
+test('ein Dokument-Link in der Verlaufs-Ansicht steht am Haushalts-Tag, nicht am UTC-Tag (Review #1257)', async () => {
+  db.prepare(`INSERT INTO sync_config (key, value) VALUES ('household_timezone', 'Europe/Berlin')
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run();
+
+  const item = (await call('POST', '/items', { body: { name: 'Kamera 2' } })).body.data;
+  const doc = insertDocument({ name: 'Rechnung' });
+  db.prepare('INSERT INTO inventory_item_documents (item_id, document_id, created_by) VALUES (?, ?, ?)').run(item.id, doc, A);
+  // Der LINK-Zeitpunkt zaehlt (inventory_item_documents.created_at), nicht das
+  // Dokument selbst - 23:30 UTC = 01:30 Berlin am naechsten Tag (Sommerzeit,
+  // UTC+2), UTC-Tag und Haushalts-Tag liegen hier bewusst auseinander.
+  db.prepare("UPDATE inventory_item_documents SET created_at = '2026-09-21T23:30:00Z' WHERE item_id = ? AND document_id = ?").run(item.id, doc);
+
+  const history = await call('GET', `/items/${item.id}/history`, { as: { id: A } });
+  const entry = history.body.data.timeline.find((e) => e.type === 'document');
+  assert.ok(entry, 'der Dokument-Link steht in der Zeitleiste');
+  assert.equal(entry.date, '2026-09-22', 'der Haushalts-Tag zaehlt, nicht der UTC-Tag');
+
+  db.prepare("UPDATE sync_config SET value = 'UTC' WHERE key = 'household_timezone'").run();
 });
 
 // --------------------------------------------------------
@@ -614,4 +656,36 @@ test('DELETE der einzigen Ablesung heilt den verwaisten Stand ab, auch wenn die 
   });
   assert.equal(fresh.status, 201, JSON.stringify(fresh.body));
   assert.equal((await call('GET', `/items/${itemId}`)).body.data.odometer, 60000);
+});
+
+test('eine Ablesung ueber den Service-Log respektiert die Meilen-Einheit des Gegenstands (Review #1257)', async () => {
+  // Das Item traegt bereits 'mi' (z. B. aus dem Formular gesetzt, ohne dass
+  // je eine eigene Ablesung dabei war) - ein Log-Eintrag darf das nicht
+  // stillschweigend auf 'km' zuruecksetzen.
+  const created = await call('POST', '/items', {
+    body: { name: 'Auto11', category: 'vehicles', odometer_unit: 'mi' },
+  });
+  const itemId = created.body.data.id;
+  assert.equal(created.body.data.odometer_unit, 'mi');
+
+  const logged = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 12000 },
+  });
+  assert.equal(logged.status, 201, JSON.stringify(logged.body));
+
+  const after = await call('GET', `/items/${itemId}`);
+  assert.equal(after.body.data.odometer, 12000);
+  assert.equal(after.body.data.odometer_unit, 'mi', 'die bestehende Einheit bleibt stehen, wird nicht auf km zurueckgesetzt');
+});
+
+test('eine erste Ablesung ueber den Service-Log ohne bestehende Einheit bekommt km als Standard (Review #1257)', async () => {
+  const created = await call('POST', '/items', { body: { name: 'Auto12', category: 'vehicles' } });
+  const itemId = created.body.data.id;
+  assert.equal(created.body.data.odometer_unit, null);
+
+  await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 5000 },
+  });
+  const after = await call('GET', `/items/${itemId}`);
+  assert.equal(after.body.data.odometer_unit, 'km', 'derselbe Standard wie beim Formular-Feld');
 });
