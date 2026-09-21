@@ -272,6 +272,15 @@
   gap: var(--space-3);
 }
 
+/* [hidden] hat gegenueber display:grid zu geringe Spezifitaet - explizit
+ * uebersteuern (gleiches Muster wie .inventory-filters[hidden] oben). Ohne
+ * diese Regel steht die Kilometerstand-Gruppe bei JEDER Kategorie im
+ * Formular, obwohl `hidden` gesetzt ist, und saveItem() verwirft das
+ * Getippte still, weil es odometerRaw an categoryTracksOdometer() klemmt. */
+.inventory-form-row[hidden] {
+  display: none;
+}
+
 /* Vier Zustaende eines Gegenstands, und sie tragen ihren Ton in der SCHRIFT
  * (Skalen-Regel, zweiter Zweig - wie die Vorratsmeldung). Vorher lag unter
  * jeder Schrift dieselbe Farbe noch einmal als Waschung; das ist die Bauart,
