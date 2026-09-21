@@ -2858,7 +2858,7 @@ series' materialized instance or an `is_pending` (expected) entry is rejected. C
 linked to it, so a collective receipt split across several items does not silently copy its total
 onto each one.
 
-### Inventory Item Dates (migration v140, recurrence/service log/odometer in v223)
+### Inventory Item Dates (migration v140, recurrence/service log/odometer in v224)
 Custom, per-item tracked dates beyond the built-in warranty deadline — TÜV, service, insurance
 renewal, or anything else with a date and its own reminder lead time.
 
@@ -2880,7 +2880,7 @@ rejects the whole write with no partial insert. **Because this is a full replace
 new id on every item save** - free-text rows have no natural key to diff on. Each row drives its own
 [reminder](#reminders), recreated whenever the item is saved.
 
-**Completion (`POST /api/v1/inventory/items/:id/dates/:dateId/complete`, v223).** Marking a tracked
+**Completion (`POST /api/v1/inventory/items/:id/dates/:dateId/complete`, v224).** Marking a tracked
 date done writes one `inventory_item_service_log` row (a label/date snapshot, plus optional
 odometer/vendor/note) and either:
 
@@ -2898,7 +2898,7 @@ a distance threshold, so it renders beside the date (e.g. "1,400 km to go, last 
 never produces a `reminders` row or an ICS `VEVENT` of its own - odometer readings are manual only,
 there is no telematics/vehicle-API integration.
 
-**Service log (`inventory_item_service_log`, v223).** One row per completed or manually logged
+**Service log (`inventory_item_service_log`, v224).** One row per completed or manually logged
 service event: `item_id` (CASCADE delete), `item_date_id` (nullable, **SET NULL** - not CASCADE - so
 "the TÜV was done on 2026-03-11" stays true after the tracked-date row it came from is replaced or
 deleted on the next item save), `label`/`performed_on` (a snapshot, **never rendered by joining
@@ -2913,7 +2913,7 @@ lower it to an earlier row's value or clear it to `NULL` if no row carries a rea
 same "was this row the source" check gates both, so an edit or deletion of any *other* row never
 touches the cached value.
 
-**History view (`GET /api/v1/inventory/items/:id/history`, v223).** A read-only aggregation, no new
+**History view (`GET /api/v1/inventory/items/:id/history`, v224).** A read-only aggregation, no new
 store: service-log rows, linked budget entries with the `maintenance`/`accessory` roles (via the
 existing item↔booking links), and linked documents, merged into one dated timeline with a cost total.
 Visibility follows the existing rules unchanged - budget-entry visibility through the household's
@@ -2921,7 +2921,7 @@ Visibility follows the existing rules unchanged - budget-entry visibility throug
 other document link uses. Inventory items have no per-item visibility model of their own (they are
 household-wide); service log rows are therefore visible to the whole household.
 
-**Odometer (`inventory_items.odometer`/`odometer_unit`/`odometer_on`, v223).** A manual reading,
+**Odometer (`inventory_items.odometer`/`odometer_unit`/`odometer_on`, v224).** A manual reading,
 gated by `inventory_categories.tracks_odometer` (an additive boolean column, default off, seeded on
 for the built-in `vehicles` category only) rather than a hardcoded `category === 'vehicles'` string
 comparison - a household-renamed `vehicles` category keeps the flag through its stable `key`, not

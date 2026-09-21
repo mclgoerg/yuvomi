@@ -9395,6 +9395,117 @@ const MIGRATIONS = [
   },
   {
     version: 223,
+    description: 'Health: daily nutrition target per person and a logged intake (#1326)',
+    up: `
+      -- ACHT SPALTEN, FEST, UND DIESELBEN ACHT UEBERALL (docs/DECISIONS.md
+      -- Abschnitt 8). Energie in Kilokalorien, Fett, davon gesaettigte
+      -- Fettsaeuren, Kohlenhydrate, davon Zucker, Eiweiss, Salz und
+      -- Ballaststoffe: die sieben Pflichtangaben der EU-Naehrwerttabelle plus
+      -- Ballaststoffe - also der Satz, den jemand von der Packung vor sich
+      -- ablist, statt einer hier ausgedachten Auswahl.
+      --
+      -- WARUM FEST UND NICHT nutrient_key/value: eine neunte Spalte spaeter ist
+      -- eine Migration, die jede Bestandsinstallation nehmen muss; ein
+      -- Schluessel/Wert-Paar dagegen hiesse "was immer jemand eintippt", und
+      -- genau in dieser Form waechst ein Produktkatalog eine Zeile nach der
+      -- anderen - das ist die Absage aus #714.
+      --
+      -- WARUM DIE EINHEIT IM NAMEN STEHT: ein blosses "fat" sagt nicht, ob dort
+      -- Gramm oder Milligramm liegen, und eine REAL-Spalte nimmt beides
+      -- klaglos bis in alle Ewigkeit. "energy_kcal" sagt ausserdem, welche
+      -- Energieeinheit gewaehlt wurde - eine Packung nennt auch kJ, die
+      -- Anzeige darf rechnen, die Spalte fuehrt eine davon.
+      --
+      -- UND KEINE SPALTE HEISST "calories": health_activities.calories (v65)
+      -- ist die Energie, die eine Sporteinheit VERBRENNT. Ein Wort fuer beide
+      -- Richtungen waere ein Fehler, der im Wortschatz wartet, und er trifft
+      -- zuerst den CSV-Export, wo beide Bereiche in einer Datei liegen.
+      --
+      -- "fiber", nicht "fibre": die Prosa unter docs/ ist britisch, das Schema
+      -- ist es nicht - "color" (v1) ist das bestehende Vorbild. Spalten folgen
+      -- dem Schema.
+
+      -- Das Tagesziel je Person. SPARSE wie health_fasting_settings (v209):
+      -- keine Zeile heisst "kein Ziel", und deshalb ist jede der acht Spalten
+      -- nullbar. Der Unterschied traegt hier wirklich etwas: NULL ist "nicht
+      -- gesetzt", 0 ist das ausdrueckliche Ziel "null Gramm Zucker" - wer die
+      -- Spalte als falsy liest, macht aus der zweiten Aussage die erste.
+      CREATE TABLE health_nutrition_targets (
+        user_id          INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        energy_kcal      REAL CHECK (energy_kcal      IS NULL OR energy_kcal      >= 0),
+        fat_g            REAL CHECK (fat_g            IS NULL OR fat_g            >= 0),
+        saturated_fat_g  REAL CHECK (saturated_fat_g  IS NULL OR saturated_fat_g  >= 0),
+        carbs_g          REAL CHECK (carbs_g          IS NULL OR carbs_g          >= 0),
+        sugar_g          REAL CHECK (sugar_g          IS NULL OR sugar_g          >= 0),
+        protein_g        REAL CHECK (protein_g        IS NULL OR protein_g        >= 0),
+        salt_g           REAL CHECK (salt_g           IS NULL OR salt_g           >= 0),
+        fiber_g          REAL CHECK (fiber_g          IS NULL OR fiber_g          >= 0),
+        created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE TRIGGER trg_health_nutrition_targets_updated_at
+        AFTER UPDATE ON health_nutrition_targets FOR EACH ROW BEGIN
+          UPDATE health_nutrition_targets SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+          WHERE user_id = OLD.user_id; END;
+
+      -- Der erfasste Eintrag. Die acht Zahlen stehen als Werte HIER und zeigen
+      -- nicht auf ein Rezept: wer naechsten Monat sein Rezept aendert, darf
+      -- damit nicht umschreiben, was jemand letzte Woche gegessen hat -
+      -- dieselbe Begruendung, aus der v193 den bezahlten Preis am
+      -- Einkaufsartikel speichert statt auf ein Produkt zu zeigen.
+      CREATE TABLE health_nutrition_entries (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        -- Wanduhrzeit des Haushalts (YYYY-MM-DDTHH:mm), kein Instant: "heute"
+        -- ist hier ein Kalendertag, und der faellt in der Haushaltszone
+        -- (server/utils/timezone.js, todayKey). Ein UTC-Zeitpunkt haette am
+        -- Abend westlich und am Morgen oestlich von UTC den Nachbartag
+        -- getragen.
+        consumed_at     TEXT    NOT NULL,
+        meal_type       TEXT    CHECK (meal_type IS NULL OR meal_type IN ('breakfast', 'lunch', 'dinner', 'snack')),
+        title           TEXT    NOT NULL,
+        energy_kcal     REAL CHECK (energy_kcal     IS NULL OR energy_kcal     >= 0),
+        fat_g           REAL CHECK (fat_g           IS NULL OR fat_g           >= 0),
+        saturated_fat_g REAL CHECK (saturated_fat_g IS NULL OR saturated_fat_g >= 0),
+        carbs_g         REAL CHECK (carbs_g         IS NULL OR carbs_g         >= 0),
+        sugar_g         REAL CHECK (sugar_g         IS NULL OR sugar_g         >= 0),
+        protein_g       REAL CHECK (protein_g       IS NULL OR protein_g       >= 0),
+        salt_g          REAL CHECK (salt_g          IS NULL OR salt_g          >= 0),
+        fiber_g         REAL CHECK (fiber_g         IS NULL OR fiber_g         >= 0),
+        note            TEXT,
+        -- DAS KANONISCHE VOKABULAR AUS docs/DECISIONS.md ABSCHNITT 5, nicht das
+        -- Paar private/family, das die Gesundheit sonst fuehrt. Abschnitt 5
+        -- nennt dieses Paar unter den Vokabularen, die er normalisieren will,
+        -- und haelt einen neuen Gesundheits-Tab, der mit einer eigenen Spalte
+        -- in ebendiesem Paar ankam (PR #1019), als den Fall fest, den er
+        -- verhindern soll. "Neue Module nehmen den kanonischen Satz von
+        -- Anfang an" ist der Satz, und ein Tagebuch je Person ist das
+        -- Zeilenaufkommen eines neuen Moduls.
+        --
+        -- Der benannte Satz aus der Mitte des Vokabulars ('assignees') steht
+        -- bewusst NICHT im CHECK: die Gesundheit hat keine Zuweisungstabelle,
+        -- der Wert waere hier von 'private' nicht unterscheidbar und damit ein
+        -- Wert, der etwas anderes behauptet, als er tut. Er kommt, wenn es
+        -- eine Zuordnung gibt, die ihn traegt.
+        visibility      TEXT    NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'all')),
+        created_by      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        updated_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+      );
+      CREATE TRIGGER trg_health_nutrition_entries_updated_at
+        AFTER UPDATE ON health_nutrition_entries FOR EACH ROW BEGIN
+          UPDATE health_nutrition_entries SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+          WHERE id = OLD.id; END;
+
+      -- Die eine Abfrage, die diese Tabelle staendig fahren muss, ist "alles von
+      -- dieser Person an diesem Tag" - Eigentuemer plus Datumsanfang von
+      -- consumed_at, in genau dieser Reihenfolge.
+      CREATE INDEX idx_health_nutrition_entries_user_date
+        ON health_nutrition_entries(user_id, consumed_at);
+    `,
+  },
+  {
+    version: 224,
     description: 'Inventory: recurring tracked dates, a service log, and a manual odometer',
     up: `
       -- NULL bleibt das heutige Einmal-Verhalten (kein Zyklus) - jede
@@ -9453,11 +9564,60 @@ const MIGRATIONS = [
 ];
 
 /**
- * Führt alle ausstehenden Migrations in einer Transaktion aus.
+ * Hat ein ANDERER Prozess genau diese Migration inzwischen verbucht? (#1331)
+ *
+ * Zwei Erststarts auf derselben frischen Datei bestimmen ihre Liste
+ * ausstehender Migrationen, bevor einer von beiden etwas geschrieben hat: jede
+ * Migration läuft in einer deferred begonnenen Transaktion, die ihre
+ * Schreibsperre erst beim ersten Schreiben nimmt - lange nach der
+ * Entscheidung. Der Nachzügler fährt dieselbe Migration deshalb ein zweites
+ * Mal und stirbt daran, je nachdem wie weit er kommt: an der Buchung
+ * (`UNIQUE constraint failed: schema_migrations.version`) oder schon am DDL
+ * (`table ... already exists`).
+ *
+ * Entschieden wird am ZUSTAND, nicht am Fehlertext: die Transaktion dieses
+ * Laufs ist zurückgerollt, die eigene Buchung also wieder weg. Steht die
+ * Version danach trotzdem da, hat ein anderer Prozess sie geschrieben - und
+ * zwar in derselben Transaktion wie ihre Wirkung, sonst stünde sie nicht da.
+ * Ein Syntaxfehler, eine kaputte Tabelle, ein Constraint aus dem Migrations-SQL
+ * selbst hinterlassen keine Buchung und bleiben damit Fehler.
+ *
+ * Der Meldungstext taugt dafür nicht, und der Fehlercode allein auch nicht:
+ * `table ... already exists` und ein Syntaxfehler tragen beide SQLITE_ERROR,
+ * und SQLITE_CONSTRAINT_PRIMARYKEY kommt genauso aus einer Migration, die
+ * ihre eigene Zeile doppelt schreibt (gemessen, test:migrate-tolerance).
  */
-function migrate() {
+function migrationAlreadyRecorded(database, migration, err) {
+  // Ohne SQLite-Code kommt der Fehler nicht vom Treiber: die
+  // Fremdschlüssel-Prüfung unten wirft selbst, ein Tippfehler in einem
+  // up()/afterUp()-Hook wirft einen ReferenceError. Beides sind
+  // Programmfehler und bleiben es.
+  if (typeof err?.code !== 'string' || !err.code.startsWith('SQLITE_')) return false;
+
+  // SQLITE_BUSY ist die andere Hälfte des Rennens und ein WARTEN, kein Erfolg:
+  // dieser Lauf kam an der Sperre gar nicht vorbei. Dass der andere Prozess in
+  // derselben Sekunde fertig wurde, macht das Warten nicht zum Lauf - und ein
+  // busy_timeout löst es auch nicht, denn SQLite antwortet auf die Schreibsperre
+  // nach einem fremden Commit sofort mit SQLITE_BUSY_SNAPSHOT.
+  if (err.code.startsWith('SQLITE_BUSY')) return false;
+
+  return Boolean(
+    database.prepare('SELECT version FROM schema_migrations WHERE version = ?').get(migration.version)
+  );
+}
+
+/**
+ * Führt alle ausstehenden Migrations in einer Transaktion aus.
+ *
+ * Beide Parameter tragen im Betrieb ihren Vorgabewert; sie stehen da, damit ein
+ * Test den Lauf gegen einen GESETZTEN Zustand fahren kann - eine eigene Datei
+ * und eine eigene Migrationsliste - statt gegen ein Rennen zu hoffen.
+ * @param {import('better-sqlite3-multiple-ciphers').Database} [database]
+ * @param {typeof MIGRATIONS} [migrations]
+ */
+function migrate(database = db, migrations = MIGRATIONS) {
   // Migrations-Versions-Tabelle sicherstellen (außerhalb der Haupt-Transaktion)
-  db.exec(`
+  database.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version     INTEGER PRIMARY KEY,
       description TEXT    NOT NULL,
@@ -9466,51 +9626,68 @@ function migrate() {
   `);
 
   const applied = new Set(
-    db.prepare('SELECT version FROM schema_migrations').all().map((r) => r.version)
+    database.prepare('SELECT version FROM schema_migrations').all().map((r) => r.version)
   );
 
-  const pending = MIGRATIONS.filter((m) => !applied.has(m.version));
+  const pending = migrations.filter((m) => !applied.has(m.version));
 
   if (pending.length === 0) return;
 
-  const runMigration = db.transaction((migration) => {
+  const runMigration = database.transaction((migration) => {
     if (typeof migration.up === 'function') {
-      migration.up(db);
+      migration.up(database);
     } else {
-      db.exec(migration.up);
+      database.exec(migration.up);
     }
     // Optionaler JS-Hook für Datenmigrationen, die nach dem Schema-DDL laufen.
     if (typeof migration.afterUp === 'function') {
-      migration.afterUp(db);
+      migration.afterUp(database);
     }
     if (migration.foreignKeysOff) {
-      const violations = db.pragma('foreign_key_check');
+      const violations = database.pragma('foreign_key_check');
       if (violations.length > 0) {
         throw new Error(
           `Migration ${migration.version} left ${violations.length} foreign key violation(s).`
         );
       }
     }
-    db.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)')
+    database.prepare('INSERT INTO schema_migrations (version, description) VALUES (?, ?)')
       .run(migration.version, migration.description);
     log.info(`Migration ${migration.version} applied: ${migration.description}`);
   });
 
+  /**
+   * Eine Migration fahren und genau den einen fremden Fall hinnehmen: sie ist
+   * schon verbucht, also hat ein anderer Prozess sie angewendet. Jeder andere
+   * Fehler fliegt weiter.
+   */
+  const applyPendingMigration = (migration) => {
+    try {
+      runMigration(migration);
+    } catch (err) {
+      if (!migrationAlreadyRecorded(database, migration, err)) throw err;
+      log.warn(
+        `Migration ${migration.version} war bereits verbucht, als dieser Lauf sie anwenden wollte: `
+        + `${migration.description} - ein anderer Prozess war schneller (#1331).`
+      );
+    }
+  };
+
   for (const migration of pending) {
     if (!migration.foreignKeysOff) {
-      runMigration(migration);
+      applyPendingMigration(migration);
       continue;
     }
 
-    db.pragma('foreign_keys = OFF');
-    if (db.pragma('foreign_keys', { simple: true }) !== 0) {
+    database.pragma('foreign_keys = OFF');
+    if (database.pragma('foreign_keys', { simple: true }) !== 0) {
       throw new Error(`Migration ${migration.version} could not disable foreign key enforcement.`);
     }
     try {
-      runMigration(migration);
+      applyPendingMigration(migration);
     } finally {
-      db.pragma('foreign_keys = ON');
-      if (db.pragma('foreign_keys', { simple: true }) !== 1) {
+      database.pragma('foreign_keys = ON');
+      if (database.pragma('foreign_keys', { simple: true }) !== 1) {
         throw new Error(`Migration ${migration.version} could not restore foreign key enforcement.`);
       }
     }
@@ -9986,4 +10163,4 @@ try {
   if (!(err?.code === EMPTY_DATABASE_FILE && globalThis[RESTORE_TARGET_HANDSHAKE] === true)) throw err;
 }
 
-export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, unknownMigrationVersions, MIGRATIONS, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
+export { init, get, transaction, currentVersion, getPath, backupToFile, restoreFromFile, unknownMigrationVersions, MIGRATIONS, migrate, reconcileCriticalSchema, _setTestDatabase, _resetTestDatabase };
