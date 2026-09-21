@@ -33,7 +33,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the reason on it, and the reserved points go straight back. Two children asking for the last
   unit at the same moment cannot both get it. (#1310)
 
+- **A recipe ingredient can now be told which row of your pantry it means.** Open a recipe, unfold
+  it, and each ingredient offers to be matched to one row of your stock - "400 g tin of tomatoes"
+  in the recipe, the tin that actually stands in your cupboard. Yuvomi never guesses this, not even
+  when the two are spelled identically: a match exists only where somebody confirmed it, and no
+  import, no recipe save and no name similarity ever writes one. An ingredient without a match reads
+  "not matched", never "missing" - it is unknown, and saying otherwise would turn half an answer
+  into a confident one. The match survives editing the recipe, because it hangs on the ingredient
+  and not on its row in the database; rename that ingredient and the match is gone for good rather
+  than lying in wait for the old spelling to come back, and the same holds for recipes mirrored from
+  Mealie or Tandoor when the provider does the renaming. Deleting the stock row removes the match and
+  leaves the recipe untouched. Changing a match needs permission to write the pantry, not just the
+  recipes; members who may only look at the pantry see the match and cannot change it, and members
+  who may not see the pantry at all are not told which row it is - not in the page and not in the
+  API's answer either. (#1314)
+
 ### Fixed
+
+- **Health no longer offers buttons that a read-only member is not allowed to press.** Where your
+  access to the module is "read", the largest module in the app still carried every writing control
+  across all of its tabs, and each of them ended in an error message once the form was filled in:
+  booking or skipping a dose, the as-needed dose, correcting an entry in the medication log,
+  deleting a single measurement, editing a medication, a lab report, an activity or a vaccination,
+  and on the cycle tab starting or ending a period, tapping a day in the calendar, editing an entry
+  in the history, the import and the settings. The rule is the one Tasks, Calendar, Notes and
+  Contacts already follow: something that shows a state stays, as a sign that names the state rather
+  than as a greyed-out button that promises a touch doing nothing, and something that only acts
+  disappears. A due dose therefore keeps saying that it is still pending, a card keeps its stock
+  level, the cycle calendar keeps its colours and your own marks, and the line that says your period
+  is due today stays - without the button beside it. What you can read stays complete: measurements
+  and charts, the medication log, lab results and their reference ranges, the activity log,
+  vaccination records, the cycle history, and the CSV exports, which only read. The fasting tab
+  already asked about this right and is unchanged. Recording for someone you care for is unaffected
+  as long as your access to Health is "write" - the module right is now asked first, so a
+  caregiving permission no longer offers a button the server would refuse. (#1265)
 
 - **A nightly recurring appointment that crosses midnight no longer covers the entry it should be
   sharing its column with.** On a day that carries two occurrences of the same series - last
