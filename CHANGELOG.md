@@ -82,6 +82,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **On browsers older than Chrome 108, the main area scrolls and dialogs stay on screen.**
+  Yuvomi sized the page, the app frame and the height limit of its dialogs with `dvh`, a unit for
+  the visible window height that Chrome understands from version 108 and Safari from 15.4. An older
+  browser drops every line that uses it, and with it went the height of the app frame: the main area
+  grew to the full length of its content, so on a Chromebook with Chrome 91 there was nothing left to
+  scroll, while the sidebar next to it scrolled normally. Dialogs lost their height limit the same
+  way and ran off the top and bottom of the screen, taking their buttons with them. Where `dvh` is
+  unknown, these heights now fall back to the plain window height; browsers that know it behave
+  exactly as before. Older browsers are supported on the paths nobody can do without - starting the
+  app, scrolling it and using a dialog - rather than everywhere. (#1276)
+
+- **A date and time sent to the API with `Z` or a numeric offset is now converted instead of cut
+  off.** `/api/v1` accepted values such as `2026-09-21T16:00:00Z` or `2026-09-21T18:00:00+02:00`,
+  but kept only their digits and dropped the offset: in a household on Europe/Berlin, an event
+  created with `16:00:00Z` - meant as 18:00 local time - landed at 16:00, without any error. Offsets
+  are now converted instead of dropped, into the form the field is stored in. Calendar start and end
+  (also on the occurrence routes and the MCP tool `create_event`) and the health timestamps
+  (`measured_at`, `performed_at`, `consumed_at`, `scheduled_at`, `taken_at`) become household
+  wall-clock time; for an all-day event only the date counts, so a start at midnight UTC stays on
+  its day west of UTC. `remind_at` becomes UTC without a zone suffix in one notation, the form
+  reminders are compared in (a bare date is midnight UTC, when it fired before), and
+  `last_completed` of a housekeeping task becomes a UTC instant, the form `/complete` writes. Values
+  without an offset mean household wall-clock time as before, so a client that sends local digits
+  sees no change. **This changes what is stored for input `/api/v1` already accepted**; as a
+  fix to values stored wrong without an error it is named here rather than deprecated first (see
+  "How long that line holds" in MODULES.md). `PUT /api/v1/calendar/:id` now stores the validated
+  value like `POST` does instead of the raw request value, which had moved a weekly series by an
+  hour at the October clock change, and an empty start is now rejected with 400. Reminders already
+  stored with an offset are not rewritten but compared as the instant they name: one at
+  `18:00:00+02:00` used to come two hours late. Digits that are no real point in time, such as 30
+  February with an offset, are rejected with 400. OpenAPI now says "converted" instead of
+  "normalized" and describes the request form apart from the stored one, since synced events keep
+  their offsets. A `last_completed` without an offset is read in the household time zone instead of
+  the server's. (#1364)
+
+- **Durations are written in your interface language, not in the language of the household
+  region.** A fasting duration and a birthday's own reminder took their words from the region: with
+  English as your language and "Deutsch (Deutschland)" as the household region, the fasting journal
+  read "1 Tg. 1 Std. 7 Min." and a birthday reminder "3 Wochen", and an English interface with a
+  Saudi region showed the Arabic word. The region was only ever meant to decide how numbers look,
+  and it still does: the words, their plural form and their order now come from your language, and
+  the digits and separators of the number from the region, the same as every amount next to it -
+  "1,5 hours" in German number style, "٣ weeks" with Arabic digits. Where language and region
+  match, nothing changes. (#1365)
+
+- **A birthday without a reminder of its own now shows the reminder it really gets, and saving it
+  no longer moves that reminder.** A birthday can come in without a reminder setting: taken over
+  from Contacts, created for a household member or for a guest of a shared expense, or created
+  through the API without the field. Such a birthday is reminded on the day itself, and always has
+  been. Its form said "1 day before" all the same, and saving the form - even without touching
+  anything - wrote that down, so the reminder quietly moved to the day before. The form now shows
+  "On the day" for these birthdays, the reading view for read-only members says the same, and
+  saving writes a reminder only when you pick one. No existing reminder moves. "On the day" is also
+  in the menu now, for anybody who wants to pick it. (#1363)
+
 - **A supply request from Housekeeping now needs shopping rights as well.** The request puts the
   item on the shopping list, and creates a list first when the household has none. Since 2.68.0,
   sending a meal or a recipe to the shopping list asks for write access to the shopping list, but
@@ -96,10 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to - no longer gets the edit form, and rightly so. But nothing took its place, and on a phone the
   list leaves the note out for lack of room: the form had been the only way to it. Tapping a
   birthday now opens a reading view with everything the form shows - picture, date of birth, name
-  day, note and reminder - and not a single control. The one exception is a birthday taken over
-  from Contacts without a reminder of its own: the form claims "1 day before" there, while the
-  reminder actually comes on the day itself, so the reading view says nothing rather than repeat the
-  claim. (#1348)
+  day, note and reminder - and not a single control. (#1348)
 
 - **After a contact import, "Go to Birthdays" is only offered where you can use it.** When imported
   contacts carried a birthday, the result offered to take them over into Birthdays - also to
