@@ -221,10 +221,13 @@ test('eine mehrere Intervalle ueberfaellige Frist rollt weit genug vor, nicht nu
   assert.equal(rolled.date, '2000-05-15', 'rollt so oft vor, bis das Ergebnis nach dem Erledigungsdatum liegt');
 });
 
-test('eine extrem weit in der Zukunft erledigte Frist rollt ohne eine Schleife je verstrichenem Monat vor (Review #1257)', async () => {
+test('eine extrem weit in der Zukunft erledigte Frist landet auf der ersten Monatsmarke danach (Review #1257)', async () => {
   // performed_on ist Nutzereingabe - eine Faelligkeit von 2000-01-15 mit
-  // monatlichem Intervall gegen ein Erledigungsdatum 100 Jahre spaeter waeren
-  // 1200 Durchlaeufe, wenn vorrollen einen Schritt je Durchlauf ginge.
+  // monatlichem Intervall gegen ein Erledigungsdatum 100 Jahre spaeter. Eine
+  // Zeitgrenze stand hier frueher, mass aber nichts: auch 1200 Durchlaeufe
+  // einer Monat-fuer-Monat-Schleife sind nach wenigen Millisekunden fertig.
+  // Was zaehlt, ist der Wert - und genau den hatte die erste geschlossene
+  // Fassung um einen Monat verfehlt (2100-02-15).
   const created = await call('POST', '/items', {
     body: {
       name: 'Weit in der Zukunft erledigt',
@@ -233,14 +236,33 @@ test('eine extrem weit in der Zukunft erledigte Frist rollt ohne eine Schleife j
   });
   const dateId = created.body.data.tracked_dates[0].id;
 
-  const start = Date.now();
   const completed = await call('POST', `/items/${created.body.data.id}/dates/${dateId}/complete`, {
     body: { performed_on: '2100-01-01' },
   });
-  assert.ok(Date.now() - start < 1000, 'ein geschlossen berechneter Sprung, keine Monat-fuer-Monat-Schleife');
   assert.equal(completed.status, 201);
   const rolled = completed.body.data.tracked_dates.find((d) => d.id === dateId);
-  assert.equal(rolled.date, '2100-02-15', 'die erste Monatsmarke nach dem Erledigungsdatum');
+  assert.equal(rolled.date, '2100-01-15', 'die erste Monatsmarke nach dem Erledigungsdatum');
+});
+
+test('eine ein Jahr spaet, aber vor dem Stichtag erledigte Jahresfrist ueberspringt kein Intervall (Review #1257)', async () => {
+  // Faellig 2025-06-10, jaehrlich, erst am 2026-06-05 erledigt: die erste
+  // Jahresmarke danach ist 2026-06-10. Genau ein ganzes Intervall verstrichen
+  // UND der Erledigungstag vor dem Faelligkeitstag - in diesem Fall sprang ein
+  // ceil()-Einstieg in rollForwardPast() ein Jahr zu weit (2027-06-10).
+  const created = await call('POST', '/items', {
+    body: {
+      name: 'Heizung',
+      tracked_dates: [{ label: 'Wartung', date: '2025-06-10', reminder_offset_days: 0, interval_months: 12 }],
+    },
+  });
+  const dateId = created.body.data.tracked_dates[0].id;
+
+  const completed = await call('POST', `/items/${created.body.data.id}/dates/${dateId}/complete`, {
+    body: { performed_on: '2026-06-05' },
+  });
+  assert.equal(completed.status, 201, JSON.stringify(completed.body));
+  const rolled = completed.body.data.tracked_dates.find((d) => d.id === dateId);
+  assert.equal(rolled.date, '2026-06-10', 'die erste Jahresmarke nach dem Erledigungsdatum, nicht die uebernaechste');
 });
 
 // --------------------------------------------------------
@@ -676,6 +698,26 @@ test('eine Ablesung ueber den Service-Log respektiert die Meilen-Einheit des Geg
   const after = await call('GET', `/items/${itemId}`);
   assert.equal(after.body.data.odometer, 12000);
   assert.equal(after.body.data.odometer_unit, 'mi', 'die bestehende Einheit bleibt stehen, wird nicht auf km zurueckgesetzt');
+});
+
+test('das Loeschen der einzigen Ablesung laesst die gewaehlte Meilen-Einheit stehen (Review #1257)', async () => {
+  // Die Einheit kann im Formular gewaehlt sein, ohne dass je eine Ablesung
+  // dabei war. Faellt die einzige Ablesung weg, darf recomputeItemOdometer()
+  // sie nicht auf NULL setzen - die naechste Ablesung kaeme sonst als 'km'.
+  const created = await call('POST', '/items', {
+    body: { name: 'Auto13', category: 'vehicles', odometer_unit: 'mi' },
+  });
+  const itemId = created.body.data.id;
+  const logged = await call('POST', `/items/${itemId}/service-log`, {
+    body: { label: 'Inspektion', performed_on: '2026-09-10', odometer: 12000 },
+  });
+  assert.equal(logged.status, 201, JSON.stringify(logged.body));
+
+  const del = await call('DELETE', `/items/${itemId}/service-log/${logged.body.data.id}`);
+  assert.equal(del.status, 204);
+  const after = (await call('GET', `/items/${itemId}`)).body.data;
+  assert.equal(after.odometer, null, 'die Ablesung ist weg');
+  assert.equal(after.odometer_unit, 'mi', 'die gewaehlte Einheit bleibt');
 });
 
 test('eine erste Ablesung ueber den Service-Log ohne bestehende Einheit bekommt km als Standard (Review #1257)', async () => {

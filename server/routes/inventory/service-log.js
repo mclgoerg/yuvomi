@@ -241,6 +241,12 @@ function updateServiceLogEntry({ itemId, logId, values }) {
  * nicht mehr gibt. Setzt auf die neueste VERBLEIBENDE Ablesung zurueck, oder
  * auf NULL, wenn keine Log-Zeile mehr eine traegt.
  *
+ * odometer_unit bleibt dabei stehen, wenn keine Ablesung uebrig ist: die
+ * Einheit kann im Formular gewaehlt worden sein, ohne dass je eine Ablesung
+ * dabei war, und ohne Ablesung zeigt keine Stelle sie an. Sie auf NULL zu
+ * setzen, liesse die naechste Ablesung als 'km' hereinkommen - bei einem
+ * Meilen-Fahrzeug genau der Fehler, den maybeAdvanceItemOdometer() schliesst.
+ *
  * Braucht dieselbe tracks_odometer-Sperre wie maybeAdvanceItemOdometer - aber
  * hier RAEUMT das Gate ab, statt nur abzubrechen (Review #1257, Runde 2 an
  * dieser Sperre): diese Funktion ist die Aufraeum-Funktion selbst, ein
@@ -264,7 +270,7 @@ function recomputeItemOdometer(itemId) {
   db.get().prepare(`
     UPDATE inventory_items
     SET odometer = ?, odometer_on = ?,
-        odometer_unit = CASE WHEN ? IS NULL THEN NULL ELSE COALESCE(odometer_unit, 'km') END
+        odometer_unit = CASE WHEN ? IS NULL THEN odometer_unit ELSE COALESCE(odometer_unit, 'km') END
     WHERE id = ?
   `).run(latest?.odometer ?? null, latest?.performed_on ?? null, latest?.odometer ?? null, itemId);
 }
@@ -326,22 +332,24 @@ function monthsBetween(fromKey, toKey) {
 
 /**
  * Rollt `fromDate` in interval_months-Schritten vor, bis das Ergebnis nach
- * `afterDate` liegt - ohne dabei einen Schritt je verstrichenem Intervall zu
- * gehen. `performed_on` ist Nutzereingabe; ein Datum Jahrzehnte in der Zukunft
- * liesse eine Schleife, die einen Monat je Durchlauf vorankommt, hunderttausend
- * Mal drehen (Review #1257). monthsBetween() liefert die noetige Anzahl
- * Intervalle in einer Rechnung; die verbleibende Schleife korrigiert nur noch
- * die Tages-Klemmung (31. Jan + 1 Monat -> 28. Feb kann den Vergleich um ein
- * Intervall verschieben) und dreht sich deshalb hoechstens ein-, zweimal.
+ * `afterDate` liegt - das ERSTE solche Vielfache, nie eins dahinter. Jeder
+ * Kandidat wird vom Ausgangsdatum aus gerechnet (fromDate + k * Intervall),
+ * nicht Schritt fuer Schritt, damit sich die Tages-Klemmung nicht aufsummiert.
+ *
+ * `performed_on` ist Nutzereingabe; eine Schleife, die ein Intervall je
+ * Durchlauf vorankommt, liefe bei einem Datum Jahrzehnte in der Zukunft
+ * entsprechend oft (Review #1257). floor(monthsBetween / Intervall) ist
+ * deshalb der Einstieg: dieses Vielfache landet hoechstens im Monat von
+ * `afterDate`, nie danach, und das naechste liegt schon in einem spaeteren
+ * Monat - die Schleife dreht also hoechstens einmal (gleicher Monat, Tag noch
+ * nicht erreicht). Ein ceil()-Einstieg sprang in genau diesem Fall ein
+ * Intervall zu weit: faellig 2025-06-10, jaehrlich, erledigt 2026-06-05
+ * ergab 2027-06-10 statt 2026-06-10.
  */
 function rollForwardPast(fromDate, intervalMonths, afterDate) {
-  const elapsed = monthsBetween(fromDate, afterDate);
-  const steps = Math.max(1, Math.ceil((elapsed + 1) / intervalMonths));
-  let nextDate = addMonthsClamped(fromDate, steps * intervalMonths);
-  while (nextDate <= afterDate) {
-    nextDate = addMonthsClamped(nextDate, intervalMonths);
-  }
-  return nextDate;
+  let k = Math.max(1, Math.floor(monthsBetween(fromDate, afterDate) / intervalMonths));
+  while (addMonthsClamped(fromDate, k * intervalMonths) <= afterDate) k += 1;
+  return addMonthsClamped(fromDate, k * intervalMonths);
 }
 
 /**
@@ -381,7 +389,7 @@ function completeTrackedDate({ item, dateId, values, userId }) {
       // bliebe ueberfaellig, keine Erinnerung entstuende (syncTrackedDateReminder
       // verwirft einen bereits vergangenen remind_at), und ein zweiter Klick auf
       // "Erledigt" schriebe eine zweite Log-Zeile mit demselben performed_on.
-      // Solange weiterrollen, bis das Ergebnis nach dem Erledigungsdatum liegt.
+      // Auf die ERSTE Intervall-Marke nach dem Erledigungsdatum vorrollen.
       const nextDate = rollForwardPast(trackedDate.date, trackedDate.interval_months, values.performed_on);
       rollTrackedDateForward(trackedDate, nextDate, item.created_by);
     } else {

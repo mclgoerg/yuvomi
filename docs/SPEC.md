@@ -2885,7 +2885,9 @@ date done writes one `inventory_item_service_log` row (a label/date snapshot, pl
 odometer/vendor/note) and either:
 
 - rolls `date` forward by `interval_months` (clamped to the end of the target month, e.g. 31 Jan + 1
-  month → 28/29 Feb) and re-syncs its reminder - **the row keeps its id**, unlike a full item save,
+  month → 28/29 Feb) to the first such mark after the completion day, however late the completion
+  was (due 2025-06-10 yearly, done 2026-06-05 → 2026-06-10), and re-syncs its reminder - **the row
+  keeps its id**, unlike a full item save,
   so its ICS `UID` stays stable and only its `DTSTART` moves; or
 - if `interval_months` is not set, removes the date and its reminder - the completion lives on only
   in the service log.
