@@ -68,6 +68,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Controls and hints that are meant to be hidden now really disappear.** Yuvomi hides an element
+  by setting `hidden` on it, and the browser honours that only until a stylesheet gives the element
+  a layout of its own: any `display` rule wins over it. Several places were caught this way and
+  stayed on screen. A task comment you deleted stayed in the list while the undo notice was up. The
+  housekeeping form showed both the daily and the hourly rate, whatever billing type was chosen. The
+  activity form showed its free-text type field and the prevention form its name field when neither
+  applied. The first phone or email row of a contact offered a remove button. An attachments field
+  said "Nothing attached yet" underneath the attachments it listed. A document thumbnail that had not
+  loaded yet covered the category icon with an empty box. The folder breadcrumb and the attachment
+  preview in the event dialog left empty space behind. A new test now reads every element the code
+  hides and every stylesheet rule that sets `display`, and fails when a rule keeps a hidden element
+  on screen. (#1340)
+
+- **The recipes page keeps its "+ Recipe" button on a wide screen when recipes from Mealie or Tandoor
+  are in the list.** From 1024 pixels wide, the round add button moves up into the page header, into
+  the same spot as the "Filter by source" menu. As soon as a mirrored recipe was in the list, building
+  that menu cleared the spot and took the button with it, and the n shortcut stopped working along
+  with it. The filter now has a place of its own next to the button. (#1340)
+
+- **With several people assigned, the event dialog now says why no calendar was picked.** Since
+  #1060 a new event goes to the calendar that names its one assigned person as the default
+  assignee. With two or more people assigned, the assignment deliberately picks nothing and the
+  event goes to your own default target - and until now it did so without a word, although the
+  notes for 2.66.0 said the dialog tells you instead of guessing. It now does, right under the
+  calendar choice, and names the calendar used instead, or "Store locally only" when your default
+  target is not available. The hint appears only when a calendar names at least one of the assigned
+  people, because only then would the assignment have picked something; a household without
+  default assignees sees nothing new. Choosing a calendar yourself removes the hint, and two
+  calendars naming the same person keep their own hint as before. (#1332)
+
 - **Two first starts on the same new database no longer knock each other out.** A fresh installation
   that is started twice at once - a container restarted while it is still coming up, two replicas on
   one volume - has both processes decide which migrations are pending before either of them has
