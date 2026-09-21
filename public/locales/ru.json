@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Для этого человека нет записей",
         "responsibleFilterEmptyDescription": "В этом месяце никто не отвечает за запись в этой выборке.",
         "handoverToSplit": "Перенести в общие расходы",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (план: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (план: {{plan}})",
+        "detailDateLabel": "Дата",
+        "loanDetailStartMonthLabel": "Первый месяц оплаты"
     },
     "settings": {
         "healthCycleEnableLabel": "Показать вкладку цикла",
@@ -3430,6 +3432,7 @@
         "addCustomTask": "Добавить свою задачу",
         "noReports": "Сообщений пока нет.",
         "profileTitle": "Профиль помощника",
+        "openWorkerProfile": "Открыть профиль",
         "profilePicture": "Фото профиля",
         "workerName": "Имя",
         "workerUsername": "Имя пользователя",
@@ -3487,6 +3490,7 @@
         "visitUnpaidToast": "Оплата отменена.",
         "receiptUploadTitle": "Загрузить чек об оплате",
         "receiptUploadHint": "Прикрепите чек об оплате. Он появится в разделе «Документы».",
+        "receiptLabel": "Чек об оплате",
         "receiptDocumentName": "Чек - {{name}} - {{date}}",
         "receiptDocumentDescription": "Чек об оплате визита {{name}} от {{date}}.",
         "taskTemplateData": {
@@ -3680,7 +3684,9 @@
         "proofLabel": "Подтверждение оплаты",
         "proofHint": "Одно подтверждение, например скриншот перевода.",
         "proofDocumentName": "Подтверждение оплаты {{group}}: {{name}}",
-        "loadError": "Не удалось загрузить общие расходы."
+        "loadError": "Не удалось загрузить общие расходы.",
+        "moreMembers": "+{{count}} ещё",
+        "moreMembers_one": "+{{count}} ещё"
     },
     "wmo": {
         "0": "Ясное небо",
@@ -3976,7 +3982,9 @@
         "endsAfter": "Осталось {{count}} платежей",
         "logoTypeError": "Используйте изображение PNG, JPEG, WebP или SVG.",
         "accountUsernameLabel": "Зарегистрировано на",
-        "accountUsernameHint": "Адрес электронной почты или имя пользователя. Это не поле пароля - Yuvomi не хранит пароли."
+        "accountUsernameHint": "Адрес электронной почты или имя пользователя. Это не поле пароля - Yuvomi не хранит пароли.",
+        "detailAmountLabel": "Сумма",
+        "detailNextPaymentLabel": "Следующий платеж"
     },
     "health": {
         "fasting": {

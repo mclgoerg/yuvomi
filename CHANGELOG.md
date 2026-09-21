@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **In the week and day views, an appointment of a day or more now shows its times on the all-day
+  bar.** An appointment with a start and an end time that lasts 24 hours or longer - a trip from
+  Friday 14:00 to Sunday 11:00, a workshop over three days - stays in the all-day row above the time
+  grid, and there it looked like three whole days. The bar now says "from 14:00" on the first day and
+  "until 11:00" on the last; the days in between carry no time, because the appointment covers them
+  completely. The wording and the 12- or 24-hour format are the ones the agenda has always used for
+  those days, so both views say the same thing about the same day, and the tooltip carries the time
+  as well. An appointment that ends at exactly 00:00 ends on the day before, as everywhere else in
+  the calendar, so that is where its "until" appears. Appointments marked as all-day have no times
+  and look as before. Where a bar is too narrow for both - a phone showing three days, or a busy
+  week on a smaller screen - the title keeps its room and the time is left off that bar rather than
+  cut short; the tooltip and the appointment's details still give it. The tooltip also shows a
+  calendar name with quotation marks in full now; it used to break off at the first one. (#1350)
+
 - **Health has a ninth tab: a daily nutrition target per person and a log of what was eaten.** You
   type the numbers off the packet in front of you - energy in kcal, fat, of which saturates,
   carbohydrate, of which sugars, protein, salt and fibre - and the tab shows today's total against
@@ -67,6 +81,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API's answer either. (#1314)
 
 ### Fixed
+
+- **A supply request from Housekeeping now needs shopping rights as well.** The request puts the
+  item on the shopping list, and creates a list first when the household has none. Since 2.68.0,
+  sending a meal or a recipe to the shopping list asks for write access to the shopping list, but
+  this request was left out and asked only for housekeeping: a member who may only look at the
+  shopping list, or an API token scoped to housekeeping alone, could still add items to it. It now
+  asks the same question before it creates anything, and answers a missing right the same way. No
+  page in Yuvomi sends this request today, so only API clients notice the change, and anybody with
+  both rights notices no difference. (#1351)
+
+- **With read-only access to Birthdays, tapping a birthday opens it again, so its note can be read
+  on a phone.** Since 2.68.0 a member who may only read the Calendar - the module birthdays belong
+  to - no longer gets the edit form, and rightly so. But nothing took its place, and on a phone the
+  list leaves the note out for lack of room: the form had been the only way to it. Tapping a
+  birthday now opens a reading view with everything the form shows - picture, date of birth, name
+  day, note and reminder - and not a single control. The one exception is a birthday taken over
+  from Contacts without a reminder of its own: the form claims "1 day before" there, while the
+  reminder actually comes on the day itself, so the reading view says nothing rather than repeat the
+  claim. (#1348)
+
+- **After a contact import, "Go to Birthdays" is only offered where you can use it.** When imported
+  contacts carried a birthday, the result offered to take them over into Birthdays - also to
+  members who may only read the Calendar, where the page opened and the import did not, or who may
+  not see it at all, where the app sent them back to the start page. The offer now appears only
+  with permission to edit the Calendar and while Birthdays is switched on for the household; the
+  count of contacts with a birthday stays in the message either way. (#1348)
+
+- **Empty Notes, Contacts and Birthdays pages no longer point read-only members to a + button they
+  do not have.** The button itself was already gone for them, but the text underneath still said
+  "Add new contacts with the + button" and the like. With read-only access the empty page now only
+  says that there is nothing here yet. (#1348)
 
 - **Controls and hints that are meant to be hidden now really disappear.** Yuvomi hides an element
   by setting `hidden` on it, and the browser honours that only until a stylesheet gives the element
@@ -160,6 +205,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already asked about this right and is unchanged. Recording for someone you care for is unaffected
   as long as your access to Health is "write" - the module right is now asked first, so a
   caregiving permission no longer offers a button the server would refuse. (#1265)
+
+- **The budget no longer offers buttons that a read-only member is not allowed to press.** Where
+  your access to Budget is "read", every tab except the reports still carried its writing controls,
+  and each of them ended in an error message: deleting or confirming an entry, opening an entry to
+  edit it, managing categories, adding or editing an account, editing or deleting a loan, booking
+  an instalment or correcting one, setting a category budget or the savings goal; on the
+  subscriptions tab adding, editing, renewing and deleting a subscription - by button and by swipe -
+  and managing its categories, payment methods, monthly budget and currency; on the shared-expenses
+  tab adding an expense or a group, editing, archiving, restoring or deleting a group, settling up
+  and inviting someone. The rule is the one Tasks, Notes, Contacts and Health already follow:
+  something that shows a state stays, something that only acts disappears. An expected entry keeps
+  its "expected" tag, a recurring entry and one with a receipt keep their marks, a savings goal that
+  is set stays as a card, and a plan row keeps its target, what was spent and what is left. An
+  entry, a subscription or a shared expense still opens when you tap it, but into a read-only view
+  instead of the editor: it shows everything the editor would - an entry's subcategory, account,
+  visibility, who is responsible, how it repeats and its receipts; a subscription's description,
+  category, payment method, the account it runs under and its notes; an expense's payer, how it
+  is split and each person's share, its notes and receipts - and offers nothing to change. Receipts
+  are listed only if you may read documents. The same view now opens for an expense in an archived
+  group. A loan's report also shows the account, the first due month, the interest terms and the
+  notes from the loan form. Where a value only lived in a form, it now stands where a tap already
+  leads, without a new button: a credit card's statement shows its credit limit at the top (for
+  everyone - the card itself only shows what is still available), and at "read" a shared-expense
+  group shows its default currency, its default split and its members under the description,
+  with the names cut off after five and the rest counted. What you can read stays complete: the monthly summary and chart, the
+  account balances and each account's statement, the subscription analytics, a group's balances,
+  expenses and activity, the reports tab and the CSV exports. A tab with nothing in it yet says so,
+  instead of telling you to use a + button that is not there. Shared expenses are part of Budget in
+  the permission settings, so the same right decides there. (#1265)
+
+- **Housekeeping no longer offers buttons that a read-only member is not allowed to press.** Where
+  your access to the module is "read", the page still carried most of its writing controls, and each
+  of them ended in an error message: checking a housekeeper in or out, adding a chore from a
+  template or from the form, marking a chore done, undoing that, editing or deleting a chore,
+  editing a housekeeper's profile and setting up the first one from the empty page. The visit log
+  also showed a greyed-out "Mark as paid" button that did nothing. The rule is the one Tasks, Notes
+  and Health already follow: something that shows a state stays, as a sign that names the state
+  rather than as a greyed-out button, and something that only acts disappears. A housekeeper who is
+  checked in right now therefore still shows as "Currently here", in the words of the dashboard
+  tile, and every chore keeps its name, area, rhythm and how urgent it is. Visits, the monthly
+  reports and the month switch stay as they were. What only an edit form used to show is now
+  readable too: a housekeeper's profile opens as a read-only view with everything the form shows -
+  contact details, birthday, billing, schedule, colours and notes - and the visit report now also
+  lists the minutes worked on an hourly visit and the payment receipt, where your access to
+  Documents lets you read it. The receipt upload in the visit dialog now also asks about Documents,
+  where the receipt is stored: somebody allowed to edit Housekeeping but only to read Documents saw
+  the upload, and saving ended in an error before the visit itself was saved. The upload is gone
+  for them, a receipt that is already linked stays listed, and saving the visit keeps it. (#1265)
 
 - **A nightly recurring appointment that crosses midnight no longer covers the entry it should be
   sharing its column with.** On a day that carries two occurrences of the same series - last

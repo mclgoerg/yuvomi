@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "لا توجد قيود لهذا الشخص",
         "responsibleFilterEmptyDescription": "لا أحد مسؤول عن أي قيد هذا الشهر ضمن هذا التحديد.",
         "handoverToSplit": "نقل إلى النفقات المشتركة",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (الخطة: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (الخطة: {{plan}})",
+        "detailDateLabel": "التاريخ",
+        "loanDetailStartMonthLabel": "أول شهر استحقاق"
     },
     "settings": {
         "healthCycleEnableLabel": "إظهار علامة تبويب الدورة",
@@ -3430,6 +3432,7 @@
         "addCustomTask": "إضافة مهمة مخصصة",
         "noReports": "لا توجد بلاغات بعد.",
         "profileTitle": "ملف التدبير المنزلي",
+        "openWorkerProfile": "فتح الملف الشخصي",
         "profilePicture": "صورة الملف الشخصي",
         "workerName": "الاسم",
         "workerUsername": "اسم المستخدم",
@@ -3487,6 +3490,7 @@
         "visitUnpaidToast": "تم التراجع عن الدفع.",
         "receiptUploadTitle": "رفع إيصال الدفع",
         "receiptUploadHint": "أرفق إيصال دفع. سيظهر بعد ذلك في المستندات.",
+        "receiptLabel": "إيصال الدفع",
         "receiptDocumentName": "إيصال - {{name}} - {{date}}",
         "receiptDocumentDescription": "إيصال دفع لزيارة {{name}} بتاريخ {{date}}.",
         "taskTemplateData": {
@@ -3680,7 +3684,9 @@
         "proofLabel": "إثبات الدفع",
         "proofHint": "إثبات واحد، مثل لقطة شاشة للتحويل.",
         "proofDocumentName": "إثبات الدفع {{group}}: {{name}}",
-        "loadError": "تعذر تحميل المصاريف المشتركة."
+        "loadError": "تعذر تحميل المصاريف المشتركة.",
+        "moreMembers": "+{{count}} آخرون",
+        "moreMembers_one": "+{{count}} آخر"
     },
     "wmo": {
         "0": "سماء صافية",
@@ -3976,7 +3982,9 @@
         "endsAfter": "المتبقّي: {{count}} دفعة",
         "logoTypeError": "استخدم صورة PNG أو JPEG أو WebP أو SVG.",
         "accountUsernameLabel": "مسجَّل باسم",
-        "accountUsernameHint": "عنوان بريد إلكتروني أو اسم مستخدم. ليس حقل كلمة مرور - لا يحفظ Yuvomi كلمات المرور."
+        "accountUsernameHint": "عنوان بريد إلكتروني أو اسم مستخدم. ليس حقل كلمة مرور - لا يحفظ Yuvomi كلمات المرور.",
+        "detailAmountLabel": "المبلغ",
+        "detailNextPaymentLabel": "الدفعة التالية"
     },
     "health": {
         "fasting": {

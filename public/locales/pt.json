@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Nenhum lançamento para esta pessoa",
         "responsibleFilterEmptyDescription": "Ninguém é responsável por um lançamento neste mês com esta seleção.",
         "handoverToSplit": "Passar para despesas partilhadas",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (plano: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (plano: {{plan}})",
+        "detailDateLabel": "Data",
+        "loanDetailStartMonthLabel": "Primeiro mês de vencimento"
     },
     "settings": {
         "healthCycleEnableLabel": "Mostrar a aba de ciclo",
@@ -3430,6 +3432,7 @@
         "addCustomTask": "Adicionar tarefa personalizada",
         "noReports": "Nenhuma ocorrência ainda.",
         "profileTitle": "Perfil da faxineira",
+        "openWorkerProfile": "Abrir perfil",
         "profilePicture": "Foto de perfil da faxineira",
         "workerName": "Nome",
         "workerUsername": "Usuário",
@@ -3487,6 +3490,7 @@
         "visitUnpaidToast": "Pagamento desfeito.",
         "receiptUploadTitle": "Enviar comprovante de pagamento",
         "receiptUploadHint": "Anexe um comprovante de pagamento. Ele aparecerá em Documentos.",
+        "receiptLabel": "Comprovante de pagamento",
         "receiptDocumentName": "Comprovante - {{name}} - {{date}}",
         "receiptDocumentDescription": "Comprovante de pagamento da visita de faxina de {{name}} em {{date}}.",
         "taskTemplateData": {
@@ -3680,7 +3684,9 @@
         "proofLabel": "Comprovativo de pagamento",
         "proofHint": "Um comprovativo, por exemplo a captura da transferência.",
         "proofDocumentName": "Comprovativo de pagamento {{group}}: {{name}}",
-        "loadError": "Não foi possível carregar as despesas compartilhadas."
+        "loadError": "Não foi possível carregar as despesas compartilhadas.",
+        "moreMembers": "+{{count}} outros",
+        "moreMembers_one": "+{{count}} outro"
     },
     "wmo": {
         "0": "Céu limpo",
@@ -3976,7 +3982,9 @@
         "endsAfter": "Faltam {{count}} pagamentos",
         "logoTypeError": "Use uma imagem PNG, JPEG, WebP ou SVG.",
         "accountUsernameLabel": "Registado com",
-        "accountUsernameHint": "Endereço de e-mail ou nome de utilizador. Não é um campo de palavra-passe - o Yuvomi não guarda palavras-passe."
+        "accountUsernameHint": "Endereço de e-mail ou nome de utilizador. Não é um campo de palavra-passe - o Yuvomi não guarda palavras-passe.",
+        "detailAmountLabel": "Valor",
+        "detailNextPaymentLabel": "Próximo pagamento"
     },
     "health": {
         "fasting": {

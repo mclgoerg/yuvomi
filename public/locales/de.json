@@ -1564,7 +1564,9 @@
         "responsibleFilterEmptyTitle": "Keine Buchung für diese Person",
         "responsibleFilterEmptyDescription": "In diesem Monat ist niemand für eine Buchung dieser Auswahl zuständig.",
         "handoverToSplit": "In geteilte Ausgaben übernehmen",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (Plan: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (Plan: {{plan}})",
+        "detailDateLabel": "Datum",
+        "loanDetailStartMonthLabel": "Erster Fälligkeitsmonat"
     },
     "settings": {
         "healthCycleEnableLabel": "Zyklus-Tab anzeigen",
@@ -3434,6 +3436,7 @@
         "addCustomTask": "Eigene Aufgabe hinzufügen",
         "noReports": "Noch keine Meldungen.",
         "profileTitle": "Hauspflege-Profil",
+        "openWorkerProfile": "Profil öffnen",
         "profilePicture": "Profilbild",
         "workerName": "Name",
         "workerUsername": "Benutzername",
@@ -3491,6 +3494,7 @@
         "visitUnpaidToast": "Zahlung zurückgenommen.",
         "receiptUploadTitle": "Zahlungsbeleg hochladen",
         "receiptUploadHint": "Füge einen Zahlungsbeleg hinzu. Er erscheint anschließend in Dokumente.",
+        "receiptLabel": "Zahlungsbeleg",
         "receiptDocumentName": "Beleg - {{name}} - {{date}}",
         "receiptDocumentDescription": "Zahlungsbeleg für den Einsatz von {{name}} am {{date}}.",
         "taskTemplateData": {
@@ -3680,7 +3684,9 @@
         "proofLabel": "Zahlungsnachweis",
         "proofHint": "Ein Nachweis, etwa der Screenshot der Überweisung.",
         "proofDocumentName": "Zahlungsnachweis {{group}}: {{name}}",
-        "loadError": "Gemeinsame Ausgaben konnten nicht geladen werden."
+        "loadError": "Gemeinsame Ausgaben konnten nicht geladen werden.",
+        "moreMembers": "+{{count}} weitere",
+        "moreMembers_one": "+{{count}} weitere"
     },
     "wmo": {
         "0": "Klarer Himmel",
@@ -3976,7 +3982,9 @@
         "endsAfter": "Noch {{count}} Zahlungen",
         "logoTypeError": "Bitte ein PNG-, JPEG-, WebP- oder SVG-Bild verwenden.",
         "accountUsernameLabel": "Registriert unter",
-        "accountUsernameHint": "E-Mail-Adresse oder Benutzername. Kein Passwortfeld - Yuvomi speichert keine Passwörter."
+        "accountUsernameHint": "E-Mail-Adresse oder Benutzername. Kein Passwortfeld - Yuvomi speichert keine Passwörter.",
+        "detailAmountLabel": "Betrag",
+        "detailNextPaymentLabel": "Nächste Zahlung"
     },
     "health": {
         "fasting": {

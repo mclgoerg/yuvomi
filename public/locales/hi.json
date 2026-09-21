@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "इस व्यक्ति के लिए कोई प्रविष्टि नहीं",
         "responsibleFilterEmptyDescription": "इस चयन में इस माह किसी प्रविष्टि के लिए कोई जिम्मेदार नहीं है।",
         "handoverToSplit": "साझा खर्च में ले जाएं",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (योजना: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (योजना: {{plan}})",
+        "detailDateLabel": "तारीख",
+        "loanDetailStartMonthLabel": "पहला देय महीना"
     },
     "settings": {
         "healthCycleEnableLabel": "चक्र टैब दिखाएँ",
@@ -3430,6 +3432,7 @@
         "addCustomTask": "अपना कार्य जोड़ें",
         "noReports": "अभी तक कोई रिपोर्ट नहीं।",
         "profileTitle": "सहायक प्रोफ़ाइल",
+        "openWorkerProfile": "प्रोफ़ाइल खोलें",
         "profilePicture": "प्रोफ़ाइल चित्र",
         "workerName": "नाम",
         "workerUsername": "उपयोगकर्ता नाम",
@@ -3487,6 +3490,7 @@
         "visitUnpaidToast": "भुगतान वापस लिया गया।",
         "receiptUploadTitle": "भुगतान रसीद अपलोड करें",
         "receiptUploadHint": "भुगतान रसीद जोड़ें। यह इसके बाद दस्तावेज़ में दिखेगी।",
+        "receiptLabel": "भुगतान रसीद",
         "receiptDocumentName": "रसीद - {{name}} - {{date}}",
         "receiptDocumentDescription": "{{date}} को {{name}} की विज़िट के लिए भुगतान रसीद।",
         "taskTemplateData": {
@@ -3680,7 +3684,9 @@
         "proofLabel": "भुगतान प्रमाण",
         "proofHint": "एक प्रमाण, जैसे ट्रांसफ़र का स्क्रीनशॉट।",
         "proofDocumentName": "भुगतान प्रमाण {{group}}: {{name}}",
-        "loadError": "साझा खर्च लोड नहीं हो सके।"
+        "loadError": "साझा खर्च लोड नहीं हो सके।",
+        "moreMembers": "+{{count}} और",
+        "moreMembers_one": "+{{count}} और"
     },
     "wmo": {
         "0": "साफ आकाश",
@@ -3976,7 +3982,9 @@
         "endsAfter": "{{count}} भुगतान शेष",
         "logoTypeError": "PNG, JPEG, WebP या SVG चित्र इस्तेमाल करें।",
         "accountUsernameLabel": "इसके नाम पंजीकृत",
-        "accountUsernameHint": "ईमेल पता या उपयोगकर्ता नाम। यह पासवर्ड फ़ील्ड नहीं है - Yuvomi पासवर्ड सहेजता नहीं है।"
+        "accountUsernameHint": "ईमेल पता या उपयोगकर्ता नाम। यह पासवर्ड फ़ील्ड नहीं है - Yuvomi पासवर्ड सहेजता नहीं है।",
+        "detailAmountLabel": "राशि",
+        "detailNextPaymentLabel": "अगला भुगतान"
     },
     "health": {
         "fasting": {

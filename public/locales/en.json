@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "No entry for this person",
         "responsibleFilterEmptyDescription": "Nobody is responsible for an entry in this month under this selection.",
         "handoverToSplit": "Move to Split Expenses",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (plan: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (plan: {{plan}})",
+        "detailDateLabel": "Date",
+        "loanDetailStartMonthLabel": "First due month"
     },
     "settings": {
         "healthCycleEnableLabel": "Show cycle tab",
@@ -3430,6 +3432,7 @@
         "addCustomTask": "Add custom chore",
         "noReports": "No reports yet.",
         "profileTitle": "Housekeeper profile",
+        "openWorkerProfile": "Open profile",
         "profilePicture": "Housekeeper profile picture",
         "workerName": "Name",
         "workerUsername": "Username",
@@ -3487,6 +3490,7 @@
         "visitUnpaidToast": "Payment undone.",
         "receiptUploadTitle": "Upload payment receipt",
         "receiptUploadHint": "Attach a payment receipt. It will appear in Documents.",
+        "receiptLabel": "Payment receipt",
         "receiptDocumentName": "Receipt - {{name}} - {{date}}",
         "receiptDocumentDescription": "Payment receipt for {{name}} housekeeping visit on {{date}}.",
         "taskTemplateData": {
@@ -3680,7 +3684,9 @@
         "proofLabel": "Payment proof",
         "proofHint": "One proof, for example a screenshot of the transfer.",
         "proofDocumentName": "Payment proof {{group}}: {{name}}",
-        "loadError": "Shared expenses could not be loaded."
+        "loadError": "Shared expenses could not be loaded.",
+        "moreMembers": "+{{count}} more",
+        "moreMembers_one": "+{{count}} more"
     },
     "wmo": {
         "0": "Clear sky",
@@ -3976,7 +3982,9 @@
         "endsAfter": "{{count}} payments left",
         "logoTypeError": "Use a PNG, JPEG, WebP or SVG image.",
         "accountUsernameLabel": "Registered under",
-        "accountUsernameHint": "E-mail address or username. Not a password field - Yuvomi does not store passwords."
+        "accountUsernameHint": "E-mail address or username. Not a password field - Yuvomi does not store passwords.",
+        "detailAmountLabel": "Amount",
+        "detailNextPaymentLabel": "Next payment"
     },
     "health": {
         "fasting": {

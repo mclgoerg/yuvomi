@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "该成员没有记录",
         "responsibleFilterEmptyDescription": "在此筛选下，本月没有任何记录有负责人。",
         "handoverToSplit": "转入共享支出",
-        "loanRemainingInstallmentsForecast": "{{forecast}}（计划：{{plan}}）"
+        "loanRemainingInstallmentsForecast": "{{forecast}}（计划：{{plan}}）",
+        "detailDateLabel": "日期",
+        "loanDetailStartMonthLabel": "首期月份"
     },
     "settings": {
         "healthCycleEnableLabel": "显示周期标签页",
@@ -3430,6 +3432,7 @@
         "addCustomTask": "添加自定义任务",
         "noReports": "暂无报告。",
         "profileTitle": "家政人员档案",
+        "openWorkerProfile": "打开档案",
         "profilePicture": "档案照片",
         "workerName": "姓名",
         "workerUsername": "用户名",
@@ -3487,6 +3490,7 @@
         "visitUnpaidToast": "付款已撤销。",
         "receiptUploadTitle": "上传付款凭证",
         "receiptUploadHint": "添加付款凭证，之后会显示在“文档”中。",
+        "receiptLabel": "付款凭证",
         "receiptDocumentName": "凭证 - {{name}} - {{date}}",
         "receiptDocumentDescription": "{{name}} 于 {{date}} 上门服务的付款凭证。",
         "taskTemplateData": {
@@ -3680,7 +3684,9 @@
         "proofLabel": "付款凭据",
         "proofHint": "一份凭据，例如转账截图。",
         "proofDocumentName": "付款凭据 {{group}}：{{name}}",
-        "loadError": "无法加载共享支出。"
+        "loadError": "无法加载共享支出。",
+        "moreMembers": "还有 {{count}} 位",
+        "moreMembers_one": "还有 {{count}} 位"
     },
     "wmo": {
         "0": "晴天",
@@ -3976,7 +3982,9 @@
         "endsAfter": "还剩 {{count}} 次付款",
         "logoTypeError": "请使用 PNG、JPEG、WebP 或 SVG 图片。",
         "accountUsernameLabel": "注册账号",
-        "accountUsernameHint": "电子邮箱地址或用户名。这不是密码字段，Yuvomi 不保存密码。"
+        "accountUsernameHint": "电子邮箱地址或用户名。这不是密码字段，Yuvomi 不保存密码。",
+        "detailAmountLabel": "金额",
+        "detailNextPaymentLabel": "下次付款"
     },
     "health": {
         "fasting": {

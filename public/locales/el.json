@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Καμία εγγραφή για αυτό το άτομο",
         "responsibleFilterEmptyDescription": "Κανείς δεν είναι υπεύθυνος για εγγραφή αυτόν τον μήνα σε αυτή την επιλογή.",
         "handoverToSplit": "Μεταφορά στα κοινά έξοδα",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (σχέδιο: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (σχέδιο: {{plan}})",
+        "detailDateLabel": "Ημερομηνία",
+        "loanDetailStartMonthLabel": "Πρώτος μήνας λήξης"
     },
     "settings": {
         "healthCycleEnableLabel": "Εμφάνιση καρτέλας κύκλου",
@@ -3430,6 +3432,7 @@
         "addCustomTask": "Προσθήκη δικής σου εργασίας",
         "noReports": "Δεν υπάρχουν ακόμη αναφορές.",
         "profileTitle": "Προφίλ βοηθού",
+        "openWorkerProfile": "Άνοιγμα προφίλ",
         "profilePicture": "Φωτογραφία προφίλ",
         "workerName": "Όνομα",
         "workerUsername": "Όνομα χρήστη",
@@ -3487,6 +3490,7 @@
         "visitUnpaidToast": "Η πληρωμή αναιρέθηκε.",
         "receiptUploadTitle": "Μεταφόρτωση απόδειξης πληρωμής",
         "receiptUploadHint": "Πρόσθεσε μια απόδειξη πληρωμής. Θα εμφανιστεί στη συνέχεια στα Έγγραφα.",
+        "receiptLabel": "Απόδειξη πληρωμής",
         "receiptDocumentName": "Απόδειξη - {{name}} - {{date}}",
         "receiptDocumentDescription": "Απόδειξη πληρωμής για την επίσκεψη {{name}} στις {{date}}.",
         "taskTemplateData": {
@@ -3680,7 +3684,9 @@
         "proofLabel": "Αποδεικτικό πληρωμής",
         "proofHint": "Ένα αποδεικτικό, π.χ. στιγμιότυπο του εμβάσματος.",
         "proofDocumentName": "Αποδεικτικό πληρωμής {{group}}: {{name}}",
-        "loadError": "Δεν ήταν δυνατή η φόρτωση των κοινών εξόδων."
+        "loadError": "Δεν ήταν δυνατή η φόρτωση των κοινών εξόδων.",
+        "moreMembers": "+{{count}} ακόμη",
+        "moreMembers_one": "+{{count}} ακόμη"
     },
     "wmo": {
         "0": "Αίθριος καιρός",
@@ -3976,7 +3982,9 @@
         "endsAfter": "Απομένουν {{count}} πληρωμές",
         "logoTypeError": "Χρησιμοποιήστε εικόνα PNG, JPEG, WebP ή SVG.",
         "accountUsernameLabel": "Καταχωρημένο ως",
-        "accountUsernameHint": "Διεύθυνση e-mail ή όνομα χρήστη. Δεν είναι πεδίο κωδικού - το Yuvomi δεν αποθηκεύει κωδικούς."
+        "accountUsernameHint": "Διεύθυνση e-mail ή όνομα χρήστη. Δεν είναι πεδίο κωδικού - το Yuvomi δεν αποθηκεύει κωδικούς.",
+        "detailAmountLabel": "Ποσό",
+        "detailNextPaymentLabel": "Επόμενη πληρωμή"
     },
     "health": {
         "fasting": {

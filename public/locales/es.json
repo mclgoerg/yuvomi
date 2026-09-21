@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Ningún apunte para esta persona",
         "responsibleFilterEmptyDescription": "Nadie es responsable de un apunte este mes con esta selección.",
         "handoverToSplit": "Pasar a gastos compartidos",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (según plan: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (según plan: {{plan}})",
+        "detailDateLabel": "Fecha",
+        "loanDetailStartMonthLabel": "Primer mes de vencimiento"
     },
     "settings": {
         "healthCycleEnableLabel": "Mostrar la pestaña de ciclo",
@@ -3430,6 +3432,7 @@
         "addCustomTask": "Agregar tarea personalizada",
         "noReports": "Aún no hay reportes.",
         "profileTitle": "Perfil de limpieza",
+        "openWorkerProfile": "Abrir perfil",
         "profilePicture": "Foto de perfil",
         "workerName": "Nombre",
         "workerUsername": "Usuario",
@@ -3487,6 +3490,7 @@
         "visitUnpaidToast": "Pago deshecho.",
         "receiptUploadTitle": "Subir comprobante de pago",
         "receiptUploadHint": "Adjunta un comprobante de pago. Aparecerá después en Documentos.",
+        "receiptLabel": "Comprobante de pago",
         "receiptDocumentName": "Comprobante - {{name}} - {{date}}",
         "receiptDocumentDescription": "Comprobante de pago del servicio de {{name}} del {{date}}.",
         "taskTemplateData": {
@@ -3680,7 +3684,9 @@
         "proofLabel": "Justificante de pago",
         "proofHint": "Un justificante, por ejemplo la captura de la transferencia.",
         "proofDocumentName": "Justificante de pago {{group}}: {{name}}",
-        "loadError": "No se pudieron cargar los gastos compartidos."
+        "loadError": "No se pudieron cargar los gastos compartidos.",
+        "moreMembers": "+{{count}} más",
+        "moreMembers_one": "+{{count}} más"
     },
     "wmo": {
         "0": "Cielo despejado",
@@ -3976,7 +3982,9 @@
         "endsAfter": "Quedan {{count}} pagos",
         "logoTypeError": "Usa una imagen PNG, JPEG, WebP o SVG.",
         "accountUsernameLabel": "Registrado con",
-        "accountUsernameHint": "Dirección de correo o nombre de usuario. No es un campo de contraseña: Yuvomi no guarda contraseñas."
+        "accountUsernameHint": "Dirección de correo o nombre de usuario. No es un campo de contraseña: Yuvomi no guarda contraseñas.",
+        "detailAmountLabel": "Importe",
+        "detailNextPaymentLabel": "Próximo pago"
     },
     "health": {
         "fasting": {

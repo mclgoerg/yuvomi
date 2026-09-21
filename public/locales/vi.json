@@ -1552,7 +1552,9 @@
         "responsibleFilterEmptyTitle": "Không có mục nào cho người này",
         "responsibleFilterEmptyDescription": "Tháng này không ai phụ trách mục nào trong lựa chọn này.",
         "handoverToSplit": "Chuyển sang chi tiêu chung",
-        "loanRemainingInstallmentsForecast": "{{forecast}} (kế hoạch: {{plan}})"
+        "loanRemainingInstallmentsForecast": "{{forecast}} (kế hoạch: {{plan}})",
+        "detailDateLabel": "Ngày",
+        "loanDetailStartMonthLabel": "Tháng đáo hạn đầu tiên"
     },
     "settings": {
         "healthCycleEnableLabel": "Hiện tab chu kỳ",
@@ -3430,6 +3432,7 @@
         "addCustomTask": "Thêm việc nhà tùy chỉnh",
         "noReports": "Chưa có báo cáo nào.",
         "profileTitle": "Hồ sơ người dọn dẹp",
+        "openWorkerProfile": "Mở hồ sơ",
         "profilePicture": "Ảnh hồ sơ người dọn dẹp",
         "workerName": "Tên",
         "workerUsername": "Tên người dùng",
@@ -3487,6 +3490,7 @@
         "visitUnpaidToast": "Đã hoàn tác thanh toán.",
         "receiptUploadTitle": "Tải lên biên lai thanh toán",
         "receiptUploadHint": "Đính kèm một biên lai thanh toán. Nó sẽ xuất hiện trong Tài liệu.",
+        "receiptLabel": "Biên lai thanh toán",
         "receiptDocumentName": "Biên lai - {{name}} - {{date}}",
         "receiptDocumentDescription": "Biên lai thanh toán cho lượt dọn dẹp của {{name}} vào ngày {{date}}.",
         "taskTemplateData": {
@@ -3680,7 +3684,9 @@
         "proofLabel": "Bằng chứng thanh toán",
         "proofHint": "Một bằng chứng, ví dụ ảnh chụp màn hình chuyển khoản.",
         "proofDocumentName": "Bằng chứng thanh toán {{group}}: {{name}}",
-        "loadError": "Không thể tải chi phí chung."
+        "loadError": "Không thể tải chi phí chung.",
+        "moreMembers": "+{{count}} người nữa",
+        "moreMembers_one": "+{{count}} người nữa"
     },
     "wmo": {
         "0": "Trời quang",
@@ -3976,7 +3982,9 @@
         "endsAfter": "Còn {{count}} lần thanh toán",
         "logoTypeError": "Sử dụng ảnh PNG, JPEG, WebP hoặc SVG.",
         "accountUsernameLabel": "Đăng ký dưới tên",
-        "accountUsernameHint": "Địa chỉ e-mail hoặc tên đăng nhập. Đây không phải ô mật khẩu - Yuvomi không lưu mật khẩu."
+        "accountUsernameHint": "Địa chỉ e-mail hoặc tên đăng nhập. Đây không phải ô mật khẩu - Yuvomi không lưu mật khẩu.",
+        "detailAmountLabel": "Số tiền",
+        "detailNextPaymentLabel": "Khoản thanh toán tiếp theo"
     },
     "health": {
         "fasting": {

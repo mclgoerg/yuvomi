@@ -82,11 +82,11 @@
  *    Seite, die sich selbst eine baut, verspricht einen Knopf, den der Server
  *    abweist.
  *
- * 6. NAMENSKOLLISION: `renderExpenses(readOnly)` in `split-expenses.js` meint
- *    „archivierte Gruppe", nicht das Modulrecht. Wer dort das Recht
- *    einfuehrt, benennt den Parameter um (etwa `archived`) oder odert die
- *    Modulfrage ausdruecklich hinein - zwei Bedeutungen unter einem Namen
- *    sind ein Rueckfall, der beim naechsten Umbau passiert.
+ * 6. NAMENSKOLLISION: `renderExpenses(readOnly)` in `split-expenses.js` meinte
+ *    „archivierte Gruppe", nicht das Modulrecht. Seit P7 heisst der Parameter
+ *    `asList`, und der Aufrufer odert Archiv und Modulrecht ausdruecklich
+ *    hinein. Dieselbe Regel fuer jede weitere Stelle: zwei Bedeutungen unter
+ *    einem Namen sind ein Rueckfall, der beim naechsten Umbau passiert.
  *
  * 7. KATEGORIE-VERWALTER (`components/category-manager.js`): der AUFRUFER
  *    versteckt den Ausloeser mit seinem `readOnly()`, die Komponente fragt
@@ -102,7 +102,27 @@
  *    `shopping` - und umgekehrt `meals` fuer
  *    `/shopping/:listId/import-meal-plan`. Die Knoepfe fragen es noch NICHT;
  *    das ist Sache von P3/P4, und dann mit dem Pfad des ZIELS statt dem der
- *    Seite (Regel 1).
+ *    Seite (Regel 1). Das Zielrecht gilt nur fuer AUSDRUECKLICHE Uebertraege.
+ *    Was eine Aktion bloss MITerzeugt (der Check-in der Haushaltshilfe legt
+ *    Termin und Zahlungsaufgabe an), fragt kein Zielrecht, weder am Server
+ *    noch am Knopf - die Abgrenzung steht in docs/DECISIONS.md, Abschnitt 10.
+ *
+ * 9. LESEANSICHT BEI `read`, ENTSCHIEDEN (#1265): ein Datensatz oeffnet bei
+ *    `read` eine Leseansicht mit ALLEM, was der Editor zeigt - nicht den
+ *    Editor mit abgeschalteten Teilen und nicht bloss die Felder der Zeile.
+ *    Vorbild ist `openNoteReadModal()` in `notes.js` (P1, #1311). Damit gilt
+ *    Regel 2 auch fuer Felder, die NUR im Editor stehen: wer lesen darf, sieht
+ *    sie, als Zeichen statt als Eingabe. Und ein Leertext, der zu einer
+ *    Handlung einlaedt („Tippe auf + ...“), entfaellt bei `read` zusammen mit
+ *    dem Knopf, den er meint: `action: readOnly() ? null : ...` allein laesst
+ *    `hint` und `description` des Leerzustands stehen.
+ *    FUEHRT DER TIPP SCHON WOANDERSHIN, weil er nicht den Datensatz selbst
+ *    oeffnet, steht ein Wert, der sonst nur im Editor stand, bei `read` dort,
+ *    wo der Tipp landet - einen neuen Knopf nur zum Lesen gibt es nicht. Ein
+ *    Konto oeffnet den Kontoauszug, also kommt der Kreditrahmen in dessen
+ *    Kopf; eine Split-Gruppe wird per Tipp nur ausgewaehlt, also kommen
+ *    Standardwaehrung, Standardaufteilung und Mitglieder als kompakte Zeile
+ *    in den Gruppenkopf (entschieden am 21.09.2026 fuer #1352).
  */
 
 import { moduleAccess } from '/permissions.js';
