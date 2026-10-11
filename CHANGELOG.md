@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **An archived shared-expense group now refuses changes on the server too** (#1747). Until now only
+  the page was locked: an API client or a stale tab could still add, edit or delete expenses,
+  comments, settlements and recurring expenses in a group the household had put away, and the
+  hourly run kept booking its recurring expenses. Every write on an archived group is now answered
+  with 409 (`group_archived`) and changes nothing; restoring the group, reading it and deleting it
+  under the existing rules work as before. The hourly run skips an archived group without booking
+  or pausing anything, and restoring the group moves its active recurring expenses to their first
+  date from today on, so the months in between are never booked afterwards.
+- **Moving an event to another CalDAV calendar no longer leaves it in both** (#1861). A move
+  stores the event in the new calendar and then removes it from the old one. When the server
+  stored the copy but refused the removal - an old calendar that is shared read-only, or a server
+  that was briefly overloaded - Yuvomi booked the move as done and never tried again: every other
+  app on that account showed the event twice from then on, and in Yuvomi it could jump back to
+  its old calendar. The refused removal is now remembered and tried again with every sync, up to
+  five times like any other refused deletion, and until then Yuvomi shows the event once, in the
+  calendar you moved it to. After the fifth refusal Yuvomi gives up, and the event stays in both
+  calendars until you remove one copy yourself. Events that were left doubled before the update
+  are not cleaned up.
+- **Editing or deleting an entry while it is being uploaded is no longer lost or undone**
+  (#1862). Sending an entry to a CalDAV or iCloud server takes a moment, and Yuvomi booked the
+  result against the entry as it was before that moment. If you deleted a new event, task or
+  shopping item while it was being uploaded, it stayed on the server and came back with the next
+  sync. If you edited it during the upload, or edited an event while others were being uploaded
+  before it, the server kept the old text and the next sync wrote that old text back over your
+  edit. And a second edit to a task or shopping item made while the first one was on its way was
+  replaced by the first. Yuvomi now looks at the entry again after the server has answered: an
+  entry deleted in the meantime is removed from the server too, and an edit made in the meantime
+  is sent after it. Not covered yet: if you change the target calendar of an event while it is
+  being uploaded, the event stays in the calendar it was uploaded to.
+- **A CalDAV event belongs to the account that brought it** (#1860). With two or more CalDAV
+  accounts, an event was identified by its UID alone. When a second account served an event with
+  the same UID, it took over the entry of the first: title, calendar and address then came from
+  the second account, and an edit made in Yuvomi went there. An event now belongs to one account
+  and is changed, moved and deleted only through that account. The same UID in two accounts is
+  still shown once, and it belongs to the account that delivered it first; if that account is
+  removed or no longer has the event, the other account takes it on with its next sync. What to
+  know after the update:
+  - Existing events are assigned to their account automatically. With several accounts, an event
+    whose calendar is in the selection of more than one account, or of none, cannot be assigned
+    with certainty. It stays without an account, is not sent to any server, and is taken on by
+    the first account that delivers it at the next sync. A change you made to such an event
+    before the update and that had not been sent yet is not sent and is dropped after five sync
+    runs; the event then shows what the server has.
+  - With exactly one CalDAV account, all existing CalDAV events go to it, including leftovers of
+    an account that was removed earlier.
+  - A deletion that was still waiting to be sent and cannot be assigned to an account is dropped.
+    The event may come back once with the next sync; delete it again then.
+  - Two different events that happen to carry the same UID in two accounts show as one.
+  - As a sync target, Yuvomi accepts only a calendar that is switched on for that account - the
+    ones the event form offers. A new target outside that selection is rejected. A target saved
+    earlier for a calendar that has since been switched off stays as it is, but the event is no
+    longer uploaded until the calendar is switched on again; changing it to one of the offered
+    calendars works. An event that is already synchronised can only be moved to another calendar
+    of its own account.
+  - Pointing an account at a different server or a different user drops its deletions that were
+    still waiting to be sent, since they named objects on the old server.
+  - Deleting an account while keeping its events drops any edits of those events that had not
+    been sent yet.
+  - An event that belongs to no account is deleted only in Yuvomi, never at a server.
+  - Events without an account that no account delivers any more stay until you delete them.
+  - If you delete an event that a second account also keeps as its own copy, that account adds it
+    back on its next sync.
+
+## [2.76.0] - 2026-10-11
+
 ### Added
 
 - **The demo household has pocket money** (#1750). The Rewards overview of a demo database now
@@ -35,6 +102,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **"Grant bonus" is on the Rewards overview** (#1787). Giving bonus points was only possible from
+  the history tab, which is not where parents look first. They now find a "Grant bonus" button
+  in the head of the point standings, next to "Manage participants"; it opens the same dialog. The button in the history tab stays. Children and members who can only read
+  Rewards do not see it.
 - **Today's programme says which calendar an appointment comes from, and the wall when it
   ends** (#1698, from D#988). Every appointment in "Today at a glance" and on the wall carried
   the same word underneath, "Event". It now shows the name of its calendar there, so "Early"
@@ -207,18 +278,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **An archived shared-expense group now refuses changes on the server too** (#1747). Until now only
-  the page was locked: an API client or a stale tab could still add, edit or delete expenses,
-  comments, settlements and recurring expenses in a group the household had put away, and the
-  hourly run kept booking its recurring expenses. Every write on an archived group is now answered
-  with 409 (`group_archived`) and changes nothing; restoring the group, reading it and deleting it
-  under the existing rules work as before. The hourly run skips an archived group without booking
-  or pausing anything, and restoring the group moves its active recurring expenses to their first
-  date from today on, so the months in between are never booked afterwards.
+- **An event written to Google keeps its time when the Google calendar is set to another time zone**
+  (#1875). Yuvomi sent the time you typed together with the time zone of the Google calendar it
+  went into. If that calendar was set to UTC while your household lives in Amsterdam, a 14:00
+  event arrived in Google as 14:00 UTC, showed there at 16:00, and came back to Yuvomi at 16:00
+  with the next sync. The same happened to an event from Google once it was edited in Yuvomi.
+  The time now goes out in the household time zone. This applies only when the household time
+  zone is set under Settings; without it Yuvomi keeps using the time zone of the Google calendar,
+  as before. Events that were already shifted are not corrected automatically: set them to the
+  right time once, in Yuvomi or in Google.
 - **"Mark as renewed" follows the same permission as editing a subscription.** In the personal
   budget mode a subscription can only be changed or deleted by the member it belongs to. Marking
   it as renewed did not ask that question and now does: another member gets the same refusal as
   for editing, and nothing is changed. The shared budget mode is unchanged.
+- **A subscription now shows in every month of the budget it is due in** (#1844). A subscription
+  with "Include in budget" kept one expense, on its next payment date, so the budget showed it in
+  that month only. The following months now show it as an expected line that is not booked yet,
+  worked out from the subscription's cycle when the month is read. Nothing is written ahead of
+  time, and the booked expense still comes from "Mark as renewed". Expected lines count in no
+  total; the line under the summary names their number and amount, and the CSV export marks them
+  `Expected`. A tap on one leads to the Subscriptions tab. Months that are already over show none.
+  If you deleted a subscription's expense in the budget by hand, save or renew the subscription
+  to get it and the following months back.
 - **Managing budget categories shows the built-in categories in your language** (#1859, from D#1841).
   "Manage categories" in Budget listed the built-in categories and subcategories in English,
   whatever language Yuvomi ran in. They now appear in the language of the interface you are
