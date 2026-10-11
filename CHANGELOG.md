@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The demo household has pocket money** (#1750). The Rewards overview of a demo database now
+  shows the pocket money section: Emma has an account in euros with a monthly plan, three
+  credits by that plan, a birthday bonus from a parent, an approved withdrawal and one request
+  that is still open. Leo has no account, so he appears as someone a parent can set up. Only a
+  database filled by `scripts/seed-demo.js` is affected.
 - **Payment reminders can be turned off for each subscription** (#1708, from D#1226). Turn off the reminder
   in the subscription dialog while keeping the subscription active and its cost in the budget.
   Editing or renewing it keeps the reminder off. Existing subscriptions keep reminders enabled.
@@ -30,6 +35,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Today's programme says which calendar an appointment comes from, and the wall when it
+  ends** (#1698, from D#988). Every appointment in "Today at a glance" and on the wall carried
+  the same word underneath, "Event". It now shows the name of its calendar there, so "Early"
+  reads as the shift from the work calendar. An appointment that lives in Yuvomi only keeps the
+  word "Event". In wall mode the time also shows start and end ("06:00 - 14:00", or "6:00 AM -
+  2:00 PM" in the 12-hour format) instead of the start alone; all-day appointments, ones carried
+  over from yesterday and ones that run for a day or longer read as before, and on a phone-sized
+  screen the wall keeps the start alone so the title keeps its room. The line under a title is
+  now a single line in both places: a long calendar name, or any other long text there, ends in
+  an ellipsis instead of wrapping.
+- **The notes grid stops at four columns** (#1765, from D#826). The four-column step now starts at
+  1200px of grid width instead of 900px, and the fifth column is gone. A note card is never
+  narrower than 232px, where it could be 216px before, so the title and first lines of a note
+  stay readable on a wide screen. Phones and narrow windows look as they did.
 - **Rows show fewer buttons.** Lists no longer carry a pencil and a bin on every line. Editing,
   deleting and anything further sit behind one "more" button per row that is always visible and
   names what it does in words. This applies to shopping items, birthdays, tasks, loan payments
@@ -188,6 +207,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Pocket money without an account now says what it is for** (#1774). Before an admin had opened
+  an account for any child, "Pocket money" was a heading with a button and nothing below it, which
+  read like a section that failed to load. It now shows one sentence below the heading, in the same
+  list the accounts appear in later. Only admins who can open an account see it; a child without an
+  account still sees no section.
+- **Wall mode counts a shared event for everyone it is assigned to** (#1828). An event assigned to
+  two or more people added to the number of only one of them, and whoever had nothing else that day
+  was missing from the row of faces. Each assigned person now gets the event in their number. The
+  same holds for a task assigned to several people. On a phone, the row that collects several
+  overdue tasks on the overview had the same fault and now shows every person those tasks are
+  assigned to.
+- **Wall mode shows the icon you chose for an event** (#1829). Events on the wall always carried the
+  generic calendar icon, whatever was picked in the event editor. They now show their own icon, as
+  the calendar does; an event without one keeps the calendar icon.
 - **The first-run state of Waste sits in the middle of the page on a desktop** (#1771). Without a
   waste type the page showed its first-run block left of the middle with an empty column beside
   it. On a wide window it now spans the content area and is centred in it. With at least one
@@ -200,6 +233,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   affected. On a display the option now means all events; for members it works as before. The
   hint under Settings > Wall tablets now says where a tablet takes its overview from and names
   what it shows: calendar, tasks, rewards and weather.
+- **A wall tablet no longer ends up with an empty calendar or task list from "Assigned to me"** (#1808).
+  That switch is remembered per browser. If someone had turned it on while signed in on the device
+  that later became the wall tablet, the tablet kept filtering on itself and showed nothing - in
+  the calendar without any switch to turn it off again. A wall tablet now ignores the remembered
+  choice, and the task filters no longer offer the switch there. The choice itself stays stored
+  for the person who made it.
 - **A locked field looks locked.** A field you cannot change looked exactly like one you can -
   same text, same fill, same outline; only the mouse pointer gave it away, and on a phone nothing
   did. Text, number and date fields, dropdowns and text areas now all show it the same way,
@@ -357,6 +396,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   straight back could leave the wrong month on screen - whichever answer arrived last won. Each
   click now counts from the month you asked for, and a late answer for a month you already left
   is ignored. The same holds for "Current" and for swiping.
+- **Opening Settings > Calendar no longer shows "An unexpected error occurred."** When Edge or
+  Chrome filled in a saved password there, two red error messages could appear, because the
+  browser's autofill sends a key press without a key and the keyboard shortcuts did not expect
+  one. Such a key press is now ignored; the shortcuts work as before.
 
 ## [2.75.0] - 2026-10-07
 
