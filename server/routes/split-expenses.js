@@ -701,7 +701,12 @@ router.post('/groups/:id/unarchive', (req, res) => {
     // nach. Pausierte Serien bleiben, wie sie sind - Fortsetzen entscheidet.
     db.transaction(() => {
       const database = db.get();
-      database.prepare("UPDATE expense_groups SET status = 'active', archived_at = NULL WHERE id = ?").run(id);
+      const restored = database.prepare("UPDATE expense_groups SET status = 'active', archived_at = NULL WHERE id = ? AND status = 'archived'").run(id);
+      if (restored.changes !== 1) {
+        // Schon aktiv: wie vor #1747 nur der Aktivitaetseintrag, Serien bleiben.
+        activity(id, userId(req), 'group_unarchived', 'group', id);
+        return;
+      }
       const today = todayKey(database);
       let total = 0;
       const advance = database.prepare('UPDATE recurring_expenses SET next_run_date = ? WHERE id = ?');
@@ -851,6 +856,9 @@ router.post('/groups/:id/members', async (req, res) => {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
     if (!canManageGroup(groupId, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    // Vorab, vor Body-Pruefung und Hash; die Pruefung in der Transaktion bleibt.
+    const archivedEarly = archivedRefusal(groupId);
+    if (archivedEarly) return sendRefusal(res, archivedEarly);
     const vUserId = req.body.user_id ? validateId(req.body.user_id, 'user_id') : { value: null, error: null };
     const vContactId = req.body.contact_id ? validateId(req.body.contact_id, 'contact_id') : { value: null, error: null };
     if (vUserId.error || vContactId.error) return res.status(400).json({ error: vUserId.error || vContactId.error, code: 400 });
@@ -949,6 +957,9 @@ router.post('/groups/:id/guests', async (req, res) => {
     const groupId = Number(req.params.id);
     if (!requireGroupAccess(groupId, req)) return res.status(404).json({ error: 'Group not found.', code: 404 });
     if (!canManageGroup(groupId, req)) return res.status(403).json({ error: 'Not authorized.', code: 403 });
+    // Vorab, vor Body-Pruefung und Hash; die Pruefung in der Transaktion bleibt.
+    const archivedEarly = archivedRefusal(groupId);
+    if (archivedEarly) return sendRefusal(res, archivedEarly);
 
     const vDisplayName = str(req.body.display_name, 'Display name', { max: 128 });
     const vPhone = str(req.body.phone, 'Phone', { max: 100, required: false });

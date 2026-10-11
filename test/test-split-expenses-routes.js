@@ -2007,6 +2007,30 @@ test('Buchungslauf: eine archivierte Gruppe wird weder gebucht noch pausiert; Wi
   assert.equal(serienLauf('2026-07-10').generated, 0, 'kein zweiter Termin aus der Luecke');
 });
 
+test('POST /unarchive auf einer aktiven Gruppe: 200, Serien bleiben, wie sie sind', async (t) => {
+  const aktiv = await serienGruppe('Unarchive-Aktiv');
+  const serie = await serieIn(aktiv, { title: 'Rueckstand bleibt', next_run_date: '2026-03-10' });
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-06-15T12:00:00Z') });
+  const r = await call('POST', `/groups/${aktiv}/unarchive`, { actor: OWNER_ACTOR });
+  t.mock.timers.reset();
+  assert.equal(r.status, 200);
+  assert.deepEqual(serienStand(serie), { next_run_date: '2026-03-10', paused_at: null });
+  const eintrag = db.prepare("SELECT metadata FROM expense_activity WHERE group_id = ? AND type = 'group_unarchived'").get(aktiv);
+  assert.deepEqual(JSON.parse(eintrag.metadata || '{}'), {}, 'kein skipped bei einer Gruppe, die nicht archiviert war');
+});
+
+test('archivierte Gruppe: Mitglied und Gast antworten 409 noch vor der Body-Pruefung (kein 400)', async () => {
+  const { gid } = await archivGruppe('Archiv-Body');
+  await call('POST', `/groups/${gid}/archive`, { actor: OWNER_ACTOR });
+  const vorher = gruppenStand(gid);
+  for (const [name, path] of [['members', `/groups/${gid}/members`], ['guests', `/groups/${gid}/guests`]]) {
+    const r = await call('POST', path, { actor: OWNER_ACTOR, body: {} });
+    assert.equal(r.status, 409, `${name}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.reason, 'group_archived', name);
+  }
+  assert.equal(gruppenStand(gid), vorher);
+});
+
 test('teardown: Server schließen', async () => {
   await new Promise((r) => server.close(r));
 });
