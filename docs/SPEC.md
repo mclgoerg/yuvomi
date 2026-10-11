@@ -1452,6 +1452,95 @@ scheduled sync and a second scheduled tick wait for each other, and a burst of w
 pass is followed by one catch-up pass rather than one per write. It covers Google, CalDAV, iCloud
 and the CalDAV reminder lists behind Tasks and Shopping.
 
+**A refusal from the server is a failure, not a result.** The CalDAV library (tsdav) does not throw
+on every HTTP refusal: `createCalendarObject`, `updateCalendarObject` and `deleteCalendarObject`
+resolve with the raw response (`ok: false`), and `fetchCalendars` / `fetchAddressBooks` resolve with
+an empty list when the listing request itself is refused. `withHttpRefusalsAsErrors()` in
+`server/utils/caldav-client.js` turns both into an error carrying the HTTP `status`, at the one
+place every CalDAV and CardDAV client is built, so the rules above apply to refusals exactly as
+they do to network errors:
+
+- A refused **upload** leaves the event, task or shopping item local and waiting; it is never
+  marked as mirrored. An upload has no attempt limit and is tried again on every run. What bounds
+  it is a gate per run: after the first refusal that concerns the collection (anything but `400`,
+  `409`, `412`, `413`, `415`, `422`, which concern the one object) nothing more is uploaded into
+  that collection in that run, and one log line names how many entries are waiting. Without it a
+  shopping list mapped to a read-only reminder list sent every unmirrored item again on every
+  tap. An object-level refusal does not close the gate, or one entry the server never accepts
+  would lock out everything queued behind it.
+- A refused **change** or **deletion** keeps its marker (`outbound_dirty`, tombstone) and counts as
+  a failed attempt: `404`/`410` settle it (the object is gone), `400` gives up at once, everything
+  else - `403`, `412` (stale ETag; the next run reads the fresh one), `5xx`, `507` - is retried and
+  given up after five attempts.
+- A **move** whose copy is refused in the destination leaves the source untouched. `404`/`410`
+  on the copy means the *destination* is gone, not the event: only the move is dropped, a pending
+  edit still goes out in the old calendar. `412` on the copy means the name is taken in the
+  destination: if the object there carries the event's UID it is the copy of an earlier attempt,
+  the current state is written onto it and the move completes; any other object is left alone and
+  the source stays.
+- A refused **listing** aborts the run for that account. It is not read as "the account has no
+  calendars", so no calendar, reminder list or address book is disabled by it, no pending upload
+  loses its target, and a pending move waits for a run that knows the calendar list. Only the
+  listing request itself counts; a single collection refusing its `supported-report-set` lookup
+  does not fail the list. A `200` that is not a WebDAV listing (the sign-in page of a proxy in
+  front of the server) counts as a refusal too.
+- A listing that **arrives but names no collection** (a multistatus with only the home collection,
+  or one that answers every resource with `403`) is indistinguishable from an empty account at the
+  client and resolves to an empty list. The four places that read "not in the list" as "gone"
+  therefore carry the same empty guard as the prune (#508): with zero collections listed, the
+  calendar sync, the reminder sync and the immediate task upload skip the account, and the
+  CardDAV sync fails with an error on the account; nothing is disabled and no target is cleared.
+- A move's destination counts as known as soon as the **listing** names it, not only after its
+  objects were fetched: a move writes into the destination, it does not read it.
+
+Known gaps, not closed here: when the copy of a move succeeded and deleting the source is refused,
+that is logged once and not retried, so the event stays in both calendars until it is removed by
+hand. And CalDAV accounts have no `last_error` column: `POST /caldav/sync` answers `success: true`
+even when an account's listing was refused; the refusal is only in the server log (CardDAV records
+it on the account).
+
+**UIDs of uploaded objects (`server/utils/own-uid.js`).** An entry created in Yuvomi goes up under
+`yuvomi-<kind>-<id>-<installation>@yuvomi.local`, with `<kind>` one of `task`, `item`, `event` and
+`<installation>` a random 16-hex identifier generated once and kept in `sync_config`
+(`installation_id`). It travels with the database, so a restored backup is the same installation.
+The UID of a row never changes between attempts.
+
+- Before, the UID carried only the row id (`yuvomi-task-<id>@yuvomi.local`,
+  `yuvomi-item-<id>@yuvomi.local`, `oikos-<id>@oikos.local` for events). A row id is unique in one
+  database only: a second installation against the same account, or a fresh one whose ids start
+  at 1 again, produced the same name for a different entry.
+- With the installation in the name, `412` on an upload means "this is ours": the earlier PUT
+  arrived and only its answer was lost. The object is adopted - the row becomes a mirror and is
+  marked `outbound_dirty`, so the local state goes up as a change; nothing is guessed about what
+  the server holds. The UID is read from the object at exactly the refused address
+  (`findObjectWithUid`), not concluded from the file name, and the address that is stored is the
+  computed one, never one the server named. An object with a different UID under that name stays
+  untouched and the row stays local.
+- The inbound run does the same from the other side: an object whose UID names this installation
+  and a row that is still local is adopted into that row instead of being imported as a second
+  one. Both orders end in the same state.
+- **The installation identifier is a namespace, not a credential.** It is in every UID on every
+  server ever synced with, and whoever may write to a collection can build a UID in this pattern
+  with any row id. A UID from a server answer therefore only names which row *could* be meant
+  (`ownUploadRowId`). Whether the row is adopted is decided on local state alone
+  (`adoptOwnUpload`, `adoptOwnEventUpload`): the row must be unmirrored
+  (`external_source = 'local'`) and must right now be waiting for its upload to exactly this
+  account and exactly this collection - the same selection the upload itself takes its rows from
+  (a task's `target_caldav_account_id` + `target_caldav_list_url`, a shopping item's list
+  mapped to the list being fetched, an event's `target_caldav_account_id` +
+  `target_caldav_calendar_url`, for iCloud the first calendar) - and the object must lie in the
+  collection being fetched. Then the server learns nothing it would not get by PUT in the same
+  run. Everything else is an ordinary import as a new row; the named row is not touched, and
+  adopting never copies server content into it.
+- **Existing mirrors keep their UID.** Nothing is renamed on the server. Where the code only
+  *recognises* an upload of its own (default assignee, colour repair, inheriting a task series'
+  target) both patterns count; *adopting* needs the new pattern with this installation's
+  identifier, because an old-style UID may come from an earlier installation.
+
+Before this, a refused upload was stamped as mirrored and the next inbound run pruned the row as
+"deleted on the server"; a refused change was dropped and overwritten by the next inbound run; a
+refused deletion dropped its tombstone and the entry came back.
+
 ### CalDAV Reminder Selection
 Per-account reminder-list selection for CalDAV accounts. Apple Reminders lists are CalDAV
 collections whose supported components include `VTODO`, so any CalDAV server serving `VTODO`
@@ -1532,9 +1621,10 @@ response, and retried by the next sync run (at-least-once, given up after 5 atte
     Shopping would send a task out and bring it back as a shopping item.
   - The upload is the **last** step of a sync run. The prune before it removes mirrors the server
     does not list, and a task uploaded any earlier would be deleted seconds after it arrived.
-  - The UID is derived from the task id (`yuvomi-task-<id>@yuvomi.local`), not drawn at random: a
-    run that dies between the upload and the bookkeeping overwrites its own object next time
-    instead of leaving a duplicate.
+  - The UID is derived from the task id and the installation
+    (`yuvomi-task-<id>-<installation>@yuvomi.local`, see "UIDs of uploaded objects" above), not
+    drawn at random: a run that dies between the upload and the bookkeeping finds its own object
+    next time and adopts it instead of leaving a duplicate.
   - **Subtasks are excluded.** As standalone VTODOs they would stand beside their parent as equals,
     and the relation that makes them subtasks would be lost — `RELATED-TO` exists in RFC 5545 but
     the inbound does not read it, so the round trip would return them as loose tasks.
@@ -4818,6 +4908,7 @@ The surface carries four things, in this order: **the time**, large (this is whe
 - **Read state, not operate.** The program rows are text: no link, no button, no quick-action dialog. Touchable rows would need distance-sized hit targets and lead into views built for arm's length; anyone who actually wants to act is one tap from the dashboard. This also makes the single touch point of the surface unambiguous.
 - **The way out is quietly present, never hidden.** A control in the bottom-right corner sits in the DOM at all times, is reachable by keyboard, and shows only its glyph in secondary ink at rest; any pointer or key activity raises it to a full labelled capsule for six seconds (`data-wall-awake`). `Escape` leaves as well. A visible button would contradict the calm surface; an invisible one would be a trap.
 - **Night dimming, 22:00 to 06:00.** The tablet hangs in the hallway and glows at three in the morning, and the problem is luminance, not colour mode — a dark theme still glows. The dark ground is therefore *forced* (`data-theme="dark"` on the root, without touching the stored preference, which `wall-mode.js` restores from at 06:00), and the only filled surface of the page — the program list — becomes a hairline while the ink steps back one notch. Since v2.21.0 the weather gives up its colour and its movement here as well: at two metres every one of the four forecast days normally carries its own condition tone (unlike the card, where a span bar takes that job and the forecast glyphs stay secondary), but an amber sun glyph at three in the morning would be the brightest point in the hallway. Nothing is hidden: whoever walks past at 06:05 reads the same surface as at 18:00, only quieter. All states stay ≥ 4.9:1.
+- **An appointment names its calendar, and on the wall its span** (#1698). The subtitle of an appointment row of the day program is the name of the calendar it belongs to (`source_calendar_name`, else `cal_name` - the same order as the calendar module, so an appointment still waiting for its upload or its move names the calendar the person chose; CalDAV/Google calendars and ICS subscriptions alike) instead of the word "Event" - in the Today sheet of the overview and on the wall alike, it is the row's `sub`. An appointment that lives in Yuvomi only has no calendar name and keeps the word. The END is the wall's alone: there the time of a timed appointment reads start and end, both through `formatTime` ("06:00 - 14:00", "6:00 AM - 2:00 PM" in the 12-hour format); the sheet keeps the start. The wall stays with the start alone without an end that carries a time (a date-only end is no end of a span, also when it names a later day), with an end not after the start, or when the end lies a day or more after the start - measured on the household's wall clock (the end against the start's time on the following day), not in elapsed milliseconds, so the night of a clock change and the zone of the device do not move the line. "All day" and "until 12:00" read as before. On a surface narrower than a tablet (container below 520px, the wall switched on on a phone) the end is hidden: "9:30 PM - 11:30 PM" took 132 of 254px there and left the title eleven characters. No fourth line: the subtitle of EVERY row is one line and is cut with an ellipsis, on the wall and in the sheet (appointment, task, meal, dose, collection); only the state row of an empty day still wraps. The row carries the end as `wallTimeEnd` behind `timeLabel`, and only `renderWallRow` writes it.
 - **Its own cap.** Four program rows plus the timeless shopping row, not the cockpit's six: a distance row is ~88px, and six of them plus clock, section head and footer measured 892px — off the bottom of the smallest realistic wall tablet (1280×800), exit included. A wall cannot scroll. The overflow does not lie: "+N more today" counts from the same model.
 - **Who's up today** shows faces, not name lines — a face is recognised faster at two metres than a row of text — each with a counter of how much of today is theirs. It counts across the *whole* day, not the capped rows, so nobody disappears behind the cap. Cooking counts like a task (#1679): the cook of today's meal in the program is up today with it, next to whatever else is theirs, and a meal without a cook puts nobody on the list. What the items *are* stays in the program on the left (no echo). Not offered in a household of one.
 - **Self-healing instead of a retry button.** The wall error state is a distance-readable line with the clock still running beside it (the clock needs no network and proves the device is alive); the surface retries itself every 60 seconds rather than showing a button nobody at a wall will press. An empty day speaks with the same copy as the cockpit — at distance, an empty area reads as a defect.
@@ -5178,7 +5269,7 @@ Related hardening: the inbound `cancelled` delete is scoped to the reporting cal
 
 ### Notes (`/notes`)
 
-Responsive grid with colored sticky notes. Phones use one readable column; wider containers progressively use two columns from 520px, three from 720px, four from 900px, and five from 1200px. The title keeps its intrinsic width while search flexes into the remaining toolbar space, preventing clipping on narrow screens.
+Responsive grid with colored sticky notes. Phones use one readable column; wider containers progressively use two columns from 520px, three from 720px, and four from 1200px, never more, so a card stays at least 232px wide. The title keeps its intrinsic width while search flexes into the remaining toolbar space, preventing clipping on narrow screens.
 
 - CRUD: title (optional), content, color
 - **The editor is a workspace:** title and text carry no label rows (the labels stay as accessible names), and the text field has a minimum height that fills the sheet (300px or 38% of the viewport height on a phone, 400px or 45% in the wide dialog) and grows with its content where the browser supports `field-sizing`. Categories and "More settings" (colour, pin) follow below it. The formatting toolbar is the shared one (see Tasks).
@@ -5650,7 +5741,7 @@ The shape stays stable in every case — a blocked module yields an empty list, 
 - **Platform inheritance:** Subscriptions uses the application's existing household multi-user authorization, OIDC/OAuth login, SQLCipher option, backup/restore, responsive PWA shell, offline shell caching, themes, and 25-locale i18n system rather than duplicating those controls inside the tab.
 - **Shared expenses tab:** shared expense tracking within named groups (household, couple, travel, event, shopping, general). Split methods: equal, exact amounts, percentage, shares. **Split defaults (#517):** each group stores a default split method and, for percentage/shares, per-member default values; new expenses in the group open pre-filled with them (editable in the group dialog once it has at least two members) so recurring same-split expenses need no re-entry. Balances derived from an immutable double-entry ledger - amounts stored as integer minor currency units (cents) to avoid floating-point errors. **Settlements:** record payments between members; a debt-simplification algorithm produces the minimal transfer set. A recorded payment can be **reversed (#1309)** from its entry in the activity feed, which names payer, payee and amount: after a confirmation, a counter-entry restores the balances, and the payment stays in the feed marked as reversed - a state shown at every access level, while the action appears only for group owners/admins and whoever recorded it, with write access, outside the archive. Details under [Settlements](#settlements). **Recurring expenses:** daily, weekly, monthly, yearly schedule with automatic generation via hourly scheduler. **Guest accounts:** invite people outside the family as restricted users who can only access the Shared expenses module and see their invited groups. The restriction belongs to the account, not to its group membership: deleting the group leaves the guest confined and showing nothing rather than releasing it into the rest of the household, and adding a guest to a further group does not widen what it sees. A guest left without a group keeps its login and stays visible under Settings → Household → Family, where it can be deleted. **Multi-currency:** each group has a default currency; individual expenses can use any currency with historical exchange rate snapshots. **Activity feed:** per-group log of all expense, member, and settlement events; the latest 12 entries load first, "Load more" pages further through every entry (#1309, see [Expense Activity](#expense-activity)). **Receipts (#583):** an expense takes documents from the Documents module as receipts (link an existing one or upload a new file), and a settle-up records exactly one payment proof - the data model holds a single `proof_document_id` there, so the field accepts one document rather than silently dropping a second. Expenses with a receipt carry a paperclip in the list. The backend already had the columns; until now nothing in the UI filled them, and the read path handed out receipt names without checking the document's visibility. **Archive (#574):** the group list has an Active/Archived filter. An archived group stays fully readable - balances, expenses and activity feed - but every writing action is replaced by **Restore**, which returns it to the active list without a confirmation prompt (the step is lossless and reversible by archiving again). Restoring is limited to group owners/admins, like archiving. **Inside Budget (#1148)** the tab has one primary add action: Budget's generic toolbar button and FAB are switched off for it, as they already were for Reports; the tab's own FAB is the primary action and its header button steps back to a secondary one. Its heading is a section heading (`h2`) under Budget's page title rather than a second `h1`, and deleting a group uses the restrained destructive treatment.
   **The figures at the top belong to the selected group:** "You are owed" / "You owe" (the compact row on a phone, the cards on a desktop) are the viewer's own balance in that group, per currency, from the group's balances. The sum across all groups (`GET /split-expenses/dashboard`) stands in the group picker, above the list it adds up, and is hidden in the archive. "Settle up" sits in the head of the balances section; on a phone the group header then carries nothing visible and steps back (it stays in the tree), and the group's tools menu gets a second trigger in the balances row - one menu, two triggers, of which one shows per width.
-- API: `GET /api/v1/budget/categories`, `GET /api/v1/budget/categories/:key/subcategories` (optional `?lang=` localisation), `POST /api/v1/budget/categories`, `POST /api/v1/budget/categories/:key/subcategories`, `GET /api/v1/budget/stats?range=week|month|year&anchor=YYYY-MM-DD` (totals, comparison vs. previous period, per-period series, per-category breakdown), `GET /api/v1/budget/export?from=YYYY-MM-DD&to=YYYY-MM-DD` (range CSV; legacy `?month=YYYY-MM` still supported), `GET /api/v1/budget/plans?month=YYYY-MM` (planned vs. actual per category + savings goal), `PUT`/`DELETE /api/v1/budget/plans/:category`
+- API: `GET /api/v1/budget/categories`, `GET /api/v1/budget/categories/:key/subcategories` (optional `?lang=` localisation; without it, or with an unsupported value, the labels come in the household language), `POST /api/v1/budget/categories`, `POST /api/v1/budget/categories/:key/subcategories`, `GET /api/v1/budget/stats?range=week|month|year&anchor=YYYY-MM-DD` (totals, comparison vs. previous period, per-period series, per-category breakdown), `GET /api/v1/budget/export?from=YYYY-MM-DD&to=YYYY-MM-DD` (range CSV; legacy `?month=YYYY-MM` still supported), `GET /api/v1/budget/plans?month=YYYY-MM` (planned vs. actual per category + savings goal), `PUT`/`DELETE /api/v1/budget/plans/:category`
 - Loans API: `GET /api/v1/budget/loans`, `POST /api/v1/budget/loans`, `POST /api/v1/budget/loans/preview` (live interest calculation — monthly payment, term, total interest, remaining balance after the fixed period; no persistence), `GET /api/v1/budget/loans/:id`, `PUT /api/v1/budget/loans/:id`, `DELETE /api/v1/budget/loans/:id`, `GET /api/v1/budget/loans/:id/payments`, `POST /api/v1/budget/loans/:id/payments`, `DELETE /api/v1/budget/loans/:id/payments/:paymentId`
 - Subscriptions API: `/api/v1/budget/subscriptions` CRUD and analytics, plus `/meta`, `/settings`, and `/logo-search` for selectable logo candidates from a website URL or service name.
 - Split API: `/api/v1/split/*` — CRUD for groups, members, expenses, settlements, recurring expenses, and activity feed
