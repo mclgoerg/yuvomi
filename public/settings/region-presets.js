@@ -105,6 +105,16 @@ export const REGION_PRESETS = {
   'vi-VN': { currency: 'VND', date_format: 'dmy_slash', time_format: '24h' },
 };
 
+// Früherer Triple einer Region, dessen Preset sich geändert hat. Haushalte
+// speichern `region` samt Triple; ohne diese Zuordnung fiele ein bereits
+// gespeicherter Haushalt nach der Preset-Änderung auf detectRegion() zurück
+// (nl-NL → de-DE: andere Zahlen-Locale, falsche Region im Dropdown). #1847:
+// nl-NL wechselte von dmy auf dmy_dash. Der Eintrag muss bleiben, solange
+// gespeicherte Haushalte den alten Triple tragen können.
+const LEGACY_REGION_TRIPLES = {
+  'nl-NL': { currency: 'EUR', date_format: 'dmy', time_format: '24h' },
+};
+
 export const REGION_CODES = Object.keys(REGION_PRESETS);
 
 // Liefert den ersten Regions-Code, dessen Preset exakt den drei Werten
@@ -133,16 +143,15 @@ export function detectRegion({ currency, date_format, time_format } = {}) {
 // oder ihr Preset nicht mehr zu den aktuellen Werten passt (z. B. nach manueller
 // Formatänderung).
 export function resolveRegion({ region, currency, date_format, time_format } = {}) {
-  const preset = region ? REGION_PRESETS[region] : undefined;
-  if (
-    preset
-    && preset.currency === currency
-    && preset.date_format === date_format
-    && preset.time_format === time_format
-  ) {
+  const values = { currency, date_format, time_format };
+  const matches = (triple) => Boolean(triple)
+    && triple.currency === values.currency
+    && triple.date_format === values.date_format
+    && triple.time_format === values.time_format;
+  if (region && (matches(REGION_PRESETS[region]) || matches(LEGACY_REGION_TRIPLES[region]))) {
     return region;
   }
-  return detectRegion({ currency, date_format, time_format });
+  return detectRegion(values);
 }
 
 // Liefert den BCP-47-Locale-Tag für die Zahlen-/Währungsformatierung

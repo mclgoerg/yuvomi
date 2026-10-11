@@ -803,3 +803,25 @@ test('Netherlands preset writes day-month-year with dashes and no longer collide
   // Der Server schreibt das Datum in gespeicherten Beschreibungen genauso.
   assert.equal(formatDateKey('2026-03-05', REGION_PRESETS['nl-NL'].date_format), '05-03-2026');
 });
+
+// #1847: Haushalte, die nl-NL vor der Aenderung gewaehlt haben, tragen
+// EUR/dmy/24h. Ohne die Altzuordnung fielen sie auf de-DE zurueck.
+test('a stored nl-NL household with the former dmy triple keeps its region and number locale (#1847)', () => {
+  const former = { region: 'nl-NL', currency: 'EUR', date_format: 'dmy', time_format: '24h' };
+  assert.equal(resolveRegion(former), 'nl-NL');
+  assert.equal(numberLocaleFor(former), 'nl-NL');
+  const fmt = (locale) => new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(-1234.5);
+  assert.equal(fmt(numberLocaleFor(former)), fmt('nl-NL'));
+  assert.notEqual(fmt(numberLocaleFor(former)), fmt('de-DE'));
+
+  // Das neue Tripel loest weiterhin nach nl-NL auf.
+  assert.equal(resolveRegion({ region: 'nl-NL', ...REGION_PRESETS['nl-NL'] }), 'nl-NL');
+  assert.equal(numberLocaleFor({ region: 'nl-NL', ...REGION_PRESETS['nl-NL'] }), 'nl-NL');
+
+  // Ein fremdes Tripel faellt wie bisher auf die Erkennung zurueck, und die
+  // Altzuordnung gilt nur fuer nl-NL.
+  const unrelated = { region: 'nl-NL', currency: 'EUR', date_format: 'mdy', time_format: '12h' };
+  assert.equal(resolveRegion(unrelated), detectRegion(unrelated));
+  assert.equal(resolveRegion({ ...former, region: 'de-AT' }), 'de-AT');
+  assert.equal(resolveRegion({ ...former, region: undefined }), 'de-DE');
+});
